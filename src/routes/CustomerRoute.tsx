@@ -3,6 +3,7 @@ import { useCustomersStore } from '@/store/customers.store'
 import { CustomerTabs, type CustomerTab } from '@/components/customer/CustomerTabs'
 import { WorkflowPane } from '@/components/workflow/WorkflowPane'
 import { DashboardPane } from '@/components/kpis/DashboardPane'
+import { ZeitPane } from '@/components/time/ZeitPane'
 
 interface Props {
   customerId: string
@@ -36,7 +37,7 @@ export function CustomerRoute({ customerId }: Props) {
           <DashboardPane customerId={customerId} />
         )}
         {activeTab === 'zeit' && (
-          <p className="text-sm text-[var(--text2)]">Zeit — Phase 2.4</p>
+          <ZeitPane customerId={customerId} />
         )}
         {activeTab === 'ablage' && (
           <p className="text-sm text-[var(--text2)]">Ablage — Phase 2.6</p>
