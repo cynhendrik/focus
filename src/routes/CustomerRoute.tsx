@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCustomersStore } from '@/store/customers.store'
 import { CustomerTabs, type CustomerTab } from '@/components/customer/CustomerTabs'
+import { WorkflowPane } from '@/components/workflow/WorkflowPane'
 
 interface Props {
   customerId: string
@@ -28,7 +29,7 @@ export function CustomerRoute({ customerId }: Props) {
 
       <div className="flex-1 overflow-auto p-6">
         {activeTab === 'workflow' && (
-          <p className="text-sm text-[var(--text2)]">Workflow — Phase 2.2</p>
+          <WorkflowPane customerId={customerId} />
         )}
         {activeTab === 'dashboard' && (
           <p className="text-sm text-[var(--text2)]">Dashboard — Phase 2.3</p>
