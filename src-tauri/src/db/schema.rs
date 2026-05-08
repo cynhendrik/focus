@@ -106,7 +106,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         CREATE TABLE IF NOT EXISTS files (
             id          TEXT PRIMARY KEY,
             customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-            folder_id   TEXT REFERENCES folders(id),
+            folder_id   TEXT REFERENCES folders(id) ON DELETE CASCADE,
             name        TEXT NOT NULL,
             path        TEXT NOT NULL,
             size        INTEGER,

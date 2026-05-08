@@ -5,6 +5,7 @@ import { WorkflowPane } from '@/components/workflow/WorkflowPane'
 import { DashboardPane } from '@/components/kpis/DashboardPane'
 import { ZeitPane } from '@/components/time/ZeitPane'
 import { KommunikationPane } from '@/components/chat/KommunikationPane'
+import { AblagePane } from '@/components/ablage/AblagePane'
 
 interface Props {
   customerId: string
@@ -41,7 +42,7 @@ export function CustomerRoute({ customerId }: Props) {
           <ZeitPane customerId={customerId} />
         )}
         {activeTab === 'ablage' && (
-          <p className="text-sm text-[var(--text2)]">Ablage — Phase 2.6</p>
+          <AblagePane customerId={customerId} />
         )}
         {activeTab === 'kommunikation' && (
           <KommunikationPane customerId={customerId} />
