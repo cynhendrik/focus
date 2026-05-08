@@ -4,6 +4,7 @@ import { CustomerTabs, type CustomerTab } from '@/components/customer/CustomerTa
 import { WorkflowPane } from '@/components/workflow/WorkflowPane'
 import { DashboardPane } from '@/components/kpis/DashboardPane'
 import { ZeitPane } from '@/components/time/ZeitPane'
+import { KommunikationPane } from '@/components/chat/KommunikationPane'
 
 interface Props {
   customerId: string
@@ -43,7 +44,7 @@ export function CustomerRoute({ customerId }: Props) {
           <p className="text-sm text-[var(--text2)]">Ablage — Phase 2.6</p>
         )}
         {activeTab === 'kommunikation' && (
-          <p className="text-sm text-[var(--text2)]">Kommunikation — Phase 2.5</p>
+          <KommunikationPane customerId={customerId} />
         )}
       </div>
     </div>
