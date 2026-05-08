@@ -4,3 +4,4 @@ pub mod migrations;
 pub mod customer;
 pub mod todo;
 pub mod note;
+pub mod kpi;

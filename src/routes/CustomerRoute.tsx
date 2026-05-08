@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useCustomersStore } from '@/store/customers.store'
 import { CustomerTabs, type CustomerTab } from '@/components/customer/CustomerTabs'
 import { WorkflowPane } from '@/components/workflow/WorkflowPane'
+import { DashboardPane } from '@/components/kpis/DashboardPane'
 
 interface Props {
   customerId: string
@@ -32,7 +33,7 @@ export function CustomerRoute({ customerId }: Props) {
           <WorkflowPane customerId={customerId} />
         )}
         {activeTab === 'dashboard' && (
-          <p className="text-sm text-[var(--text2)]">Dashboard — Phase 2.3</p>
+          <DashboardPane customerId={customerId} />
         )}
         {activeTab === 'zeit' && (
           <p className="text-sm text-[var(--text2)]">Zeit — Phase 2.4</p>
