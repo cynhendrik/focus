@@ -1,0 +1,293 @@
+use futures_util::StreamExt as FuturesStreamExt;
+use native_tls::TlsConnector as NativeTlsConnector;
+use tokio_native_tls::TlsConnector;
+use mailparse::{parse_mail, MailHeaderMap};
+use uuid::Uuid;
+use chrono::Utc;
+
+use crate::email::types::{CustomerRef, SyncProgress};
+use crate::email::db::EmailRow;
+
+// ── TLS helpers ───────────────────────────────────────────────────────────────
+
+type TlsStream = tokio_native_tls::TlsStream<tokio::net::TcpStream>;
+
+async fn tls_connect(host: &str, port: u16) -> Result<TlsStream, String> {
+    let tcp = tokio::net::TcpStream::connect((host, port))
+        .await
+        .map_err(|e| format!("TCP-Verbindung zu {}:{} fehlgeschlagen: {}", host, port, e))?;
+
+    let connector = NativeTlsConnector::builder()
+        .build()
+        .map_err(|e| format!("TLS-Builder-Fehler: {}", e))?;
+    let tls = TlsConnector::from(connector);
+    tls.connect(host, tcp)
+        .await
+        .map_err(|e| format!("TLS-Handshake fehlgeschlagen ({}): {}", host, e))
+}
+
+// ── Connection test ───────────────────────────────────────────────────────────
+
+pub async fn test_connection(email: &str, password: &str, host: &str, port: u16) -> Result<(), String> {
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email, password)
+        .await
+        .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
+    let _ = session.logout().await;
+    Ok(())
+}
+
+// ── MIME parsing ──────────────────────────────────────────────────────────────
+
+fn extract_bodies(raw: &[u8]) -> (String, String) {
+    let Ok(parsed) = parse_mail(raw) else { return (String::new(), String::new()) };
+    extract_from_part(&parsed)
+}
+
+fn extract_from_part(part: &mailparse::ParsedMail) -> (String, String) {
+    let ct = part.ctype.mimetype.to_lowercase();
+    if part.subparts.is_empty() {
+        let body = part.get_body().unwrap_or_default();
+        return match ct.as_str() {
+            "text/plain" => (body, String::new()),
+            "text/html"  => (String::new(), body),
+            _            => (String::new(), String::new()),
+        };
+    }
+    let mut text = String::new();
+    let mut html = String::new();
+    for sub in &part.subparts {
+        let (t, h) = extract_from_part(sub);
+        if text.is_empty() { text = t; }
+        if html.is_empty() { html = h; }
+    }
+    (text, html)
+}
+
+fn parse_addr(raw: &str) -> (String, String) {
+    if let (Some(s), Some(e)) = (raw.find('<'), raw.find('>')) {
+        let addr = raw[s + 1..e].trim().to_string();
+        let name = raw[..s].trim().trim_matches('"').to_string();
+        return (name, addr);
+    }
+    (String::new(), raw.trim().to_string())
+}
+
+fn parse_to_addrs(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(|s| parse_addr(s.trim()).1)
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+// ── Auto-customer matching ────────────────────────────────────────────────────
+
+fn match_customer(from_addr: &str, customers: &[CustomerRef]) -> Option<String> {
+    let from_lower = from_addr.to_lowercase();
+    // Exact match
+    if let Some(c) = customers.iter().find(|c| {
+        c.email.as_deref().map(|e| e.to_lowercase()) == Some(from_lower.clone())
+    }) {
+        return Some(c.id.clone());
+    }
+    // Domain match
+    let domain = from_addr.split('@').nth(1)?.to_lowercase();
+    customers.iter().find(|c| {
+        c.email.as_deref()
+            .and_then(|e| e.split('@').nth(1))
+            .map(|d| d.to_lowercase() == domain)
+            .unwrap_or(false)
+    }).map(|c| c.id.clone())
+}
+
+// ── Sent folder detection ─────────────────────────────────────────────────────
+
+const SENT_CANDIDATES: &[&str] = &[
+    "Sent", "Sent Items", "Sent Messages", "Gesendet",
+    "[Gmail]/Sent Mail", "INBOX.Sent", "Sent Mail",
+];
+
+async fn find_sent_folder(session: &mut async_imap::Session<TlsStream>) -> String {
+    if let Ok(stream) = session.list(Some(""), Some("*")).await {
+        let mailboxes: Vec<_> = stream
+            .filter_map(|r| async move { r.ok() })
+            .collect::<Vec<_>>()
+            .await;
+
+        // Prefer \Sent special-use flag (RFC 6154)
+        for mailbox in &mailboxes {
+            for attr in mailbox.attributes() {
+                if format!("{:?}", attr).contains("Sent") {
+                    return mailbox.name().to_string();
+                }
+            }
+        }
+        // Fallback: match by name
+        for candidate in SENT_CANDIDATES {
+            if mailboxes.iter().any(|m| m.name().eq_ignore_ascii_case(candidate)) {
+                return candidate.to_string();
+            }
+        }
+    }
+    "Sent".to_string()
+}
+
+// ── Sync ──────────────────────────────────────────────────────────────────────
+
+pub struct SyncOutput {
+    pub rows: Vec<EmailRow>,
+    pub max_uid: u32,
+    pub inserted_count: usize,
+}
+
+pub async fn sync_account<F>(
+    email: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    account_id: &str,
+    last_uid: u32,
+    customers: &[CustomerRef],
+    mut on_progress: F,
+) -> Result<SyncOutput, String>
+where
+    F: FnMut(SyncProgress),
+{
+    on_progress(SyncProgress {
+        folder: "INBOX".into(), done: 0, total: 0, phase: "connecting".into(),
+    });
+
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email, password)
+        .await
+        .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
+
+    let sent_folder = find_sent_folder(&mut session).await;
+
+    let folders = vec![
+        ("INBOX".to_string(), "INBOX".to_string()),
+        (sent_folder, "Sent".to_string()),
+    ];
+
+    let mut all_rows: Vec<EmailRow> = Vec::new();
+    let mut max_uid: u32 = last_uid;
+
+    for (server_folder, normalized_folder) in folders {
+        let mailbox = match session.select(&server_folder).await {
+            Ok(m) => m,
+            Err(_) => continue, // skip inaccessible folders
+        };
+
+        let total_msgs = mailbox.exists as usize;
+        on_progress(SyncProgress {
+            folder: normalized_folder.clone(),
+            done: 0,
+            total: total_msgs,
+            phase: "scanning".into(),
+        });
+
+        let uid_set = match session.uid_search("ALL").await {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let mut uids: Vec<u32> = uid_set
+            .into_iter()
+            .filter(|&uid| uid > last_uid)
+            .collect();
+        uids.sort_unstable();
+
+        let total = uids.len();
+        let mut done = 0usize;
+
+        for chunk in uids.chunks(50) {
+            let uid_str: String = chunk.iter()
+                .map(|u| u.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+
+            on_progress(SyncProgress {
+                folder: normalized_folder.clone(),
+                done,
+                total,
+                phase: "fetching".into(),
+            });
+
+            let fetch_stream = match session.uid_fetch(&uid_str, "(RFC822 FLAGS UID)").await {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let fetches: Vec<_> = fetch_stream
+                .filter_map(|r| async move { r.ok() })
+                .collect::<Vec<_>>()
+                .await;
+
+            for fetch in &fetches {
+                let uid = match fetch.uid {
+                    Some(u) => u,
+                    None => continue,
+                };
+                if uid > max_uid { max_uid = uid; }
+
+                let body_bytes = match fetch.body() {
+                    Some(b) => b,
+                    None => continue,
+                };
+
+                let is_read = fetch.flags().any(|f| matches!(f, async_imap::types::Flag::Seen));
+
+                let Ok(parsed) = parse_mail(body_bytes) else { continue };
+                let subject  = parsed.headers.get_first_value("Subject").unwrap_or_default();
+                let from_raw = parsed.headers.get_first_value("From").unwrap_or_default();
+                let to_raw   = parsed.headers.get_first_value("To").unwrap_or_default();
+                let date_raw = parsed.headers.get_first_value("Date").unwrap_or_default();
+                let msg_id   = parsed.headers.get_first_value("Message-ID").unwrap_or_default();
+
+                let (from_name, from_addr) = parse_addr(&from_raw);
+                let to_addrs = parse_to_addrs(&to_raw);
+                let to_addrs_json = serde_json::to_string(&to_addrs).unwrap_or_else(|_| "[]".into());
+
+                let sent_at = chrono::DateTime::parse_from_rfc2822(&date_raw)
+                    .map(|d| d.to_rfc3339())
+                    .unwrap_or_else(|_| Utc::now().to_rfc3339());
+
+                let (body_text, body_html) = extract_bodies(body_bytes);
+                let customer_id = match_customer(&from_addr, customers);
+
+                all_rows.push(EmailRow {
+                    id: Uuid::new_v4().to_string(),
+                    account_id: account_id.to_string(),
+                    uid,
+                    folder: normalized_folder.clone(),
+                    message_id: msg_id,
+                    subject,
+                    from_addr,
+                    from_name,
+                    to_addrs_json,
+                    body_text,
+                    body_html,
+                    sent_at,
+                    is_read,
+                    customer_id,
+                });
+
+                done += 1;
+            }
+
+            on_progress(SyncProgress {
+                folder: normalized_folder.clone(),
+                done,
+                total,
+                phase: "fetching".into(),
+            });
+        }
+    }
+
+    let _ = session.logout().await;
+    let count = all_rows.len();
+    Ok(SyncOutput { rows: all_rows, max_uid, inserted_count: count })
+}

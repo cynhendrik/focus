@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const pkg = require\\('./node_modules/@testing-library/jest-dom/package.json'\\); console.log\\('exports:', JSON.stringify\\(pkg.exports ? Object.keys\\(pkg.exports\\) : 'none'\\)\\); console.log\\('main:', pkg.main\\); console.log\\('module:', pkg.module\\);\")",
+      "Bash(npm ls *)",
+      "Bash(node_modules/.bin/vitest --version)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\(p.version\\)\")",
+      "Bash(node *)",
+      "Bash(Get-ChildItem *)",
+      "Bash(npm run *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx vitest *)",
+      "Bash(npm test *)",
+      "Bash(git commit *)",
+      "Bash(grep -E \"\\\\.\\(js|jsx|ts|tsx\\)$\")",
+      "Bash(git merge *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :1420)",
+      "Bash(taskkill *)",
+      "Bash(npx vite *)",
+      "Bash(cargo check *)",
+      "Bash(npm install *)",
+      "Bash(git rm *)",
+      "Bash(cargo test *)",
+      "Bash(git mv *)",
+      "Bash(git remote *)",
+      "Bash(git push *)"
+    ]
+  }
+}

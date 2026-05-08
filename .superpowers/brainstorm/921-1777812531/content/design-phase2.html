@@ -1,0 +1,82 @@
+<h2>Design — Phase 2: Dashboard + Editor-Upgrade</h2>
+<p class="subtitle">Skeleton durch echte Daten ersetzen + Markdown-Parser modernisieren</p>
+
+<div class="section">
+  <h3>Dashboard — echte KPI-Karten</h3>
+  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-top:10px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div style="background:rgba(120,0,26,0.15);border:1px solid rgba(120,0,26,0.3);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#FF6B82">12</div>
+        <div style="font-size:10px;opacity:.6;margin-top:2px">Offene Todos</div>
+      </div>
+      <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#60A5FA">5</div>
+        <div style="font-size:10px;opacity:.6;margin-top:2px">Aktive Kunden</div>
+      </div>
+      <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#F59E0B">3</div>
+        <div style="font-size:10px;opacity:.6;margin-top:2px">Fällig heute</div>
+      </div>
+      <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#22C55E">28</div>
+        <div style="font-size:10px;opacity:.6;margin-top:2px">Notizen gesamt</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px">
+        <div style="font-size:11px;font-weight:600;margin-bottom:8px;opacity:.7">LETZTE AKTIVITÄTEN</div>
+        <div style="font-size:11px;line-height:2;opacity:.6">
+          📝 Notiz bei Müller GmbH · vor 2h<br>
+          ✓ Todo erledigt: Tech AG · vor 5h<br>
+          📎 Datei hochgeladen · gestern<br>
+          👤 Neuer Kunde: Weber KG · vor 2d
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:10px">
+        <div style="font-size:11px;font-weight:600;margin-bottom:8px;opacity:.7">HIGH PRIORITY TODOS</div>
+        <div style="font-size:11px;line-height:2;opacity:.6">
+          🔴 Angebot senden · Müller GmbH<br>
+          🔴 Call zurückrufen · Tech AG<br>
+          🟡 KPI-Report erstellen · Weber<br>
+          🟡 Rechnung prüfen · Bauer Ltd
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:12px;opacity:.6;margin-top:8px;line-height:1.6">
+    Alle Daten kommen direkt aus dem bestehenden Store — keine neue Backend-Logik nötig. KPI-Karten aggregieren <code>todos</code>, <code>notes</code>, <code>customers</code> mit einfachen Array-Operationen.
+  </div>
+</div>
+
+<div class="section">
+  <h3>Editor-Upgrade: remark-gfm aktivieren</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+    <div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#EF4444;margin-bottom:6px">HEUTE — Custom Regex-Parser</div>
+      <div style="font-size:12px;line-height:1.7;opacity:.8">
+        ✗ Keine Tabellen<br>
+        ✗ Keine verschachtelten Listen<br>
+        ✗ Kein Syntax-Highlighting<br>
+        ✗ Kein Strikethrough (~~text~~)<br>
+        ✗ Edge-Cases mit Sonderzeichen<br>
+        ✓ Schnell (kein npm-Overhead)
+      </div>
+    </div>
+    <div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.15);border-radius:8px;padding:12px">
+      <div style="font-size:11px;font-weight:700;color:#22C55E;margin-bottom:6px">NEU — react-markdown + remark-gfm</div>
+      <div style="font-size:12px;line-height:1.7;opacity:.8">
+        ✓ Tabellen (GFM-Spec)<br>
+        ✓ Verschachtelte Listen<br>
+        ✓ react-syntax-highlighter (Code)<br>
+        ✓ Strikethrough, Checkboxen<br>
+        ✓ Bereits im package.json!<br>
+        ✓ Custom-CSS für Cynera-Theme
+      </div>
+    </div>
+  </div>
+  <div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.15);border-radius:8px;padding:12px;margin-top:10px;font-size:12px;line-height:1.6">
+    <strong>Migration:</strong> <code>react-markdown</code> + <code>remark-gfm</code> sind bereits installiert — nur ungenutzt. Der Custom-Renderer in <code>NotesPane.jsx</code> wird ersetzt. Bestehende Notizen bleiben unverändert (Markdown ist Markdown).
+  </div>
+</div>
+
+<p style="margin-top:20px;font-size:12px;opacity:.5;text-align:center">Passt Phase 2 so? → Antwort im Terminal</p>

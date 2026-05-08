@@ -1,0 +1,40 @@
+[package]
+name = "focus"
+version = "2.0.0"
+description = "Focus — Business Management Desktop App"
+authors = ["Cynera"]
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde        = { version = "1",    features = ["derive"] }
+serde_json   = "1"
+thiserror    = "1"
+tracing      = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# ── HTTP / Streaming ──────────────────────────────────────────────────────────
+reqwest      = { version = "0.11", features = ["json", "stream"] }
+futures-util = "0.3"
+
+# ── SQLite ────────────────────────────────────────────────────────────────────
+rusqlite     = { version = "0.31", features = ["bundled"] }
+
+# ── Email ────────────────────────────────────────────────────────────────────
+async-imap       = { version = "0.9", default-features = false, features = ["runtime-tokio"] }
+tokio            = { version = "1",   features = ["full"] }
+tokio-native-tls = "0.3"
+native-tls       = "0.2"
+mailparse        = "0.14"
+keyring          = "2"
+
+# ── Utils ────────────────────────────────────────────────────────────────────
+uuid             = { version = "1", features = ["v4"] }
+chrono           = { version = "0.4", features = ["serde"] }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

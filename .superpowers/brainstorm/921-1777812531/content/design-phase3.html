@@ -1,0 +1,91 @@
+<h2>Design — Phase 3: Persönlicher Workspace</h2>
+<p class="subtitle">Eigene Notizen & Todos ohne Kundenbezug — direkt in der Sidebar</p>
+
+<div class="section">
+  <h3>Sidebar — neue Struktur</h3>
+  <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;margin-top:10px;align-items:start">
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;font-size:12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.1em;opacity:.4;margin-bottom:8px">CYNERA</div>
+      <div style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:5px;background:rgba(255,255,255,0.04);margin-bottom:4px">
+        <span>🔍</span> <span style="opacity:.5">Suchen...</span>
+      </div>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;opacity:.35;margin:12px 0 6px">KUNDEN</div>
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px">
+        <div style="padding:5px 6px;border-radius:5px;background:rgba(120,0,26,0.2);border:1px solid rgba(120,0,26,0.3);display:flex;align-items:center;gap:6px">
+          <span style="width:20px;height:20px;background:linear-gradient(135deg,#78001A,#FF6B82);border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">M</span>
+          <span>Müller GmbH</span>
+        </div>
+        <div style="padding:5px 6px;border-radius:5px;opacity:.6;display:flex;align-items:center;gap:6px">
+          <span style="width:20px;height:20px;background:linear-gradient(135deg,#1A4578,#6B82FF);border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">T</span>
+          <span>Tech AG</span>
+        </div>
+        <div style="padding:5px 6px;border-radius:5px;opacity:.6;display:flex;align-items:center;gap:6px">
+          <span style="width:20px;height:20px;background:linear-gradient(135deg,#145A14,#6BFF82);border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">W</span>
+          <span>Weber KG</span>
+        </div>
+      </div>
+      <div style="padding:5px 6px;border-radius:5px;opacity:.4;font-size:11px;text-align:center;border:1px dashed rgba(255,255,255,0.1);margin-top:4px">+ Neuer Kunde</div>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.06);margin:12px 0"></div>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;opacity:.35;margin-bottom:6px">WORKSPACE</div>
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="padding:5px 8px;border-radius:5px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);display:flex;align-items:center;gap:6px;font-size:12px">
+          <span>📓</span> Meine Notizen <span style="margin-left:auto;font-size:10px;background:rgba(59,130,246,0.2);border-radius:3px;padding:0 4px;color:#60A5FA">4</span>
+        </div>
+        <div style="padding:5px 8px;border-radius:5px;display:flex;align-items:center;gap:6px;font-size:12px;opacity:.65">
+          <span>✓</span> Meine Todos <span style="margin-left:auto;font-size:10px;background:rgba(245,158,11,0.15);border-radius:3px;padding:0 4px;color:#F59E0B">2</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;line-height:1.8">
+      <div style="margin-bottom:12px">
+        <strong>Was sich ändert:</strong>
+        <ul style="margin:6px 0 0 16px;opacity:.8">
+          <li>Sidebar bekommt eine horizontale Trennlinie zwischen Kunden und Workspace</li>
+          <li>"Meine Notizen" öffnet denselben NotesPane — aber <code>customerId = null</code></li>
+          <li>"Meine Todos" öffnet denselben TodoPane — aber <code>customerId = null</code></li>
+          <li>Badge zeigt offene/ungelesene Einträge</li>
+        </ul>
+      </div>
+      <div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.15);border-radius:8px;padding:10px">
+        <strong style="color:#22C55E">Kein Datenmodell-Umbau nötig:</strong><br>
+        <span style="opacity:.8">Todos und Notizen haben bereits ein <code>customerId</code>-Feld. <code>null</code> = persönlich. Keine Migration, kein neues Schema.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Workspace-Ansicht (Hauptbereich rechts)</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px">
+      <div style="font-size:11px;font-weight:700;opacity:.5;margin-bottom:8px">MEINE NOTIZEN — View</div>
+      <div style="font-size:12px;line-height:1.7;opacity:.8">
+        Identisch mit NotesPane (Notizliste links, Editor rechts)<br><br>
+        <strong>Unterschied:</strong> Kein Kunden-Kontext im TopBar. Stattdessen: "Persönlicher Workspace" als Header.<br><br>
+        Notizen können per <code>[[Kundenname]]</code>-Link (Phase 4) mit Kunden verknüpft werden.
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px">
+      <div style="font-size:11px;font-weight:700;opacity:.5;margin-bottom:8px">MEINE TODOS — View</div>
+      <div style="font-size:12px;line-height:1.7;opacity:.8">
+        Identisch mit TodoPane (Filter, Prioritäten, Fälligkeitsdaten)<br><br>
+        <strong>Unterschied:</strong> Kein Kunden-Dropdown. Todos erscheinen NICHT im PrioritySideboard (das ist für Kunden-Todos).<br><br>
+        Optional: eigenes "Fokus"-Sideboard für persönliche High-Priority.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>⌘K Palette — Erweiterung</h3>
+  <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:12px;font-size:12px;line-height:1.7">
+    Neue Sektion "Workspace" in der Command Palette:<br>
+    <span style="opacity:.7">→ Neue persönliche Notiz · Neues persönliches Todo · Zu Meine Notizen · Zu Meine Todos</span>
+  </div>
+</div>
+
+<p style="margin-top:20px;font-size:12px;opacity:.5;text-align:center">Passt Phase 3 so? → Antwort im Terminal</p>

@@ -1,0 +1,53 @@
+<h2>Navigation — wie kommt der persönliche Workspace rein?</h2>
+<p class="subtitle">Aktuell: Sidebar zeigt nur Kundenliste. Wo lebt der persönliche Bereich?</p>
+
+<div class="options">
+  <div class="option" data-choice="toggle" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Toggle oben in der Sidebar</h3>
+      <p>Zwei Modes: <strong>Kunden</strong> | <strong>Workspace</strong>. Klick wechselt die gesamte Sidebar. Klar getrennt, einfach zu verstehen.</p>
+      <div style="margin-top:12px;background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8">
+        <div style="display:flex;gap:4px;margin-bottom:8px">
+          <span style="background:rgba(120,0,26,0.4);border-radius:4px;padding:2px 8px;color:#FF6B82">● Kunden</span>
+          <span style="background:rgba(255,255,255,0.06);border-radius:4px;padding:2px 8px;opacity:.5">○ Workspace</span>
+        </div>
+        <div style="opacity:.6">→ Sidebar wechselt komplett</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="section" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Eigene Section in der Sidebar</h3>
+      <p>Sidebar hat zwei feste Bereiche: oben Kunden, unten "Mein Workspace" mit eigenen Notizen & Todos. Alles gleichzeitig sichtbar.</p>
+      <div style="margin-top:12px;background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8">
+        <div style="opacity:.5;margin-bottom:4px">── KUNDEN ──</div>
+        <div style="opacity:.8">• Müller GmbH</div>
+        <div style="opacity:.8">• Tech AG</div>
+        <div style="opacity:.5;margin:6px 0 4px">── WORKSPACE ──</div>
+        <div style="opacity:.8">📓 Meine Notizen</div>
+        <div style="opacity:.8">✓ Meine Todos</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="topnav" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Globale Top-Navigation</h3>
+      <p>Icons/Tabs ganz oben (oder links als schmale Icon-Rail): CRM | Workspace | Einstellungen. Wie Linear oder Notion's Sidebar-Gruppen.</p>
+      <div style="margin-top:12px;background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;line-height:1.8">
+        <div style="display:flex;gap:12px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px">
+          <span style="color:#FF6B82">👥 CRM</span>
+          <span style="opacity:.5">📓 Workspace</span>
+          <span style="opacity:.5">⚙️ Settings</span>
+        </div>
+        <div style="opacity:.6">→ Sidebar-Inhalt wechselt je nach Tab</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:16px;font-size:12px;opacity:.5;text-align:center">Klicke eine Option und/oder antworte im Terminal</p>

@@ -1,0 +1,73 @@
+<h2>Cynera — App-Analyse</h2>
+<p class="subtitle">Was aktuell drin ist, was fehlt, und wo Tech Debt steckt</p>
+
+<div class="section">
+  <h3>Was gut funktioniert ✓</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#22c55e;margin-bottom:6px">NOTES</div>
+      <div style="font-size:13px;line-height:1.6">Markdown-Editor mit Auto-Save, Tags, Preview-Toggle. Custom Renderer statt react-markdown — schnell, aber limitiert.</div>
+    </div>
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#22c55e;margin-bottom:6px">TODOS</div>
+      <div style="font-size:13px;line-height:1.6">Prioritäten (low/mid/high), Fälligkeitsdaten, Filter, High-Priority-Sideboard. Solide Grundlage.</div>
+    </div>
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#22c55e;margin-bottom:6px">ABLAGE</div>
+      <div style="font-size:13px;line-height:1.6">Grid/List-View, Drag & Drop Upload, hierarchische Ordner, Dateivorschau. Komplex & gut umgesetzt.</div>
+    </div>
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#22c55e;margin-bottom:6px">UX / DESIGN</div>
+      <div style="font-size:13px;line-height:1.6">⌘K-Palette, Dark Mode, Framer Motion Animationen, konsistentes Designsystem mit Cynera Purple.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Kritische Lücken 🔴</h3>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+    <div style="display:flex;align-items:flex-start;gap:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:18px;flex-shrink:0">💾</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Dateien in localStorage — Zeitbombe</div>
+        <div style="font-size:12px;opacity:.7;line-height:1.5">Base64-kodierte Dateien im localStorage. Limit ~5–10 MB. Schon 2–3 PDFs = App crasht. Tauri Filesystem API oder IndexedDB nötig.</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:18px;flex-shrink:0">📊</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Dashboard = nur Skeleton</div>
+        <div style="font-size:12px;opacity:.7;line-height:1.5">DashboardPane zeigt nur Shimmer-Placeholder. Keine echten KPI-Karten, keine Charts, keine Aktivitäten.</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:18px;flex-shrink:0">↩️</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Kein Undo/Redo</div>
+        <div style="font-size:12px;opacity:.7;line-height:1.5">Gelöschte Notizen, Todos, KPIs sind weg. Nur Bestätigungs-Modals als Schutz.</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px">
+      <div style="font-size:18px;flex-shrink:0">📝</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">Markdown-Parser zu simpel</div>
+        <div style="font-size:12px;opacity:.7;line-height:1.5">Kein Syntax-Highlighting, keine Tabellen, keine verschachtelten Listen. remark-gfm ist installiert aber ungenutzt.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Store Performance — Status</h3>
+  <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:14px;margin-top:10px">
+    <div style="font-size:13px;line-height:1.7">
+      Der Zustand liegt in <strong>einem einzigen Zustand-Objekt</strong> mit localStorage-Persistenz.
+      Bei jedem State-Update wird das <em>gesamte</em> Objekt serialisiert &amp; gespeichert — inkl. aller Base64-Dateien.
+      Selektoren (<code>useStore(s =&gt; s.field)</code>) sind gut eingesetzt, aber die Persistenz-Logik ist der Flaschenhals.
+      <br/><br/>
+      Außerdem: <strong>keine Pagination</strong> für lange Listen, <strong>kein Memoization</strong> für gefilterte/sortierte Listen.
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:20px;font-size:12px;opacity:.5;text-align:center">Nächste Frage kommt im Terminal ↓</p>

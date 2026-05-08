@@ -1,0 +1,79 @@
+<h2>Design — Phase 1: Store-Refactor + Filesystem</h2>
+<p class="subtitle">Das Fundament: Crash-Risiko eliminieren, Performance verbessern</p>
+
+<div class="section">
+  <h3>Problem heute</h3>
+  <div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:14px;font-size:13px;line-height:1.7">
+    <strong>Zustand:</strong> Ein einziger Zustand-Blob → localStorage (Key: <code>cynera-os-v3</code>)<br>
+    <strong>Dateien:</strong> Base64-kodiert im selben Blob → bei ~3 PDFs ist das 5–10 MB → Browser verwirft den Key stillschweigend<br>
+    <strong>Performance:</strong> Jeder State-Update → ganzer Blob wird serialisiert + gespeichert, inkl. aller Base64-Daten<br>
+    <strong>Kein Memoizing:</strong> Gefilterte Listen (z.B. Todos eines Kunden) werden bei jedem Render neu berechnet
+  </div>
+</div>
+
+<div class="section">
+  <h3>Lösung: Store in zwei Schichten aufteilen</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+    <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#60A5FA;margin-bottom:8px">ZUSTAND (bleibt in Zustand / localStorage)</div>
+      <div style="font-size:12px;line-height:1.8;font-family:monospace">
+        customers[ ]<br>
+        todos[ ]<br>
+        notes[ ]<br>
+        kpis[ ]<br>
+        folders[ ]<br>
+        uploadedFiles[ ] <span style="color:#F59E0B">← nur Metadaten</span><br>
+        <span style="opacity:.5">  id, name, type, size</span><br>
+        <span style="opacity:.5">  <strong>tauriPath</strong> ← neu</span><br>
+        <span style="color:#EF4444;text-decoration:line-through;opacity:.5">  data (base64)</span> entfernt
+      </div>
+    </div>
+    <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#22C55E;margin-bottom:8px">TAURI FILESYSTEM (neu)</div>
+      <div style="font-size:12px;line-height:1.8;font-family:monospace">
+        AppData/cynera/<br>
+        &nbsp;&nbsp;files/<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;{customerId}/<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{fileId}.{ext}<br>
+        &nbsp;&nbsp;workspace-files/<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;{fileId}.{ext}
+      </div>
+      <div style="font-size:11px;margin-top:8px;opacity:.7">Lesen/Schreiben via Tauri <code>fs</code> API — kein localStorage-Limit</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Store-Performance: Selektoren + Memoization</h3>
+  <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:14px;font-size:12px;line-height:1.8">
+    <div style="margin-bottom:8px">
+      <span style="color:#F59E0B;font-weight:600">Heute:</span> Jede Komponente ruft <code>store.todos.filter(t => t.customerId === id)</code> direkt auf<br>
+      → bei jedem Store-Update werden alle Komponenten neu gerendert
+    </div>
+    <div>
+      <span style="color:#22C55E;font-weight:600">Neu:</span> Selektoren als <strong>computed slices</strong> im Store (Zustand <code>subscribeWithSelector</code>)<br>
+      + <code>useMemo</code> in Komponenten für teure Filter/Sort-Operationen<br>
+      + Store in <strong>3 Slices</strong> aufteilen: <code>dataSlice</code> · <code>uiSlice</code> · <code>filesSlice</code>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Was sich für den User ändert</h3>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;gap:10px;align-items:center;font-size:13px">
+      <span style="color:#22C55E;font-size:16px">✓</span> Dateien unbegrenzt hochladen (kein 5MB-Crash mehr)
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;font-size:13px">
+      <span style="color:#22C55E;font-size:16px">✓</span> App spürbar schneller bei vielen Kunden/Todos
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;font-size:13px">
+      <span style="color:#22C55E;font-size:16px">✓</span> Bestehende Dateien werden automatisch migriert (einmaliger Import beim ersten Start)
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;font-size:13px">
+      <span style="color:#F59E0B;font-size:16px">!</span> Ablage-Download-Button bleibt gleich — liest jetzt von Disk statt aus Base64
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:20px;font-size:12px;opacity:.5;text-align:center">Sieht Phase 1 so richtig aus? → Antwort im Terminal</p>

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "backprop": {
+      "source": "JuliusBrussee/cavekit",
+      "sourceType": "github",
+      "skillPath": "skills/backprop/SKILL.md",
+      "computedHash": "b2e4d6c53c4441b6f1ba52b3e3c513cb48d8c2026182045d902fd56908015f5e"
+    },
+    "build": {
+      "source": "JuliusBrussee/cavekit",
+      "sourceType": "github",
+      "skillPath": "skills/build/SKILL.md",
+      "computedHash": "ea39796ce8a33b3dbfefe240efdaf6a2ba44c5a7a264f9b02700ca5f45919248"
+    },
+    "caveman": {
+      "source": "JuliusBrussee/cavekit",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "2201563d38dba043e56df1b5653efd7408d09499527bce5f4ccaa2093773cece"
+    },
+    "check": {
+      "source": "JuliusBrussee/cavekit",
+      "sourceType": "github",
+      "skillPath": "skills/check/SKILL.md",
+      "computedHash": "27c300e5f1e5914d97b2fc64de9e71e88f195d27bef61dd18beae129e2751fe0"
+    },
+    "spec": {
+      "source": "JuliusBrussee/cavekit",
+      "sourceType": "github",
+      "skillPath": "skills/spec/SKILL.md",
+      "computedHash": "83b71b1096d7eb42bffcb5515d044727201e2b81de0c78601f6f6149503a44ff"
+    }
+  }
+}

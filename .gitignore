@@ -1,0 +1,8 @@
+node_modules/
+dist/
+src-tauri/target/
+
+# API Keys — niemals committen
+src-tauri/.cargo/config.toml
+.env
+.env.local
