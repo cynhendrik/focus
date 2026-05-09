@@ -9,7 +9,7 @@ export function AppShell({ children }: Props) {
   const theme = useUiStore(s => s.theme)
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
+    document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
   return (
