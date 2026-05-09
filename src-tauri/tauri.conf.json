@@ -31,13 +31,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/Icon.ico",
       "icons/icon.icns"
-    ]
+    ],
+    "publisher": "Cynera",
+    "copyright": "© 2026 Cynera",
+    "category": "Business",
+    "shortDescription": "Kunden- und Projektverwaltung für Selbstständige",
+    "longDescription": "Focus ist eine Desktop-App für Selbstständige und kleine Agenturen zur professionellen Kunden- und Projektverwaltung.",
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "languages": ["German"],
+        "displayLanguageSelector": false
+      }
+    }
   }
 }

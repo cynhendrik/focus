@@ -10,11 +10,15 @@ interface UiState {
   appView: AppView
   focusMode: boolean
   hasSeenIntro: boolean
+  migrationDone: boolean
+  cmdPaletteOpen: boolean
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   setAppView: (view: AppView) => void
   toggleFocusMode: () => void
   markIntroSeen: () => void
+  markMigrationDone: () => void
+  setCmdPaletteOpen: (open: boolean) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -25,6 +29,8 @@ export const useUiStore = create<UiState>()(
       appView: 'customers',
       focusMode: false,
       hasSeenIntro: false,
+      migrationDone: false,
+      cmdPaletteOpen: false,
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -40,6 +46,12 @@ export const useUiStore = create<UiState>()(
 
       markIntroSeen: () =>
         set({ hasSeenIntro: true }),
+
+      markMigrationDone: () =>
+        set({ migrationDone: true }),
+
+      setCmdPaletteOpen: (open) =>
+        set({ cmdPaletteOpen: open }),
     }),
     {
       name: 'focus-ui-v2',
@@ -47,6 +59,7 @@ export const useUiStore = create<UiState>()(
         theme: s.theme,
         selectedCustomerId: s.selectedCustomerId,
         hasSeenIntro: s.hasSeenIntro,
+        migrationDone: s.migrationDone,
       }),
     }
   )
