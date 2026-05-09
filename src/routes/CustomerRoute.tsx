@@ -7,6 +7,7 @@ import { ZeitPane } from '@/components/time/ZeitPane'
 import { KommunikationPane } from '@/components/chat/KommunikationPane'
 import { AblagePane } from '@/components/ablage/AblagePane'
 import { CrmPane } from '@/components/crm/CrmPane'
+import { FocusAiPane } from '@/components/focus/FocusAiPane'
 
 interface Props {
   customerId: string
@@ -50,6 +51,9 @@ export function CustomerRoute({ customerId }: Props) {
         )}
         {activeTab === 'kommunikation' && (
           <KommunikationPane customerId={customerId} />
+        )}
+        {activeTab === 'ai' && (
+          <FocusAiPane customerId={customerId} />
         )}
       </div>
     </div>
