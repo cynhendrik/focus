@@ -6,6 +6,7 @@ import { DashboardPane } from '@/components/kpis/DashboardPane'
 import { ZeitPane } from '@/components/time/ZeitPane'
 import { KommunikationPane } from '@/components/chat/KommunikationPane'
 import { AblagePane } from '@/components/ablage/AblagePane'
+import { CrmPane } from '@/components/crm/CrmPane'
 
 interface Props {
   customerId: string
@@ -40,6 +41,9 @@ export function CustomerRoute({ customerId }: Props) {
         )}
         {activeTab === 'zeit' && (
           <ZeitPane customerId={customerId} />
+        )}
+        {activeTab === 'crm' && (
+          <CrmPane customerId={customerId} />
         )}
         {activeTab === 'ablage' && (
           <AblagePane customerId={customerId} />
