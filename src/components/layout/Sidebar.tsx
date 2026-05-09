@@ -39,6 +39,16 @@ export function Sidebar() {
 
       <div className="p-2 border-t border-[var(--border)]">
         <button
+          onClick={() => setAppView('mail')}
+          className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors
+            ${appView === 'mail'
+              ? 'bg-primary text-white'
+              : 'text-[var(--text2)] hover:bg-[var(--bg1)]'
+            }`}
+        >
+          E-Mails
+        </button>
+        <button
           onClick={() => setAppView('company')}
           className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors
             ${appView === 'company'

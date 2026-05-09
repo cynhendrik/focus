@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { CustomerRoute } from '@/routes/CustomerRoute'
 import { OverviewRoute } from '@/routes/OverviewRoute'
 import { CompanyRoute } from '@/routes/CompanyRoute'
+import { MailRoute } from '@/routes/MailRoute'
 
 export default function App() {
   const init = useCustomersStore(s => s.init)
@@ -18,6 +19,7 @@ export default function App() {
 
   const renderMain = () => {
     if (appView === 'company') return <CompanyRoute />
+    if (appView === 'mail') return <MailRoute />
     if (selectedCustomerId) return <CustomerRoute customerId={selectedCustomerId} />
     return <OverviewRoute />
   }

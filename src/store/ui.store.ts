@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-export type AppView = 'customers' | 'company'
+export type AppView = 'customers' | 'company' | 'mail'
 
 interface UiState {
   theme: Theme
