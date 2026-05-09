@@ -1,4 +1,4 @@
-export type CustomerTab = 'workflow' | 'dashboard' | 'crm' | 'zeit' | 'ablage' | 'kommunikation' | 'ai'
+export type CustomerTab = 'workflow' | 'dashboard' | 'crm' | 'zeit' | 'ablage' | 'kommunikation' | 'social' | 'ai'
 
 const LABELS: Record<CustomerTab, string> = {
   workflow: 'Workflow',
@@ -7,10 +7,11 @@ const LABELS: Record<CustomerTab, string> = {
   zeit: 'Zeit',
   ablage: 'Ablage',
   kommunikation: 'Kommunikation',
+  social: 'Social',
   ai: 'FOCUS AI',
 }
 
-const TABS: CustomerTab[] = ['workflow', 'dashboard', 'crm', 'zeit', 'ablage', 'kommunikation', 'ai']
+const TABS: CustomerTab[] = ['workflow', 'dashboard', 'crm', 'zeit', 'ablage', 'kommunikation', 'social', 'ai']
 
 interface Props {
   active: CustomerTab
