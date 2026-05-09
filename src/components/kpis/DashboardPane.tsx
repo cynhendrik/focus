@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useKpisStore } from '@/store/kpis.store'
+import { useTodosStore } from '@/store/todos.store'
+import { useCrmStore } from '@/store/crm.store'
+import { computeHealthScore } from '@/lib/healthScore'
 import type { Kpi } from '@/types/kpi.types'
 
 interface Props {
@@ -10,10 +13,14 @@ const EMPTY_FORM = { label: '', value: '', unit: '', target: '', period: '' }
 
 export function DashboardPane({ customerId }: Props) {
   const { kpis, loadForCustomer, upsert, remove } = useKpisStore()
+  const todos = useTodosStore(s => s.todos)
+  const followUps = useCrmStore(s => s.followUps)
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => { loadForCustomer(customerId) }, [customerId])
+
+  const health = computeHealthScore(todos, kpis, followUps)
 
   const startEdit = (kpi: Kpi) => {
     setEditingId(kpi.id)
@@ -48,6 +55,20 @@ export function DashboardPane({ customerId }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Health Score */}
+      <div className="p-4 rounded-lg bg-[var(--bg1)] flex items-center gap-4">
+        <div className={`text-4xl font-bold ${health.color}`}>{health.score}</div>
+        <div>
+          <p className={`text-sm font-semibold ${health.color}`}>{health.label}</p>
+          <p className="text-xs text-[var(--text2)]">Health Score</p>
+        </div>
+        <div className="ml-auto flex gap-4 text-xs text-[var(--text2)]">
+          <span>Todos {health.factors.todoCompletion}%</span>
+          <span>KPIs {health.factors.kpiProgress}%</span>
+          <span>CRM {health.factors.followUpHealth}%</span>
+        </div>
+      </div>
+
       <h3 className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider">KPIs</h3>
 
       {/* KPI List */}
