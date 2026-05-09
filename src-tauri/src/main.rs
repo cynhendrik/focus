@@ -159,6 +159,8 @@ fn main() {
             commands::crm::get_follow_ups,
             commands::crm::upsert_follow_up,
             commands::crm::delete_follow_up,
+            commands::company::get_company_settings,
+            commands::company::update_company_settings,
             email::commands::email_get_accounts,
             email::commands::email_test_connection,
             email::commands::email_add_account,

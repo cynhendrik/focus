@@ -6,3 +6,4 @@ pub mod time_entry;
 pub mod chat;
 pub mod folder;
 pub mod crm;
+pub mod company;

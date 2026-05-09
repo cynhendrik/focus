@@ -6,7 +6,9 @@ export function Sidebar() {
   const customers = useCustomersStore(s => s.customers)
   const isLoading = useCustomersStore(s => s.isLoading)
   const selectedId = useUiStore(s => s.selectedCustomerId)
+  const appView = useUiStore(s => s.appView)
   const setSelected = useUiStore(s => s.setSelectedCustomer)
+  const setAppView = useUiStore(s => s.setAppView)
 
   return (
     <aside className="w-64 flex-shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--bg)] overflow-hidden">
@@ -33,6 +35,19 @@ export function Sidebar() {
             />
           ))
         )}
+      </div>
+
+      <div className="p-2 border-t border-[var(--border)]">
+        <button
+          onClick={() => setAppView('company')}
+          className={`w-full text-left text-sm px-3 py-2 rounded-lg transition-colors
+            ${appView === 'company'
+              ? 'bg-primary text-white'
+              : 'text-[var(--text2)] hover:bg-[var(--bg1)]'
+            }`}
+        >
+          Mein Unternehmen
+        </button>
       </div>
     </aside>
   )

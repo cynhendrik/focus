@@ -5,25 +5,29 @@ import { useUiStore } from '@/store/ui.store'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { CustomerRoute } from '@/routes/CustomerRoute'
 import { OverviewRoute } from '@/routes/OverviewRoute'
+import { CompanyRoute } from '@/routes/CompanyRoute'
 
 export default function App() {
   const init = useCustomersStore(s => s.init)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
+  const appView = useUiStore(s => s.appView)
 
   useEffect(() => {
     init()
   }, [init])
+
+  const renderMain = () => {
+    if (appView === 'company') return <CompanyRoute />
+    if (selectedCustomerId) return <CustomerRoute customerId={selectedCustomerId} />
+    return <OverviewRoute />
+  }
 
   return (
     <AppShell>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-auto">
-          {selectedCustomerId ? (
-            <CustomerRoute customerId={selectedCustomerId} />
-          ) : (
-            <OverviewRoute />
-          )}
+          {renderMain()}
         </main>
       </div>
     </AppShell>
