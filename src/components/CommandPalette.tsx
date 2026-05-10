@@ -44,7 +44,7 @@ export function CommandPalette({ open, onClose }: Props) {
 
   const staticActions: Item[] = [
     { id: 'mail', icon: '✉', label: 'E-Mails', sub: 'Zum Mail-Client wechseln', action: () => navigate('mail') },
-    { id: 'company', icon: '🏢', label: 'Mein Unternehmen', sub: 'Einstellungen', action: () => navigate('company') },
+    { id: 'company', icon: '🏢', label: 'Mein Unternehmen', sub: 'Einstellungen', action: () => navigate('settings') },
   ]
 
   const filteredActions = staticActions.filter(
