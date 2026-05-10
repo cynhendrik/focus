@@ -18,6 +18,7 @@ export function CustomerModal({ customer, onClose }: Props) {
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (customer) {
@@ -52,9 +53,12 @@ export function CustomerModal({ customer, onClose }: Props) {
   const handleSave = async () => {
     if (!form.name.trim()) return
     setSaving(true)
+    setSaveError(null)
     try {
       await upsert({ ...form, name: form.name.trim() })
       onClose()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
@@ -159,6 +163,11 @@ export function CustomerModal({ customer, onClose }: Props) {
           </div>
         </div>
 
+        {saveError && (
+          <div className="px-6 pb-0 pt-3">
+            <p className="text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded-lg">{saveError}</p>
+          </div>
+        )}
         <div className="px-6 py-4 border-t border-[var(--border)] flex items-center gap-3">
           <button
             onClick={handleSave}

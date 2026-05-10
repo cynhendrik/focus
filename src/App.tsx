@@ -4,7 +4,7 @@ import { NavSidebar } from '@/components/layout/NavSidebar'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { CommandPaletteController } from '@/components/CommandPaletteController'
+import { CommandPalette } from '@/components/CommandPalette'
 
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
@@ -23,6 +23,8 @@ export default function App() {
   const init = useCustomersStore(s => s.init)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView = useUiStore(s => s.appView)
+  const cmdOpen = useUiStore(s => s.cmdPaletteOpen)
+  const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
 
   useEffect(() => { init() }, [init])
 
@@ -54,7 +56,7 @@ export default function App() {
           </ErrorBoundary>
         </main>
       </div>
-      <CommandPaletteController />
+      {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
     </AppShell>
   )
 }

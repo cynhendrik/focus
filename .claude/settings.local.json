@@ -29,7 +29,10 @@
       "Bash(cargo test *)",
       "Bash(git mv *)",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npx tsc *)",
+      "Bash(Select-String -Pattern '\"scripts\"' -Context 0,10)",
+      "Bash(Remove-Item *)"
     ]
   }
 }
