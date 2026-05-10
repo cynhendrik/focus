@@ -2,7 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-export type AppView = 'customers' | 'company' | 'mail'
+export type AppView =
+  | 'dashboard' | 'profile'
+  | 'clients'   | 'invoices' | 'tasks' | 'kpis' | 'insights'
+  | 'calendar'  | 'mail'     | 'crm'   | 'settings'
 
 interface UiState {
   theme: Theme
@@ -26,7 +29,7 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       theme: 'dark',
       selectedCustomerId: null,
-      appView: 'customers',
+      appView: 'dashboard',
       focusMode: false,
       hasSeenIntro: false,
       migrationDone: false,
@@ -36,7 +39,7 @@ export const useUiStore = create<UiState>()(
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
 
       setSelectedCustomer: (id) =>
-        set({ selectedCustomerId: id, appView: 'customers' }),
+        set({ selectedCustomerId: id, appView: 'clients' }),
 
       setAppView: (view) =>
         set({ appView: view, selectedCustomerId: null }),
