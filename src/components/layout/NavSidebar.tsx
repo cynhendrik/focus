@@ -62,16 +62,13 @@ const ICON_PATHS: Record<string, string[]> = {
 const MAIN_NAV: { view: AppView; label: string; icon: string }[] = [
   { view: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { view: 'clients',   label: 'Clients',   icon: 'clients' },
-  { view: 'invoices',  label: 'Invoices',  icon: 'invoices' },
+  { view: 'invoices',  label: 'Finanzen',  icon: 'invoices' },
   { view: 'tasks',     label: 'Tasks',     icon: 'tasks' },
-  { view: 'kpis',      label: 'KPIs',      icon: 'kpis' },
-  { view: 'insights',  label: 'Insights',  icon: 'insights' },
 ]
 
 const BOTTOM_NAV: { view: AppView; label: string; icon: string }[] = [
   { view: 'calendar', label: 'Calendar', icon: 'calendar' },
   { view: 'mail',     label: 'Mail',     icon: 'mail' },
-  { view: 'crm',      label: 'CRM',      icon: 'crm' },
   { view: 'settings', label: 'Settings', icon: 'settings' },
 ]
 
