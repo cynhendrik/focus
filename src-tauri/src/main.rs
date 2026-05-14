@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use email::db::EmailDb;
 use db::pool::DbPool;
+use core::auth::SyncState;
 
 fn groq_key() -> &'static str {
     option_env!("GROQ_API_KEY").unwrap_or("")
@@ -107,7 +108,9 @@ fn main() {
             let db_path = data_dir.join("focus.db");
             let db_pool = DbPool::new(&db_path)
                 .expect("focus.db konnte nicht geöffnet werden");
-            app.manage(db_pool);
+            let sync_state = SyncState::new();
+            app.manage(sync_state.clone());
+            app.manage(db_pool.clone());
 
             // Legacy email DB — kept until Phase 4 email migration
             let email_db_path = data_dir.join("emails.db");
@@ -127,6 +130,11 @@ fn main() {
                 apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
                     .expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS");
             }
+
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                core::sync::connectivity::run_loop(app_handle, sync_state, db_pool).await;
+            });
 
             Ok(())
         })
@@ -173,6 +181,9 @@ fn main() {
             email::commands::email_mark_read,
             email::commands::email_assign_customer,
             email::commands::email_delete,
+            core::auth::set_auth_token,
+            core::sync::get_sync_status,
+            core::sync::sync_now,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
