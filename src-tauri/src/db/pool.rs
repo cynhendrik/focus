@@ -28,3 +28,9 @@ impl DbPool {
         self.conn.lock().unwrap()
     }
 }
+
+impl Clone for DbPool {
+    fn clone(&self) -> Self {
+        DbPool { conn: std::sync::Arc::clone(&self.conn) }
+    }
+}

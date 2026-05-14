@@ -4,6 +4,7 @@ mod email;
 mod error;
 mod db;
 mod commands;
+mod core;
 mod services;
 
 pub use error::AppError;
