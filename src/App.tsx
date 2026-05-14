@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
 import { WorkspacePicker } from '@/core/workspace/WorkspacePicker'
+import { useSyncBridge } from '@/core/sync/useSyncBridge'
 
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
@@ -44,6 +45,8 @@ export default function App() {
   useEffect(() => {
     if (activeWorkspaceId) init()
   }, [activeWorkspaceId, init])
+
+  useSyncBridge()
 
   if (authLoading) {
     return (
