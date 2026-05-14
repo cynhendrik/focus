@@ -1,4 +1,5 @@
 import { useUiStore, type AppView } from '@/store/ui.store'
+import { WorkspaceSwitcher } from '@/core/workspace/WorkspaceSwitcher'
 
 function NavIcon({ paths }: { paths: string[] }) {
   return (
@@ -101,17 +102,9 @@ export function NavSidebar() {
       className="w-56 flex-shrink-0 flex flex-col border-r border-[var(--border)] bg-[var(--bg)] overflow-hidden"
       style={{ minHeight: 0 }}
     >
-      {/* Logo */}
-      <div
-        data-tauri-drag-region
-        className="px-4 py-4 border-b border-[var(--border)] flex items-center gap-2.5"
-      >
-        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-          </svg>
-        </div>
-        <span className="text-sm font-bold text-[var(--text)] tracking-tight">Cynera Focus</span>
+      {/* Workspace Switcher */}
+      <div data-tauri-drag-region className="border-b border-[var(--border)]">
+        <WorkspaceSwitcher />
       </div>
 
       {/* Profil */}
