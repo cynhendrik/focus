@@ -1,10 +1,14 @@
 import { useEffect } from 'react'
-import { AppShell } from '@/components/layout/AppShell'
-import { NavSidebar } from '@/components/layout/NavSidebar'
+import { AppShell }    from '@/components/layout/AppShell'
+import { NavSidebar }  from '@/components/layout/NavSidebar'
 import { useCustomersStore } from '@/store/customers.store'
-import { useUiStore } from '@/store/ui.store'
+import { useUiStore }   from '@/store/ui.store'
+import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
+import { LoginScreen }   from '@/core/auth/LoginScreen'
+import { WorkspacePicker } from '@/core/workspace/WorkspacePicker'
 
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
@@ -20,13 +24,38 @@ import { SettingsRoute }   from '@/routes/SettingsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
 
 export default function App() {
-  const init = useCustomersStore(s => s.init)
+  const initAuth        = useAuthStore(s => s.init)
+  const user            = useAuthStore(s => s.user)
+  const authLoading     = useAuthStore(s => s.loading)
+  const loadWorkspaces  = useWorkspaceStore(s => s.loadWorkspaces)
+  const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
+  const init            = useCustomersStore(s => s.init)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
-  const appView = useUiStore(s => s.appView)
-  const cmdOpen = useUiStore(s => s.cmdPaletteOpen)
+  const appView         = useUiStore(s => s.appView)
+  const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
 
-  useEffect(() => { init() }, [init])
+  useEffect(() => { initAuth() }, [initAuth])
+
+  useEffect(() => {
+    if (user) loadWorkspaces()
+  }, [user, loadWorkspaces])
+
+  useEffect(() => {
+    if (activeWorkspaceId) init()
+  }, [activeWorkspaceId, init])
+
+  if (authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) return <LoginScreen />
+
+  if (!activeWorkspaceId) return <WorkspacePicker />
 
   const renderMain = () => {
     if (selectedCustomerId && appView === 'clients') return <CustomerRoute customerId={selectedCustomerId} />
