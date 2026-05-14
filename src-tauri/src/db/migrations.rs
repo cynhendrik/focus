@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 1;
+const CURRENT_VERSION: u32 = 3;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -34,6 +34,38 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             )?;
             Ok(())
         }
+        2 => {
+            let tables = [
+                "customers", "todos", "notes", "kpis", "deadlines",
+                "crm_follow_ups", "health_scores", "time_entries",
+                "folders", "files", "chat_messages", "emails",
+            ];
+            for table in &tables {
+                conn.execute_batch(&format!(
+                    "ALTER TABLE {table} ADD COLUMN workspace_id TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE {table} ADD COLUMN created_by   TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE {table} ADD COLUMN pending_sync INTEGER NOT NULL DEFAULT 0;"
+                ))?;
+            }
+            Ok(())
+        }
+        3 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS sync_queue (
+                    id          TEXT PRIMARY KEY,
+                    table_name  TEXT NOT NULL,
+                    record_id   TEXT NOT NULL,
+                    operation   TEXT NOT NULL CHECK (operation IN ('INSERT','UPDATE','DELETE')),
+                    payload     TEXT NOT NULL,
+                    created_at  TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS sync_meta (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+            "#)?;
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -56,7 +88,34 @@ mod tests {
         run(&conn).unwrap();
         run(&conn).unwrap();
         let version = get_version(&conn).unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, CURRENT_VERSION);
+    }
+
+    #[test]
+    fn migration_v2_adds_workspace_columns() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        let cols: Vec<String> = conn.prepare("PRAGMA table_info(customers)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(cols.contains(&"workspace_id".to_string()), "workspace_id fehlt in customers");
+        assert!(cols.contains(&"created_by".to_string()), "created_by fehlt in customers");
+        assert!(cols.contains(&"pending_sync".to_string()), "pending_sync fehlt in customers");
+    }
+
+    #[test]
+    fn migration_v3_creates_sync_tables() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        let tables: Vec<String> = conn.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_queue','sync_meta')"
+        ).unwrap()
+            .query_map([], |r| r.get::<_, String>(0)).unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(tables.contains(&"sync_queue".to_string()), "sync_queue fehlt");
+        assert!(tables.contains(&"sync_meta".to_string()), "sync_meta fehlt");
     }
 
     #[test]
