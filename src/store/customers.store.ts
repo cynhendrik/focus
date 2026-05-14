@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { CustomerService } from '@/services/customer.service'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { log } from '@/lib/logger'
 import type { Customer, UpsertCustomerPayload } from '@/types/customer.types'
 import type { AppError } from '@/types/error.types'
@@ -10,7 +12,7 @@ interface CustomersState {
   isLoading: boolean
   error: AppError | null
   init: () => Promise<void>
-  upsert: (payload: UpsertCustomerPayload) => Promise<void>
+  upsert: (payload: Omit<UpsertCustomerPayload, 'workspaceId' | 'createdBy'> & { id?: string }) => Promise<void>
   remove: (id: string) => Promise<void>
 }
 
@@ -24,15 +26,24 @@ function upsertById(list: Customer[], updated: Customer): Customer[] {
   return [...list, updated]
 }
 
+function getWorkspaceId(): string {
+  return useWorkspaceStore.getState().activeWorkspaceId ?? ''
+}
+
+function getCreatedBy(): string {
+  return useAuthStore.getState().user?.id ?? ''
+}
+
 export const useCustomersStore = create<CustomersState>()((set) => ({
   customers: [],
   isLoading: false,
   error: null,
 
   init: async () => {
+    const workspaceId = getWorkspaceId()
     set({ isLoading: true, error: null })
     try {
-      const customers = await CustomerService.getAll()
+      const customers = await CustomerService.getAll(workspaceId)
       set({ customers, isLoading: false })
       log.info('Customers loaded', { count: customers.length })
     } catch (err) {
@@ -43,8 +54,10 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
   },
 
   upsert: async (payload) => {
+    const workspaceId = getWorkspaceId()
+    const createdBy = getCreatedBy()
     try {
-      const updated = await CustomerService.upsert(payload)
+      const updated = await CustomerService.upsert({ ...payload, workspaceId, createdBy })
       set(s => ({ customers: upsertById(s.customers, updated) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -55,8 +68,9 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
   },
 
   remove: async (id) => {
+    const workspaceId = getWorkspaceId()
     try {
-      await CustomerService.delete(id)
+      await CustomerService.delete(id, workspaceId)
       set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }

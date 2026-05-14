@@ -29,7 +29,11 @@ export function detectLegacyData(): LegacyStore | null {
   }
 }
 
-export function buildImportPayloads(legacy: LegacyStore): UpsertCustomerPayload[] {
+export function buildImportPayloads(
+  legacy: LegacyStore,
+  workspaceId: string,
+  createdBy: string,
+): UpsertCustomerPayload[] {
   return (legacy.customers ?? []).map(c => ({
     name: c.name,
     company: c.company,
@@ -38,6 +42,8 @@ export function buildImportPayloads(legacy: LegacyStore): UpsertCustomerPayload[
     status: normalizeStatus(c.status),
     priority: normalizePriority(c.priority),
     tags: c.tags ?? [],
+    workspaceId,
+    createdBy,
   }))
 }
 

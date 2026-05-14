@@ -7,14 +7,16 @@ interface Props {
   onClose: () => void
 }
 
-const EMPTY: UpsertCustomerPayload = {
+type FormPayload = Omit<UpsertCustomerPayload, 'workspaceId' | 'createdBy'>
+
+const EMPTY: FormPayload = {
   name: '', company: '', email: '', phone: '',
   status: 'aktiv', priority: 'normal', tags: [],
 }
 
 export function CustomerModal({ customer, onClose }: Props) {
   const { upsert, remove } = useCustomersStore()
-  const [form, setForm] = useState<UpsertCustomerPayload>(EMPTY)
+  const [form, setForm] = useState<FormPayload>(EMPTY)
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -23,21 +25,21 @@ export function CustomerModal({ customer, onClose }: Props) {
   useEffect(() => {
     if (customer) {
       setForm({
-        id: customer.id,
-        name: customer.name,
-        company: customer.company ?? '',
-        email: customer.email ?? '',
-        phone: customer.phone ?? '',
-        status: customer.status,
+        id:       customer.id,
+        name:     customer.name,
+        company:  customer.company ?? '',
+        email:    customer.email ?? '',
+        phone:    customer.phone ?? '',
+        status:   customer.status,
         priority: customer.priority,
-        tags: customer.tags ?? [],
+        tags:     customer.tags ?? [],
       })
     } else {
       setForm(EMPTY)
     }
   }, [customer])
 
-  const set = (key: keyof UpsertCustomerPayload, value: unknown) =>
+  const set = (key: keyof FormPayload, value: unknown) =>
     setForm(f => ({ ...f, [key]: value }))
 
   const addTag = () => {

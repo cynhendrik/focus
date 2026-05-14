@@ -13,6 +13,7 @@ export interface Customer extends TimestampedEntity {
   priority: Priority
   tags: string[]
   isPrivate: boolean
+  workspaceId: string
 }
 
 export interface UpsertCustomerPayload {
@@ -24,4 +25,6 @@ export interface UpsertCustomerPayload {
   status?: CustomerStatus
   priority?: Priority
   tags?: string[]
+  workspaceId: string
+  createdBy: string
 }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import { useCustomersStore } from '@/store/customers.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { detectLegacyData, buildImportPayloads, clearLegacyData } from '@/lib/migration'
 
 type Step = 'idle' | 'prompt' | 'importing' | 'done'
@@ -27,7 +29,9 @@ export function MigrationWizard() {
     const legacy = detectLegacyData()
     if (!legacy) { setStep('done'); markMigrationDone(); return }
     setStep('importing')
-    const payloads = buildImportPayloads(legacy)
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+    const createdBy = useAuthStore.getState().user?.id ?? ''
+    const payloads = buildImportPayloads(legacy, workspaceId, createdBy)
     let n = 0
     for (const payload of payloads) {
       try { await upsert(payload); n++ } catch { /* skip duplicates */ }
