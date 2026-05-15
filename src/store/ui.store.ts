@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
+export type CustomerTab = 'dashboard' | 'workflow' | 'kommunikation' | 'dateien' | 'historie' | 'profil'
 export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'invoices' | 'tasks' | 'kpis' | 'insights'
@@ -15,6 +16,7 @@ interface UiState {
   hasSeenIntro: boolean
   migrationDone: boolean
   cmdPaletteOpen: boolean
+  activeCustomerTab: CustomerTab
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   setAppView: (view: AppView) => void
@@ -22,6 +24,7 @@ interface UiState {
   markIntroSeen: () => void
   markMigrationDone: () => void
   setCmdPaletteOpen: (open: boolean) => void
+  setActiveCustomerTab: (tab: CustomerTab) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -34,6 +37,7 @@ export const useUiStore = create<UiState>()(
       hasSeenIntro: false,
       migrationDone: false,
       cmdPaletteOpen: false,
+      activeCustomerTab: 'dashboard',
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -55,6 +59,9 @@ export const useUiStore = create<UiState>()(
 
       setCmdPaletteOpen: (open) =>
         set({ cmdPaletteOpen: open }),
+
+      setActiveCustomerTab: (tab) =>
+        set({ activeCustomerTab: tab }),
     }),
     {
       name: 'focus-ui-v2',
