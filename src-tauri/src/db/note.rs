@@ -10,6 +10,8 @@ pub struct Note {
     pub title: String,
     pub content: String,
     pub pinned: bool,
+    pub note_type: String,
+    pub waiting_reply: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -22,26 +24,29 @@ pub struct UpsertNotePayload {
     pub title: String,
     pub content: Option<String>,
     pub pinned: Option<bool>,
+    pub note_type: Option<String>,
+    pub waiting_reply: Option<bool>,
 }
 
 pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Note>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, customer_id, title, content, pinned, created_at, updated_at
+        "SELECT id, customer_id, title, content, pinned, note_type, waiting_reply,
+                created_at, updated_at
          FROM notes WHERE customer_id = ?1 ORDER BY pinned DESC, created_at DESC",
     )?;
-    let notes = stmt
-        .query_map([customer_id], |row| {
-            Ok(Note {
-                id: row.get(0)?,
-                customer_id: row.get(1)?,
-                title: row.get(2)?,
-                content: row.get(3)?,
-                pinned: row.get::<_, i32>(4)? != 0,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+    let notes = stmt.query_map([customer_id], |row| {
+        Ok(Note {
+            id:            row.get(0)?,
+            customer_id:   row.get(1)?,
+            title:         row.get(2)?,
+            content:       row.get(3)?,
+            pinned:        row.get::<_, i32>(4)? != 0,
+            note_type:     row.get(5)?,
+            waiting_reply: row.get::<_, i32>(6)? != 0,
+            created_at:    row.get(7)?,
+            updated_at:    row.get(8)?,
+        })
+    })?.collect::<Result<Vec<_>, _>>()?;
     Ok(notes)
 }
 
@@ -49,26 +54,32 @@ pub fn upsert(conn: &Connection, payload: UpsertNotePayload) -> Result<Note, App
     let id = payload.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
-        "INSERT INTO notes (id, customer_id, title, content, pinned, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+        "INSERT INTO notes (id, customer_id, title, content, pinned, note_type, waiting_reply,
+                            created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?8)
          ON CONFLICT(id) DO UPDATE SET
-           title = excluded.title, content = excluded.content,
-           pinned = excluded.pinned, updated_at = excluded.updated_at",
+           title=excluded.title, content=excluded.content, pinned=excluded.pinned,
+           note_type=excluded.note_type, waiting_reply=excluded.waiting_reply,
+           updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.customer_id, payload.title,
             payload.content.unwrap_or_default(),
             payload.pinned.unwrap_or(false) as i32,
+            payload.note_type.unwrap_or_else(|| "gespraech".to_string()),
+            payload.waiting_reply.unwrap_or(false) as i32,
             now,
         ],
     )?;
     let note = conn.query_row(
-        "SELECT id, customer_id, title, content, pinned, created_at, updated_at
+        "SELECT id, customer_id, title, content, pinned, note_type, waiting_reply,
+                created_at, updated_at
          FROM notes WHERE id = ?1",
         [&id],
         |row| Ok(Note {
             id: row.get(0)?, customer_id: row.get(1)?, title: row.get(2)?,
             content: row.get(3)?, pinned: row.get::<_, i32>(4)? != 0,
-            created_at: row.get(5)?, updated_at: row.get(6)?,
+            note_type: row.get(5)?, waiting_reply: row.get::<_, i32>(6)? != 0,
+            created_at: row.get(7)?, updated_at: row.get(8)?,
         }),
     )?;
     Ok(note)
@@ -100,10 +111,25 @@ mod tests {
         let conn = setup();
         let note = upsert(&conn, UpsertNotePayload {
             id: None, customer_id: "__cynera_privat__".to_string(),
-            title: "Meine Notiz".to_string(), content: Some("Inhalt".to_string()), pinned: None,
+            title: "Meine Notiz".to_string(), content: Some("Inhalt".to_string()),
+            pinned: None, note_type: None, waiting_reply: None,
         }).unwrap();
         assert_eq!(note.title, "Meine Notiz");
         assert!(!note.pinned);
+        assert_eq!(note.note_type, "gespraech");
+        assert!(!note.waiting_reply);
+    }
+
+    #[test]
+    fn upsert_persists_note_type_and_waiting_reply() {
+        let conn = setup();
+        let note = upsert(&conn, UpsertNotePayload {
+            id: None, customer_id: "__cynera_privat__".to_string(),
+            title: "Meeting Notes".to_string(), content: Some("Inhalt".to_string()),
+            pinned: None, note_type: Some("meeting".to_string()), waiting_reply: Some(true),
+        }).unwrap();
+        assert_eq!(note.note_type, "meeting");
+        assert!(note.waiting_reply);
     }
 
     #[test]
@@ -112,10 +138,12 @@ mod tests {
         upsert(&conn, UpsertNotePayload {
             id: None, customer_id: "__cynera_privat__".to_string(),
             title: "Normal".to_string(), content: None, pinned: Some(false),
+            note_type: None, waiting_reply: None,
         }).unwrap();
         upsert(&conn, UpsertNotePayload {
             id: None, customer_id: "__cynera_privat__".to_string(),
             title: "Pinned".to_string(), content: None, pinned: Some(true),
+            note_type: None, waiting_reply: None,
         }).unwrap();
         let notes = get_by_customer(&conn, "__cynera_privat__").unwrap();
         assert_eq!(notes[0].title, "Pinned");
@@ -127,6 +155,7 @@ mod tests {
         let note = upsert(&conn, UpsertNotePayload {
             id: None, customer_id: "__cynera_privat__".to_string(),
             title: "Weg".to_string(), content: None, pinned: None,
+            note_type: None, waiting_reply: None,
         }).unwrap();
         delete(&conn, &note.id).unwrap();
         assert_eq!(get_by_customer(&conn, "__cynera_privat__").unwrap().len(), 0);
