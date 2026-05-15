@@ -10,3 +10,4 @@ pub mod chat_message;
 pub mod folder;
 pub mod crm;
 pub mod company;
+pub mod deadline;
