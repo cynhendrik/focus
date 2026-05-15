@@ -2,6 +2,12 @@ import type { Priority } from './customer.types'
 
 export type TodoStatus = 'open' | 'in_progress' | 'done'
 
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
+}
+
 export interface Todo {
   id: string
   customerId: string
@@ -9,6 +15,9 @@ export interface Todo {
   status: TodoStatus
   priority: Priority
   dueDate?: string
+  checklist: ChecklistItem[]
+  tags: string[]
+  assignee?: string
   createdAt: string
   updatedAt: string
 }
@@ -20,4 +29,7 @@ export interface UpsertTodoPayload {
   status?: TodoStatus
   priority?: Priority
   dueDate?: string
+  checklist?: ChecklistItem[]
+  tags?: string[]
+  assignee?: string
 }
