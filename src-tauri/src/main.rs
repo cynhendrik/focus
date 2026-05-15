@@ -165,6 +165,7 @@ fn main() {
             commands::folder::cmd_get_files,
             commands::folder::cmd_add_file,
             commands::folder::cmd_delete_file,
+            commands::folder::cmd_import_file,
             commands::crm::get_follow_ups,
             commands::crm::upsert_follow_up,
             commands::crm::delete_follow_up,
