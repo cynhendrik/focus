@@ -1,6 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { Folder, FileEntry, CreateFolderPayload, AddFilePayload } from '@/types/file.types'
 
+export interface ImportFileParams {
+  customerId: string
+  folderId?: string | null
+  name: string
+  data: number[]
+  mimeType?: string | null
+}
+
 export const FolderService = {
   getFolders(customerId: string): Promise<Folder[]> {
     return invoke<Folder[]>('cmd_get_folders', { customerId })
@@ -19,5 +27,14 @@ export const FolderService = {
   },
   deleteFile(id: string): Promise<void> {
     return invoke<void>('cmd_delete_file', { id })
+  },
+  importFile(params: ImportFileParams): Promise<FileEntry> {
+    return invoke<FileEntry>('cmd_import_file', {
+      customerId: params.customerId,
+      folderId: params.folderId ?? null,
+      name: params.name,
+      data: params.data,
+      mimeType: params.mimeType ?? null,
+    })
   },
 }

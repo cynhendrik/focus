@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { FolderService } from '@/services/folder.service'
+import type { ImportFileParams } from '@/services/folder.service'
 import { log } from '@/lib/logger'
 import type { Folder, FileEntry, CreateFolderPayload, AddFilePayload } from '@/types/file.types'
 import type { AppError } from '@/types/error.types'
@@ -17,6 +18,7 @@ interface FilesState {
   createFolder: (payload: CreateFolderPayload) => Promise<void>
   removeFolder: (id: string) => Promise<void>
   addFile: (payload: AddFilePayload) => Promise<void>
+  importFile: (params: ImportFileParams) => Promise<void>
   removeFile: (id: string) => Promise<void>
 }
 
@@ -80,6 +82,18 @@ export const useFilesStore = create<FilesState>()((set, get) => ({
   addFile: async (payload) => {
     try {
       const file = await FolderService.addFile(payload)
+      if (file.folderId === get().activeFolderId) {
+        set(s => ({ files: [...s.files, file] }))
+      }
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  importFile: async (params) => {
+    try {
+      const file = await FolderService.importFile(params)
       if (file.folderId === get().activeFolderId) {
         set(s => ({ files: [...s.files, file] }))
       }
