@@ -13,25 +13,49 @@ import { KommunikationPane } from '@/components/customer/tabs/KommunikationPane'
 import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { HistoriePane } from '@/components/customer/tabs/HistoriePane'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
+import { HealthPane } from '@/components/customer/tabs/HealthPane'
+
+function avatarBg(name: string): string {
+  const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
+  let h = 0
+  for (const c of name) h += c.charCodeAt(0)
+  return palette[h % palette.length]
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const days = Math.floor(diff / 86400000)
+  if (days === 0) return 'Today'
+  if (days === 1) return '1 day ago'
+  return `${days} days ago`
+}
+
+function TabIcon({ id }: { id: CustomerTab }) {
+  const paths: Record<CustomerTab, string[]> = {
+    dashboard:     ['M18 20V10', 'M12 20V4', 'M6 20v-6'],
+    workflow:      ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+    kommunikation: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+    dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
+    historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
+    profil:        ['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
+    health:        ['M22 12h-4l-3 9L9 3l-3 9H2'],
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {(paths[id] ?? []).map((d, i) => <path key={i} d={d} />)}
+    </svg>
+  )
+}
 
 const TABS: { id: CustomerTab; label: string }[] = [
   { id: 'dashboard',     label: 'Dashboard' },
-  { id: 'workflow',      label: 'Workflow' },
+  { id: 'workflow',      label: 'Workflow / Tasks' },
   { id: 'kommunikation', label: 'Kommunikation' },
   { id: 'dateien',       label: 'Dateien' },
   { id: 'historie',      label: 'Historie' },
   { id: 'profil',        label: 'Profil' },
+  { id: 'health',        label: 'Health / Insights' },
 ]
-
-const STATUS_LABEL: Record<string, string> = {
-  lead: 'Lead', aktiv: 'Aktiv', inaktiv: 'Inaktiv', lost: 'Lost',
-}
-const STATUS_COLOR: Record<string, string> = {
-  lead: 'bg-blue-500/10 text-blue-500',
-  aktiv: 'bg-green-500/10 text-green-500',
-  inaktiv: 'bg-gray-400/10 text-gray-400',
-  lost: 'bg-red-400/10 text-red-400',
-}
 
 interface Props { customerId: string }
 
@@ -66,68 +90,56 @@ export function CustomerRoute({ customerId }: Props) {
       case 'dateien':       return <DateienPane customerId={customerId} />
       case 'historie':      return <HistoriePane customerId={customerId} />
       case 'profil':        return <ProfilPane customerId={customerId} />
+      case 'health':        return <HealthPane customerId={customerId} />
     }
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 pt-5 pb-0 border-b border-[var(--border)]">
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-semibold text-[var(--text)]">{customer.name}</h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[customer.status] ?? ''}`}>
-                {STATUS_LABEL[customer.status] ?? customer.status}
-              </span>
-              {customer.priority === 'high' && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 font-medium">Hohe Priorität</span>
-              )}
-            </div>
-            {customer.company && (
-              <p className="text-sm text-[var(--text2)] mt-0.5">{customer.company}</p>
-            )}
-            <div className="flex gap-3 mt-1">
-              {customer.email && (
-                <a href={`mailto:${customer.email}`} className="text-xs text-[var(--text2)] hover:text-primary">{customer.email}</a>
-              )}
-              {customer.phone && (
-                <span className="text-xs text-[var(--text2)]">{customer.phone}</span>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)]"
-            >
-              Bearbeiten
-            </button>
-            <button
-              onClick={() => setSelected(null)}
-              className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)]"
-            >
-              ✕
-            </button>
-          </div>
+      <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-4 flex-shrink-0">
+        <button
+          onClick={() => setSelected(null)}
+          className="w-8 h-8 rounded-full flex items-center justify-center border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)] flex-shrink-0 transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+        </button>
+
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${avatarBg(customer.name)}`}>
+          {customer.name.slice(0, 1).toUpperCase()}
         </div>
 
-        {/* Tab bar */}
-        <div className="flex gap-0">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
-                ${activeTab === tab.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-[var(--text2)] hover:text-[var(--text)]'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold text-[var(--text)] truncate">{customer.name}</h1>
+          <p className="text-xs text-[var(--text2)]">Letzte Aktivität: {relativeTime(customer.updatedAt)}</p>
         </div>
+
+        <button
+          onClick={() => setShowEdit(true)}
+          className="px-4 py-2 rounded-xl bg-primary text-black text-sm font-semibold hover:bg-primary-dark flex-shrink-0 transition-colors"
+        >
+          + Neue Aktion
+        </button>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--border)] overflow-x-auto flex-shrink-0 scrollbar-none">
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setTab(tab.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0
+              ${activeTab === tab.id
+                ? 'bg-primary text-black'
+                : 'text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)]'
+              }`}
+          >
+            <TabIcon id={tab.id} />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Active pane */}
@@ -136,10 +148,7 @@ export function CustomerRoute({ customerId }: Props) {
       </div>
 
       {showEdit && (
-        <CustomerModal
-          customer={customer}
-          onClose={() => setShowEdit(false)}
-        />
+        <CustomerModal customer={customer} onClose={() => setShowEdit(false)} />
       )}
     </div>
   )

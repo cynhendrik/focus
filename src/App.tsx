@@ -5,6 +5,8 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+
+const DEV_BYPASS = import.meta.env.DEV
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
@@ -13,7 +15,6 @@ import { useSyncBridge } from '@/core/sync/useSyncBridge'
 
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
-import { CustomerRoute }   from '@/routes/CustomerRoute'
 import { InvoicesRoute }   from '@/routes/InvoicesRoute'
 import { TasksRoute }      from '@/routes/TasksRoute'
 import { KpisRoute }       from '@/routes/KpisRoute'
@@ -39,6 +40,12 @@ export default function App() {
   useEffect(() => { initAuth() }, [initAuth])
 
   useEffect(() => {
+    if (DEV_BYPASS && !activeWorkspaceId) {
+      useWorkspaceStore.getState().setActiveWorkspace('dev')
+    }
+  }, [])
+
+  useEffect(() => {
     if (user) loadWorkspaces()
   }, [user, loadWorkspaces])
 
@@ -56,12 +63,11 @@ export default function App() {
     )
   }
 
-  if (!user) return <LoginScreen />
+  if (!user && !DEV_BYPASS) return <LoginScreen />
 
-  if (!activeWorkspaceId) return <WorkspacePicker />
+  if (!activeWorkspaceId && !DEV_BYPASS) return <WorkspacePicker />
 
   const renderMain = () => {
-    if (selectedCustomerId && appView === 'clients') return <CustomerRoute customerId={selectedCustomerId} />
     switch (appView) {
       case 'dashboard':  return <DashboardRoute />
       case 'profile':    return <ProfileRoute />
