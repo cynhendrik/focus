@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 3;
+const CURRENT_VERSION: u32 = 4;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -66,6 +66,23 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             "#)?;
             Ok(())
         }
+        4 => {
+            conn.execute_batch(r#"
+                ALTER TABLE todos ADD COLUMN checklist     TEXT    NOT NULL DEFAULT '[]';
+                ALTER TABLE todos ADD COLUMN tags          TEXT    NOT NULL DEFAULT '[]';
+                ALTER TABLE todos ADD COLUMN assignee      TEXT;
+
+                ALTER TABLE notes ADD COLUMN note_type     TEXT    NOT NULL DEFAULT 'gespraech';
+                ALTER TABLE notes ADD COLUMN waiting_reply INTEGER NOT NULL DEFAULT 0;
+
+                ALTER TABLE customers ADD COLUMN industry       TEXT;
+                ALTER TABLE customers ADD COLUMN contact_person TEXT;
+                ALTER TABLE customers ADD COLUMN goals          TEXT NOT NULL DEFAULT '[]';
+                ALTER TABLE customers ADD COLUMN social_links   TEXT NOT NULL DEFAULT '{}';
+                ALTER TABLE customers ADD COLUMN internal_notes TEXT;
+            "#)?;
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -116,6 +133,33 @@ mod tests {
             .collect();
         assert!(tables.contains(&"sync_queue".to_string()), "sync_queue fehlt");
         assert!(tables.contains(&"sync_meta".to_string()), "sync_meta fehlt");
+    }
+
+    #[test]
+    fn migration_v4_adds_new_columns() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        assert_eq!(get_version(&conn).unwrap(), 4);
+
+        let todo_cols: Vec<String> = conn.prepare("PRAGMA table_info(todos)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(todo_cols.contains(&"checklist".to_string()));
+        assert!(todo_cols.contains(&"tags".to_string()));
+        assert!(todo_cols.contains(&"assignee".to_string()));
+
+        let note_cols: Vec<String> = conn.prepare("PRAGMA table_info(notes)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(note_cols.contains(&"note_type".to_string()));
+        assert!(note_cols.contains(&"waiting_reply".to_string()));
+
+        let cust_cols: Vec<String> = conn.prepare("PRAGMA table_info(customers)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(cust_cols.contains(&"industry".to_string()));
+        assert!(cust_cols.contains(&"goals".to_string()));
+        assert!(cust_cols.contains(&"social_links".to_string()));
     }
 
     #[test]
