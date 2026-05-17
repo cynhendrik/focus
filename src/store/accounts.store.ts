@@ -10,6 +10,7 @@ interface AccountsState {
   init: () => Promise<void>
   upsert: (payload: Omit<UpsertAccountPayload, 'workspaceId' | 'createdBy'> & { id?: string }) => Promise<Account>
   remove: (id: string) => Promise<void>
+  setPrimaryDeal: (accountId: string, dealId: string | null) => Promise<void>
 }
 
 function upsertById(list: Account[], updated: Account): Account[] {
@@ -45,5 +46,10 @@ export const useAccountsStore = create<AccountsState>()((set) => ({
     const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
     await invoke<void>('delete_account', { id, workspaceId })
     set(s => ({ accounts: s.accounts.filter(a => a.id !== id) }))
+  },
+
+  setPrimaryDeal: async (accountId, dealId) => {
+    const updated = await invoke<Account>('cmd_set_primary_deal', { accountId, dealId })
+    set(s => ({ accounts: upsertById(s.accounts, updated) }))
   },
 }))
