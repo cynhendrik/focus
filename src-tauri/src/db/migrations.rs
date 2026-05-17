@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 5;
+const CURRENT_VERSION: u32 = 6;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -129,6 +129,52 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
 
             result
+        }
+        6 => {
+            if !table_exists(conn, "accounts") { return Ok(()); }
+
+            if !column_exists(conn, "accounts", "primary_deal_id") {
+                conn.execute_batch("ALTER TABLE accounts ADD COLUMN primary_deal_id TEXT;")?;
+            }
+            if !column_exists(conn, "accounts", "lead_score") {
+                conn.execute_batch("ALTER TABLE accounts ADD COLUMN lead_score REAL NOT NULL DEFAULT 0;")?;
+            }
+            if !column_exists(conn, "activities", "outcome") {
+                conn.execute_batch("ALTER TABLE activities ADD COLUMN outcome TEXT;")?;
+            }
+
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS pipeline_stages (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    name         TEXT NOT NULL,
+                    label        TEXT NOT NULL,
+                    order_index  INTEGER NOT NULL DEFAULT 0,
+                    color        TEXT NOT NULL DEFAULT '#6B7280',
+                    is_won       INTEGER NOT NULL DEFAULT 0,
+                    is_lost      INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
+                    ON pipeline_stages(workspace_id, order_index);
+            "#)?;
+
+            // Seed default pipeline stages for every existing workspace
+            let workspace_ids: Vec<String> = {
+                let mut stmt = conn.prepare(
+                    "SELECT DISTINCT workspace_id FROM accounts WHERE workspace_id != ''"
+                )?;
+                let ids = stmt.query_map([], |r| r.get(0))?
+                    .collect::<Result<Vec<String>, _>>()
+                    .map_err(|e| AppError::Db(e.to_string()))?;
+                ids
+            };
+            for ws_id in &workspace_ids {
+                crate::db::pipeline_stage::seed_defaults(conn, ws_id)?;
+            }
+
+            Ok(())
         }
         _ => Ok(()),
     }
@@ -538,5 +584,43 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(activity_type, "task");
+    }
+
+    #[test]
+    fn migration_v6_seeds_pipeline_stages() {
+        let conn = in_memory_db();
+        // Insert an account with a workspace_id so seeding is triggered
+        let now = "2026-01-01T00:00:00Z";
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-1', 'ws-test', '', 'Test', 'individual', 0, ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
+        run(&conn).unwrap();
+        // pipeline_stages table should have 10 default stages for ws-test
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM pipeline_stages WHERE workspace_id = 'ws-test'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 10);
+    }
+
+    #[test]
+    fn migration_v6_adds_new_columns() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        // Check accounts has new columns
+        let cols: Vec<String> = conn.prepare("PRAGMA table_info(accounts)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(cols.contains(&"primary_deal_id".to_string()), "primary_deal_id missing");
+        assert!(cols.contains(&"lead_score".to_string()), "lead_score missing");
+        // Check activities has outcome
+        let act_cols: Vec<String> = conn.prepare("PRAGMA table_info(activities)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(act_cols.contains(&"outcome".to_string()), "outcome missing");
     }
 }
