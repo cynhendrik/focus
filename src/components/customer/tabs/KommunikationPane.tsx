@@ -1,38 +1,7 @@
-import { useState } from 'react'
-import { useNotesStore } from '@/store/notes.store'
-import type { Note, NoteType } from '@/types/note.types'
-
-// TODO: Wichtige Nachrichten automatisch aus E-Mails generieren
-// Basierend auf Kundenprofil:
-// - customer.email
-// - customer.domain
-// - customer.aliases
-// E-Mail-Parser ordnet Nachrichten automatisch zu
-// und schreibt sie in das Modul "Wichtige Nachrichten"
-
-// ── Config ──────────────────────────────────────────────────────────────────
-
-const MODULE_CONFIG = {
-  gespraech: { label: 'Gesprächsnotizen',     accent: '#404040', cardBg: '#262626', onCard: '#FFFFFF' },
-  meeting:   { label: 'Meeting-Protokolle',   accent: '#404040', cardBg: '#262626', onCard: '#FFFFFF' },
-  telefon:   { label: 'Telefonnotizen',       accent: '#D0FC69', cardBg: '#262626', onCard: '#FFFFFF' },
-  nachricht: { label: 'Wichtige Nachrichten', accent: '#D0FC69', cardBg: '#262626', onCard: '#FFFFFF' },
-} as const
-
-type ModuleKey = keyof typeof MODULE_CONFIG
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins  = Math.floor(diff / 60000)
-  if (mins < 60)   return `${mins}m ago`
-  const hours = Math.floor(diff / 3600000)
-  if (hours < 24)  return `${hours}h ago`
-  const days  = Math.floor(diff / 86400000)
-  if (days === 1)  return 'Gestern'
-  return `vor ${days} Tagen`
-}
+import { useEffect, useState } from 'react'
+import { useMailStore } from '@/store/mail.store'
+import type { EmailBody } from '@/types/mail.types'
+import { MailService } from '@/services/mail.service'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -40,387 +9,174 @@ function formatDate(iso: string): string {
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 }
 
-function parseParticipants(content: string): { participants: string[]; body: string } {
-  const match = content.match(/^Teilnehmer:\s*(.+)\n?([\s\S]*)$/)
-  if (match) return { participants: match[1].split(',').map(s => s.trim()).filter(Boolean), body: match[2].trim() }
-  return { participants: [], body: content }
-}
+// ── WhatsApp Scaffold ─────────────────────────────────────────────────────────
 
-function contentPreview(content: string, lines = 2): string {
-  return content.split('\n').slice(0, lines).join(' ').trim()
-}
-
-// ── Note Cards ───────────────────────────────────────────────────────────────
-
-type CardProps = { note: Note; accent: string; cardBg: string; onCard: string; onClick: () => void }
-
-function sub(onCard: string, opacity: number) {
-  return onCard === '#FFFFFF'
-    ? `rgba(255,255,255,${opacity})`
-    : `rgba(17,17,17,${opacity})`
-}
-
-function GesprächCard({ note, accent, cardBg, onCard, onClick }: CardProps) {
-  const preview = contentPreview(note.content, 2)
+function WhatsAppSection() {
   return (
-    <button onClick={onClick} className="w-full text-left" style={cardStyle(accent, cardBg)}>
-      <div className="flex items-start justify-between gap-2">
-        <p style={{ fontSize: 14, fontWeight: 600, color: onCard, lineHeight: 1.3 }}>{note.title}</p>
-        {note.waitingReply && (
-          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: 'rgba(245,158,11,0.15)', color: '#F59E0B', flexShrink: 0 }}>
-            Wartet
-          </span>
-        )}
-      </div>
-      <p style={{ fontSize: 12, color: sub(onCard, 0.45), marginTop: 4 }}>
-        {formatDate(note.createdAt)} · {formatTime(note.createdAt)}
-      </p>
-      {preview && (
-        <p style={{ fontSize: 13, color: sub(onCard, 0.6), marginTop: 6, lineHeight: 1.5,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {preview}
-        </p>
-      )}
-    </button>
-  )
-}
-
-function MeetingCard({ note, accent, cardBg, onCard, onClick }: CardProps) {
-  const { participants, body } = parseParticipants(note.content)
-  return (
-    <button onClick={onClick} className="w-full text-left" style={cardStyle(accent, cardBg)}>
-      <p style={{ fontSize: 14, fontWeight: 600, color: onCard, lineHeight: 1.3 }}>{note.title}</p>
-      <p style={{ fontSize: 12, color: sub(onCard, 0.45), marginTop: 4 }}>{formatDate(note.createdAt)}</p>
-      {participants.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          {participants.map((p, i) => (
-            <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-              background: `${accent}22`, color: accent, border: `1px solid ${accent}40` }}>
-              {p}
-            </span>
-          ))}
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg1)] overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)]">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#25D366' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.553 4.116 1.522 5.845L0 24l6.335-1.502A11.954 11.954 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.892 0-3.668-.497-5.208-1.37l-.374-.216-3.762.892.942-3.665-.236-.385A9.952 9.952 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+          </svg>
         </div>
-      )}
-      {body && (
-        <p style={{ fontSize: 13, color: sub(onCard, 0.6), marginTop: 8, lineHeight: 1.5,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {body}
-        </p>
-      )}
-    </button>
-  )
-}
-
-function TelefonCard({ note, accent, cardBg, onCard, onClick }: CardProps) {
-  const keyPoint = note.content.split('\n')[0]?.trim()
-  return (
-    <button onClick={onClick} className="w-full text-left" style={cardStyle(accent, cardBg)}>
-      <p style={{ fontSize: 14, fontWeight: 600, color: onCard, lineHeight: 1.3 }}>{note.title}</p>
-      <p style={{ fontSize: 12, color: sub(onCard, 0.45), marginTop: 4 }}>{formatTime(note.createdAt)} Uhr</p>
-      {keyPoint && (
-        <p style={{ fontSize: 13, color: sub(onCard, 0.6), marginTop: 6, lineHeight: 1.5,
-          display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {keyPoint}
-        </p>
-      )}
-    </button>
-  )
-}
-
-function NachrichtCard({ note, accent, cardBg, onCard, onClick }: CardProps) {
-  const preview = contentPreview(note.content, 1)
-  return (
-    <button onClick={onClick} className="w-full text-left" style={cardStyle(accent, cardBg)}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 14, fontWeight: 600, color: onCard, lineHeight: 1.3, flex: 1 }}>{note.title}</p>
-        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, flexShrink: 0,
-          background: `${accent}22`, color: accent, border: `1px solid ${accent}40` }}>
-          {relativeTime(note.createdAt)}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--text)]">WhatsApp Business</p>
+          <p className="text-xs text-[var(--text2)]">API-Integration</p>
+        </div>
+        <span className="text-[10px] px-2.5 py-1 rounded-full border font-medium"
+          style={{ background: 'rgba(234,179,8,0.1)', color: '#CA8A04', borderColor: 'rgba(234,179,8,0.3)' }}>
+          In Vorbereitung
         </span>
       </div>
-      {preview && (
-        <p style={{ fontSize: 13, color: sub(onCard, 0.6), marginTop: 6, lineHeight: 1.5,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {preview}
+
+      <div className="px-5 py-8 flex flex-col items-center gap-3 text-center">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(37,211,102,0.1)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </div>
+        <p className="text-sm font-medium text-[var(--text)]">WhatsApp-Konversationen</p>
+        <p className="text-xs text-[var(--text2)] max-w-xs leading-relaxed">
+          Sobald der API-Key hinterlegt ist, werden Nachrichten dieses Kunden hier angezeigt und können direkt beantwortet werden.
         </p>
-      )}
-    </button>
-  )
-}
-
-function cardStyle(accent: string, cardBg: string): React.CSSProperties {
-  return {
-    background: cardBg,
-    borderRadius: 16,
-    padding: 20,
-    paddingLeft: 24,
-    borderLeft: `4px solid ${accent}`,
-    boxShadow: '0px 4px 12px rgba(0,0,0,0.10)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 0,
-  }
-}
-
-// ── Detail Panel ─────────────────────────────────────────────────────────────
-
-function DetailPanel({ note, accent, onClose, onUpdate, onRemove }: {
-  note: Note; accent: string
-  onClose: () => void
-  onUpdate: (n: Note) => void
-  onRemove: (id: string) => void
-}) {
-  const [content, setContent] = useState(note.content)
-  const isMeeting = note.noteType === 'meeting'
-  const { participants, body } = parseParticipants(content)
-  const [participantsText, setParticipantsText] = useState(participants.join(', '))
-
-  const saveContent = () => {
-    const merged = isMeeting && participantsText.trim()
-      ? `Teilnehmer: ${participantsText.trim()}\n${body}`
-      : content
-    onUpdate({ ...note, content: merged })
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={() => { saveContent(); onClose() }} />
-      <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl border-t border-white/8 p-6 pb-10 flex flex-col gap-4"
-        style={{ background: '#1A1A1A', animation: 'focusSlideUp 0.28s cubic-bezier(0.32,0.72,0,1) both',
-          borderLeft: `4px solid ${accent}` }}>
-        <div className="w-10 h-1 rounded-full bg-white/15 mx-auto -mt-1 mb-2" />
-
-        <div className="flex items-center gap-3">
-          <h3 className="flex-1 text-base font-bold text-white">{note.title}</h3>
-          <label className="flex items-center gap-1.5 text-xs text-white/50 cursor-pointer">
-            <input type="checkbox" checked={note.waitingReply}
-              onChange={() => onUpdate({ ...note, waitingReply: !note.waitingReply })}
-              className="accent-amber-400" />
-            Wartet auf Antwort
-          </label>
-          <button onClick={() => { onRemove(note.id); onClose() }}
-            className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 text-red-400">
-            Löschen
-          </button>
-          <button onClick={() => { saveContent(); onClose() }}
-            className="w-7 h-7 rounded-full bg-white/10 text-white/50 text-sm flex items-center justify-center">
-            ✕
-          </button>
-        </div>
-
-        {isMeeting && (
-          <div>
-            <p className="text-xs text-white/40 mb-1">Teilnehmer (kommagetrennt)</p>
-            <input
-              value={participantsText}
-              onChange={e => setParticipantsText(e.target.value)}
-              placeholder="Anna, Ben, Clara…"
-              className="w-full px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-        )}
-
-        <textarea
-          value={isMeeting ? body : content}
-          onChange={e => {
-            if (isMeeting) {
-              const merged = participantsText.trim()
-                ? `Teilnehmer: ${participantsText}\n${e.target.value}`
-                : e.target.value
-              setContent(merged)
-            } else {
-              setContent(e.target.value)
-            }
-          }}
-          onBlur={saveContent}
-          placeholder="Inhalt…"
-          rows={6}
-          className="w-full px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-        />
-      </div>
-    </>
-  )
-}
-
-// ── Add Note Form ─────────────────────────────────────────────────────────────
-
-function AddNoteInline({ type, customerId, accent, onClose, onSave }: {
-  type: NoteType; customerId: string; accent: string
-  onClose: () => void
-  onSave: (title: string, content: string) => void
-}) {
-  const [title, setTitle]   = useState('')
-  const [extra, setExtra]   = useState('') // participants for meeting, key point for others
-
-  const submit = () => {
-    if (!title.trim()) return
-    const content = type === 'meeting' && extra.trim()
-      ? `Teilnehmer: ${extra.trim()}\n`
-      : extra.trim()
-    onSave(title.trim(), content)
-  }
-
-  return (
-    <div style={{ background: '#1A1A1A', borderRadius: 16, padding: 16, borderLeft: `4px solid ${accent}`,
-      boxShadow: '0px 4px 12px rgba(0,0,0,0.15)' }}>
-      <input
-        autoFocus
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && submit()}
-        placeholder="Titel…"
-        className="w-full px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:ring-1 focus:ring-primary mb-2"
-      />
-      {type === 'meeting' && (
-        <input
-          value={extra}
-          onChange={e => setExtra(e.target.value)}
-          placeholder="Teilnehmer (kommagetrennt)…"
-          className="w-full px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:ring-1 focus:ring-primary mb-2"
-        />
-      )}
-      {type === 'telefon' && (
-        <input
-          value={extra}
-          onChange={e => setExtra(e.target.value)}
-          placeholder="Wichtigster Punkt…"
-          className="w-full px-3 py-2 rounded-xl text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:ring-1 focus:ring-primary mb-2"
-        />
-      )}
-      <div className="flex gap-2 justify-end">
-        <button onClick={onClose}
-          className="text-xs px-3 py-1.5 rounded-lg text-white/40 hover:text-white/70">
-          Abbrechen
-        </button>
-        <button onClick={submit}
-          style={{ fontSize: 12, padding: '6px 14px', borderRadius: 8, background: accent, color: '#fff', fontWeight: 600 }}>
-          Erstellen
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── Module Section ────────────────────────────────────────────────────────────
-
-function ModuleSection({ type, notes, customerId, onSelect, onSave }: {
-  type: ModuleKey
-  notes: Note[]
-  customerId: string
-  onSelect: (n: Note) => void
-  onSave: (title: string, content: string, type: NoteType) => void
-}) {
-  const { label, accent, cardBg, onCard } = MODULE_CONFIG[type]
-  const [adding, setAdding] = useState(false)
-
-  const renderCard = (note: Note) => {
-    const props = { note, accent, cardBg, onCard, onClick: () => onSelect(note) }
-    if (type === 'gespraech') return <GesprächCard key={note.id} {...props} />
-    if (type === 'meeting')   return <MeetingCard  key={note.id} {...props} />
-    if (type === 'telefon')   return <TelefonCard  key={note.id} {...props} />
-    return                           <NachrichtCard key={note.id} {...props} />
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 3, height: 16, borderRadius: 99, background: accent }} />
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>{label}</h2>
-          {notes.length > 0 && (
-            <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 99,
-              background: `${accent}20`, color: accent }}>
-              {notes.length}
-            </span>
-          )}
-        </div>
         <button
-          onClick={() => setAdding(v => !v)}
-          style={{ fontSize: 18, lineHeight: 1, color: accent, fontWeight: 300, opacity: 0.8,
-            background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
+          disabled
+          className="mt-1 px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text2)] border border-[var(--border)] opacity-50 cursor-not-allowed"
         >
-          {adding ? '−' : '+'}
+          API-Key einrichten
         </button>
       </div>
-
-      {/* Add inline form */}
-      {adding && (
-        <AddNoteInline
-          type={type}
-          customerId={customerId}
-          accent={accent}
-          onClose={() => setAdding(false)}
-          onSave={(title, content) => { onSave(title, content, type); setAdding(false) }}
-        />
-      )}
-
-      {/* Cards */}
-      {notes.length === 0 && !adding && (
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.25)', padding: '8px 0' }}>Noch keine Einträge</p>
-      )}
-      {notes.map(renderCard)}
     </div>
   )
 }
 
-// ── Main Pane ─────────────────────────────────────────────────────────────────
+// ── Email List ────────────────────────────────────────────────────────────────
 
 interface Props { customerId: string }
 
 export function KommunikationPane({ customerId }: Props) {
-  const notes      = useNotesStore(s => s.notes)
-  const upsertNote = useNotesStore(s => s.upsert)
-  const removeNote = useNotesStore(s => s.remove)
+  const allEmails     = useMailStore(s => s.emails)
+  const loadEmails    = useMailStore(s => s.loadEmails)
+  const selectEmail   = useMailStore(s => s.selectEmail)
+  const selectedEmail = useMailStore(s => s.selectedEmail)
+  const emailBody     = useMailStore(s => s.emailBody)
+  const isLoading     = useMailStore(s => s.isLoading)
 
-  const [selected, setSelected] = useState<Note | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [bodyCache, setBodyCache] = useState<Record<string, EmailBody>>({})
 
-  const byType = (type: NoteType) =>
-    notes.filter(n => n.noteType === type).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  useEffect(() => {
+    loadEmails()
+  }, [])
 
-  const handleSave = async (title: string, content: string, noteType: NoteType) => {
-    await upsertNote({ customerId, title, content, noteType })
-  }
+  const emails = allEmails
+    .filter(e => e.customerId === customerId)
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
 
-  const handleUpdate = async (n: Note) => {
-    await upsertNote(n)
-    setSelected(n)
+  const toggleExpand = async (emailId: string) => {
+    if (expandedId === emailId) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(emailId)
+    if (!bodyCache[emailId]) {
+      try {
+        const body = await MailService.getBody(emailId)
+        setBodyCache(c => ({ ...c, [emailId]: body }))
+      } catch {}
+    }
   }
 
   return (
-    <div style={{ background: 'var(--bg)', height: '100%', overflowY: 'auto', padding: '28px 24px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 1100 }}>
+    <div className="p-6 flex flex-col gap-6 max-w-3xl">
 
-        {/* Linke Spalte */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <ModuleSection type="gespraech" notes={byType('gespraech')} customerId={customerId}
-            onSelect={setSelected} onSave={handleSave} />
-          <ModuleSection type="telefon"   notes={byType('telefon')}   customerId={customerId}
-            onSelect={setSelected} onSave={handleSave} />
+      <WhatsAppSection />
+
+      {/* E-Mails */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text2)]">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+          </svg>
+          <p className="text-sm font-semibold text-[var(--text)]">E-Mails</p>
+          {emails.length > 0 && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg1)] border border-[var(--border)] text-[var(--text2)]">
+              {emails.length}
+            </span>
+          )}
         </div>
 
-        {/* Rechte Spalte */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-          <ModuleSection type="meeting"   notes={byType('meeting')}   customerId={customerId}
-            onSelect={setSelected} onSave={handleSave} />
-          <ModuleSection type="nachricht" notes={byType('nachricht')} customerId={customerId}
-            onSelect={setSelected} onSave={handleSave} />
-        </div>
+        {isLoading && emails.length === 0 && (
+          <p className="text-sm text-[var(--text2)] py-4">Laden…</p>
+        )}
+
+        {!isLoading && emails.length === 0 && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg1)] px-5 py-8 flex flex-col items-center gap-2 text-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text2)] opacity-40">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
+            <p className="text-sm text-[var(--text2)]">Keine zugeordneten E-Mails</p>
+            <p className="text-xs text-[var(--text2)] opacity-60">E-Mails können im Mail-Modul diesem Kunden zugeordnet werden.</p>
+          </div>
+        )}
+
+        {emails.map(email => {
+          const isExpanded = expandedId === email.id
+          const body = bodyCache[email.id]
+
+          return (
+            <div key={email.id}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg1)] overflow-hidden"
+            >
+              <button
+                onClick={() => toggleExpand(email.id)}
+                className="w-full text-left px-5 py-4 flex items-start gap-3 hover:bg-[var(--bg2)] transition-colors"
+              >
+                <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${email.isRead ? 'bg-transparent' : 'bg-primary'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`text-sm truncate ${email.isRead ? 'text-[var(--text2)]' : 'text-[var(--text)] font-semibold'}`}>
+                      {email.subject || '(Kein Betreff)'}
+                    </p>
+                    <p className="text-xs text-[var(--text2)] flex-shrink-0">
+                      {formatDate(email.sentAt)} · {formatTime(email.sentAt)}
+                    </p>
+                  </div>
+                  <p className="text-xs text-[var(--text2)] truncate mt-0.5">{email.fromName || email.fromAddr}</p>
+                </div>
+                <svg
+                  width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  className={`text-[var(--text2)] flex-shrink-0 mt-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {isExpanded && (
+                <div className="px-5 pb-5 pt-1 border-t border-[var(--border)]">
+                  <p className="text-xs text-[var(--text2)] mb-3">Von: {email.fromAddr}</p>
+                  {body ? (
+                    <div className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap">
+                      {body.bodyText || body.bodyHtml.replace(/<[^>]*>/g, ' ').trim()}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--text2)]">Laden…</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      {selected && (
-        <DetailPanel
-          note={selected}
-          accent={MODULE_CONFIG[selected.noteType as ModuleKey]?.accent ?? '#888'}
-          onClose={() => setSelected(null)}
-          onUpdate={handleUpdate}
-          onRemove={id => { removeNote(id); setSelected(null) }}
-        />
-      )}
     </div>
   )
 }
