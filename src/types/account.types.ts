@@ -22,6 +22,7 @@ export interface Account extends TimestampedEntity {
   socialLinks: string
   primaryDealId?: string
   leadScore: number
+  scoreFactors: Record<string, number>
   pipelinePhase?: string
   pipelinePhaseLabel?: string
 }

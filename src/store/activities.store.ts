@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { useWorkspaceStore } from './workspace.store'
 import { useAuthStore } from './auth.store'
+import { useAccountsStore } from './accounts.store'
 import type { Activity, CreateActivityPayload, UpdateActivityPayload } from '@/types/activity.types'
 
 interface ActivitiesState {
@@ -50,12 +51,18 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
     const createdBy = useAuthStore.getState().user?.id ?? ''
     const activity = await invoke<Activity>('create_activity', { payload: { ...payload, workspaceId, createdBy } })
     set(s => ({ activities: [activity, ...s.activities] }))
+    if (payload.outcome) {
+      await useAccountsStore.getState().init()
+    }
     return activity
   },
 
   update: async (id, payload) => {
     const updated = await invoke<Activity>('update_activity', { id, payload })
     set(s => ({ activities: s.activities.map(a => a.id === id ? updated : a) }))
+    if (payload.outcome) {
+      await useAccountsStore.getState().init()
+    }
     return updated
   },
 

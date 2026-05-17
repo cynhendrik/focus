@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { useWorkspaceStore } from './workspace.store'
 import { useAuthStore } from './auth.store'
+import { useAccountsStore } from './accounts.store'
 import type { Deal, UpsertDealPayload, DealStage } from '@/types/deal.types'
 
 interface DealsState {
@@ -42,6 +43,7 @@ export const useDealsStore = create<DealsState>()((set) => ({
   updateStage: async (id, stage) => {
     const updated = await invoke<Deal>('update_deal_stage', { id, stage })
     set(s => ({ deals: s.deals.map(d => d.id === id ? updated : d) }))
+    await useAccountsStore.getState().init()
     return updated
   },
 
