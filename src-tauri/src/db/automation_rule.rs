@@ -73,10 +73,13 @@ pub fn set_active(
     active: bool,
 ) -> Result<(), AppError> {
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    let affected = conn.execute(
         "UPDATE automation_rules SET is_active = ?1, updated_at = ?2 WHERE id = ?3 AND workspace_id = ?4",
         rusqlite::params![active as i32, now, id, workspace_id],
     )?;
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("Rule {id} not found")));
+    }
     Ok(())
 }
 
@@ -175,5 +178,17 @@ mod tests {
         let updated = get_all(&conn, "ws-1").unwrap();
         let rule = updated.iter().find(|r| r.id == first_id).unwrap();
         assert!(!rule.is_active);
+    }
+
+    #[test]
+    fn set_active_returns_not_found_for_missing_rule() {
+        let conn = setup();
+        seed_defaults(&conn, "ws-1").unwrap();
+        let result = set_active(&conn, "nonexistent-id", "ws-1", false);
+        assert!(result.is_err());
+        match result {
+            Err(AppError::NotFound(msg)) => assert!(msg.contains("not found")),
+            _ => panic!("Expected NotFound error"),
+        }
     }
 }
