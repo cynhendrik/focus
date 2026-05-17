@@ -9,3 +9,4 @@ pub mod kpi;
 pub mod folder;
 pub mod chat_message;
 pub mod company;
+pub mod pipeline_stage;
