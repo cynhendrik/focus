@@ -23,6 +23,10 @@ export interface Account extends TimestampedEntity {
   primaryDealId?: string
   leadScore: number
   scoreFactors: Record<string, number>
+  street?: string
+  zip?: string
+  city?: string
+  country?: string
   pipelinePhase?: string
   pipelinePhaseLabel?: string
 }
@@ -42,4 +46,8 @@ export interface UpsertAccountPayload {
   internalNotes?: string
   socialLinks?: string
   primaryDealId?: string
+  street?: string
+  zip?: string
+  city?: string
+  country?: string
 }

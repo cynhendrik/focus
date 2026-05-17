@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 7;
+const CURRENT_VERSION: u32 = 8;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -217,6 +217,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 crate::db::automation_rule::seed_defaults(conn, ws_id)?;
             }
 
+            Ok(())
+        }
+        8 => {
+            if !table_exists(conn, "accounts") { return Ok(()); }
+            for col in ["street", "zip", "city", "country"] {
+                if !column_exists(conn, "accounts", col) {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE accounts ADD COLUMN {col} TEXT;"
+                    ))?;
+                }
+            }
             Ok(())
         }
         _ => Ok(()),

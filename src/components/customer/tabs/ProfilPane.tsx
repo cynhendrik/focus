@@ -37,6 +37,10 @@ export function ProfilPane({ customerId }: Props) {
       goals: next.goals,
       socialLinks: next.socialLinks,
       internalNotes: next.internalNotes,
+      street: next.street,
+      zip: next.zip,
+      city: next.city,
+      country: next.country,
     })
   }
 
@@ -138,6 +142,19 @@ export function ProfilPane({ customerId }: Props) {
           {field('Instagram', input(socialLinks.instagram, v => saveSocialLinks({ instagram: v }), '@handle'))}
           {field('LinkedIn', input(socialLinks.linkedin, v => saveSocialLinks({ linkedin: v }), 'linkedin.com/in/…'))}
           {field('Website', input(socialLinks.website, v => saveSocialLinks({ website: v }), 'https://…'))}
+        </div>
+      </div>
+
+      {/* Adresse */}
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-[var(--text2)] font-medium">Adresse</p>
+        <div className="grid grid-cols-1 gap-2">
+          {field('Straße', input(form.street, v => save({ street: v }), 'Musterstraße 1'))}
+          <div className="grid grid-cols-2 gap-2">
+            {field('PLZ', input(form.zip, v => save({ zip: v }), '12345'))}
+            {field('Ort', input(form.city, v => save({ city: v }), 'Berlin'))}
+          </div>
+          {field('Land', input(form.country, v => save({ country: v }), 'Deutschland'))}
         </div>
       </div>
 

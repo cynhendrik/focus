@@ -24,6 +24,10 @@ pub struct Account {
     pub primary_deal_id: Option<String>,
     pub lead_score: f64,
     pub score_factors: HashMap<String, f64>,
+    pub street: Option<String>,
+    pub zip: Option<String>,
+    pub city: Option<String>,
+    pub country: Option<String>,
     // Computed via JOIN, never stored on Account
     pub pipeline_phase: Option<String>,
     pub pipeline_phase_label: Option<String>,
@@ -48,6 +52,10 @@ pub struct UpsertAccountPayload {
     pub internal_notes: Option<String>,
     pub social_links: Option<String>,
     pub primary_deal_id: Option<String>,
+    pub street: Option<String>,
+    pub zip: Option<String>,
+    pub city: Option<String>,
+    pub country: Option<String>,
 }
 
 fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
@@ -73,10 +81,14 @@ fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
         primary_deal_id:      row.get(15)?,
         lead_score:           row.get::<_, Option<f64>>(16)?.unwrap_or(0.0),
         score_factors:        serde_json::from_str(&score_factors_json).unwrap_or_default(),
-        created_at:           row.get(18)?,
-        updated_at:           row.get(19)?,
-        pipeline_phase:       row.get(20)?,
-        pipeline_phase_label: row.get(21)?,
+        street:               row.get(18)?,
+        zip:                  row.get(19)?,
+        city:                 row.get(20)?,
+        country:              row.get(21)?,
+        created_at:           row.get(22)?,
+        updated_at:           row.get(23)?,
+        pipeline_phase:       row.get(24)?,
+        pipeline_phase_label: row.get(25)?,
     })
 }
 
@@ -85,6 +97,7 @@ SELECT
     a.id, a.workspace_id, a.created_by, a.name, a.kind, a.industry, a.website,
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
+    a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
@@ -108,6 +121,7 @@ SELECT
     a.id, a.workspace_id, a.created_by, a.name, a.kind, a.industry, a.website,
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
+    a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
@@ -154,13 +168,16 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
     conn.execute(
         "INSERT INTO accounts (id, workspace_id, created_by, name, kind, industry, website,
                                status, priority, tags, goals, internal_notes,
-                               pending_sync, social_links, primary_deal_id, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?15)
+                               pending_sync, social_links, primary_deal_id,
+                               street, zip, city, country,
+                               created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?16,?17,?18,?19,?19)
          ON CONFLICT(id) DO UPDATE SET
            name=excluded.name, kind=excluded.kind, industry=excluded.industry,
            website=excluded.website, status=excluded.status, priority=excluded.priority,
            tags=excluded.tags, goals=excluded.goals, internal_notes=excluded.internal_notes,
            social_links=excluded.social_links, primary_deal_id=excluded.primary_deal_id,
+           street=excluded.street, zip=excluded.zip, city=excluded.city, country=excluded.country,
            pending_sync=1, updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.name,
@@ -170,7 +187,9 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
             payload.priority.unwrap_or_else(|| "normal".to_string()),
             tags_json, goals_json, payload.internal_notes,
             payload.social_links.unwrap_or_else(|| "{}".to_string()),
-            payload.primary_deal_id, now,
+            payload.primary_deal_id,
+            payload.street, payload.zip, payload.city, payload.country,
+            now,
         ],
     )?;
 
@@ -245,6 +264,10 @@ mod tests {
             internal_notes: None,
             social_links: None,
             primary_deal_id: None,
+            street: None,
+            zip: None,
+            city: None,
+            country: None,
         }
     }
 

@@ -25,6 +25,10 @@ export interface Customer extends TimestampedEntity {
   goals: string[]
   socialLinks: string
   internalNotes?: string
+  street?: string
+  zip?: string
+  city?: string
+  country?: string
 }
 
 export interface UpsertCustomerPayload {
@@ -43,4 +47,8 @@ export interface UpsertCustomerPayload {
   goals?: string[]
   socialLinks?: string
   internalNotes?: string
+  street?: string
+  zip?: string
+  city?: string
+  country?: string
 }

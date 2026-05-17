@@ -16,6 +16,10 @@ function accountToCustomer(a: Account): Customer {
     goals: a.goals,
     socialLinks: a.socialLinks,
     internalNotes: a.internalNotes,
+    street: a.street,
+    zip: a.zip,
+    city: a.city,
+    country: a.country,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   }
@@ -40,6 +44,10 @@ export const CustomerService = {
       goals: payload.goals,
       internalNotes: payload.internalNotes,
       socialLinks: payload.socialLinks,
+      street: payload.street,
+      zip: payload.zip,
+      city: payload.city,
+      country: payload.country,
     }
     return invoke<Account>('upsert_account', { payload: accountPayload }).then(accountToCustomer)
   },

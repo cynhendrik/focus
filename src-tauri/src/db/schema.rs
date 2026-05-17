@@ -22,6 +22,10 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             primary_deal_id TEXT,
             lead_score      REAL NOT NULL DEFAULT 0,
             score_factors   TEXT NOT NULL DEFAULT '{}',
+            street          TEXT,
+            zip             TEXT,
+            city            TEXT,
+            country         TEXT,
             pending_sync    INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL

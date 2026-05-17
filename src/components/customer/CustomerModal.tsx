@@ -12,6 +12,7 @@ type FormPayload = Omit<UpsertCustomerPayload, 'workspaceId' | 'createdBy'>
 const EMPTY: FormPayload = {
   name: '', company: '', email: '', phone: '',
   status: 'aktiv', priority: 'normal', tags: [],
+  street: '', zip: '', city: '', country: '',
 }
 
 export function CustomerModal({ customer, onClose }: Props) {
@@ -33,6 +34,10 @@ export function CustomerModal({ customer, onClose }: Props) {
         status:   customer.status,
         priority: customer.priority,
         tags:     customer.tags ?? [],
+        street:   customer.street ?? '',
+        zip:      customer.zip ?? '',
+        city:     customer.city ?? '',
+        country:  customer.country ?? '',
       })
     } else {
       setForm(EMPTY)
@@ -113,6 +118,32 @@ export function CustomerModal({ customer, onClose }: Props) {
               className="text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
+          <input
+            placeholder="Straße"
+            value={form.street ?? ''}
+            onChange={e => set('street', e.target.value)}
+            className="w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              placeholder="PLZ"
+              value={form.zip ?? ''}
+              onChange={e => set('zip', e.target.value)}
+              className="text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <input
+              placeholder="Ort"
+              value={form.city ?? ''}
+              onChange={e => set('city', e.target.value)}
+              className="text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <input
+            placeholder="Land"
+            value={form.country ?? ''}
+            onChange={e => set('country', e.target.value)}
+            className="w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-xs text-[var(--text2)] mb-1">Status</p>
