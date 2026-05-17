@@ -150,6 +150,8 @@ fn main() {
             commands::pipeline_stage::cmd_upsert_pipeline_stage,
             commands::pipeline_stage::cmd_delete_pipeline_stage,
             commands::pipeline_stage::cmd_reorder_pipeline_stages,
+            commands::automation_rule::cmd_get_automation_rules,
+            commands::automation_rule::cmd_set_rule_active,
             commands::contact::get_contacts,
             commands::contact::upsert_contact,
             commands::contact::delete_contact,

@@ -7,3 +7,4 @@ pub mod chat;
 pub mod folder;
 pub mod company;
 pub mod pipeline_stage;
+pub mod automation_rule;
