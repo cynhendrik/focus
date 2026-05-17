@@ -1,10 +1,8 @@
-pub mod customer;
-pub mod todo;
-pub mod note;
+pub mod account;
+pub mod contact;
+pub mod deal;
+pub mod activity;
 pub mod kpi;
-pub mod time_entry;
 pub mod chat;
 pub mod folder;
-pub mod crm;
 pub mod company;
-pub mod deadline;

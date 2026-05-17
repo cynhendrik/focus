@@ -6,6 +6,7 @@ mod db;
 mod commands;
 mod core;
 mod services;
+mod activity_engine;
 
 pub use error::AppError;
 
@@ -132,7 +133,7 @@ fn main() {
             }
 
             let app_handle = app.handle().clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 core::sync::connectivity::run_loop(app_handle, sync_state, db_pool).await;
             });
 
@@ -140,21 +141,25 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             focus_ai_chat,
-            commands::customer::get_customers,
-            commands::customer::upsert_customer,
-            commands::customer::delete_customer,
-            commands::todo::get_todos,
-            commands::todo::upsert_todo,
-            commands::todo::delete_todo,
-            commands::note::get_notes,
-            commands::note::upsert_note,
-            commands::note::delete_note,
+            commands::account::get_accounts,
+            commands::account::upsert_account,
+            commands::account::delete_account,
+            commands::contact::get_contacts,
+            commands::contact::upsert_contact,
+            commands::contact::delete_contact,
+            commands::deal::get_deals,
+            commands::deal::upsert_deal,
+            commands::deal::delete_deal,
+            commands::deal::update_deal_stage,
+            commands::activity::create_activity,
+            commands::activity::update_activity,
+            commands::activity::delete_activity,
+            commands::activity::get_activities_by_account,
+            commands::activity::get_activities_by_deal,
+            commands::activity::get_open_tasks,
             commands::kpi::get_kpis,
             commands::kpi::upsert_kpi,
             commands::kpi::delete_kpi,
-            commands::time_entry::get_time_entries,
-            commands::time_entry::add_time_entry,
-            commands::time_entry::delete_time_entry,
             commands::chat::get_chat_messages,
             commands::chat::add_chat_message,
             commands::chat::mark_chat_read,
@@ -166,12 +171,6 @@ fn main() {
             commands::folder::cmd_add_file,
             commands::folder::cmd_delete_file,
             commands::folder::cmd_import_file,
-            commands::crm::get_follow_ups,
-            commands::crm::upsert_follow_up,
-            commands::crm::delete_follow_up,
-            commands::deadline::get_deadlines,
-            commands::deadline::upsert_deadline,
-            commands::deadline::delete_deadline,
             commands::company::get_company_settings,
             commands::company::update_company_settings,
             email::commands::email_get_accounts,
