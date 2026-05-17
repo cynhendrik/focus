@@ -1,5 +1,9 @@
 use tauri::{AppHandle, State};
-use crate::{AppError, activity_engine, db::{self, activity::{Activity, CreateActivityPayload, UpdateActivityPayload}}, db::pool::DbPool};
+use crate::{
+    AppError, engine, activity_engine,
+    db::{self, activity::{Activity, CreateActivityPayload, UpdateActivityPayload}},
+    db::pool::DbPool,
+};
 
 #[tauri::command]
 pub fn create_activity(
@@ -7,7 +11,16 @@ pub fn create_activity(
     app: AppHandle,
     payload: CreateActivityPayload,
 ) -> Result<Activity, AppError> {
-    activity_engine::create(&db.conn(), &app, payload)
+    let conn = db.conn();
+    let activity = activity_engine::create(&*conn, &app, payload)?;
+    if let Some(outcome) = &activity.outcome {
+        engine::evaluate(&*conn, engine::CrmEvent::ActivityOutcome {
+            account_id:   activity.account_id.clone(),
+            workspace_id: activity.workspace_id.clone(),
+            outcome:      outcome.clone(),
+        })?;
+    }
+    Ok(activity)
 }
 
 #[tauri::command]
@@ -17,7 +30,16 @@ pub fn update_activity(
     id: String,
     payload: UpdateActivityPayload,
 ) -> Result<Activity, AppError> {
-    activity_engine::update(&db.conn(), &app, &id, payload)
+    let conn = db.conn();
+    let activity = activity_engine::update(&*conn, &app, &id, payload)?;
+    if let Some(outcome) = &activity.outcome {
+        engine::evaluate(&*conn, engine::CrmEvent::ActivityOutcome {
+            account_id:   activity.account_id.clone(),
+            workspace_id: activity.workspace_id.clone(),
+            outcome:      outcome.clone(),
+        })?;
+    }
+    Ok(activity)
 }
 
 #[tauri::command]
