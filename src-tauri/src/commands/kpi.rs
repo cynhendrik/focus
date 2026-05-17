@@ -2,8 +2,8 @@ use tauri::State;
 use crate::{AppError, db::{pool::DbPool, kpi::{self, Kpi, UpsertKpiPayload}}};
 
 #[tauri::command]
-pub async fn get_kpis(db: State<'_, DbPool>, customer_id: String) -> Result<Vec<Kpi>, AppError> {
-    kpi::get_by_customer(&db.conn(), &customer_id)
+pub async fn get_kpis(db: State<'_, DbPool>, account_id: String) -> Result<Vec<Kpi>, AppError> {
+    kpi::get_by_customer(&db.conn(), &account_id)
 }
 
 #[tauri::command]

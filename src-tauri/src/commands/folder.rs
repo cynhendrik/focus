@@ -2,8 +2,8 @@ use tauri::{Manager, State};
 use crate::{AppError, db::{pool::DbPool, folder::{self, Folder, FileEntry, CreateFolderPayload, AddFilePayload}}};
 
 #[tauri::command]
-pub async fn cmd_get_folders(db: State<'_, DbPool>, customer_id: String) -> Result<Vec<Folder>, AppError> {
-    folder::get_folders(&db.conn(), &customer_id)
+pub async fn cmd_get_folders(db: State<'_, DbPool>, account_id: String) -> Result<Vec<Folder>, AppError> {
+    folder::get_folders(&db.conn(), &account_id)
 }
 
 #[tauri::command]
@@ -17,8 +17,8 @@ pub async fn cmd_delete_folder(db: State<'_, DbPool>, id: String) -> Result<(), 
 }
 
 #[tauri::command]
-pub async fn cmd_get_files(db: State<'_, DbPool>, customer_id: String, folder_id: Option<String>) -> Result<Vec<FileEntry>, AppError> {
-    folder::get_files(&db.conn(), &customer_id, folder_id.as_deref())
+pub async fn cmd_get_files(db: State<'_, DbPool>, account_id: String, folder_id: Option<String>) -> Result<Vec<FileEntry>, AppError> {
+    folder::get_files(&db.conn(), &account_id, folder_id.as_deref())
 }
 
 #[tauri::command]
@@ -35,7 +35,7 @@ pub async fn cmd_delete_file(db: State<'_, DbPool>, id: String) -> Result<(), Ap
 pub async fn cmd_import_file(
     app: tauri::AppHandle,
     db: State<'_, DbPool>,
-    customer_id: String,
+    account_id: String,
     folder_id: Option<String>,
     name: String,
     data: Vec<u8>,
@@ -48,14 +48,14 @@ pub async fn cmd_import_file(
     let dest_dir = data_dir
         .join("cynera")
         .join("files")
-        .join(&customer_id)
+        .join(&account_id)
         .join(&file_id);
     std::fs::create_dir_all(&dest_dir)?;
     let dest = dest_dir.join(&name);
     std::fs::write(&dest, &data)?;
 
     let payload = AddFilePayload {
-        customer_id,
+        account_id,
         folder_id,
         name,
         path: dest.to_string_lossy().to_string(),

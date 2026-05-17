@@ -2,8 +2,8 @@ use tauri::State;
 use crate::{AppError, db::{pool::DbPool, chat_message::{self, ChatMessage, AddChatMessagePayload}}};
 
 #[tauri::command]
-pub async fn get_chat_messages(db: State<'_, DbPool>, customer_id: String) -> Result<Vec<ChatMessage>, AppError> {
-    chat_message::get_by_customer(&db.conn(), &customer_id)
+pub async fn get_chat_messages(db: State<'_, DbPool>, account_id: String) -> Result<Vec<ChatMessage>, AppError> {
+    chat_message::get_by_customer(&db.conn(), &account_id)
 }
 
 #[tauri::command]

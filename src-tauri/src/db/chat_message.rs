@@ -6,7 +6,7 @@ use crate::AppError;
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub id: String,
-    pub customer_id: String,
+    pub account_id: String,
     pub content: String,
     pub sender: String,
     pub read: bool,
@@ -16,21 +16,21 @@ pub struct ChatMessage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddChatMessagePayload {
-    pub customer_id: String,
+    pub account_id: String,
     pub content: String,
     pub sender: String,
 }
 
-pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<ChatMessage>, AppError> {
+pub fn get_by_customer(conn: &Connection, account_id: &str) -> Result<Vec<ChatMessage>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, customer_id, content, sender, read, created_at
-         FROM chat_messages WHERE customer_id = ?1 ORDER BY created_at ASC",
+        "SELECT id, account_id, content, sender, read, created_at
+         FROM chat_messages WHERE account_id = ?1 ORDER BY created_at ASC",
     )?;
     let messages = stmt
-        .query_map([customer_id], |row| {
+        .query_map([account_id], |row| {
             Ok(ChatMessage {
                 id: row.get(0)?,
-                customer_id: row.get(1)?,
+                account_id: row.get(1)?,
                 content: row.get(2)?,
                 sender: row.get(3)?,
                 read: row.get::<_, i32>(4)? != 0,
@@ -45,12 +45,12 @@ pub fn add(conn: &Connection, payload: AddChatMessagePayload) -> Result<ChatMess
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
-        "INSERT INTO chat_messages (id, customer_id, content, sender, read, created_at)
+        "INSERT INTO chat_messages (id, account_id, content, sender, read, created_at)
          VALUES (?1, ?2, ?3, ?4, 0, ?5)",
-        rusqlite::params![id, payload.customer_id, payload.content, payload.sender, now],
+        rusqlite::params![id, payload.account_id, payload.content, payload.sender, now],
     )?;
     Ok(ChatMessage {
-        id, customer_id: payload.customer_id,
+        id, account_id: payload.account_id,
         content: payload.content, sender: payload.sender,
         read: false, created_at: now,
     })
@@ -86,7 +86,7 @@ mod tests {
     fn add_creates_message() {
         let conn = setup();
         let msg = add(&conn, AddChatMessagePayload {
-            customer_id: "__cynera_privat__".to_string(),
+            account_id: "__cynera_privat__".to_string(),
             content: "Hallo".to_string(),
             sender: "user".to_string(),
         }).unwrap();
@@ -98,7 +98,7 @@ mod tests {
     fn mark_read_updates_flag() {
         let conn = setup();
         let msg = add(&conn, AddChatMessagePayload {
-            customer_id: "__cynera_privat__".to_string(),
+            account_id: "__cynera_privat__".to_string(),
             content: "X".to_string(), sender: "customer".to_string(),
         }).unwrap();
         mark_read(&conn, &msg.id).unwrap();
@@ -110,11 +110,11 @@ mod tests {
     fn get_by_customer_ordered_asc() {
         let conn = setup();
         add(&conn, AddChatMessagePayload {
-            customer_id: "__cynera_privat__".to_string(),
+            account_id: "__cynera_privat__".to_string(),
             content: "First".to_string(), sender: "user".to_string(),
         }).unwrap();
         add(&conn, AddChatMessagePayload {
-            customer_id: "__cynera_privat__".to_string(),
+            account_id: "__cynera_privat__".to_string(),
             content: "Second".to_string(), sender: "customer".to_string(),
         }).unwrap();
         let messages = get_by_customer(&conn, "__cynera_privat__").unwrap();
