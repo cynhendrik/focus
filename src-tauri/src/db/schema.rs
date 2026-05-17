@@ -19,6 +19,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             internal_notes  TEXT,
             is_private      INTEGER NOT NULL DEFAULT 0,
             social_links    TEXT NOT NULL DEFAULT '{}',
+            primary_deal_id TEXT,
+            lead_score      REAL NOT NULL DEFAULT 0,
             pending_sync    INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL
@@ -73,6 +75,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             status          TEXT NOT NULL DEFAULT 'open',
             due_at          TEXT,
             assignee        TEXT,
+            outcome         TEXT,
             pending_sync    INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL
@@ -84,6 +87,21 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             ON activities(deal_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_activities_contact
             ON activities(contact_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS pipeline_stages (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            name         TEXT NOT NULL,
+            label        TEXT NOT NULL,
+            order_index  INTEGER NOT NULL DEFAULT 0,
+            color        TEXT NOT NULL DEFAULT '#6B7280',
+            is_won       INTEGER NOT NULL DEFAULT 0,
+            is_lost      INTEGER NOT NULL DEFAULT 0,
+            created_at   TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
+            ON pipeline_stages(workspace_id, order_index);
 
         CREATE TABLE IF NOT EXISTS customers (
             id          TEXT PRIMARY KEY,
@@ -266,5 +284,34 @@ mod tests {
         assert!(tables.contains(&"contacts".to_string()));
         assert!(tables.contains(&"deals".to_string()));
         assert!(tables.contains(&"activities".to_string()));
+        assert!(tables.contains(&"pipeline_stages".to_string()));
+    }
+
+    #[test]
+    fn schema_has_pipeline_stages_table() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        create_tables(&conn).unwrap();
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(tables.contains(&"pipeline_stages".to_string()));
+        // Check new account columns exist
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(accounts)").unwrap()
+            .query_map([], |r| r.get(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(cols.contains(&"primary_deal_id".to_string()));
+        assert!(cols.contains(&"lead_score".to_string()));
+        // Check new activity column exists
+        let act_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(activities)").unwrap()
+            .query_map([], |r| r.get(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(act_cols.contains(&"outcome".to_string()));
     }
 }
