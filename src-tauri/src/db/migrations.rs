@@ -139,7 +139,7 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             if !column_exists(conn, "accounts", "lead_score") {
                 conn.execute_batch("ALTER TABLE accounts ADD COLUMN lead_score REAL NOT NULL DEFAULT 0;")?;
             }
-            if !column_exists(conn, "activities", "outcome") {
+            if table_exists(conn, "activities") && !column_exists(conn, "activities", "outcome") {
                 conn.execute_batch("ALTER TABLE activities ADD COLUMN outcome TEXT;")?;
             }
 

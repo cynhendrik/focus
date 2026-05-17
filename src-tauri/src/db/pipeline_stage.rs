@@ -142,9 +142,15 @@ pub fn reorder(conn: &Connection, workspace_id: &str, ordered_ids: &[String]) ->
 pub fn seed_defaults(conn: &Connection, workspace_id: &str) -> Result<(), AppError> {
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM pipeline_stages WHERE workspace_id = ?1",
-        [workspace_id], |r| r.get(0),
-    )?;
-    if count > 0 { return Ok(()); }
+        [workspace_id],
+        |r| r.get(0),
+    ).map_err(|e| AppError::Db(e.to_string()))?;
+    if count > 0 {
+        return Ok(());
+    }
+
+    let tx = conn.unchecked_transaction().map_err(|e| AppError::Db(e.to_string()))?;
+    let now = chrono::Utc::now().to_rfc3339();
     let defaults: &[(&str, &str, &str, bool, bool)] = &[
         ("lead",           "Lead",                "#6B7280", false, false),
         ("qualified",      "Qualifiziert",        "#3B82F6", false, false),
@@ -157,19 +163,19 @@ pub fn seed_defaults(conn: &Connection, workspace_id: &str) -> Result<(), AppErr
         ("won",            "Won",                 "#22C55E", true,  false),
         ("lost",           "Lost",                "#6B7280", false, true),
     ];
-    let now = chrono::Utc::now().to_rfc3339();
     for (idx, (name, label, color, is_won, is_lost)) in defaults.iter().enumerate() {
-        let id = uuid::Uuid::new_v4().to_string();
-        conn.execute(
-            "INSERT OR IGNORE INTO pipeline_stages
+        tx.execute(
+            "INSERT INTO pipeline_stages
              (id, workspace_id, name, label, order_index, color, is_won, is_lost, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)",
             rusqlite::params![
-                id, workspace_id, name, label, idx as i32,
+                uuid::Uuid::new_v4().to_string(),
+                workspace_id, name, label, idx as i32,
                 color, *is_won as i32, *is_lost as i32, now,
             ],
-        )?;
+        ).map_err(|e| AppError::Db(e.to_string()))?;
     }
+    tx.commit().map_err(|e| AppError::Db(e.to_string()))?;
     Ok(())
 }
 
