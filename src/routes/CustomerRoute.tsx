@@ -13,7 +13,6 @@ import { KommunikationPane } from '@/components/customer/tabs/KommunikationPane'
 import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { HistoriePane } from '@/components/customer/tabs/HistoriePane'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
-import { HealthPane } from '@/components/customer/tabs/HealthPane'
 
 function avatarBg(name: string): string {
   const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
@@ -37,8 +36,6 @@ function TabIcon({ id }: { id: CustomerTab }) {
     kommunikation: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
     dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
     historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
-    profil:        ['M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
-    health:        ['M22 12h-4l-3 9L9 3l-3 9H2'],
   }
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,8 +50,6 @@ const TABS: { id: CustomerTab; label: string }[] = [
   { id: 'kommunikation', label: 'Kommunikation' },
   { id: 'dateien',       label: 'Dateien' },
   { id: 'historie',      label: 'Historie' },
-  { id: 'profil',        label: 'Profil' },
-  { id: 'health',        label: 'Health / Insights' },
 ]
 
 interface Props { customerId: string }
@@ -65,6 +60,7 @@ export function CustomerRoute({ customerId }: Props) {
   const setTab      = useUiStore(s => s.setActiveCustomerTab)
   const setSelected = useUiStore(s => s.setSelectedCustomer)
   const [showEdit, setShowEdit] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   const loadTodos     = useTodosStore(s => s.loadForCustomer)
   const loadNotes     = useNotesStore(s => s.loadForCustomer)
@@ -89,8 +85,6 @@ export function CustomerRoute({ customerId }: Props) {
       case 'kommunikation': return <KommunikationPane customerId={customerId} />
       case 'dateien':       return <DateienPane customerId={customerId} />
       case 'historie':      return <HistoriePane customerId={customerId} />
-      case 'profil':        return <ProfilPane customerId={customerId} />
-      case 'health':        return <HealthPane customerId={customerId} />
     }
   }
 
@@ -115,6 +109,13 @@ export function CustomerRoute({ customerId }: Props) {
           <h1 className="text-xl font-bold text-[var(--text)] truncate">{customer.name}</h1>
           <p className="text-xs text-[var(--text2)]">Letzte Aktivität: {relativeTime(customer.updatedAt)}</p>
         </div>
+
+        <button
+          onClick={() => setShowDetails(true)}
+          className="px-4 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] text-sm font-medium hover:bg-[var(--bg1)] flex-shrink-0 transition-colors"
+        >
+          Details
+        </button>
 
         <button
           onClick={() => setShowEdit(true)}
@@ -149,6 +150,28 @@ export function CustomerRoute({ customerId }: Props) {
 
       {showEdit && (
         <CustomerModal customer={customer} onClose={() => setShowEdit(false)} />
+      )}
+
+      {showDetails && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDetails(false)} />
+          <div className="relative flex flex-col w-[480px] max-w-full h-full bg-[var(--bg)] border-l border-[var(--border)] shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] flex-shrink-0">
+              <h2 className="text-base font-bold text-[var(--text)]">Details</h2>
+              <button
+                onClick={() => setShowDetails(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)] transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <ProfilPane customerId={customerId} />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'dashboard' | 'workflow' | 'kommunikation' | 'dateien' | 'historie' | 'profil' | 'health'
+export type CustomerTab = 'dashboard' | 'workflow' | 'kommunikation' | 'dateien' | 'historie'
 export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'invoices' | 'tasks' | 'kpis' | 'insights'
