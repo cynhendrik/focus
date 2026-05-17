@@ -14,6 +14,7 @@ export const useAutomationStore = create<AutomationState>()((set) => ({
   isLoading: false,
 
   load: async (workspaceId) => {
+    if (!workspaceId) return
     set({ isLoading: true })
     try {
       const rules = await invoke<AutomationRule[]>('cmd_get_automation_rules', { workspaceId })
