@@ -6,6 +6,12 @@ export type ActivityType =
 
 export type ActivityStatus = 'open' | 'done' | 'cancelled'
 
+export type ActivityOutcome =
+  | 'strong_interest' | 'interest_follow_up' | 'proposal_requested'
+  | 'deal_won' | 'deal_lost'
+  | 'no_interest_later' | 'no_interest_lost'
+  | 'no_show' | 'reply_received' | 'no_reply' | 'waiting_for_reply'
+
 export interface Activity extends TimestampedEntity {
   id: string
   workspaceId: string
@@ -20,6 +26,7 @@ export interface Activity extends TimestampedEntity {
   status: ActivityStatus
   dueAt?: string
   assignee?: string
+  outcome?: ActivityOutcome
 }
 
 export interface CreateActivityPayload {
@@ -35,6 +42,7 @@ export interface CreateActivityPayload {
   status?: ActivityStatus
   dueAt?: string
   assignee?: string
+  outcome?: ActivityOutcome
 }
 
 export interface UpdateActivityPayload {
@@ -44,4 +52,5 @@ export interface UpdateActivityPayload {
   status?: ActivityStatus
   dueAt?: string
   assignee?: string
+  outcome?: ActivityOutcome
 }

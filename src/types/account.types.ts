@@ -20,6 +20,10 @@ export interface Account extends TimestampedEntity {
   internalNotes?: string
   isPrivate: boolean
   socialLinks: string
+  primaryDealId?: string
+  leadScore: number
+  pipelinePhase?: string
+  pipelinePhaseLabel?: string
 }
 
 export interface UpsertAccountPayload {
@@ -36,4 +40,5 @@ export interface UpsertAccountPayload {
   goals?: string[]
   internalNotes?: string
   socialLinks?: string
+  primaryDealId?: string
 }
