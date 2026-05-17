@@ -3,6 +3,7 @@ pub mod schema;
 pub mod migrations;
 pub mod account;
 pub mod contact;
+pub mod deal;
 pub mod customer;
 pub mod todo;
 pub mod note;
