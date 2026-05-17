@@ -7,6 +7,7 @@ mod commands;
 mod core;
 mod services;
 mod activity_engine;
+mod engine;
 
 pub use error::AppError;
 
