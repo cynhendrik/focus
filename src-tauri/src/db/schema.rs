@@ -97,7 +97,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             color        TEXT NOT NULL DEFAULT '#6B7280',
             is_won       INTEGER NOT NULL DEFAULT 0,
             is_lost      INTEGER NOT NULL DEFAULT 0,
-            created_at   TEXT NOT NULL
+            created_at   TEXT NOT NULL,
+            updated_at   TEXT NOT NULL
         );
 
         CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
@@ -292,14 +293,6 @@ mod tests {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
         create_tables(&conn).unwrap();
-        let tables: Vec<String> = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-            .unwrap()
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .filter_map(|r| r.ok())
-            .collect();
-        assert!(tables.contains(&"pipeline_stages".to_string()));
         // Check new account columns exist
         let cols: Vec<String> = conn
             .prepare("PRAGMA table_info(accounts)").unwrap()
@@ -313,5 +306,11 @@ mod tests {
             .query_map([], |r| r.get(1)).unwrap()
             .filter_map(|r| r.ok()).collect();
         assert!(act_cols.contains(&"outcome".to_string()));
+        // Check pipeline_stages columns exist
+        let ps_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(pipeline_stages)").unwrap()
+            .query_map([], |r| r.get(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(ps_cols.contains(&"updated_at".to_string()));
     }
 }
