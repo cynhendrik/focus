@@ -11,26 +11,26 @@ export interface ImportFileParams {
 
 export const FolderService = {
   getFolders(customerId: string): Promise<Folder[]> {
-    return invoke<Folder[]>('cmd_get_folders', { customerId })
+    return invoke<Folder[]>('cmd_get_folders', { accountId: customerId })
   },
   createFolder(payload: CreateFolderPayload): Promise<Folder> {
-    return invoke<Folder>('cmd_create_folder', { payload })
+    return invoke<Folder>('cmd_create_folder', { payload: { ...payload, accountId: payload.customerId } })
   },
   deleteFolder(id: string): Promise<void> {
     return invoke<void>('cmd_delete_folder', { id })
   },
   getFiles(customerId: string, folderId?: string | null): Promise<FileEntry[]> {
-    return invoke<FileEntry[]>('cmd_get_files', { customerId, folderId: folderId ?? null })
+    return invoke<FileEntry[]>('cmd_get_files', { accountId: customerId, folderId: folderId ?? null })
   },
   addFile(payload: AddFilePayload): Promise<FileEntry> {
-    return invoke<FileEntry>('cmd_add_file', { payload })
+    return invoke<FileEntry>('cmd_add_file', { payload: { ...payload, accountId: payload.customerId } })
   },
   deleteFile(id: string): Promise<void> {
     return invoke<void>('cmd_delete_file', { id })
   },
   importFile(params: ImportFileParams): Promise<FileEntry> {
     return invoke<FileEntry>('cmd_import_file', {
-      customerId: params.customerId,
+      accountId: params.customerId,
       folderId: params.folderId ?? null,
       name: params.name,
       data: params.data,
