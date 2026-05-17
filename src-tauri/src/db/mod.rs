@@ -10,3 +10,4 @@ pub mod folder;
 pub mod chat_message;
 pub mod company;
 pub mod pipeline_stage;
+pub mod automation_rule;

@@ -104,6 +104,23 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
             ON pipeline_stages(workspace_id, order_index);
 
+        CREATE TABLE IF NOT EXISTS automation_rules (
+            id             TEXT PRIMARY KEY,
+            workspace_id   TEXT NOT NULL,
+            name           TEXT NOT NULL,
+            is_system      INTEGER NOT NULL DEFAULT 0,
+            is_active      INTEGER NOT NULL DEFAULT 1,
+            trigger_type   TEXT NOT NULL,
+            trigger_filter TEXT NOT NULL DEFAULT '{}',
+            action_type    TEXT NOT NULL,
+            action_params  TEXT NOT NULL DEFAULT '{}',
+            order_index    INTEGER NOT NULL DEFAULT 0,
+            created_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_automation_rules_workspace
+            ON automation_rules(workspace_id, is_active, trigger_type);
+
         CREATE TABLE IF NOT EXISTS customers (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
