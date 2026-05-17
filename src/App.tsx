@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { AppShell }    from '@/components/layout/AppShell'
 import { NavSidebar }  from '@/components/layout/NavSidebar'
-import { useCustomersStore } from '@/store/customers.store'
+import { useAccountsStore } from '@/store/accounts.store'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -31,7 +31,7 @@ export default function App() {
   const authLoading     = useAuthStore(s => s.loading)
   const loadWorkspaces  = useWorkspaceStore(s => s.loadWorkspaces)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
-  const init            = useCustomersStore(s => s.init)
+  const init            = useAccountsStore(s => s.init)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
   const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
