@@ -22,6 +22,7 @@ pub struct Account {
     pub social_links: String,
     pub primary_deal_id: Option<String>,
     pub lead_score: f64,
+    pub score_factors: std::collections::HashMap<String, f64>,
     // Computed via JOIN, never stored on Account
     pub pipeline_phase: Option<String>,
     pub pipeline_phase_label: Option<String>,
@@ -51,6 +52,7 @@ pub struct UpsertAccountPayload {
 fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
     let tags_json: String = row.get(9)?;
     let goals_json: String = row.get(10)?;
+    let score_factors_json: String = row.get::<_, Option<String>>(17)?.unwrap_or_else(|| "{}".to_string());
     Ok(Account {
         id:                   row.get(0)?,
         workspace_id:         row.get(1)?,
@@ -69,10 +71,11 @@ fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
         social_links:         row.get::<_, Option<String>>(14)?.unwrap_or_else(|| "{}".to_string()),
         primary_deal_id:      row.get(15)?,
         lead_score:           row.get::<_, Option<f64>>(16)?.unwrap_or(0.0),
-        created_at:           row.get(17)?,
-        updated_at:           row.get(18)?,
-        pipeline_phase:       row.get(19)?,
-        pipeline_phase_label: row.get(20)?,
+        score_factors:        serde_json::from_str(&score_factors_json).unwrap_or_default(),
+        created_at:           row.get(18)?,
+        updated_at:           row.get(19)?,
+        pipeline_phase:       row.get(20)?,
+        pipeline_phase_label: row.get(21)?,
     })
 }
 
@@ -80,7 +83,7 @@ const JOIN_QUERY_ALL: &str = "
 SELECT
     a.id, a.workspace_id, a.created_by, a.name, a.kind, a.industry, a.website,
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
-    a.is_private, a.social_links, a.primary_deal_id, a.lead_score,
+    a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.created_at, a.updated_at,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
@@ -103,7 +106,7 @@ const JOIN_QUERY_BY_ID: &str = "
 SELECT
     a.id, a.workspace_id, a.created_by, a.name, a.kind, a.industry, a.website,
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
-    a.is_private, a.social_links, a.primary_deal_id, a.lead_score,
+    a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.created_at, a.updated_at,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
@@ -252,6 +255,13 @@ mod tests {
         assert_eq!(acc.kind, "company");
         assert_eq!(acc.workspace_id, "ws-1");
         assert!(!acc.is_private);
+    }
+
+    #[test]
+    fn upsert_returns_empty_score_factors_by_default() {
+        let conn = setup();
+        let acc = upsert(&conn, make_payload("acc-sf", "ws-1", "ScoreCo")).unwrap();
+        assert_eq!(acc.score_factors.len(), 0);
     }
 
     #[test]
