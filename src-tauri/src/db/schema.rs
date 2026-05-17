@@ -3,6 +3,88 @@ use crate::AppError;
 
 pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
     conn.execute_batch(r#"
+        CREATE TABLE IF NOT EXISTS accounts (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            name            TEXT NOT NULL,
+            kind            TEXT NOT NULL DEFAULT 'company',
+            industry        TEXT,
+            website         TEXT,
+            status          TEXT NOT NULL DEFAULT 'prospect',
+            priority        TEXT NOT NULL DEFAULT 'normal',
+            tags            TEXT NOT NULL DEFAULT '[]',
+            goals           TEXT NOT NULL DEFAULT '[]',
+            health_score    REAL,
+            internal_notes  TEXT,
+            is_private      INTEGER NOT NULL DEFAULT 0,
+            social_links    TEXT NOT NULL DEFAULT '{}',
+            pending_sync    INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS contacts (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            account_id      TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+            first_name      TEXT NOT NULL,
+            last_name       TEXT,
+            email           TEXT,
+            phone           TEXT,
+            role            TEXT,
+            is_primary      INTEGER NOT NULL DEFAULT 0,
+            avatar_url      TEXT,
+            pending_sync    INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS deals (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+            title           TEXT NOT NULL,
+            stage           TEXT NOT NULL DEFAULT 'prospect',
+            value           REAL,
+            currency        TEXT NOT NULL DEFAULT 'EUR',
+            probability     INTEGER,
+            expected_close  TEXT,
+            owner           TEXT,
+            pending_sync    INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS activities (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+            deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
+            type            TEXT NOT NULL,
+            title           TEXT,
+            body            TEXT,
+            payload         TEXT NOT NULL DEFAULT '{}',
+            status          TEXT NOT NULL DEFAULT 'open',
+            due_at          TEXT,
+            assignee        TEXT,
+            pending_sync    INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_activities_account
+            ON activities(account_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_activities_deal
+            ON activities(deal_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_activities_contact
+            ON activities(contact_id, created_at DESC);
+
         CREATE TABLE IF NOT EXISTS customers (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
@@ -162,4 +244,27 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         );
     "#)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_tables_created_in_schema() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        create_tables(&conn).unwrap();
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(tables.contains(&"accounts".to_string()));
+        assert!(tables.contains(&"contacts".to_string()));
+        assert!(tables.contains(&"deals".to_string()));
+        assert!(tables.contains(&"activities".to_string()));
+    }
 }
