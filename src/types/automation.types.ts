@@ -8,9 +8,9 @@ export interface AutomationRule {
   isSystem: boolean
   isActive: boolean
   triggerType: RuleTriggerType
-  triggerFilter: Record<string, string>
+  triggerFilter: string
   actionType: RuleActionType
-  actionParams: Record<string, string | number>
+  actionParams: string
   orderIndex: number
   createdAt: string
   updatedAt: string
