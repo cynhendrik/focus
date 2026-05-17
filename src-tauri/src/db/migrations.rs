@@ -119,261 +119,274 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 return Ok(());
             }
 
+            // Disable FK before transaction (pragmas can't run inside transactions)
             conn.execute_batch("PRAGMA foreign_keys = OFF;")?;
 
-            // 1. Migrate customers → accounts
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO accounts
-                    (id, workspace_id, created_by, name, kind, industry, status, priority,
-                     tags, goals, internal_notes, is_private, social_links, pending_sync,
-                     created_at, updated_at)
-                SELECT
-                    id, workspace_id, created_by, name,
-                    CASE WHEN company IS NOT NULL AND company != '' THEN 'company' ELSE 'individual' END,
-                    industry, status, priority, tags, goals, internal_notes, is_private,
-                    social_links, pending_sync, created_at, updated_at
-                FROM customers;
-            "#)?;
+            // Run migration in a transaction; re-enable FK regardless of outcome
+            let result = migrate_v5_body(conn);
 
-            // 2. Seed __cynera_privat__ in accounts
-            let now = chrono::Utc::now().to_rfc3339();
-            conn.execute(
-                "INSERT OR IGNORE INTO accounts
-                 (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
-                 VALUES ('__cynera_privat__', '', '', 'Privat', 'individual', 1, ?1, ?2)",
-                rusqlite::params![now, now],
-            )?;
+            // Always re-enable FK, even if migration failed
+            let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
 
-            // 3. Create contacts from customers with contact data
-            {
-                struct Row {
-                    id: String, ws: String, by: String,
-                    cp: Option<String>, email: Option<String>, phone: Option<String>,
-                    ca: String, ua: String,
-                }
-                let mut stmt = conn.prepare(
-                    "SELECT id, workspace_id, created_by, contact_person, email, phone, created_at, updated_at
-                     FROM customers WHERE contact_person IS NOT NULL OR email IS NOT NULL OR phone IS NOT NULL"
-                )?;
-                let rows: Vec<Row> = stmt.query_map([], |r| Ok(Row {
-                    id: r.get(0)?, ws: r.get(1)?, by: r.get(2)?,
-                    cp: r.get(3)?, email: r.get(4)?, phone: r.get(5)?,
-                    ca: r.get(6)?, ua: r.get(7)?,
-                }))?.collect::<Result<_, _>>()?;
-                for row in rows {
-                    let cid = uuid::Uuid::new_v4().to_string();
-                    let first_name = row.cp
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_else(|| "Unbekannt".to_string());
-                    conn.execute(
-                        "INSERT OR IGNORE INTO contacts
-                         (id, workspace_id, created_by, account_id, first_name, email, phone,
-                          is_primary, pending_sync, created_at, updated_at)
-                         VALUES (?1,?2,?3,?4,?5,?6,?7,1,0,?8,?9)",
-                        rusqlite::params![cid, row.ws, row.by, row.id, first_name, row.email, row.phone, row.ca, row.ua],
-                    )?;
-                }
-            }
-
-            // 4. Migrate notes → activities(type:'note')
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO activities
-                    (id, workspace_id, created_by, account_id, type, title, body,
-                     payload, status, pending_sync, created_at, updated_at)
-                SELECT id, workspace_id, created_by, customer_id, 'note', title, content,
-                    json_object('note_type', note_type, 'waiting_reply', waiting_reply),
-                    'done', pending_sync, created_at, updated_at
-                FROM notes;
-            "#)?;
-
-            // 5. Migrate todos → activities(type:'task')
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO activities
-                    (id, workspace_id, created_by, account_id, type, title,
-                     payload, status, due_at, assignee, pending_sync, created_at, updated_at)
-                SELECT id, workspace_id, created_by, customer_id, 'task', title,
-                    json_object('checklist', checklist, 'tags', tags, 'is_follow_up', 0),
-                    CASE WHEN status='done' THEN 'done' WHEN status='cancelled' THEN 'cancelled' ELSE 'open' END,
-                    due_date, assignee, pending_sync, created_at, updated_at
-                FROM todos;
-            "#)?;
-
-            // 6. Migrate crm_follow_ups → activities(type:'task', is_follow_up:1)
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO activities
-                    (id, workspace_id, created_by, account_id, type, title,
-                     payload, status, due_at, pending_sync, created_at, updated_at)
-                SELECT id, workspace_id, created_by, customer_id, 'task', title,
-                    json_object('is_follow_up', 1),
-                    CASE WHEN status='erledigt' THEN 'done' ELSE 'open' END,
-                    due_date, 0, created_at, created_at
-                FROM crm_follow_ups;
-            "#)?;
-
-            // 7. Migrate deadlines → activities(type:'task')
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO activities
-                    (id, workspace_id, created_by, account_id, type, title,
-                     payload, status, due_at, pending_sync, created_at, updated_at)
-                SELECT id, workspace_id, created_by, customer_id, 'task', title,
-                    json_object('is_follow_up', 0),
-                    CASE WHEN done=1 THEN 'done' ELSE 'open' END,
-                    due_date, 0, created_at, created_at
-                FROM deadlines;
-            "#)?;
-
-            // 8. Migrate time_entries → activities(type:'time_entry')
-            conn.execute_batch(r#"
-                INSERT OR IGNORE INTO activities
-                    (id, workspace_id, created_by, account_id, type, title,
-                     payload, status, due_at, pending_sync, created_at, updated_at)
-                SELECT id, workspace_id, created_by, customer_id, 'time_entry', description,
-                    json_object('minutes', minutes),
-                    'done', date, 0, created_at, created_at
-                FROM time_entries;
-            "#)?;
-
-            // 9. Cache health_score on accounts
-            conn.execute_batch(r#"
-                UPDATE accounts SET health_score = (
-                    SELECT score FROM health_scores
-                    WHERE health_scores.customer_id = accounts.id
-                    ORDER BY recorded_at DESC LIMIT 1
-                )
-                WHERE EXISTS (
-                    SELECT 1 FROM health_scores WHERE health_scores.customer_id = accounts.id
-                );
-            "#)?;
-
-            // 10. Rebuild kpis with account_id
-            conn.execute_batch(r#"
-                CREATE TABLE kpis_new (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL DEFAULT '',
-                    created_by   TEXT NOT NULL DEFAULT '',
-                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                    label        TEXT NOT NULL,
-                    value        REAL,
-                    unit         TEXT,
-                    target       REAL,
-                    period       TEXT,
-                    pending_sync INTEGER NOT NULL DEFAULT 0,
-                    updated_at   TEXT NOT NULL
-                );
-                INSERT OR IGNORE INTO kpis_new
-                    SELECT id, workspace_id, created_by, customer_id, label, value, unit, target, period, pending_sync, updated_at
-                    FROM kpis;
-                DROP TABLE kpis;
-                ALTER TABLE kpis_new RENAME TO kpis;
-            "#)?;
-
-            // 11. Rebuild folders with account_id
-            conn.execute_batch(r#"
-                CREATE TABLE folders_new (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL DEFAULT '',
-                    created_by   TEXT NOT NULL DEFAULT '',
-                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                    name         TEXT NOT NULL,
-                    parent_id    TEXT,
-                    pending_sync INTEGER NOT NULL DEFAULT 0,
-                    created_at   TEXT NOT NULL
-                );
-                INSERT OR IGNORE INTO folders_new
-                    SELECT id, workspace_id, created_by, customer_id, name, parent_id, pending_sync, created_at
-                    FROM folders;
-                DROP TABLE folders;
-                ALTER TABLE folders_new RENAME TO folders;
-            "#)?;
-
-            // 12. Rebuild files with account_id
-            conn.execute_batch(r#"
-                CREATE TABLE files_new (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL DEFAULT '',
-                    created_by   TEXT NOT NULL DEFAULT '',
-                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                    folder_id    TEXT REFERENCES folders(id) ON DELETE CASCADE,
-                    name         TEXT NOT NULL,
-                    path         TEXT NOT NULL,
-                    size         INTEGER,
-                    mime_type    TEXT,
-                    pending_sync INTEGER NOT NULL DEFAULT 0,
-                    created_at   TEXT NOT NULL
-                );
-                INSERT OR IGNORE INTO files_new
-                    SELECT id, workspace_id, created_by, customer_id, folder_id, name, path, size, mime_type, pending_sync, created_at
-                    FROM files;
-                DROP TABLE files;
-                ALTER TABLE files_new RENAME TO files;
-            "#)?;
-
-            // 13. Rebuild chat_messages with account_id
-            conn.execute_batch(r#"
-                CREATE TABLE chat_messages_new (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL DEFAULT '',
-                    created_by   TEXT NOT NULL DEFAULT '',
-                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                    content      TEXT NOT NULL,
-                    sender       TEXT NOT NULL,
-                    read         INTEGER NOT NULL DEFAULT 0,
-                    pending_sync INTEGER NOT NULL DEFAULT 0,
-                    created_at   TEXT NOT NULL
-                );
-                INSERT OR IGNORE INTO chat_messages_new
-                    SELECT id, workspace_id, created_by, customer_id, content, sender, read, pending_sync, created_at
-                    FROM chat_messages;
-                DROP TABLE chat_messages;
-                ALTER TABLE chat_messages_new RENAME TO chat_messages;
-            "#)?;
-
-            // 14. Rebuild emails with crm_account_id
-            // Original schema: id, account_id (email_accounts FK), message_id, from_addr, to_addr,
-            //                  subject, preview, body, received_at, read, customer_id (customers FK), tags
-            // After v2: also has workspace_id, created_by, pending_sync
-            // After migration: customer_id becomes crm_account_id referencing accounts(id)
-            conn.execute_batch(r#"
-                CREATE TABLE emails_new (
-                    id              TEXT PRIMARY KEY,
-                    workspace_id    TEXT NOT NULL DEFAULT '',
-                    crm_account_id  TEXT REFERENCES accounts(id),
-                    account_id      TEXT REFERENCES email_accounts(id) ON DELETE CASCADE,
-                    message_id      TEXT,
-                    from_addr       TEXT,
-                    to_addr         TEXT,
-                    subject         TEXT,
-                    preview         TEXT,
-                    body            TEXT,
-                    received_at     TEXT,
-                    read            INTEGER NOT NULL DEFAULT 0,
-                    tags            TEXT NOT NULL DEFAULT '[]'
-                );
-                INSERT OR IGNORE INTO emails_new
-                    SELECT id, workspace_id, customer_id, account_id,
-                           message_id, from_addr, to_addr, subject, preview, body,
-                           received_at, read, tags
-                    FROM emails;
-                DROP TABLE emails;
-                ALTER TABLE emails_new RENAME TO emails;
-            "#)?;
-
-            // 15. Drop old tables
-            conn.execute_batch(r#"
-                DROP TABLE IF EXISTS health_scores;
-                DROP TABLE IF EXISTS crm_follow_ups;
-                DROP TABLE IF EXISTS deadlines;
-                DROP TABLE IF EXISTS time_entries;
-                DROP TABLE IF EXISTS notes;
-                DROP TABLE IF EXISTS todos;
-                DROP TABLE IF EXISTS customers;
-            "#)?;
-
-            conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-            Ok(())
+            result
         }
         _ => Ok(()),
     }
+}
+
+fn migrate_v5_body(conn: &Connection) -> Result<(), AppError> {
+    conn.execute_batch("BEGIN;")?;
+
+    // 1. Migrate customers → accounts
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO accounts
+            (id, workspace_id, created_by, name, kind, industry, status, priority,
+             tags, goals, internal_notes, is_private, social_links, pending_sync,
+             created_at, updated_at)
+        SELECT
+            id, workspace_id, created_by, name,
+            CASE WHEN company IS NOT NULL AND company != '' THEN 'company' ELSE 'individual' END,
+            industry, status, priority, tags, goals, internal_notes, is_private,
+            social_links, pending_sync, created_at, updated_at
+        FROM customers;
+    "#)?;
+
+    // 2. Seed __cynera_privat__ in accounts
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT OR IGNORE INTO accounts
+         (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+         VALUES ('__cynera_privat__', '', '', 'Privat', 'individual', 1, ?1, ?2)",
+        rusqlite::params![now, now],
+    )?;
+
+    // 3. Create contacts from customers with contact data
+    {
+        struct Row {
+            id: String, ws: String, by: String,
+            cp: Option<String>, email: Option<String>, phone: Option<String>,
+            ca: String, ua: String,
+        }
+        let mut stmt = conn.prepare(
+            "SELECT id, workspace_id, created_by, contact_person, email, phone, created_at, updated_at
+             FROM customers WHERE contact_person IS NOT NULL OR email IS NOT NULL OR phone IS NOT NULL"
+        )?;
+        let rows: Vec<Row> = stmt.query_map([], |r| Ok(Row {
+            id: r.get(0)?, ws: r.get(1)?, by: r.get(2)?,
+            cp: r.get(3)?, email: r.get(4)?, phone: r.get(5)?,
+            ca: r.get(6)?, ua: r.get(7)?,
+        }))?.collect::<Result<_, _>>()?;
+        for row in rows {
+            let cid = uuid::Uuid::new_v4().to_string();
+            let first_name = row.cp
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "Unbekannt".to_string());
+            conn.execute(
+                "INSERT OR IGNORE INTO contacts
+                 (id, workspace_id, created_by, account_id, first_name, email, phone,
+                  is_primary, pending_sync, created_at, updated_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,1,0,?8,?9)",
+                rusqlite::params![cid, row.ws, row.by, row.id, first_name, row.email, row.phone, row.ca, row.ua],
+            )?;
+        }
+    }
+
+    // 4. Migrate notes → activities(type:'note')
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO activities
+            (id, workspace_id, created_by, account_id, type, title, body,
+             payload, status, pending_sync, created_at, updated_at)
+        SELECT id, workspace_id, created_by, customer_id, 'note', title, content,
+            json_object('note_type', note_type, 'waiting_reply', waiting_reply),
+            'done', pending_sync, created_at, updated_at
+        FROM notes;
+    "#)?;
+
+    // 5. Migrate todos → activities(type:'task')
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO activities
+            (id, workspace_id, created_by, account_id, type, title,
+             payload, status, due_at, assignee, pending_sync, created_at, updated_at)
+        SELECT id, workspace_id, created_by, customer_id, 'task', title,
+            json_object('checklist', checklist, 'tags', tags, 'is_follow_up', 0),
+            CASE WHEN status='done' THEN 'done' WHEN status='cancelled' THEN 'cancelled' ELSE 'open' END,
+            due_date, assignee, pending_sync, created_at, updated_at
+        FROM todos;
+    "#)?;
+
+    // 6. Migrate crm_follow_ups → activities(type:'task', is_follow_up:1)
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO activities
+            (id, workspace_id, created_by, account_id, type, title,
+             payload, status, due_at, pending_sync, created_at, updated_at)
+        SELECT id, workspace_id, created_by, customer_id, 'task', title,
+            json_object('is_follow_up', 1),
+            CASE WHEN status='erledigt' THEN 'done' ELSE 'open' END,
+            due_date, 0, created_at, created_at
+        FROM crm_follow_ups;
+    "#)?;
+
+    // 7. Migrate deadlines → activities(type:'task')
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO activities
+            (id, workspace_id, created_by, account_id, type, title,
+             payload, status, due_at, pending_sync, created_at, updated_at)
+        SELECT id, workspace_id, created_by, customer_id, 'task', title,
+            json_object('is_follow_up', 0),
+            CASE WHEN done=1 THEN 'done' ELSE 'open' END,
+            due_date, 0, created_at, created_at
+        FROM deadlines;
+    "#)?;
+
+    // 8. Migrate time_entries → activities(type:'time_entry')
+    conn.execute_batch(r#"
+        INSERT OR IGNORE INTO activities
+            (id, workspace_id, created_by, account_id, type, title,
+             payload, status, due_at, pending_sync, created_at, updated_at)
+        SELECT id, workspace_id, created_by, customer_id, 'time_entry', description,
+            json_object('minutes', minutes),
+            'done', date, 0, created_at, created_at
+        FROM time_entries;
+    "#)?;
+
+    // 9. Cache health_score on accounts
+    conn.execute_batch(r#"
+        UPDATE accounts SET health_score = (
+            SELECT score FROM health_scores
+            WHERE health_scores.customer_id = accounts.id
+            ORDER BY recorded_at DESC LIMIT 1
+        )
+        WHERE EXISTS (
+            SELECT 1 FROM health_scores WHERE health_scores.customer_id = accounts.id
+        );
+    "#)?;
+
+    // 10. Rebuild kpis with account_id
+    conn.execute_batch(r#"
+        CREATE TABLE kpis_new (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL DEFAULT '',
+            created_by   TEXT NOT NULL DEFAULT '',
+            account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            label        TEXT NOT NULL,
+            value        REAL,
+            unit         TEXT,
+            target       REAL,
+            period       TEXT,
+            pending_sync INTEGER NOT NULL DEFAULT 0,
+            updated_at   TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO kpis_new
+            SELECT id, workspace_id, created_by, customer_id, label, value, unit, target, period, pending_sync, updated_at
+            FROM kpis;
+        DROP TABLE kpis;
+        ALTER TABLE kpis_new RENAME TO kpis;
+    "#)?;
+
+    // 11. Rebuild folders with account_id
+    conn.execute_batch(r#"
+        CREATE TABLE folders_new (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL DEFAULT '',
+            created_by   TEXT NOT NULL DEFAULT '',
+            account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            name         TEXT NOT NULL,
+            parent_id    TEXT,
+            pending_sync INTEGER NOT NULL DEFAULT 0,
+            created_at   TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO folders_new
+            SELECT id, workspace_id, created_by, customer_id, name, parent_id, pending_sync, created_at
+            FROM folders;
+        DROP TABLE folders;
+        ALTER TABLE folders_new RENAME TO folders;
+    "#)?;
+
+    // 12. Rebuild files with account_id
+    conn.execute_batch(r#"
+        CREATE TABLE files_new (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL DEFAULT '',
+            created_by   TEXT NOT NULL DEFAULT '',
+            account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            folder_id    TEXT REFERENCES folders(id) ON DELETE CASCADE,
+            name         TEXT NOT NULL,
+            path         TEXT NOT NULL,
+            size         INTEGER,
+            mime_type    TEXT,
+            pending_sync INTEGER NOT NULL DEFAULT 0,
+            created_at   TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO files_new
+            SELECT id, workspace_id, created_by, customer_id, folder_id, name, path, size, mime_type, pending_sync, created_at
+            FROM files;
+        DROP TABLE files;
+        ALTER TABLE files_new RENAME TO files;
+    "#)?;
+
+    // 13. Rebuild chat_messages with account_id
+    conn.execute_batch(r#"
+        CREATE TABLE chat_messages_new (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL DEFAULT '',
+            created_by   TEXT NOT NULL DEFAULT '',
+            account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            content      TEXT NOT NULL,
+            sender       TEXT NOT NULL,
+            read         INTEGER NOT NULL DEFAULT 0,
+            pending_sync INTEGER NOT NULL DEFAULT 0,
+            created_at   TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO chat_messages_new
+            SELECT id, workspace_id, created_by, customer_id, content, sender, read, pending_sync, created_at
+            FROM chat_messages;
+        DROP TABLE chat_messages;
+        ALTER TABLE chat_messages_new RENAME TO chat_messages;
+    "#)?;
+
+    // 14. Rebuild emails with crm_account_id
+    // Original schema: id, account_id (email_accounts FK), message_id, from_addr, to_addr,
+    //                  subject, preview, body, received_at, read, customer_id (customers FK), tags
+    // After v2: also has workspace_id, created_by, pending_sync
+    // After migration: customer_id becomes crm_account_id referencing accounts(id)
+    conn.execute_batch(r#"
+        CREATE TABLE emails_new (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            crm_account_id  TEXT REFERENCES accounts(id),
+            account_id      TEXT REFERENCES email_accounts(id) ON DELETE CASCADE,
+            message_id      TEXT,
+            from_addr       TEXT,
+            to_addr         TEXT,
+            subject         TEXT,
+            preview         TEXT,
+            body            TEXT,
+            received_at     TEXT,
+            read            INTEGER NOT NULL DEFAULT 0,
+            tags            TEXT NOT NULL DEFAULT '[]'
+        );
+        INSERT OR IGNORE INTO emails_new
+            SELECT id, workspace_id, customer_id, account_id,
+                   message_id, from_addr, to_addr, subject, preview, body,
+                   received_at, read, tags
+            FROM emails;
+        DROP TABLE emails;
+        ALTER TABLE emails_new RENAME TO emails;
+    "#)?;
+
+    // 15. Drop old tables
+    conn.execute_batch(r#"
+        DROP TABLE IF EXISTS health_scores;
+        DROP TABLE IF EXISTS crm_follow_ups;
+        DROP TABLE IF EXISTS deadlines;
+        DROP TABLE IF EXISTS time_entries;
+        DROP TABLE IF EXISTS notes;
+        DROP TABLE IF EXISTS todos;
+        DROP TABLE IF EXISTS customers;
+    "#)?;
+
+    conn.execute_batch("COMMIT;")?;
+    Ok(())
 }
 
 #[cfg(test)]
