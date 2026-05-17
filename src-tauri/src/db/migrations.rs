@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 6;
+const CURRENT_VERSION: u32 = 7;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -172,6 +172,49 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             };
             for ws_id in &workspace_ids {
                 crate::db::pipeline_stage::seed_defaults(conn, ws_id)?;
+            }
+
+            Ok(())
+        }
+        7 => {
+            if !table_exists(conn, "accounts") { return Ok(()); }
+
+            if !column_exists(conn, "accounts", "score_factors") {
+                conn.execute_batch(
+                    "ALTER TABLE accounts ADD COLUMN score_factors TEXT NOT NULL DEFAULT '{}';"
+                )?;
+            }
+
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS automation_rules (
+                    id             TEXT PRIMARY KEY,
+                    workspace_id   TEXT NOT NULL,
+                    name           TEXT NOT NULL,
+                    is_system      INTEGER NOT NULL DEFAULT 0,
+                    is_active      INTEGER NOT NULL DEFAULT 1,
+                    trigger_type   TEXT NOT NULL,
+                    trigger_filter TEXT NOT NULL DEFAULT '{}',
+                    action_type    TEXT NOT NULL,
+                    action_params  TEXT NOT NULL DEFAULT '{}',
+                    order_index    INTEGER NOT NULL DEFAULT 0,
+                    created_at     TEXT NOT NULL,
+                    updated_at     TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_automation_rules_workspace
+                    ON automation_rules(workspace_id, is_active, trigger_type);
+            "#)?;
+
+            let workspace_ids: Vec<String> = {
+                let mut stmt = conn.prepare(
+                    "SELECT DISTINCT workspace_id FROM accounts WHERE workspace_id != ''"
+                )?;
+                let ids = stmt.query_map([], |r| r.get(0))?
+                    .collect::<Result<Vec<String>, _>>()
+                    .map_err(|e| AppError::Db(e.to_string()))?;
+                ids
+            };
+            for ws_id in &workspace_ids {
+                crate::db::automation_rule::seed_defaults(conn, ws_id)?;
             }
 
             Ok(())
@@ -622,5 +665,34 @@ mod tests {
             .filter_map(|r| r.ok())
             .collect();
         assert!(act_cols.contains(&"outcome".to_string()), "outcome missing");
+    }
+
+    #[test]
+    fn migration_v7_adds_score_factors() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        let cols: Vec<String> = conn.prepare("PRAGMA table_info(accounts)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(cols.contains(&"score_factors".to_string()), "score_factors missing");
+        assert!(table_exists_helper(&conn, "automation_rules"), "automation_rules missing");
+    }
+
+    #[test]
+    fn migration_v7_seeds_rules_for_workspace() {
+        let conn = in_memory_db();
+        let now = "2026-01-01T00:00:00Z";
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-1', 'ws-rules', '', 'Test', 'individual', 0, ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
+        run(&conn).unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM automation_rules WHERE workspace_id = 'ws-rules' AND is_system = 1",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 15);
     }
 }
