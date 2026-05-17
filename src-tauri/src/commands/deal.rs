@@ -38,6 +38,7 @@ pub fn update_deal_stage(
         status: Some("done".into()),
         due_at: None,
         assignee: None,
+        outcome: None,
     });
     Ok(updated)
 }
