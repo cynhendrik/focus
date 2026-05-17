@@ -1,5 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use crate::AppError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,7 +23,7 @@ pub struct Account {
     pub social_links: String,
     pub primary_deal_id: Option<String>,
     pub lead_score: f64,
-    pub score_factors: std::collections::HashMap<String, f64>,
+    pub score_factors: HashMap<String, f64>,
     // Computed via JOIN, never stored on Account
     pub pipeline_phase: Option<String>,
     pub pipeline_phase_label: Option<String>,
@@ -262,6 +263,20 @@ mod tests {
         let conn = setup();
         let acc = upsert(&conn, make_payload("acc-sf", "ws-1", "ScoreCo")).unwrap();
         assert_eq!(acc.score_factors.len(), 0);
+    }
+
+    #[test]
+    fn score_factors_roundtrip_from_raw_sql() {
+        let conn = setup();
+        let acc = upsert(&conn, make_payload("acc-sf2", "ws-1", "ScoreRoundtrip")).unwrap();
+        conn.execute(
+            "UPDATE accounts SET score_factors = '{\"strong_interest\":25.0,\"deal_won\":40.0}' WHERE id = ?1",
+            [&acc.id],
+        ).unwrap();
+        let updated = get_by_id(&conn, &acc.id).unwrap();
+        assert_eq!(updated.score_factors.get("strong_interest"), Some(&25.0));
+        assert_eq!(updated.score_factors.get("deal_won"), Some(&40.0));
+        assert_eq!(updated.score_factors.len(), 2);
     }
 
     #[test]
