@@ -120,8 +120,8 @@ function RevenueChart() {
           <AreaChart data={REVENUE_DATA} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#DC2626" stopOpacity={0.25} />
-                <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
@@ -148,7 +148,7 @@ function RevenueChart() {
             <Area
               type="monotone"
               dataKey="value"
-              stroke="#DC2626"
+              stroke="var(--primary)"
               strokeWidth={2}
               fill="url(#revGradient)"
               dot={false}
