@@ -56,6 +56,21 @@ pub fn get_all(conn: &Connection, workspace_id: &str) -> Result<Vec<PipelineStag
 }
 
 pub fn upsert(conn: &Connection, payload: UpsertPipelineStagePayload) -> Result<PipelineStage, AppError> {
+    if let Some(ref existing_id) = payload.id {
+        let result = conn.query_row(
+            "SELECT workspace_id FROM pipeline_stages WHERE id = ?1",
+            [existing_id],
+            |r| r.get::<_, String>(0),
+        );
+        match result {
+            Ok(ws_id) if ws_id != payload.workspace_id => {
+                return Err(AppError::Validation("stage does not belong to workspace".to_string()));
+            }
+            Ok(_) => {} // same workspace, proceed
+            Err(rusqlite::Error::QueryReturnedNoRows) => {} // new insert, proceed
+            Err(e) => return Err(AppError::Db(e.to_string())),
+        }
+    }
     let id = payload.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
@@ -113,13 +128,14 @@ pub fn delete(conn: &Connection, id: &str, workspace_id: &str) -> Result<(), App
 }
 
 pub fn reorder(conn: &Connection, workspace_id: &str, ordered_ids: &[String]) -> Result<(), AppError> {
-    for (idx, id) in ordered_ids.iter().enumerate() {
-        conn.execute(
-            "UPDATE pipeline_stages SET order_index = ?1
-             WHERE id = ?2 AND workspace_id = ?3",
-            rusqlite::params![idx as i32, id, workspace_id],
-        )?;
+    let tx = conn.unchecked_transaction().map_err(|e| AppError::Db(e.to_string()))?;
+    for (index, id) in ordered_ids.iter().enumerate() {
+        tx.execute(
+            "UPDATE pipeline_stages SET order_index = ?1, updated_at = ?2 WHERE id = ?3 AND workspace_id = ?4",
+            rusqlite::params![index as i32, chrono::Utc::now().to_rfc3339(), id, workspace_id],
+        ).map_err(|e| AppError::Db(e.to_string()))?;
     }
+    tx.commit().map_err(|e| AppError::Db(e.to_string()))?;
     Ok(())
 }
 
@@ -224,6 +240,29 @@ mod tests {
         }).unwrap();
         assert_eq!(updated.id, created.id);
         assert_eq!(updated.label, "New");
+    }
+
+    #[test]
+    fn upsert_rejects_cross_workspace_update() {
+        let conn = setup();
+        // seed defaults for ws-1
+        seed_defaults(&conn, "ws-1").unwrap();
+        // get a stage id from ws-1
+        let stages = get_all(&conn, "ws-1").unwrap();
+        let stage_id = stages[0].id.clone();
+        // attempt to upsert with ws-2 and the ws-1 id
+        let payload = UpsertPipelineStagePayload {
+            id: Some(stage_id),
+            workspace_id: "ws-2".to_string(),
+            name: "hack".to_string(),
+            label: "Hack".to_string(),
+            order_index: None,
+            color: None,
+            is_won: None,
+            is_lost: None,
+        };
+        let result = upsert(&conn, payload);
+        assert!(matches!(result, Err(AppError::Validation(_))));
     }
 
     #[test]
