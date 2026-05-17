@@ -324,6 +324,53 @@ mod tests {
     }
 
     #[test]
+    fn get_all_falls_back_to_newest_active_deal() {
+        let conn = setup();
+        let now = "2026-01-01T00:00:00Z";
+        // Insert account with no primary_deal_id
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-fb', 'ws-1', '', 'FallbackCo', 'company', 0, ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
+        // Insert pipeline stages: 'lead' (active), 'qualified' (active), 'won' (terminal)
+        for (id, name, label, order, color, is_won, is_lost) in [
+            ("ps-lead", "lead",      "Lead",        0i32, "#6B7280", 0i32, 0i32),
+            ("ps-qual", "qualified", "Qualifiziert", 1,    "#3B82F6", 0,    0),
+            ("ps-won",  "won",       "Won",          8,    "#22C55E", 1,    0),
+        ] {
+            conn.execute(
+                "INSERT INTO pipeline_stages (id, workspace_id, name, label, order_index, color, is_won, is_lost, created_at, updated_at)
+                 VALUES (?1, 'ws-1', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                rusqlite::params![id, name, label, order, color, is_won, is_lost, now, now],
+            ).unwrap();
+        }
+        // Insert two active deals: older 'lead' and newer 'qualified'
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-old', 'ws-1', 'acc-fb', 'Old', 'lead', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-new', 'ws-1', 'acc-fb', 'New', 'qualified', '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        // Insert a won deal that should NOT be picked up by the fallback
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-won', 'ws-1', 'acc-fb', 'Won', 'won', '2026-01-01T00:00:00Z', '2026-03-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        // Fallback should return the newest active (non-won/non-lost) deal = deal-new (stage: qualified)
+        let accounts = get_all(&conn, "ws-1").unwrap();
+        let acc = accounts.iter().find(|a| a.id == "acc-fb").unwrap();
+        assert_eq!(acc.pipeline_phase.as_deref(), Some("qualified"));
+        assert_eq!(acc.pipeline_phase_label.as_deref(), Some("Qualifiziert"));
+        assert!(acc.primary_deal_id.is_none());
+    }
+
+    #[test]
     fn set_primary_deal_updates_and_returns_account() {
         let conn = setup();
         let now = "2026-01-01T00:00:00Z";
