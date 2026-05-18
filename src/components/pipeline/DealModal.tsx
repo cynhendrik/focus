@@ -28,6 +28,8 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
   const [expectedClose, setExpectedClose] = useState(initial?.expectedClose ?? '')
   const [saving, setSaving] = useState(false)
 
+  const lockedCustomer = presetCustomerId ? customers.find(c => c.id === presetCustomerId) : null
+
   useEffect(() => {
     if (stages.length > 0 && !stage) setStage(stages[0].name)
   }, [stages])
@@ -63,35 +65,56 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 400, maxWidth: '90vw' }}>
+      <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 420, maxWidth: '90vw' }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>
-          {initial ? 'Deal bearbeiten' : 'Neuer Deal'}
+          {initial ? 'Deal bearbeiten' : 'Zur Pipeline hinzufügen'}
         </h2>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Kunde — fixe Badge wenn aus Kundenprofil, sonst Dropdown mit Profilinfos */}
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Titel</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Kunde</label>
+            {lockedCustomer ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 12px', borderRadius: 8,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{lockedCustomer.name}</div>
+                  {(lockedCustomer.company || lockedCustomer.email) && (
+                    <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 1 }}>
+                      {lockedCustomer.company ?? lockedCustomer.email}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <select className="mock-input" value={customerId} onChange={e => setCustomerId(e.target.value)}>
+                <option value="">— Kunden auswählen —</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}{c.company ? ` · ${c.company}` : ''}{c.email ? ` (${c.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Wofür — Hauptfeld */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Wofür</label>
             <input
               className="mock-input"
               value={title}
               onChange={e => setTitle(e.target.value)}
-              placeholder="z.B. Website Relaunch"
-              autoFocus
+              placeholder="z.B. Website Relaunch, SEO-Paket, Retainer…"
+              autoFocus={!lockedCustomer}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Kunde</label>
-            <select className="mock-input" value={customerId} onChange={e => setCustomerId(e.target.value)}>
-              <option value="">— Kein Kunde —</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Stage</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Phase</label>
             <select className="mock-input" value={stage} onChange={e => setStage(e.target.value)}>
               {stages.map(s => (
                 <option key={s.id} value={s.name}>{s.label}</option>
@@ -111,7 +134,7 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
           </div>
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Expected Close</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Abschluss bis</label>
             <input className="mock-input" type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} />
           </div>
         </div>
@@ -119,7 +142,7 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 24 }}>
           <button onClick={onClose} className="btn-secondary" style={{ fontSize: 12, padding: '7px 16px' }}>Abbrechen</button>
           <button onClick={handleSave} disabled={saving || !title.trim()} className="btn-primary" style={{ fontSize: 12, padding: '7px 16px' }}>
-            {saving ? 'Speichern…' : 'Speichern'}
+            {saving ? 'Wird hinzugefügt…' : initial ? 'Speichern' : 'Zur Pipeline hinzufügen'}
           </button>
         </div>
       </div>

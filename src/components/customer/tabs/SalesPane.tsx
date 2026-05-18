@@ -39,13 +39,14 @@ export function SalesPane({ customerId }: Props) {
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>Deals ({customerDeals.length})</span>
+        <span style={{ fontSize: 13, fontWeight: 700 }}>Pipeline ({customerDeals.length})</span>
         <button
           onClick={() => setEditDeal('new')}
           className="btn-primary"
-          style={{ fontSize: 11, padding: '5px 12px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '5px 12px' }}
         >
-          + Neuer Deal
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          Zur Pipeline hinzufügen
         </button>
       </div>
 
@@ -115,8 +116,23 @@ export function SalesPane({ customerId }: Props) {
       )}
 
       {customerDeals.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--fg-dim)', fontSize: 12 }}>
-          Noch keine Deals. Erstelle den ersten Deal für diesen Kunden.
+        <div
+          onClick={() => setEditDeal('new')}
+          style={{
+            textAlign: 'center', padding: '28px 20px', borderRadius: 12, cursor: 'pointer',
+            border: '1.5px dashed rgba(255,255,255,0.1)',
+            background: 'rgba(255,255,255,0.02)',
+            transition: 'background 150ms',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 4 }}>
+            Noch kein Deal in der Pipeline
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+            Klicken um diesen Kunden zur Pipeline hinzuzufügen
+          </div>
         </div>
       )}
 
