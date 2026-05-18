@@ -14,7 +14,6 @@ export function DealCard({ deal, onEdit, isDragging }: Props) {
   const stages = usePipelineStore(s => s.stages)
   const customers = useCustomersStore(s => s.customers)
   const setSelected = useUiStore(s => s.setSelectedCustomer)
-  const setAppView = useUiStore(s => s.setAppView)
 
   const stage = stages.find(s => s.name === deal.stage)
   const customer = customers.find(c => c.id === deal.customerId)
@@ -23,7 +22,6 @@ export function DealCard({ deal, onEdit, isDragging }: Props) {
     e.stopPropagation()
     if (customer) {
       setSelected(customer.id)
-      setAppView('clients')
     }
   }
 
