@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTodosStore } from '@/store/todos.store'
 import { useNotesStore } from '@/store/notes.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -80,7 +81,11 @@ interface Props { customerId: string }
 export function DashboardPane({ customerId }: Props) {
   const todos     = useTodosStore(s => s.todos)
   const notes     = useNotesStore(s => s.notes)
-  const followUps = useCrmStore(s => s.followUps)
+  const followUps    = useCrmStore(s => s.followUps)
+  const upsertFollowUp = useCrmStore(s => s.upsert)
+  const [showFuForm, setShowFuForm] = useState(false)
+  const [fuTitle, setFuTitle]       = useState('')
+  const [fuDate, setFuDate]         = useState(() => new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10))
   const folders   = useFilesStore(s => s.folders)
   const files     = useFilesStore(s => s.files)
   const allEmails = useMailStore(s => s.emails)
@@ -187,6 +192,50 @@ export function DashboardPane({ customerId }: Props) {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          <div className="mt-3 pt-3 border-t border-[var(--border)]">
+            {showFuForm ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  value={fuTitle}
+                  onChange={e => setFuTitle(e.target.value)}
+                  placeholder="Follow-Up Titel…"
+                  className="text-xs px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--fg)] focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--fg-dim)]"
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="date"
+                    value={fuDate}
+                    onChange={e => setFuDate(e.target.value)}
+                    className="flex-1 text-xs px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--fg)] focus:outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!fuTitle.trim()) return
+                      await upsertFollowUp({ customerId, title: fuTitle.trim(), dueDate: fuDate, priority: 'normal' })
+                      setFuTitle('')
+                      setShowFuForm(false)
+                    }}
+                    className="btn-primary"
+                    style={{ fontSize: 11, padding: '4px 12px', flexShrink: 0 }}
+                  >
+                    Speichern
+                  </button>
+                  <button
+                    onClick={() => setShowFuForm(false)}
+                    style={{ fontSize: 11, padding: '4px 8px', color: 'var(--fg-muted)' }}
+                  >✕</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowFuForm(true)}
+                className="text-xs text-[var(--fg-2)] hover:text-[var(--accent)] transition-colors"
+              >
+                + Follow-Up erstellen
+              </button>
             )}
           </div>
         </Card>
