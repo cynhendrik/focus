@@ -82,7 +82,7 @@ pub fn insert(conn: &Connection, payload: CreateActivityPayload) -> Result<Activ
 
 pub fn update(conn: &Connection, id: &str, payload: UpdateActivityPayload) -> Result<Activity, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    let n = conn.execute(
         "UPDATE activities SET
            title = COALESCE(?1, title),
            body = COALESCE(?2, body),
@@ -98,6 +98,7 @@ pub fn update(conn: &Connection, id: &str, payload: UpdateActivityPayload) -> Re
             payload.status, payload.due_at, payload.assignee, payload.outcome, now, id,
         ],
     )?;
+    if n == 0 { return Err(AppError::NotFound(format!("Activity {id} not found"))); }
     conn.query_row(
         "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
                 title, body, payload, status, due_at, assignee, outcome, created_at, updated_at
@@ -301,5 +302,45 @@ mod tests {
             outcome: Some("deal_won".into()),
         }).unwrap();
         assert_eq!(updated.outcome.as_deref(), Some("deal_won"));
+    }
+
+    #[test]
+    fn get_by_customer_returns_activities_for_customer() {
+        let conn = setup();
+        seed_account(&conn, "a1");
+        seed_account(&conn, "a2");
+        // Insert one activity with customer_id "cust-1"
+        insert(&conn, CreateActivityPayload {
+            workspace_id: "ws-1".into(), created_by: "u-1".into(),
+            account_id: "a1".into(), contact_id: None, deal_id: None,
+            customer_id: Some("cust-1".into()),
+            activity_type: "note".into(), title: Some("Notiz Kunde 1".into()),
+            body: None, payload: None, status: None, due_at: None, assignee: None,
+            outcome: None,
+        }).unwrap();
+        // Insert one activity with customer_id "cust-2"
+        insert(&conn, CreateActivityPayload {
+            workspace_id: "ws-1".into(), created_by: "u-1".into(),
+            account_id: "a2".into(), contact_id: None, deal_id: None,
+            customer_id: Some("cust-2".into()),
+            activity_type: "task".into(), title: Some("Task Kunde 2".into()),
+            body: None, payload: None, status: None, due_at: None, assignee: None,
+            outcome: None,
+        }).unwrap();
+        let results = get_by_customer(&conn, "cust-1").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title.as_deref(), Some("Notiz Kunde 1"));
+        assert!(get_by_customer(&conn, "cust-2").unwrap().len() == 1);
+        assert!(get_by_customer(&conn, "cust-99").unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_returns_not_found_for_missing_id() {
+        let conn = setup();
+        let result = update(&conn, "nonexistent-id", UpdateActivityPayload {
+            title: Some("x".into()), body: None, payload: None,
+            status: None, due_at: None, assignee: None, outcome: None,
+        });
+        assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 }

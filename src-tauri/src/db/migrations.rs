@@ -249,10 +249,10 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             Ok(())
         }
         10 => {
-            if !column_exists(conn, "deals", "customer_id") {
+            if table_exists(conn, "deals") && !column_exists(conn, "deals", "customer_id") {
                 conn.execute_batch("ALTER TABLE deals ADD COLUMN customer_id TEXT")?;
             }
-            if !column_exists(conn, "activities", "customer_id") {
+            if table_exists(conn, "activities") && !column_exists(conn, "activities", "customer_id") {
                 conn.execute_batch("ALTER TABLE activities ADD COLUMN customer_id TEXT")?;
             }
             Ok(())
