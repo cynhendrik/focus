@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { SmartList, SmartListFilter, UpsertSmartListPayload } from '@/types/smart-list.types'
+import { log } from '@/lib/logger'
 
 interface RawSmartList extends Omit<SmartList, 'filter'> {
   filter: string
@@ -7,7 +8,9 @@ interface RawSmartList extends Omit<SmartList, 'filter'> {
 
 function parse(raw: RawSmartList): SmartList {
   let filter: SmartListFilter = {}
-  try { filter = JSON.parse(raw.filter) } catch {}
+  try { filter = JSON.parse(raw.filter) } catch {
+    log.warn('SmartList filter parse failed', { id: raw.id })
+  }
   return { ...raw, filter }
 }
 
