@@ -86,9 +86,10 @@ export function DashboardPane({ customerId }: Props) {
   const allEmails = useMailStore(s => s.emails)
 
   const customer     = useCustomersStore(s => s.customers.find(c => c.id === customerId))
-  const leadScore    = customer?.leadScore ?? 0
+  const leadScore    = Math.round(customer?.leadScore ?? 0)
   const scoreFactors = customer?.scoreFactors ?? {}
   const factors      = Object.entries(scoreFactors)
+    .filter(([, points]) => points > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 6)
 
