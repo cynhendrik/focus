@@ -40,7 +40,7 @@ function MiniCheck({ done, onToggle }: { done: boolean; onToggle: (e: React.Mous
     <button
       onClick={e => { e.stopPropagation(); onToggle(e) }}
       className={`w-4 h-4 rounded-full border flex-shrink-0 flex items-center justify-center transition-colors
-        ${done ? 'bg-primary border-primary' : 'border-white/25 hover:border-primary/60'}`}
+        ${done ? 'bg-primary border-primary' : 'border-[var(--border-strong)] hover:border-[var(--accent)]'}`}
     >
       {done && (
         <svg width="6" height="6" viewBox="0 0 10 10">
