@@ -50,6 +50,12 @@ export function DealCard({ deal, onEdit, isDragging }: Props) {
           {customer.name}
         </button>
       )}
+      {stage && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontWeight: 600 }}>{stage.label}</span>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '-0.03em' }}>
           {deal.value != null ? `${deal.value.toLocaleString('de-DE')} €` : '—'}
