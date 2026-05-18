@@ -121,6 +121,13 @@
 
 * { box-sizing: border-box; }
 
+[contenteditable][data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--fg-dim);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 html, body {
   margin: 0; padding: 0;
   background: var(--bg);
@@ -327,10 +334,10 @@ input:focus, textarea:focus, button:focus { outline: none; }
   cursor: pointer; transition: color 180ms ease;
   z-index: 1; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
 }
-.tab[data-active="true"] { color: var(--accent); font-weight: 600; }
+.tab[data-active="true"] { color: var(--accent-ink); font-weight: 600; }
 .tab-indicator {
   position: absolute; top: 5px; bottom: 5px;
-  background: var(--accent-soft); border: 1px solid oklch(92% 0.2 125 / 0.22); border-radius: 99px;
+  background: var(--accent); border-radius: 99px;
   transition: left 320ms cubic-bezier(.2,.7,.1,1), width 320ms cubic-bezier(.2,.7,.1,1);
   z-index: 0;
 }
@@ -722,9 +729,12 @@ input:focus, textarea:focus, button:focus { outline: none; }
 }
 .client-tile:hover { background: var(--surface-2); transform: translateY(-1px); }
 .client-tile[data-active="true"] {
-  background: var(--surface-2); border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  background: var(--accent); border-color: transparent; color: var(--accent-ink);
 }
+.client-tile[data-active="true"] .client-tile-avatar {
+  background: oklch(0% 0 0 / 0.12); border-color: transparent; color: var(--accent-ink);
+}
+.client-tile[data-active="true"] .client-tile-body span { color: var(--accent-ink); opacity: 0.65; }
 .client-tile-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -833,7 +843,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
 
 /* ========== Kanban (Tasks) ========== */
 
-.kanban { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; align-items: flex-start; }
+.kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: flex-start; }
+.kanban-4 { grid-template-columns: repeat(4, 1fr); }
 .kanban-col {
   display: flex; flex-direction: column; gap: 8px;
   padding: 14px; border-radius: var(--radius-lg);

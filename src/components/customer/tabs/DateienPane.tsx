@@ -70,14 +70,20 @@ export function DateienPane({ customerId }: Props) {
       {/* Folder tree */}
       <div className="w-48 border-r border-[var(--border)] p-4 flex flex-col gap-1 flex-shrink-0">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wide">Ordner</p>
-          <button onClick={addFolder} className="text-xs text-primary hover:text-primary-dark">+</button>
+          <p className="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wide">Ordner</p>
+          <button
+            onClick={addFolder}
+            className="w-5 h-5 rounded flex items-center justify-center text-[var(--fg-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors text-lg leading-none"
+          >+</button>
         </div>
 
         <button
           onClick={() => selectFolder(null)}
-          className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors
-            ${activeFolderId === null ? 'bg-primary/10 text-primary' : 'text-[var(--text2)] hover:bg-[var(--bg1)]'}`}
+          className={`w-full text-left text-sm px-2 py-1.5 rounded-lg transition-colors font-medium
+            ${activeFolderId === null
+              ? 'bg-primary text-[var(--accent-ink)]'
+              : 'text-[var(--fg-muted)] hover:bg-black/5'
+            }`}
         >
           Alle Dateien
         </button>
@@ -86,14 +92,17 @@ export function DateienPane({ customerId }: Props) {
           <div key={folder.id} className="flex items-center gap-1 group">
             <button
               onClick={() => selectFolder(folder.id)}
-              className={`flex-1 text-left text-sm px-2 py-1.5 rounded-lg transition-colors truncate
-                ${activeFolderId === folder.id ? 'bg-primary/10 text-primary' : 'text-[var(--text2)] hover:bg-[var(--bg1)]'}`}
+              className={`flex-1 text-left text-sm px-2 py-1.5 rounded-lg transition-colors truncate font-medium
+                ${activeFolderId === folder.id
+                  ? 'bg-primary text-[var(--accent-ink)]'
+                  : 'text-[var(--fg-muted)] hover:bg-black/5'
+                }`}
             >
               📁 {folder.name}
             </button>
             <button
               onClick={() => removeFolder(folder.id)}
-              className="text-[var(--text2)] hover:text-red-400 text-xs opacity-0 group-hover:opacity-100"
+              className="text-[var(--fg-muted)] hover:text-red-400 text-xs opacity-0 group-hover:opacity-100"
             >
               ✕
             </button>
@@ -111,7 +120,7 @@ export function DateienPane({ customerId }: Props) {
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="text-sm px-4 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark"
+              className="text-sm px-4 py-1.5 rounded-lg bg-primary text-[var(--accent-ink)] font-semibold hover:opacity-90 transition-opacity"
             >
               + Datei hinzufügen
             </button>
