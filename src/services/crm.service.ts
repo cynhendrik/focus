@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
-import type { FollowUp, UpsertFollowUpPayload } from '@/types/crm.types'
+import type { FollowUp, UpsertFollowUpPayload, AccountActivityDate } from '@/types/crm.types'
 import type { Activity } from '@/types/activity.types'
 
 function activityToFollowUp(a: Activity): FollowUp {
@@ -68,5 +68,16 @@ export const CrmService = {
 
   delete(id: string): Promise<void> {
     return invoke<void>('delete_activity', { id })
+  },
+
+  async getAllFollowUps(workspaceId: string): Promise<FollowUp[]> {
+    const activities = await invoke<Activity[]>('get_open_tasks', { workspaceId })
+    return activities
+      .filter(a => { try { return JSON.parse(a.payload).is_follow_up === true } catch { return false } })
+      .map(activityToFollowUp)
+  },
+
+  getLastActivityDates(workspaceId: string): Promise<AccountActivityDate[]> {
+    return invoke('get_last_activity_dates', { workspaceId })
   },
 }

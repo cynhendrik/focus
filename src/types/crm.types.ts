@@ -11,6 +11,11 @@ export interface FollowUp {
   createdAt: string
 }
 
+export interface AccountActivityDate {
+  accountId: string
+  lastActivityAt: string | null
+}
+
 export interface UpsertFollowUpPayload {
   id?: string
   customerId: string

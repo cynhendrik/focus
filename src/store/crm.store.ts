@@ -1,23 +1,44 @@
 import { create } from 'zustand'
 import { CrmService } from '@/services/crm.service'
 import { log } from '@/lib/logger'
-import type { FollowUp, UpsertFollowUpPayload } from '@/types/crm.types'
+import type { FollowUp, UpsertFollowUpPayload, AccountActivityDate } from '@/types/crm.types'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
 
 interface CrmState {
   followUps: FollowUp[]
+  allFollowUps: FollowUp[]
+  lastActivity: AccountActivityDate[]
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
+  loadAll: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertFollowUpPayload) => Promise<void>
   remove: (id: string) => Promise<void>
 }
 
 export const useCrmStore = create<CrmState>()((set) => ({
   followUps: [],
+  allFollowUps: [],
+  lastActivity: [],
   isLoading: false,
   error: null,
+
+  loadAll: async (workspaceId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const [allFollowUps, lastActivity] = await Promise.all([
+        CrmService.getAllFollowUps(workspaceId),
+        CrmService.getLastActivityDates(workspaceId),
+      ])
+      set({ allFollowUps, lastActivity, isLoading: false })
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ isLoading: false, error })
+      log.error('Failed to load all follow-ups', { error })
+    }
+  },
 
   loadForCustomer: async (customerId) => {
     set({ isLoading: true, error: null })
