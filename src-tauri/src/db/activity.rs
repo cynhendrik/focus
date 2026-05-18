@@ -142,6 +142,30 @@ pub fn get_open_tasks(conn: &Connection, workspace_id: &str) -> Result<Vec<Activ
     Ok(rows)
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountActivityDate {
+    pub account_id: String,
+    pub last_activity_at: Option<String>,
+}
+
+pub fn get_last_activity_dates(conn: &Connection, workspace_id: &str) -> Result<Vec<AccountActivityDate>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT account_id, MAX(created_at) as last_activity_at
+         FROM activities
+         WHERE workspace_id = ?1
+         GROUP BY account_id
+         ORDER BY last_activity_at ASC"
+    )?;
+    let rows = stmt.query_map([workspace_id], |r| {
+        Ok(AccountActivityDate {
+            account_id: r.get(0)?,
+            last_activity_at: r.get(1)?,
+        })
+    })?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Activity> {
     Ok(Activity {
         id: r.get(0)?, workspace_id: r.get(1)?, created_by: r.get(2)?,

@@ -165,6 +165,7 @@ fn main() {
             commands::activity::get_activities_by_account,
             commands::activity::get_activities_by_deal,
             commands::activity::get_open_tasks,
+            commands::activity::get_last_activity_dates,
             commands::kpi::get_kpis,
             commands::kpi::upsert_kpi,
             commands::kpi::delete_kpi,

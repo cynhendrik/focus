@@ -68,6 +68,14 @@ pub fn get_activities_by_deal(
 }
 
 #[tauri::command]
+pub fn get_last_activity_dates(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<Vec<db::activity::AccountActivityDate>, AppError> {
+    db::activity::get_last_activity_dates(&db.conn(), &workspace_id)
+}
+
+#[tauri::command]
 pub fn get_open_tasks(
     db: State<'_, DbPool>,
     workspace_id: String,
