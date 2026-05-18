@@ -4,6 +4,8 @@ import { NavSidebar }  from '@/components/layout/NavSidebar'
 import { Topbar }      from '@/components/layout/Topbar'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCustomersStore } from '@/store/customers.store'
+import { useSmartListsStore } from '@/store/smart-lists.store'
+import { SmartListService }   from '@/services/smart-list.service'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -35,6 +37,7 @@ export default function App() {
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const init            = useAccountsStore(s => s.init)
   const initCustomers   = useCustomersStore(s => s.init)
+  const loadSmartLists  = useSmartListsStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
   const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
@@ -53,8 +56,14 @@ export default function App() {
   }, [user, loadWorkspaces])
 
   useEffect(() => {
-    if (activeWorkspaceId) { init(); initCustomers() }
-  }, [activeWorkspaceId, init, initCustomers])
+    if (activeWorkspaceId) {
+      init()
+      initCustomers()
+      SmartListService.seedSystemLists(activeWorkspaceId).then(() =>
+        loadSmartLists(activeWorkspaceId)
+      )
+    }
+  }, [activeWorkspaceId, init, initCustomers, loadSmartLists])
 
   useSyncBridge()
 

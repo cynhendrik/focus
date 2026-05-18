@@ -1,6 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
+import { useSmartListsStore } from '@/store/smart-lists.store'
+import { useCrmStore }         from '@/store/crm.store'
+import { applySmartListFilter } from '@/lib/smart-list-filter'
+import { SmartListsSection }    from '@/components/smart-lists/SmartListsSection'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
 import type { Customer } from '@/types/customer.types'
@@ -119,11 +123,32 @@ export function ClientsRoute() {
   const [search, setSearch]     = useState('')
   const [showModal, setShowModal] = useState(false)
 
-  const filtered = customers.filter(c =>
-    !search ||
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.company ?? '').toLowerCase().includes(search.toLowerCase())
+  const activeListId = useSmartListsStore(s => s.activeListId)
+  const smartLists   = useSmartListsStore(s => s.lists)
+  const setActive    = useSmartListsStore(s => s.setActive)
+  const lastActivity = useCrmStore(s => s.lastActivity)
+  const activityMap  = useMemo(
+    () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
+    [lastActivity],
   )
+  const activeList = useMemo(
+    () => activeListId ? smartLists.find(l => l.id === activeListId) ?? null : null,
+    [activeListId, smartLists],
+  )
+
+  const filtered = useMemo(() => {
+    let result = activeList
+      ? applySmartListFilter(customers, activeList.filter, activityMap)
+      : customers
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.company ?? '').toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [customers, activeList, activityMap, search])
 
   return (
     <div className="clients-layout">
@@ -144,7 +169,7 @@ export function ClientsRoute() {
         <div
           className="client-tile-overview"
           data-active={String(!selectedCustomerId)}
-          onClick={() => setSelected(null)}
+          onClick={() => { setSelected(null); setActive(null) }}
         >
           <div className="client-tile-overview-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -159,6 +184,8 @@ export function ClientsRoute() {
             <span>Alle Clients im Überblick</span>
           </div>
         </div>
+
+        <SmartListsSection />
 
         <div className="clients-list">
           {isLoading ? (
