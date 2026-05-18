@@ -82,7 +82,7 @@ export function CommandPalette({ open, onClose }: Props) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 bg-black/60 flex items-start justify-center pt-[15vh] z-50"
+          className="command-backdrop"
           onClick={onClose}
         >
           <motion.div
@@ -90,23 +90,19 @@ export function CommandPalette({ open, onClose }: Props) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="w-[560px] bg-[var(--bg)] rounded-2xl shadow-2xl overflow-hidden border border-[var(--border)]"
+            className="command glass"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
-              <span className="text-[var(--text2)]">⌘</span>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={e => { setQuery(e.target.value); setIdx(0) }}
-                onKeyDown={handleKey}
-                placeholder="Kunden suchen oder Aktion…"
-                className="flex-1 bg-transparent text-sm text-[var(--text)] placeholder:text-[var(--text2)] focus:outline-none"
-              />
-              <kbd className="text-[10px] text-[var(--text2)] border border-[var(--border)] px-1.5 py-0.5 rounded">ESC</kbd>
-            </div>
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => { setQuery(e.target.value); setIdx(0) }}
+              onKeyDown={handleKey}
+              placeholder="Kunden suchen oder Aktion…"
+              className="command-input"
+            />
 
-            <div className="max-h-80 overflow-y-auto py-1">
+            <div className="command-list">
               {allItems.length === 0 && (
                 <p className="text-sm text-[var(--text2)] text-center py-6">Keine Ergebnisse</p>
               )}
@@ -115,14 +111,15 @@ export function CommandPalette({ open, onClose }: Props) {
                   key={item.id}
                   onClick={item.action}
                   onMouseEnter={() => setIdx(i)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors
-                    ${i === clampedIdx ? 'bg-primary/10' : 'hover:bg-[var(--bg1)]'}`}
+                  className="command-item"
+                  data-selected={String(i === clampedIdx)}
                 >
                   <span className="text-base w-6 text-center flex-shrink-0">{item.icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[var(--text)] truncate">{item.label}</p>
                     <p className="text-xs text-[var(--text2)] truncate">{item.sub}</p>
                   </div>
+                  <kbd className="cmd-kbd">↵</kbd>
                 </button>
               ))}
             </div>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ChevronLeft, Mail as MailIcon, Phone, Plus } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore, type CustomerTab } from '@/store/ui.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -76,6 +77,19 @@ export function CustomerRoute({ customerId }: Props) {
     loadFolders(customerId)
   }, [customerId])
 
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 })
+
+  useLayoutEffect(() => {
+    const el = tabsRef.current
+    if (!el) return
+    const active = el.querySelector(`[data-active="true"]`) as HTMLElement | null
+    if (!active) return
+    const rect = active.getBoundingClientRect()
+    const parentRect = el.getBoundingClientRect()
+    setIndicator({ left: rect.left - parentRect.left, width: rect.width, opacity: 1 })
+  }, [activeTab])
+
   if (!customer) return <div className="p-6 text-[var(--text2)]">Kunde nicht gefunden</div>
 
   const renderPane = () => {
@@ -91,56 +105,45 @@ export function CustomerRoute({ customerId }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)] flex items-center gap-4 flex-shrink-0">
-        <button
-          onClick={() => setSelected(null)}
-          className="w-8 h-8 rounded-full flex items-center justify-center border border-[var(--border)] text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)] flex-shrink-0 transition-colors"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
+      <div className="detail-head">
+        <button className="back" onClick={() => setSelected(null)}>
+          <ChevronLeft size={16} />
         </button>
-
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ${avatarBg(customer.name)}`}>
-          {customer.name.slice(0, 1).toUpperCase()}
+        <div className="avatar" style={{ width: 56, height: 56, borderRadius: 16, fontSize: 18 }}>
+          {customer.name.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
         </div>
-
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-[var(--text)] truncate">{customer.name}</h1>
-          <p className="text-xs text-[var(--text2)]">Letzte Aktivität: {relativeTime(customer.updatedAt)}</p>
+        <div style={{ flex: 1 }}>
+          <h1>{customer.name}</h1>
+          <div className="sub">
+            Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status} · Score {customer.leadScore}
+          </div>
         </div>
-
-        <button
-          onClick={() => setShowDetails(true)}
-          className="px-4 py-2 rounded-xl border border-[var(--border)] text-[var(--text)] text-sm font-medium hover:bg-[var(--bg1)] flex-shrink-0 transition-colors"
-        >
-          Details
-        </button>
-
-        <button
-          onClick={() => setShowEdit(true)}
-          className="px-4 py-2 rounded-xl bg-primary text-black text-sm font-semibold hover:bg-primary-dark flex-shrink-0 transition-colors"
-        >
-          + Neue Aktion
+        <button className="btn-ghost"><Phone size={13} /> Anrufen</button>
+        <button className="btn-ghost"><MailIcon size={13} /> Mail</button>
+        <button className="btn-primary" onClick={() => setShowEdit(true)}>
+          <Plus size={13} /> Neue Aktion
         </button>
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--border)] overflow-x-auto flex-shrink-0 scrollbar-none">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0
-              ${activeTab === tab.id
-                ? 'bg-primary text-black'
-                : 'text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg1)]'
-              }`}
-          >
-            <TabIcon id={tab.id} />
-            {tab.label}
-          </button>
-        ))}
+      <div style={{ marginBottom: 22 }}>
+        <div className="tabs glass" ref={tabsRef}>
+          <div
+            className="tab-indicator"
+            style={{ left: indicator.left, width: indicator.width, opacity: indicator.opacity }}
+          />
+          {TABS.map(t => (
+            <div
+              key={t.id}
+              className="tab"
+              data-active={String(activeTab === t.id)}
+              onClick={() => setTab(t.id)}
+            >
+              <TabIcon id={t.id} />
+              {t.label}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Active pane */}
