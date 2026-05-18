@@ -48,9 +48,18 @@ export function MailRoute() {
   const unread = emails.filter(e => !e.isRead).length
 
   return (
-    <div className="flex h-full" style={{ minHeight: 0 }}>
+    <div className="main-inner" style={{ paddingBottom: 24 }}>
+      <div className="greeting" style={{ marginBottom: 18 }}>
+        <h1 className="greeting-title">Mail<em>.</em></h1>
+        <div className="greeting-sub">
+          <span>Posteingang</span>
+          <span>Sync aktiv</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', minHeight: 0, flex: 1 }}>
       {/* Left panel: accounts + folders */}
-      <div className="w-48 flex-shrink-0 flex flex-col border-r border-[var(--border)] p-2 gap-1">
+      <div className="card" style={{ width: 192, flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '8px', gap: 4, marginRight: 0, borderRadius: '12px 0 0 12px' }}>
         <p className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider px-2 py-1">Konten</p>
         {accounts.map(a => (
           <button
@@ -97,7 +106,7 @@ export function MailRoute() {
       </div>
 
       {/* Middle panel: email list */}
-      <div className="w-72 flex-shrink-0 flex flex-col border-r border-[var(--border)]" style={{ minHeight: 0 }}>
+      <div className="card" style={{ width: 288, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0, borderRadius: 0 }}>
         <div className="p-2 border-b border-[var(--border)]">
           <input
             value={search}
@@ -111,34 +120,34 @@ export function MailRoute() {
           {!isLoading && emails.length === 0 && (
             <p className="text-xs text-[var(--text2)] p-3 text-center">Keine E-Mails</p>
           )}
-          {emails.map(email => (
-            <button
-              key={email.id}
-              onClick={() => selectEmail(email)}
-              className={`w-full text-left px-3 py-2.5 border-b border-[var(--border)] transition-colors
-                ${selectedEmail?.id === email.id ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-[var(--bg1)]'}`}
-            >
-              <div className="flex justify-between items-baseline mb-0.5">
-                <span className={`text-xs truncate max-w-[65%] ${!email.isRead ? 'font-bold text-[var(--text)]' : 'text-[var(--text2)]'}`}>
-                  {email.fromName || email.fromAddr}
-                </span>
-                <span className="text-[10px] text-[var(--text2)] flex-shrink-0">
-                  {email.sentAt ? new Date(email.sentAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : ''}
-                </span>
+          {emails.map(email => {
+            const senderName = email.fromName || email.fromAddr
+            const senderInitial = senderName ? senderName.charAt(0).toUpperCase() : '?'
+            const subject = email.subject || '(kein Betreff)'
+            const time = email.sentAt ? new Date(email.sentAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : ''
+            return (
+              <div
+                key={email.id}
+                className="mail-item"
+                data-unread={String(!email.isRead)}
+                onClick={() => selectEmail(email)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="mail-dot" />
+                <div className="avatar">{senderInitial}</div>
+                <div className="mail-body">
+                  <div className="mail-from">{senderName}</div>
+                  <div className="mail-subj">{subject}</div>
+                </div>
+                <span className="mail-time">{time}</span>
               </div>
-              <p className={`text-xs truncate ${!email.isRead ? 'font-semibold text-[var(--text)]' : 'text-[var(--text2)]'}`}>
-                {email.subject || '(kein Betreff)'}
-              </p>
-              {!email.customerId && (
-                <span className="text-[10px] text-amber-500">● Nicht zugeordnet</span>
-              )}
-            </button>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {/* Right panel: detail */}
-      <div className="flex-1 overflow-y-auto p-6" style={{ minHeight: 0 }}>
+      <div className="card" style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0, borderRadius: '0 12px 12px 0' }}>
         {!selectedEmail ? (
           <p className="text-sm text-[var(--text2)] text-center py-12">E-Mail auswählen</p>
         ) : (
@@ -192,6 +201,7 @@ export function MailRoute() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
