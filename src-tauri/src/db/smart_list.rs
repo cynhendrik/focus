@@ -77,7 +77,13 @@ pub fn upsert_smart_list(conn: &Connection, payload: &UpsertSmartListPayload) ->
 }
 
 pub fn delete_smart_list(conn: &Connection, id: &str) -> Result<(), AppError> {
-    conn.execute("DELETE FROM smart_lists WHERE id = ?1 AND is_system = 0", [id])?;
+    let affected = conn.execute(
+        "DELETE FROM smart_lists WHERE id = ?1 AND is_system = 0",
+        [id],
+    )?;
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("SmartList {id} not found or is a system list")));
+    }
     Ok(())
 }
 
@@ -99,4 +105,127 @@ pub fn seed_system_lists(conn: &Connection, workspace_id: &str) -> Result<(), Ap
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{schema, migrations};
+
+    fn setup() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+        migrations::run(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn get_smart_lists_returns_only_rows_for_workspace() {
+        let conn = setup();
+        seed_system_lists(&conn, "ws-a").unwrap();
+        seed_system_lists(&conn, "ws-b").unwrap();
+
+        let ws_a = get_smart_lists(&conn, "ws-a").unwrap();
+        let ws_b = get_smart_lists(&conn, "ws-b").unwrap();
+
+        assert_eq!(ws_a.len(), 4);
+        assert_eq!(ws_b.len(), 4);
+        assert!(ws_a.iter().all(|l| l.workspace_id == "ws-a"));
+        assert!(ws_b.iter().all(|l| l.workspace_id == "ws-b"));
+    }
+
+    #[test]
+    fn upsert_smart_list_round_trips_insert_then_update() {
+        let conn = setup();
+
+        // Insert
+        let payload = UpsertSmartListPayload {
+            id: Some("list-1".to_string()),
+            workspace_id: "ws-test".to_string(),
+            name: "Original Name".to_string(),
+            icon: "📋".to_string(),
+            filter: "{}".to_string(),
+            order_index: Some(0),
+            is_system: Some(false),
+        };
+        let inserted = upsert_smart_list(&conn, &payload).unwrap();
+        assert_eq!(inserted.id, "list-1");
+        assert_eq!(inserted.name, "Original Name");
+        assert!(!inserted.is_system);
+
+        // Update name
+        let update_payload = UpsertSmartListPayload {
+            id: Some("list-1".to_string()),
+            workspace_id: "ws-test".to_string(),
+            name: "Updated Name".to_string(),
+            icon: "📋".to_string(),
+            filter: "{}".to_string(),
+            order_index: Some(0),
+            is_system: Some(false),
+        };
+        let updated = upsert_smart_list(&conn, &update_payload).unwrap();
+        assert_eq!(updated.id, "list-1");
+        assert_eq!(updated.name, "Updated Name");
+    }
+
+    #[test]
+    fn delete_smart_list_removes_user_list() {
+        let conn = setup();
+
+        let payload = UpsertSmartListPayload {
+            id: Some("user-list-1".to_string()),
+            workspace_id: "ws-test".to_string(),
+            name: "User List".to_string(),
+            icon: "📋".to_string(),
+            filter: "{}".to_string(),
+            order_index: Some(0),
+            is_system: Some(false),
+        };
+        upsert_smart_list(&conn, &payload).unwrap();
+
+        let result = delete_smart_list(&conn, "user-list-1");
+        assert!(result.is_ok());
+
+        let remaining = get_smart_lists(&conn, "ws-test").unwrap();
+        assert!(remaining.iter().all(|l| l.id != "user-list-1"));
+    }
+
+    #[test]
+    fn delete_smart_list_returns_error_for_system_list() {
+        let conn = setup();
+        seed_system_lists(&conn, "ws-test").unwrap();
+
+        // System list id is formatted as "{workspace_id}-{suffix}"
+        let result = delete_smart_list(&conn, "ws-test-hot-leads");
+        assert!(result.is_err());
+        match result {
+            Err(AppError::NotFound(msg)) => assert!(msg.contains("ws-test-hot-leads")),
+            _ => panic!("Expected NotFound error for system list deletion"),
+        }
+    }
+
+    #[test]
+    fn delete_smart_list_returns_error_for_nonexistent_id() {
+        let conn = setup();
+
+        let result = delete_smart_list(&conn, "nonexistent-id");
+        assert!(result.is_err());
+        match result {
+            Err(AppError::NotFound(_)) => {}
+            _ => panic!("Expected NotFound error for nonexistent list"),
+        }
+    }
+
+    #[test]
+    fn seed_system_lists_is_idempotent() {
+        let conn = setup();
+
+        seed_system_lists(&conn, "ws-test").unwrap();
+        seed_system_lists(&conn, "ws-test").unwrap();
+
+        let lists = get_smart_lists(&conn, "ws-test").unwrap();
+        assert_eq!(lists.len(), 4, "Expected exactly 4 system lists after double seed");
+        assert!(lists.iter().all(|l| l.is_system));
+    }
 }

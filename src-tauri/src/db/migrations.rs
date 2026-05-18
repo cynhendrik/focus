@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 8;
+const CURRENT_VERSION: u32 = 9;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -228,6 +228,24 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     ))?;
                 }
             }
+            Ok(())
+        }
+        9 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS smart_lists (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    name         TEXT NOT NULL,
+                    icon         TEXT NOT NULL DEFAULT '📋',
+                    filter       TEXT NOT NULL DEFAULT '{}',
+                    order_index  INTEGER NOT NULL DEFAULT 0,
+                    is_system    INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_smart_lists_workspace
+                    ON smart_lists(workspace_id, order_index);
+            "#)?;
             Ok(())
         }
         _ => Ok(()),
