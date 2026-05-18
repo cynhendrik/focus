@@ -43,6 +43,14 @@ describe('applySmartListFilter', () => {
     expect(result[0].id).toBe('1')
   })
 
+  it('scoreMax boundary is inclusive', () => {
+    const exact: Customer = { ...base, id: '2', leadScore: 50 }
+    const over:  Customer = { ...base, id: '3', leadScore: 51 }
+    const result = applySmartListFilter([exact, over], { scoreMax: 50 }, new Map())
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('2')
+  })
+
   it('filters by tags — all listed tags must match', () => {
     const tagged: Customer = { ...base, id: '2', tags: ['webinar', 'newsletter'] }
     const result = applySmartListFilter([base, tagged], { tags: ['webinar'] }, new Map())

@@ -15,6 +15,7 @@ export function applySmartListFilter(
     if (filter.industry?.length && (!c.industry || !filter.industry.includes(c.industry))) return false
     if (filter.inactiveDays != null) {
       const last = lastActivity.get(c.id) ?? null
+      // null = never contacted; treat as infinitely old so it always matches
       const days = last
         ? Math.floor((Date.now() - new Date(last).getTime()) / 86400000)
         : 9999
