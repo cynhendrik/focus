@@ -20,3 +20,11 @@ pub fn cmd_delete_pipeline_stage(db: State<'_, DbPool>, id: String, workspace_id
 pub fn cmd_reorder_pipeline_stages(db: State<'_, DbPool>, workspace_id: String, ordered_ids: Vec<String>) -> Result<(), AppError> {
     db::pipeline_stage::reorder(&db.conn(), &workspace_id, &ordered_ids)
 }
+
+#[tauri::command]
+pub fn cmd_seed_pipeline_stages(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<(), AppError> {
+    db::pipeline_stage::seed_defaults(&db.conn(), &workspace_id)
+}

@@ -53,3 +53,19 @@ pub fn update_deal_stage(
     })?;
     Ok(updated)
 }
+
+#[tauri::command]
+pub fn get_deals_by_workspace(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<Vec<Deal>, AppError> {
+    db::deal::get_by_workspace(&db.conn(), &workspace_id)
+}
+
+#[tauri::command]
+pub fn get_deals_by_customer(
+    db: State<'_, DbPool>,
+    customer_id: String,
+) -> Result<Vec<Deal>, AppError> {
+    db::deal::get_by_customer(&db.conn(), &customer_id)
+}

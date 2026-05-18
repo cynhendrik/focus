@@ -82,3 +82,11 @@ pub fn get_open_tasks(
 ) -> Result<Vec<Activity>, AppError> {
     db::activity::get_open_tasks(&db.conn(), &workspace_id)
 }
+
+#[tauri::command]
+pub fn get_activities_by_customer(
+    db: State<'_, DbPool>,
+    customer_id: String,
+) -> Result<Vec<Activity>, AppError> {
+    db::activity::get_by_customer(&db.conn(), &customer_id)
+}
