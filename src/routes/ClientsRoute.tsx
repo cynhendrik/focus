@@ -14,6 +14,12 @@ function relativeTime(iso: string): string {
   return `vor ${days} Tagen`
 }
 
+function scoreTone(score: number): 'ok' | 'warn' | 'bad' {
+  if (score >= 70) return 'ok'
+  if (score >= 40) return 'warn'
+  return 'bad'
+}
+
 function attentionScore(c: Customer): number {
   let score = 75
   if (c.priority === 'high')   score -= 30
@@ -174,7 +180,7 @@ export function ClientsRoute() {
                 </div>
                 {c.leadScore > 0 && (
                   <span className="client-tile-meta">
-                    <span className="chip">{c.leadScore}</span>
+                    <span className="chip" data-tone={scoreTone(c.leadScore)}>{c.leadScore}</span>
                   </span>
                 )}
               </div>
