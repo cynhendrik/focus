@@ -46,7 +46,10 @@ export function SmartListsSection() {
               active={activeListId === list.id}
               onClick={() => setActive(list.id)}
               onEdit={() => setEditing(list)}
-              onDelete={list.isSystem ? undefined : () => remove(list.id)}
+              onDelete={list.isSystem ? undefined : () => {
+                if (activeListId === list.id) setActive(null)
+                remove(list.id)
+              }}
             />
           ))}
         </div>

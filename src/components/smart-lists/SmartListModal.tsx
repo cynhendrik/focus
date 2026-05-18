@@ -40,17 +40,20 @@ export function SmartListModal({ initial, onClose }: {
   const handleSave = async () => {
     if (!name.trim()) return
     setSaving(true)
-    await upsert({
-      id:         initial?.id,
-      workspaceId,
-      name:       name.trim(),
-      icon,
-      filter,
-      orderIndex: initial?.orderIndex,
-      isSystem:   initial?.isSystem,
-    })
-    setSaving(false)
-    onClose()
+    try {
+      await upsert({
+        id:         initial?.id,
+        workspaceId,
+        name:       name.trim(),
+        icon,
+        filter,
+        orderIndex: initial?.orderIndex,
+        isSystem:   initial?.isSystem,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
