@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AppShell }    from '@/components/layout/AppShell'
 import { NavSidebar }  from '@/components/layout/NavSidebar'
+import { Topbar }      from '@/components/layout/Topbar'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -86,9 +87,10 @@ export default function App() {
 
   return (
     <AppShell>
-      <div className="flex flex-1 overflow-hidden">
+      <div className="app">
         <NavSidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="main">
+          <Topbar />
           <ErrorBoundary>
             {renderMain()}
           </ErrorBoundary>
