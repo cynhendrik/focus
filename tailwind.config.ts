@@ -13,7 +13,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Geist"', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
       },
     },
   },
