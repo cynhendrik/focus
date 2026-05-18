@@ -20,6 +20,12 @@ function relativeTime(iso: string): string {
   return `${days} days ago`
 }
 
+function scoreColor(score: number): string {
+  if (score >= 70) return '#D0FC69'
+  if (score >= 40) return '#f59e0b'
+  return '#ef4444'
+}
+
 function StatCard({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
     <div className="flex-1 p-5 rounded-2xl bg-[var(--bg1)] border border-[var(--border)] flex flex-col gap-1 min-w-0">
@@ -203,7 +209,20 @@ export function ClientsRoute() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--text)] truncate">{c.name}</p>
-                <p className="text-xs text-[var(--text2)] truncate">{relativeTime(c.updatedAt)}</p>
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs text-[var(--text2)] truncate">{relativeTime(c.updatedAt)}</p>
+                  {c.leadScore > 0 && (
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      style={{
+                        background: scoreColor(c.leadScore) + '22',
+                        color: scoreColor(c.leadScore),
+                      }}
+                    >
+                      {c.leadScore}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           ))}
