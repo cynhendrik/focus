@@ -4,6 +4,7 @@ import { NavSidebar }  from '@/components/layout/NavSidebar'
 import { Topbar }      from '@/components/layout/Topbar'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCustomersStore } from '@/store/customers.store'
+import { useCrmStore } from '@/store/crm.store'
 import { useSmartListsStore } from '@/store/smart-lists.store'
 import { SmartListService }   from '@/services/smart-list.service'
 import { useUiStore }   from '@/store/ui.store'
@@ -37,6 +38,7 @@ export default function App() {
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const init            = useAccountsStore(s => s.init)
   const initCustomers   = useCustomersStore(s => s.init)
+  const loadLastActivity = useCrmStore(s => s.loadLastActivity)
   const loadSmartLists  = useSmartListsStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
@@ -59,11 +61,12 @@ export default function App() {
     if (activeWorkspaceId) {
       init()
       initCustomers()
-      SmartListService.seedSystemLists(activeWorkspaceId).then(() =>
-        loadSmartLists(activeWorkspaceId)
-      )
+      loadLastActivity(activeWorkspaceId)
+      SmartListService.seedSystemLists(activeWorkspaceId)
+        .catch(() => {})
+        .then(() => loadSmartLists(activeWorkspaceId))
     }
-  }, [activeWorkspaceId, init, initCustomers, loadSmartLists])
+  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists])
 
   useSyncBridge()
 

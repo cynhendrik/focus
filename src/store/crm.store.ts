@@ -14,6 +14,7 @@ interface CrmState {
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
   loadAll: (workspaceId: string) => Promise<void>
+  loadLastActivity: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertFollowUpPayload) => Promise<void>
   remove: (id: string) => Promise<void>
 }
@@ -37,6 +38,16 @@ export const useCrmStore = create<CrmState>()((set) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ isLoading: false, error })
       log.error('Failed to load all follow-ups', { error })
+    }
+  },
+
+  loadLastActivity: async (workspaceId) => {
+    try {
+      const lastActivity = await CrmService.getLastActivityDates(workspaceId)
+      set({ lastActivity })
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      log.error('Failed to load last activity dates', { error })
     }
   },
 
