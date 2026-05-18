@@ -171,7 +171,7 @@ export function DashboardPane({ customerId }: Props) {
                       <div
                         className="h-full rounded-full"
                         style={{
-                          width: `${Math.round((points / leadScore) * 100)}%`,
+                          width: `${leadScore > 0 ? Math.round((points / leadScore) * 100) : 0}%`,
                           background: scoreColor(leadScore),
                           opacity: 0.85,
                         }}
