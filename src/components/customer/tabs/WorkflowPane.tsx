@@ -554,9 +554,9 @@ export function WorkflowPane({ customerId }: Props) {
           <button
             key={t}
             onClick={() => setSubTab(t)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
               ${subTab === t
-                ? 'bg-primary/10 text-primary'
+                ? 'bg-primary text-black'
                 : 'text-[var(--text2)] hover:text-[var(--text)] hover:bg-white/5'
               }`}
           >

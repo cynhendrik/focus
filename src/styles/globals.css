@@ -327,10 +327,10 @@ input:focus, textarea:focus, button:focus { outline: none; }
   cursor: pointer; transition: color 180ms ease;
   z-index: 1; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
 }
-.tab[data-active="true"] { color: var(--fg); }
+.tab[data-active="true"] { color: var(--accent); font-weight: 600; }
 .tab-indicator {
   position: absolute; top: 5px; bottom: 5px;
-  background: oklch(100% 0 0 / 0.08); border-radius: 99px;
+  background: var(--accent-soft); border: 1px solid oklch(92% 0.2 125 / 0.22); border-radius: 99px;
   transition: left 320ms cubic-bezier(.2,.7,.1,1), width 320ms cubic-bezier(.2,.7,.1,1);
   z-index: 0;
 }
