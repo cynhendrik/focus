@@ -196,6 +196,10 @@ fn main() {
             core::auth::set_auth_token,
             core::sync::get_sync_status,
             core::sync::sync_now,
+            commands::smart_list::get_smart_lists,
+            commands::smart_list::upsert_smart_list,
+            commands::smart_list::delete_smart_list,
+            commands::smart_list::seed_system_smart_lists,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");

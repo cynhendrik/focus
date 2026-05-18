@@ -8,3 +8,4 @@ pub mod folder;
 pub mod company;
 pub mod pipeline_stage;
 pub mod automation_rule;
+pub mod smart_list;
