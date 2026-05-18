@@ -6,22 +6,45 @@ export function WorkspaceSwitcher() {
   const workspaces       = useWorkspaceStore(s => s.workspaces)
   const activeId         = useWorkspaceStore(s => s.activeWorkspaceId)
   const setActive        = useWorkspaceStore(s => s.setActiveWorkspace)
+  const createWorkspace  = useWorkspaceStore(s => s.createWorkspace)
   const pendingCount     = useWorkspaceStore(s => s.pendingCount)
   const isOnline         = useWorkspaceStore(s => s.isOnline)
   const signOut          = useAuthStore(s => s.signOut)
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]       = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName]   = useState('')
+  const [error, setError]       = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   const active = workspaces.find(w => w.id === activeId)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setCreating(false)
+        setNewName('')
+        setError(null)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setError(null)
+    try {
+      await createWorkspace(newName.trim())
+      setCreating(false)
+      setNewName('')
+      setOpen(false)
+    } catch (err: any) {
+      setError(err?.message ?? 'Fehler beim Erstellen')
+    }
+  }
 
   return (
     <div ref={ref} className="relative px-3 pt-3 pb-2">
@@ -57,11 +80,50 @@ export function WorkspaceSwitcher() {
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--bg2)] transition-colors
                 ${ws.id === activeId ? 'text-primary font-medium' : 'text-[var(--text)]'}`}
             >
-              {ws.id === activeId && <span className="text-xs">✓</span>}
-              {ws.id !== activeId && <span className="w-3" />}
+              {ws.id === activeId ? <span className="text-xs">✓</span> : <span className="w-3" />}
               {ws.name}
             </button>
           ))}
+
+          <div className="h-px mx-3 bg-[var(--border)] my-1" />
+
+          {creating ? (
+            <form onSubmit={handleCreate} className="px-3 py-2 flex flex-col gap-2">
+              <input
+                autoFocus
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="Workspace-Name…"
+                className="w-full text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg2)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-primary"
+              />
+              {error && <p className="text-xs text-red-400">{error}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={!newName.trim()}
+                  className="flex-1 py-1.5 rounded-lg bg-primary text-[#0a0a0a] text-xs font-semibold disabled:opacity-40"
+                >
+                  Anlegen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCreating(false); setNewName(''); setError(null) }}
+                  className="px-3 py-1.5 rounded-lg text-xs text-[var(--text2)] hover:text-[var(--text)]"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setCreating(true)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg2)] transition-colors text-left"
+            >
+              <span className="text-base leading-none">+</span>
+              Neuer Workspace
+            </button>
+          )}
+
           <div className="h-px mx-3 bg-[var(--border)] my-1" />
           <button
             onClick={signOut}
