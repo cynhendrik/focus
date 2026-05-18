@@ -32,6 +32,7 @@ pub struct CreateActivityPayload {
     pub account_id: String,
     pub contact_id: Option<String>,
     pub deal_id: Option<String>,
+    pub customer_id: Option<String>,
     #[serde(rename = "type")]
     pub activity_type: String,
     pub title: Option<String>,
@@ -60,12 +61,12 @@ pub fn insert(conn: &Connection, payload: CreateActivityPayload) -> Result<Activ
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO activities
-         (id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+         (id, workspace_id, created_by, account_id, contact_id, deal_id, customer_id, type,
           title, body, payload, status, due_at, assignee, outcome, pending_sync, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,1,?15,?15)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,1,?16,?16)",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.account_id,
-            payload.contact_id, payload.deal_id, payload.activity_type,
+            payload.contact_id, payload.deal_id, payload.customer_id, payload.activity_type,
             payload.title, payload.body,
             payload.payload.unwrap_or_else(|| "{}".into()),
             payload.status.unwrap_or_else(|| "open".into()),
@@ -142,6 +143,16 @@ pub fn get_open_tasks(conn: &Connection, workspace_id: &str) -> Result<Vec<Activ
     Ok(rows)
 }
 
+pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Activity>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+                title, body, payload, status, due_at, assignee, outcome, created_at, updated_at
+         FROM activities WHERE customer_id = ?1 ORDER BY created_at DESC"
+    )?;
+    let rows = stmt.query_map([customer_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountActivityDate {
@@ -203,6 +214,7 @@ mod tests {
         CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
             account_id: account_id.into(), contact_id: None, deal_id: None,
+            customer_id: None,
             activity_type: activity_type.into(), title: Some("Test".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: None,
@@ -235,7 +247,7 @@ mod tests {
         // open task
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None,
+            account_id: "a1".into(), contact_id: None, deal_id: None, customer_id: None,
             activity_type: "task".into(), title: Some("Open Task".into()),
             body: None, payload: None, status: Some("open".into()),
             due_at: Some("2026-06-01".into()), assignee: None, outcome: None,
@@ -275,7 +287,7 @@ mod tests {
         seed_account(&conn, "a1");
         let a = insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None,
+            account_id: "a1".into(), contact_id: None, deal_id: None, customer_id: None,
             activity_type: "call".into(), title: Some("Call".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: Some("strong_interest".into()),

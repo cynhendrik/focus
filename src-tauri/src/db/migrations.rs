@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 9;
+const CURRENT_VERSION: u32 = 10;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -246,6 +246,15 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 CREATE INDEX IF NOT EXISTS idx_smart_lists_workspace
                     ON smart_lists(workspace_id, order_index);
             "#)?;
+            Ok(())
+        }
+        10 => {
+            if !column_exists(conn, "deals", "customer_id") {
+                conn.execute_batch("ALTER TABLE deals ADD COLUMN customer_id TEXT")?;
+            }
+            if !column_exists(conn, "activities", "customer_id") {
+                conn.execute_batch("ALTER TABLE activities ADD COLUMN customer_id TEXT")?;
+            }
             Ok(())
         }
         _ => Ok(()),

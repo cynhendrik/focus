@@ -34,6 +34,7 @@ pub fn update_deal_stage(
         account_id: updated.account_id.clone(),
         contact_id: updated.contact_id.clone(),
         deal_id: Some(id.clone()),
+        customer_id: None,
         activity_type: "stage_change".into(),
         title: Some(format!("Stage → {stage}")),
         body: None,
