@@ -3,42 +3,24 @@ import { useNotesStore } from '@/store/notes.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useFilesStore } from '@/store/files.store'
 import { useMailStore } from '@/store/mail.store'
+import { useCustomersStore } from '@/store/customers.store'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function computeHealthScore(
-  todos: ReturnType<typeof useTodosStore.getState>['todos'],
-  notes: ReturnType<typeof useNotesStore.getState>['notes'],
-  followUps: ReturnType<typeof useCrmStore.getState>['followUps'],
-): number {
-  const today = new Date()
-  let score = 100
-  const overdue = todos.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < today)
-  score -= overdue.length * 10
-  const highPrioOpen = todos.filter(t => t.status !== 'done' && t.priority === 'high')
-  score -= highPrioOpen.length * 5
-  const allTimestamps = [...todos.map(t => t.updatedAt), ...notes.map(n => n.updatedAt)]
-  if (allTimestamps.length === 0) {
-    score -= 20
-  } else {
-    const last = Math.max(...allTimestamps.map(d => new Date(d).getTime()))
-    const daysSince = (today.getTime() - last) / 86400000
-    if (daysSince >= 7) score -= 20
-  }
-  const overdueFollowUps = followUps.filter(f => f.status === 'offen' && new Date(f.dueDate) < today)
-  score -= overdueFollowUps.length * 15
-  return Math.max(10, Math.min(100, score))
-}
-
-function scoreColor(score: number) {
-  if (score >= 70) return '#22c55e'
+function scoreColor(score: number): string {
+  if (score >= 70) return '#D0FC69'
   if (score >= 40) return '#f59e0b'
   return '#ef4444'
 }
-function scoreLabel(score: number) {
-  if (score >= 70) return 'Healthy'
-  if (score >= 40) return 'At Risk'
-  return 'Critical'
+
+function scoreLabel(score: number): string {
+  if (score >= 70) return 'Hot'
+  if (score >= 40) return 'Warm'
+  return 'Cold'
+}
+
+function prettyFactor(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 function relativeTime(iso: string): string {
@@ -103,9 +85,12 @@ export function DashboardPane({ customerId }: Props) {
   const files     = useFilesStore(s => s.files)
   const allEmails = useMailStore(s => s.emails)
 
-  const score = computeHealthScore(todos, notes, followUps)
-  const color = scoreColor(score)
-  const label = scoreLabel(score)
+  const customer     = useCustomersStore(s => s.customers.find(c => c.id === customerId))
+  const leadScore    = customer?.leadScore ?? 0
+  const scoreFactors = customer?.scoreFactors ?? {}
+  const factors      = Object.entries(scoreFactors)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 6)
 
   // Letzte Interaktion
   const allActivity = [
@@ -148,24 +133,60 @@ export function DashboardPane({ customerId }: Props) {
       {/* ── Row 1: KPIs ── */}
       <div className="grid grid-cols-3 gap-4">
 
-        {/* Health Score */}
+        {/* Lead Score */}
         <Card>
           <div className="flex items-center gap-4">
             <div className="relative w-16 h-16 flex-shrink-0">
               <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                 <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border2)" strokeWidth="3" />
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke={color} strokeWidth="3"
-                  strokeLinecap="round" strokeDasharray={`${score} ${100 - score}`} />
+                <circle
+                  cx="18" cy="18" r="15.9" fill="none"
+                  stroke={scoreColor(leadScore)} strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray={`${leadScore} ${100 - leadScore}`}
+                />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-bold text-[var(--text)]">{score}</span>
+                <span className="text-lg font-bold" style={{ color: scoreColor(leadScore) }}>{leadScore}</span>
               </div>
             </div>
             <div>
-              <p className="text-[10px] text-[var(--text2)] uppercase tracking-wide mb-0.5">Health Score</p>
-              <p className="text-sm font-semibold" style={{ color }}>{label}</p>
-              <p className="text-[10px] text-[var(--text2)] mt-1 opacity-60">Bald KI-gesteuert</p>
+              <p className="text-[10px] text-[var(--text2)] uppercase tracking-wide mb-0.5">Lead Score</p>
+              <p className="text-sm font-semibold" style={{ color: scoreColor(leadScore) }}>{scoreLabel(leadScore)}</p>
+              <p className="text-[10px] text-[var(--text2)] mt-1 opacity-60">Rules Engine</p>
             </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-[var(--border)]">
+            {factors.length === 0 ? (
+              <p className="text-xs text-[var(--text2)]">Noch keine Aktivität</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {factors.map(([key, points]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-[11px] text-[var(--text2)] w-28 truncate flex-shrink-0">
+                      {prettyFactor(key)}
+                    </span>
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.round((points / leadScore) * 100)}%`,
+                          background: scoreColor(leadScore),
+                          opacity: 0.85,
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="text-[11px] font-medium w-8 text-right flex-shrink-0"
+                      style={{ color: scoreColor(leadScore) }}
+                    >
+                      +{points}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </Card>
 
