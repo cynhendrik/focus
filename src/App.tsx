@@ -3,6 +3,7 @@ import { AppShell }    from '@/components/layout/AppShell'
 import { NavSidebar }  from '@/components/layout/NavSidebar'
 import { Topbar }      from '@/components/layout/Topbar'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -33,6 +34,7 @@ export default function App() {
   const loadWorkspaces  = useWorkspaceStore(s => s.loadWorkspaces)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const init            = useAccountsStore(s => s.init)
+  const initCustomers   = useCustomersStore(s => s.init)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
   const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
@@ -51,8 +53,8 @@ export default function App() {
   }, [user, loadWorkspaces])
 
   useEffect(() => {
-    if (activeWorkspaceId) init()
-  }, [activeWorkspaceId, init])
+    if (activeWorkspaceId) { init(); initCustomers() }
+  }, [activeWorkspaceId, init, initCustomers])
 
   useSyncBridge()
 
