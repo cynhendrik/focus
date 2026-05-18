@@ -1,73 +1,57 @@
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
-import { useWorkspaceStore } from './workspace.store'
-import { useAuthStore } from './auth.store'
-import { useAccountsStore } from './accounts.store'
-import type { Activity, CreateActivityPayload, UpdateActivityPayload } from '@/types/activity.types'
+import { ActivitiesService } from '@/services/activities.service'
+import { useCrmStore } from '@/store/crm.store'
+import { log } from '@/lib/logger'
+import type { Activity, CreateActivityPayload } from '@/types/pipeline.types'
+import type { AppError } from '@/types/error.types'
+import { isAppError, formatError } from '@/types/error.types'
 
 interface ActivitiesState {
   activities: Activity[]
-  openTasks: Activity[]
   isLoading: boolean
-  loadByAccount: (accountId: string) => Promise<void>
-  loadByDeal: (dealId: string) => Promise<void>
-  loadOpenTasks: () => Promise<void>
-  create: (payload: Omit<CreateActivityPayload, 'workspaceId' | 'createdBy'>) => Promise<Activity>
-  update: (id: string, payload: UpdateActivityPayload) => Promise<Activity>
+  error: AppError | null
+  loadForCustomer: (customerId: string) => Promise<void>
+  create: (payload: CreateActivityPayload) => Promise<void>
   remove: (id: string) => Promise<void>
 }
 
 export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   activities: [],
-  openTasks: [],
   isLoading: false,
+  error: null,
 
-  loadByAccount: async (accountId) => {
-    set({ isLoading: true })
+  loadForCustomer: async (customerId) => {
+    set({ isLoading: true, error: null })
     try {
-      const activities = await invoke<Activity[]>('get_activities_by_account', { accountId })
+      const activities = await ActivitiesService.getByCustomer(customerId)
       set({ activities, isLoading: false })
-    } catch { set({ isLoading: false }) }
-  },
-
-  loadByDeal: async (dealId) => {
-    set({ isLoading: true })
-    try {
-      const activities = await invoke<Activity[]>('get_activities_by_deal', { dealId })
-      set({ activities, isLoading: false })
-    } catch { set({ isLoading: false }) }
-  },
-
-  loadOpenTasks: async () => {
-    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-    try {
-      const openTasks = await invoke<Activity[]>('get_open_tasks', { workspaceId })
-      set({ openTasks })
-    } catch {}
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ isLoading: false, error })
+      log.error('Failed to load activities', { error })
+    }
   },
 
   create: async (payload) => {
-    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-    const createdBy = useAuthStore.getState().user?.id ?? ''
-    const activity = await invoke<Activity>('create_activity', { payload: { ...payload, workspaceId, createdBy } })
-    set(s => ({ activities: [activity, ...s.activities] }))
-    if (payload.outcome) {
-      await useAccountsStore.getState().init()
+    set({ error: null })
+    try {
+      const activity = await ActivitiesService.create(payload)
+      set(s => ({ activities: [activity, ...s.activities] }))
+      useCrmStore.getState().loadLastActivity(payload.workspaceId)
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
     }
-    return activity
-  },
-
-  update: async (id, payload) => {
-    const updated = await invoke<Activity>('update_activity', { id, payload })
-    set(s => ({ activities: s.activities.map(a => a.id === id ? updated : a) }))
-    if (payload.outcome) {
-      await useAccountsStore.getState().init()
-    }
-    return updated
   },
 
   remove: async (id) => {
-    await invoke<void>('delete_activity', { id })
-    set(s => ({ activities: s.activities.filter(a => a.id !== id) }))
+    set({ error: null })
+    try {
+      await ActivitiesService.delete(id)
+      set(s => ({ activities: s.activities.filter(a => a.id !== id) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
   },
 }))

@@ -1,54 +1,107 @@
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
-import { useWorkspaceStore } from './workspace.store'
-import { useAuthStore } from './auth.store'
-import { useAccountsStore } from './accounts.store'
-import type { Deal, UpsertDealPayload, DealStage } from '@/types/deal.types'
+import { DealsService } from '@/services/deals.service'
+import { log } from '@/lib/logger'
+import type { Deal, UpsertDealPayload } from '@/types/pipeline.types'
+import type { AppError } from '@/types/error.types'
+import { isAppError, formatError } from '@/types/error.types'
 
 interface DealsState {
   deals: Deal[]
+  customerDeals: Deal[]
   isLoading: boolean
-  loadByAccount: (accountId: string) => Promise<void>
-  upsert: (payload: Omit<UpsertDealPayload, 'workspaceId' | 'createdBy'>) => Promise<Deal>
-  updateStage: (id: string, stage: DealStage) => Promise<Deal>
+  error: AppError | null
+  loadAll: (workspaceId: string) => Promise<void>
+  loadForCustomer: (customerId: string) => Promise<void>
+  upsert: (payload: UpsertDealPayload) => Promise<void>
   remove: (id: string) => Promise<void>
+  moveToStage: (dealId: string, stage: string) => Promise<void>
 }
 
-export const useDealsStore = create<DealsState>()((set) => ({
+export const useDealsStore = create<DealsState>()((set, get) => ({
   deals: [],
+  customerDeals: [],
   isLoading: false,
+  error: null,
 
-  loadByAccount: async (accountId) => {
-    set({ isLoading: true })
+  loadAll: async (workspaceId) => {
+    set({ isLoading: true, error: null })
     try {
-      const deals = await invoke<Deal[]>('get_deals', { accountId })
+      const deals = await DealsService.getByWorkspace(workspaceId)
       set({ deals, isLoading: false })
-    } catch {
-      set({ isLoading: false })
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ isLoading: false, error })
+      log.error('Failed to load deals', { error })
+    }
+  },
+
+  loadForCustomer: async (customerId) => {
+    set({ isLoading: true, error: null })
+    try {
+      const customerDeals = await DealsService.getByCustomer(customerId)
+      set({ customerDeals, isLoading: false })
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ isLoading: false, error })
+      log.error('Failed to load customer deals', { error })
     }
   },
 
   upsert: async (payload) => {
-    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-    const createdBy = useAuthStore.getState().user?.id ?? ''
-    const updated = await invoke<Deal>('upsert_deal', { payload: { ...payload, workspaceId, createdBy } })
-    set(s => {
-      const idx = s.deals.findIndex(d => d.id === updated.id)
-      if (idx >= 0) { const next = [...s.deals]; next[idx] = updated; return { deals: next } }
-      return { deals: [...s.deals, updated] }
-    })
-    return updated
-  },
-
-  updateStage: async (id, stage) => {
-    const updated = await invoke<Deal>('update_deal_stage', { id, stage })
-    set(s => ({ deals: s.deals.map(d => d.id === id ? updated : d) }))
-    await useAccountsStore.getState().init()
-    return updated
+    set({ error: null })
+    try {
+      const deal = await DealsService.upsert(payload)
+      set(s => {
+        const exists = s.deals.some(d => d.id === deal.id)
+        const updatedDeals = exists
+          ? s.deals.map(d => d.id === deal.id ? deal : d)
+          : [deal, ...s.deals]
+        const existsInCustomer = s.customerDeals.some(d => d.id === deal.id)
+        const updatedCustomerDeals = existsInCustomer
+          ? s.customerDeals.map(d => d.id === deal.id ? deal : d)
+          : deal.customerId ? [deal, ...s.customerDeals] : s.customerDeals
+        return { deals: updatedDeals, customerDeals: updatedCustomerDeals }
+      })
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
   },
 
   remove: async (id) => {
-    await invoke<void>('delete_deal', { id })
-    set(s => ({ deals: s.deals.filter(d => d.id !== id) }))
+    set({ error: null })
+    try {
+      await DealsService.delete(id)
+      set(s => ({
+        deals: s.deals.filter(d => d.id !== id),
+        customerDeals: s.customerDeals.filter(d => d.id !== id),
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  moveToStage: async (dealId, stage) => {
+    const prev = get().deals.find(d => d.id === dealId)?.stage
+    set(s => ({
+      deals: s.deals.map(d => d.id === dealId ? { ...d, stage } : d),
+      customerDeals: s.customerDeals.map(d => d.id === dealId ? { ...d, stage } : d),
+    }))
+    try {
+      const updated = await DealsService.updateStage(dealId, stage)
+      set(s => ({
+        deals: s.deals.map(d => d.id === dealId ? updated : d),
+        customerDeals: s.customerDeals.map(d => d.id === dealId ? updated : d),
+      }))
+    } catch (err) {
+      if (prev !== undefined) {
+        set(s => ({
+          deals: s.deals.map(d => d.id === dealId ? { ...d, stage: prev } : d),
+          customerDeals: s.customerDeals.map(d => d.id === dealId ? { ...d, stage: prev } : d),
+        }))
+      }
+      throw err
+    }
   },
 }))
