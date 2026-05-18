@@ -29,6 +29,8 @@ export interface Customer extends TimestampedEntity {
   zip?: string
   city?: string
   country?: string
+  leadScore: number
+  scoreFactors: Record<string, number>
 }
 
 export interface UpsertCustomerPayload {

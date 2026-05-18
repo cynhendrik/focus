@@ -20,6 +20,8 @@ function accountToCustomer(a: Account): Customer {
     zip: a.zip,
     city: a.city,
     country: a.country,
+    leadScore: a.leadScore,
+    scoreFactors: a.scoreFactors,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   }

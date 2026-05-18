@@ -21,6 +21,8 @@ const mockCustomer: Customer = {
   workspaceId: 'ws-1',
   goals: [],
   socialLinks: '{}',
+  leadScore: 0,
+  scoreFactors: {},
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 }

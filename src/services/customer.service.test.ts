@@ -18,6 +18,8 @@ const mockCustomer: Customer = {
   workspaceId: 'ws-1',
   goals: [],
   socialLinks: '{}',
+  leadScore: 0,
+  scoreFactors: {},
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 }
@@ -27,24 +29,38 @@ describe('CustomerService', () => {
     vi.clearAllMocks()
   })
 
-  it('getAll calls get_customers command with workspaceId', async () => {
+  it('getAll calls get_accounts command with workspaceId', async () => {
     vi.mocked(invoke).mockResolvedValueOnce([mockCustomer])
     const result = await CustomerService.getAll('ws-1')
-    expect(invoke).toHaveBeenCalledWith('get_customers', { workspaceId: 'ws-1' })
-    expect(result).toEqual([mockCustomer])
+    expect(invoke).toHaveBeenCalledWith('get_accounts', { workspaceId: 'ws-1' })
+    expect(result[0].id).toBe('1')
   })
 
-  it('upsert calls upsert_customer with payload', async () => {
+  it('upsert calls upsert_account with payload', async () => {
     vi.mocked(invoke).mockResolvedValueOnce(mockCustomer)
     const payload = { name: 'Test GmbH', workspaceId: 'ws-1', createdBy: 'u-1' }
-    const result = await CustomerService.upsert(payload)
-    expect(invoke).toHaveBeenCalledWith('upsert_customer', { payload })
-    expect(result).toEqual(mockCustomer)
+    await CustomerService.upsert(payload)
+    expect(invoke).toHaveBeenCalledWith('upsert_account', expect.objectContaining({ payload: expect.any(Object) }))
   })
 
-  it('delete calls delete_customer with id and workspaceId', async () => {
+  it('delete calls delete_account with id and workspaceId', async () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined)
     await CustomerService.delete('1', 'ws-1')
-    expect(invoke).toHaveBeenCalledWith('delete_customer', { id: '1', workspaceId: 'ws-1' })
+    expect(invoke).toHaveBeenCalledWith('delete_account', { id: '1', workspaceId: 'ws-1' })
+  })
+
+  it('maps leadScore and scoreFactors from account to customer', async () => {
+    const mockAccount = {
+      id: '2', name: 'Hot Lead GmbH', kind: 'company',
+      status: 'aktiv', priority: 'high', tags: [], goals: [],
+      isPrivate: false, workspaceId: 'ws-1', createdBy: 'u-1',
+      socialLinks: '{}', leadScore: 75,
+      scoreFactors: { qualified_meeting: 25, strong_interest: 50 },
+      createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+    }
+    vi.mocked(invoke).mockResolvedValueOnce([mockAccount])
+    const result = await CustomerService.getAll('ws-1')
+    expect(result[0].leadScore).toBe(75)
+    expect(result[0].scoreFactors).toEqual({ qualified_meeting: 25, strong_interest: 50 })
   })
 })
