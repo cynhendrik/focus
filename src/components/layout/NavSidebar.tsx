@@ -2,7 +2,7 @@ import { useUiStore, type AppView } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import {
   LayoutDashboard, Users, FileText, CheckSquare,
-  Calendar, Mail, Settings, Bell,
+  Calendar, Mail, Settings, Bell, TrendingUp,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -52,6 +52,7 @@ export function NavSidebar() {
       <div className="sidebar-section">Workspace</div>
       <SidebarNavItem icon={LayoutDashboard} label="Dashboard" active={appView === 'dashboard'} onClick={() => setAppView('dashboard')} kbd="H" />
       <SidebarNavItem icon={Users}           label="Clients"   active={appView === 'clients'}   onClick={() => setAppView('clients')}   kbd="C" />
+      <SidebarNavItem icon={TrendingUp}      label="Pipeline"  active={appView === 'pipeline'}  onClick={() => setAppView('pipeline')}  kbd="P" />
       <SidebarNavItem icon={FileText}        label="Finanzen"  active={appView === 'invoices'}  onClick={() => setAppView('invoices')}  kbd="F" />
       <SidebarNavItem icon={CheckSquare}     label="Tasks"       active={appView === 'tasks'}   onClick={() => setAppView('tasks')}   kbd="T" />
       <SidebarNavItem icon={Bell}            label="Follow-Ups"  active={appView === 'kpis'}    onClick={() => setAppView('kpis')}    kbd="U" />

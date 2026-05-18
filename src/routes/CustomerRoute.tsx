@@ -37,6 +37,8 @@ function TabIcon({ id }: { id: CustomerTab }) {
     kommunikation: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
     dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
     historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
+    sales:         ['M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 3 2-7L2 9h7z'],
+    activities:    ['M22 12h-4l-3 9L9 3l-3 9H2'],
   }
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

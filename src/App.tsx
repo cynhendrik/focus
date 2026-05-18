@@ -7,6 +7,9 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useSmartListsStore } from '@/store/smart-lists.store'
 import { SmartListService }   from '@/services/smart-list.service'
+import { PipelineService }    from '@/services/pipeline.service'
+import { usePipelineStore }   from '@/store/pipeline.store'
+import { useDealsStore }      from '@/store/deals.store'
 import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -29,6 +32,7 @@ import { MailRoute }       from '@/routes/MailRoute'
 import { CrmRoute }        from '@/routes/CrmRoute'
 import { SettingsRoute }   from '@/routes/SettingsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
+import { PipelineRoute }   from '@/routes/PipelineRoute'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -40,6 +44,8 @@ export default function App() {
   const initCustomers   = useCustomersStore(s => s.init)
   const loadLastActivity = useCrmStore(s => s.loadLastActivity)
   const loadSmartLists  = useSmartListsStore(s => s.load)
+  const loadPipelineStages = usePipelineStore(s => s.load)
+  const loadAllDeals    = useDealsStore(s => s.loadAll)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
   const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
@@ -65,8 +71,12 @@ export default function App() {
       SmartListService.seedSystemLists(activeWorkspaceId)
         .catch(() => {})
         .then(() => loadSmartLists(activeWorkspaceId))
+      PipelineService.seed(activeWorkspaceId).catch(() => {}).then(() =>
+        loadPipelineStages(activeWorkspaceId)
+      )
+      loadAllDeals(activeWorkspaceId)
     }
-  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists])
+  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists, loadPipelineStages, loadAllDeals])
 
   useSyncBridge()
 
@@ -87,6 +97,7 @@ export default function App() {
       case 'dashboard':  return <DashboardRoute />
       case 'profile':    return <ProfileRoute />
       case 'clients':    return <ClientsRoute />
+      case 'pipeline':   return <PipelineRoute />
       case 'invoices':   return <InvoicesRoute />
       case 'tasks':      return <TasksRoute />
       case 'kpis':       return <KpisRoute />
