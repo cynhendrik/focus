@@ -224,15 +224,24 @@ function FollowUpRow({ fu, onToggle, onRemove }: {
 
 // ── Feed Item ─────────────────────────────────────────────────────────────────
 
+const BODY_TRUNCATE = 140
+
 function FeedItem({ item, onRemove }: {
   item: { id: string; type: string; title?: string; body?: string; status: string; createdAt: string }
   onRemove: () => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.note
   const { Icon } = cfg
   const isDoneFu = item.type === 'followup' && item.status === 'done'
-  const mainText = item.title ?? item.body
-  const subText  = item.title && item.body ? item.body : undefined
+
+  // title from modal (custom or type-label), body = Gesprächsnotiz
+  const headline = item.title
+  const note     = item.body
+  const isLong   = (note?.length ?? 0) > BODY_TRUNCATE
+  const noteText = note
+    ? (isLong && !expanded ? note.slice(0, BODY_TRUNCATE).trimEnd() + '…' : note)
+    : undefined
 
   return (
     <div
@@ -255,6 +264,7 @@ function FeedItem({ item, onRemove }: {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Header row: type label + timestamp */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: isDoneFu ? '#4ade80' : cfg.color }}>
             {isDoneFu ? 'Follow-up erledigt' : cfg.label}
@@ -263,15 +273,37 @@ function FeedItem({ item, onRemove }: {
             {fmtTime(item.createdAt)}
           </span>
         </div>
-        {mainText && (
-          <p style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3, lineHeight: 1.5 }}>
-            {mainText}
+
+        {/* Custom title (if set and different from type label) */}
+        {headline && headline !== cfg.label && (
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)', marginTop: 3, lineHeight: 1.4 }}>
+            {headline}
           </p>
         )}
-        {subText && (
-          <p style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2, lineHeight: 1.5 }}>
-            {subText}
-          </p>
+
+        {/* Gesprächsnotiz / body */}
+        {noteText && (
+          <>
+            <p style={{
+              fontSize: 11, color: 'var(--fg-muted)', marginTop: 4,
+              lineHeight: 1.6, whiteSpace: 'pre-wrap',
+            }}>
+              {noteText}
+            </p>
+            {isLong && (
+              <button
+                onClick={() => setExpanded(v => !v)}
+                style={{
+                  marginTop: 4, fontSize: 10, fontWeight: 600, color: 'var(--fg-dim)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-dim)')}
+              >
+                {expanded ? 'Weniger anzeigen ↑' : 'Mehr lesen ↓'}
+              </button>
+            )}
+          </>
         )}
       </div>
 

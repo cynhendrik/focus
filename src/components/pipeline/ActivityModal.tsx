@@ -24,6 +24,7 @@ export function ActivityModal({ customerId, presetType, onClose }: Props) {
   const user = useAuthStore(s => s.user)
 
   const [type, setType] = useState<ActivityType>(presetType ?? 'call')
+  const [title, setTitle] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [duration, setDuration] = useState('')
   const [body, setBody] = useState('')
@@ -38,7 +39,7 @@ export function ActivityModal({ customerId, presetType, onClose }: Props) {
         accountId: customerId,
         customerId,
         type,
-        title: TYPES.find(t => t.id === type)?.label,
+        title: title.trim() || TYPES.find(t => t.id === type)?.label,
         body: body.trim() || undefined,
         durationMinutes: (type === 'call' || type === 'meeting') && duration
           ? parseInt(duration)
@@ -82,6 +83,18 @@ export function ActivityModal({ customerId, presetType, onClose }: Props) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 4 }}>
+              Titel <span style={{ fontWeight: 400, opacity: 0.5 }}>(optional)</span>
+            </label>
+            <input
+              className="mock-input"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder={`z.B. Erstgespräch, Demo-Call, Preisverhandlung…`}
+              autoFocus
+            />
+          </div>
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 4 }}>Datum</label>
             <input className="mock-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
