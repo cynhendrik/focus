@@ -219,9 +219,16 @@ function ContextMenu({
       <div style={{ height: 1, background: 'var(--border)', margin: '2px 0 4px' }} />
 
       <CtxItem label="Follow-Up erstellen" onClick={() => act(() => onFollowUp([menu.lead]))} />
+      {menu.lead.leadStatus !== 'warm' && (
+        <CtxItem
+          label="→ Warm Lead"
+          color="var(--accent)"
+          onClick={() => act(() => bulkUpdate({ ids: [menu.lead.id], status: 'warm' }, workspaceId))}
+        />
+      )}
       <CtxItem
         label="Zu Kunde machen ✓"
-        color="#4ade80"
+        color="var(--accent)"
         onClick={() => act(() => convertToClient(menu.lead.id))}
       />
 
@@ -262,7 +269,7 @@ function CtxItem({ label, color, onClick }: { label: string; color?: string; onC
         color: color ?? 'var(--fg)',
         background: 'none', border: 'none', cursor: 'pointer',
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
     >
       {label}
@@ -272,13 +279,17 @@ function CtxItem({ label, color, onClick }: { label: string; color?: string; onC
 
 // ── Lead Card ─────────────────────────────────────────────────────────────────
 
-function LeadCard({ lead, selected, onToggle, onContext, isDragging }: {
+function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
   lead: Lead
   selected?: boolean
   onToggle?: () => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
+  onWarm?: () => void
   isDragging?: boolean
 }) {
+  const isWebinar = lead.leadSource === 'zoom'
+  const showWarmBtn = isWebinar && lead.leadStatus !== 'warm' && onWarm
+
   return (
     <div
       className="task-card"
@@ -287,7 +298,7 @@ function LeadCard({ lead, selected, onToggle, onContext, isDragging }: {
       onContextMenu={e => { e.preventDefault(); onContext(e, lead) }}
       style={{
         marginBottom: 6, cursor: 'grab', userSelect: 'none',
-        outline: selected ? '2px solid var(--primary)' : undefined,
+        outline: selected ? '2px solid var(--accent)' : undefined,
         outlineOffset: selected ? 1 : undefined,
       }}
     >
@@ -305,56 +316,74 @@ function LeadCard({ lead, selected, onToggle, onContext, isDragging }: {
         {selected && (
           <div style={{
             width: 14, height: 14, borderRadius: 4, flexShrink: 0,
-            background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-              <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M1 3L3 5L7 1" stroke="var(--accent-ink)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         )}
       </div>
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
           fontSize: 10, padding: '1px 7px', borderRadius: 99, fontWeight: 700,
-          background: lead.leadSource === 'zoom' ? 'rgba(139,92,246,0.15)' : 'rgba(74,222,128,0.12)',
-          color: lead.leadSource === 'zoom' ? '#a78bfa' : '#4ade80',
+          background: isWebinar ? 'rgba(139,92,246,0.15)' : 'var(--surface-2)',
+          color: isWebinar ? '#a78bfa' : 'var(--fg-dim)',
         }}>
           {sourceLabel(lead.leadSource, lead.leadSourceDetail)}
         </span>
         {lead.engagementScore > 0 && (
-          <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+          <span style={{ fontSize: 10, color: 'var(--warn)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
             {lead.engagementScore}p
           </span>
         )}
       </div>
+
+      {showWarmBtn && (
+        <button
+          onClick={e => { e.stopPropagation(); onWarm() }}
+          style={{
+            marginTop: 8, width: '100%', padding: '4px 0',
+            borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+            color: 'var(--accent)', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 4,
+          }}
+        >
+          ↑ Warm Lead
+        </button>
+      )}
     </div>
   )
 }
 
 // ── Draggable wrapper ─────────────────────────────────────────────────────────
 
-function DraggableLeadCard({ lead, selected, onToggle, onContext }: {
+function DraggableLeadCard({ lead, selected, onToggle, onContext, onWarm }: {
   lead: Lead
   selected: boolean
   onToggle: () => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
+  onWarm?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id })
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.35 : 1 }}>
-      <LeadCard lead={lead} selected={selected} onToggle={onToggle} onContext={onContext} isDragging={isDragging} />
+      <LeadCard lead={lead} selected={selected} onToggle={onToggle} onContext={onContext} onWarm={onWarm} isDragging={isDragging} />
     </div>
   )
 }
 
 // ── Droppable column ──────────────────────────────────────────────────────────
 
-function LeadColumn({ col, leads, selected, onToggle, onContext }: {
+function LeadColumn({ col, leads, selected, onToggle, onContext, onWarm }: {
   col: typeof COLUMNS[number]
   leads: Lead[]
   selected: Set<string>
   onToggle: (id: string) => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
+  onWarm: (id: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id })
 
@@ -387,11 +416,12 @@ function LeadColumn({ col, leads, selected, onToggle, onContext }: {
             selected={selected.has(lead.id)}
             onToggle={() => onToggle(lead.id)}
             onContext={onContext}
+            onWarm={() => onWarm(lead.id)}
           />
         ))}
         {leads.length === 0 && (
-          <div style={{ border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 9, padding: 16, textAlign: 'center' }}>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Leer</span>
+          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 9, padding: 16, textAlign: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Leer</span>
           </div>
         )}
       </div>
@@ -566,6 +596,10 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
     setCtxMenu({ lead, x: e.clientX, y: e.clientY })
   }
 
+  const handleWarm = (id: string) => {
+    bulkUpdate({ ids: [id], status: 'warm' }, workspaceId)
+  }
+
   const selectedLeads = boardLeads.filter(l => selected.has(l.id))
 
   async function deleteSelected() {
@@ -630,6 +664,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
                 selected={selected}
                 onToggle={toggleSelect}
                 onContext={handleContext}
+                onWarm={handleWarm}
               />
             ))}
           </div>
