@@ -16,6 +16,8 @@ import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { HistoriePane } from '@/components/customer/tabs/HistoriePane'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
 import { SalesPane } from '@/components/customer/tabs/SalesPane'
+import { AktivitaetenPane } from '@/components/customer/tabs/AktivitaetenPane'
+import { InformationenPane } from '@/components/customer/tabs/InformationenPane'
 
 function avatarBg(name: string): string {
   const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
@@ -35,11 +37,13 @@ function relativeTime(iso: string): string {
 function TabIcon({ id }: { id: CustomerTab }) {
   const paths: Record<CustomerTab, string[]> = {
     dashboard:     ['M18 20V10', 'M12 20V4', 'M6 20v-6'],
-    workflow:      ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
     kommunikation: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
+    aktivitaeten:  ['M22 12h-4l-3 9L9 3l-3 9H2'],
+    informationen: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 16v-4', 'M12 8h.01'],
+    sales:         ['M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
+    workflow:      ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
     dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
     historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
-    sales:         ['M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
   }
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,11 +54,13 @@ function TabIcon({ id }: { id: CustomerTab }) {
 
 const TABS: { id: CustomerTab; label: string }[] = [
   { id: 'dashboard',     label: 'Dashboard' },
-  { id: 'workflow',      label: 'Workflow / Tasks' },
   { id: 'kommunikation', label: 'Kommunikation' },
+  { id: 'aktivitaeten',  label: 'Aktivitäten' },
+  { id: 'informationen', label: 'Informationen' },
+  { id: 'sales',         label: 'Deals' },
+  { id: 'workflow',      label: 'Workflow' },
   { id: 'dateien',       label: 'Dateien' },
   { id: 'historie',      label: 'Historie' },
-  { id: 'sales',         label: 'Deals' },
 ]
 
 interface Props { customerId: string }
@@ -101,11 +107,13 @@ export function CustomerRoute({ customerId }: Props) {
   const renderPane = () => {
     switch (activeTab) {
       case 'dashboard':     return <DashboardPane customerId={customerId} />
-      case 'workflow':      return <WorkflowPane customerId={customerId} />
       case 'kommunikation': return <KommunikationPane customerId={customerId} />
+      case 'aktivitaeten':  return <AktivitaetenPane customerId={customerId} />
+      case 'informationen': return <InformationenPane customerId={customerId} />
+      case 'sales':         return <SalesPane customerId={customerId} />
+      case 'workflow':      return <WorkflowPane customerId={customerId} />
       case 'dateien':       return <DateienPane customerId={customerId} />
       case 'historie':      return <HistoriePane customerId={customerId} />
-      case 'sales':         return <SalesPane customerId={customerId} />
     }
   }
 
