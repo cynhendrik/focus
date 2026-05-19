@@ -199,14 +199,11 @@ function ContextMenu({
       <div style={{ height: 1, background: 'var(--border)', margin: '2px 0 4px' }} />
 
       <CtxItem label="Follow-Up erstellen" onClick={() => act(() => onFollowUp([menu.lead]))} />
-
-      {menu.lead.leadStatus === 'warm' && (
-        <CtxItem
-          label="Zu Kunde machen ✓"
-          color="#4ade80"
-          onClick={() => act(() => convertToClient(menu.lead.id))}
-        />
-      )}
+      <CtxItem
+        label="Zu Kunde machen ✓"
+        color="#4ade80"
+        onClick={() => act(() => convertToClient(menu.lead.id))}
+      />
 
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
