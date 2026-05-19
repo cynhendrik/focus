@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useLeadsStore } from '@/store/leads.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import type { Lead, LeadSource, LeadStatus } from '@/types/lead.types'
+import type { Lead, LeadSource, LeadStatus, UpsertLeadPayload } from '@/types/lead.types'
 
 type Tab = 'new' | 'phases' | 'reengage'
 
@@ -64,11 +64,125 @@ function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => voi
   )
 }
 
+function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
+  const upsert = useLeadsStore(s => s.upsert)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [source, setSource] = useState<LeadSource>('manual')
+  const [sourceDetail, setSourceDetail] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSave() {
+    if (!name.trim()) return
+    setSaving(true)
+    const payload: UpsertLeadPayload = {
+      workspaceId,
+      name: name.trim(),
+      email: email.trim() || undefined,
+      leadSource: source,
+      leadSourceDetail: sourceDetail.trim() || undefined,
+      leadStatus: 'new',
+    }
+    try {
+      await upsert(payload)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{
+        width: '100%', maxWidth: 400,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 16, padding: 24,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+      }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Lead anlegen</h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+              Name *
+            </label>
+            <input
+              className="mock-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Max Mustermann"
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+              E-Mail
+            </label>
+            <input
+              className="mock-input"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="max@beispiel.de"
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+              Quelle
+            </label>
+            <select className="mock-input" value={source} onChange={e => setSource(e.target.value as LeadSource)}>
+              <option value="manual">Manuell</option>
+              <option value="zoom">Zoom Webinar</option>
+              <option value="generic">Web / Sonstiges</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+              Quelle Detail
+            </label>
+            <input
+              className="mock-input"
+              value={sourceDetail}
+              onChange={e => setSourceDetail(e.target.value)}
+              placeholder="z.B. Empfehlung, Messe, Webinar-Titel…"
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
+          <button className="btn-ghost" onClick={onClose} disabled={saving}>
+            Abbrechen
+          </button>
+          <button
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={!name.trim() || saving}
+          >
+            {saving ? 'Speichern…' : 'Lead anlegen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function NewInTab({ workspaceId }: { workspaceId: string }) {
   const allLeads = useLeadsStore(s => s.leads)
   const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
   const leads = useMemo(() => allLeads.filter(l => l.leadStatus === 'new'), [allLeads])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showCreate, setShowCreate] = useState(false)
 
   function toggleAll() {
     if (selected.size === leads.length && leads.length > 0) {
@@ -143,10 +257,11 @@ function NewInTab({ workspaceId }: { workspaceId: string }) {
           </>
         )}
         <div style={{ flex: 1 }} />
-        <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }}>
+        <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={() => setShowCreate(true)}>
           + Lead
         </button>
       </div>
+      {showCreate && <CreateLeadModal workspaceId={workspaceId} onClose={() => setShowCreate(false)} />}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px' }}>
         {leads.length === 0 ? (
