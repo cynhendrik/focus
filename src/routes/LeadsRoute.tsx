@@ -439,11 +439,8 @@ export function LeadsRoute() {
       </div>
 
       {isLoading ? (
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--fg-dim)', fontSize: 13,
-        }}>
-          Lädt…
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="spinner" />
         </div>
       ) : (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
