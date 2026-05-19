@@ -40,8 +40,8 @@ export interface PendingLead {
   email: string
   name: string | null
   source: 'zoom' | 'generic'
-  sourceDetail: string | null
+  source_detail: string | null
   payload: Record<string, unknown>
   synced: boolean
-  createdAt: string
+  created_at: string
 }

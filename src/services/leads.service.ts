@@ -8,7 +8,7 @@ function normalizePendingLead(row: PendingLead): UpsertLeadPayload {
     name: row.name ?? row.email,
     email: row.email,
     leadSource: row.source,
-    leadSourceDetail: row.sourceDetail ?? undefined,
+    leadSourceDetail: row.source_detail ?? undefined,
     leadStatus: 'new',
   }
 }
