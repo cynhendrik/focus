@@ -1,28 +1,13 @@
 import { useState } from 'react'
 import { useTodosStore } from '@/store/todos.store'
 import { useNotesStore } from '@/store/notes.store'
-import { useCrmStore } from '@/store/crm.store'
+import { useActivitiesStore } from '@/store/activities.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { useFilesStore } from '@/store/files.store'
 import { useMailStore } from '@/store/mail.store'
-import { useCustomersStore } from '@/store/customers.store'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function scoreColor(score: number): string {
-  if (score >= 70) return '#D0FC69'
-  if (score >= 40) return '#f59e0b'
-  return '#ef4444'
-}
-
-function scoreLabel(score: number): string {
-  if (score >= 70) return 'Hot'
-  if (score >= 40) return 'Warm'
-  return 'Cold'
-}
-
-function prettyFactor(key: string): string {
-  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -61,6 +46,14 @@ function formatBytes(bytes: number | null): string {
   return `${(bytes / 1048576).toFixed(1)} MB`
 }
 
+function relationshipStatus(lastActivityTime: string | undefined): { label: string; color: string } {
+  if (!lastActivityTime) return { label: 'Kein Kontakt', color: '#ef4444' }
+  const days = Math.floor((Date.now() - new Date(lastActivityTime).getTime()) / 86_400_000)
+  if (days <= 14) return { label: 'Aktiv', color: '#4ade80' }
+  if (days <= 90) return { label: 'Inaktiv', color: '#fbbf24' }
+  return { label: 'Eingeschlafen', color: '#ef4444' }
+}
+
 // ── Card Wrapper ──────────────────────────────────────────────────────────────
 
 function Card({ title, children, className = '' }: { title?: string; children: React.ReactNode; className?: string }) {
@@ -79,41 +72,38 @@ function Card({ title, children, className = '' }: { title?: string; children: R
 interface Props { customerId: string }
 
 export function DashboardPane({ customerId }: Props) {
-  const todos     = useTodosStore(s => s.todos)
-  const notes     = useNotesStore(s => s.notes)
-  const followUps    = useCrmStore(s => s.followUps)
-  const upsertFollowUp = useCrmStore(s => s.upsert)
+  const todos      = useTodosStore(s => s.todos)
+  const notes      = useNotesStore(s => s.notes)
+  const activities = useActivitiesStore(s => s.activities)
+  const createActivity = useActivitiesStore(s => s.create)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user        = useAuthStore(s => s.user)
   const [showFuForm, setShowFuForm] = useState(false)
   const [fuTitle, setFuTitle]       = useState('')
   const [fuDate, setFuDate]         = useState(() => new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10))
+
+  const followUps = activities.filter(a => a.type === 'followup' && a.status === 'open')
   const folders   = useFilesStore(s => s.folders)
   const files     = useFilesStore(s => s.files)
   const allEmails = useMailStore(s => s.emails)
-
-  const customer     = useCustomersStore(s => s.customers.find(c => c.id === customerId))
-  const leadScore    = Math.round(customer?.leadScore ?? 0)
-  const scoreFactors = customer?.scoreFactors ?? {}
-  const factors      = Object.entries(scoreFactors)
-    .filter(([, points]) => points > 0)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 6)
 
   // Letzte Interaktion
   const allActivity = [
     ...todos.map(t => ({ label: t.title, time: t.updatedAt, kind: 'task' as const })),
     ...notes.map(n => ({ label: n.title, time: n.updatedAt, kind: 'note' as const })),
-    ...followUps.map(f => ({ label: f.title, time: f.dueDate, kind: 'followup' as const })),
+    ...followUps.map(f => ({ label: f.title ?? 'Follow-up', time: f.createdAt, kind: 'followup' as const })),
   ].sort((a, b) => b.time.localeCompare(a.time))
 
   const lastInteraction = allActivity[0]
 
   // Nächste Aktion
-  const nextAction = [...followUps]
-    .filter(f => f.status === 'offen')
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
-    ?? [...todos]
-      .filter(t => t.status !== 'done' && t.dueDate)
-      .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))[0]
+  const nextFollowUp = [...followUps]
+    .filter(f => f.dueAt)
+    .sort((a, b) => a.dueAt!.localeCompare(b.dueAt!))[0]
+  const nextTodo = [...todos]
+    .filter(t => t.status !== 'done' && t.dueDate)
+    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))[0]
+  const nextAction = nextFollowUp ?? nextTodo
 
   // Hohe Prio
   const highPrio = todos
@@ -123,7 +113,7 @@ export function DashboardPane({ customerId }: Props) {
   // Timeline
   const timeline = allActivity.slice(0, 8)
 
-  // Dateien (neueste 5 Dateien + Root-Ordner)
+  // Dateien
   const recentFiles = [...files].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
   const rootFolders = folders.filter(f => !f.parentId).slice(0, 4)
 
@@ -133,75 +123,72 @@ export function DashboardPane({ customerId }: Props) {
     .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
     .slice(0, 4)
 
+  // Beziehungsstatus
+  const openTodosCount = todos.filter(t => t.status !== 'done').length
+  const relStatus = relationshipStatus(lastInteraction?.time)
+
   return (
     <div className="p-5 flex flex-col gap-4 overflow-auto h-full">
 
-      {/* ── Row 1: KPIs ── */}
+      {/* ── Row 1: Beziehung + Letzte Interaktion + Nächste Aktion ── */}
       <div className="grid grid-cols-3 gap-4">
 
-        {/* Lead Score */}
+        {/* Beziehung */}
         <Card>
-          <div className="flex items-center gap-4">
-            <div className="relative w-16 h-16 flex-shrink-0">
-              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border2)" strokeWidth="3" />
-                <circle
-                  cx="18" cy="18" r="15.9" fill="none"
-                  stroke={scoreColor(leadScore)} strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeDasharray={`${leadScore} ${100 - leadScore}`}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-bold" style={{ color: scoreColor(leadScore) }}>{leadScore}</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] text-[var(--text2)] uppercase tracking-wide mb-0.5">Lead Score</p>
-              <p className="text-sm font-semibold" style={{ color: scoreColor(leadScore) }}>{scoreLabel(leadScore)}</p>
-              <p className="text-[10px] text-[var(--text2)] mt-1 opacity-60">Rules Engine</p>
-            </div>
-          </div>
+          <p className="text-[10px] text-[var(--text2)] uppercase tracking-wide mb-3">Beziehung</p>
 
-          <div className="mt-4 pt-3 border-t border-[var(--border)]">
-            {factors.length === 0 ? (
-              <p className="text-xs text-[var(--text2)]">Noch keine Aktivität</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {factors.map(([key, points]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--text2)] w-28 truncate flex-shrink-0">
-                      {prettyFactor(key)}
-                    </span>
-                    <div className="flex-1 h-1.5 rounded-full bg-[var(--border)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${leadScore > 0 ? Math.round((points / leadScore) * 100) : 0}%`,
-                          background: scoreColor(leadScore),
-                          opacity: 0.85,
-                        }}
-                      />
-                    </div>
-                    <span
-                      className="text-[11px] font-medium w-8 text-right flex-shrink-0"
-                      style={{ color: scoreColor(leadScore) }}
-                    >
-                      +{points}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          {/* Status */}
+          <div className="flex items-center gap-2 mb-4">
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: relStatus.color,
+              boxShadow: `0 0 7px ${relStatus.color}99`,
+              flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: relStatus.color }}>
+              {relStatus.label}
+            </span>
+            {lastInteraction && (
+              <span className="text-xs text-[var(--text2)] ml-0.5">
+                {relativeTime(lastInteraction.time)}
+              </span>
             )}
           </div>
 
-          <div className="mt-3 pt-3 border-t border-[var(--border)]">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[
+              { label: 'Aufgaben', value: openTodosCount },
+              { label: 'Follow-Ups', value: followUps.length },
+              { label: 'Notizen', value: notes.length },
+            ].map(stat => (
+              <div
+                key={stat.label}
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  borderRadius: 8, padding: '8px 4px', textAlign: 'center',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', lineHeight: 1.1 }}>
+                  {stat.value}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text2)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Follow-Up */}
+          <div className="pt-3 border-t border-[var(--border)]">
             {showFuForm ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input
                   value={fuTitle}
                   onChange={e => setFuTitle(e.target.value)}
                   placeholder="Follow-Up Titel…"
+                  autoFocus
                   className="text-xs px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--fg)] focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--fg-dim)]"
                 />
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -213,8 +200,17 @@ export function DashboardPane({ customerId }: Props) {
                   />
                   <button
                     onClick={async () => {
-                      if (!fuTitle.trim()) return
-                      await upsertFollowUp({ customerId, title: fuTitle.trim(), dueDate: fuDate, priority: 'normal' })
+                      if (!fuTitle.trim() || !workspaceId) return
+                      await createActivity({
+                        workspaceId,
+                        createdBy: user?.email ?? 'user',
+                        accountId: customerId,
+                        customerId,
+                        type: 'followup',
+                        title: fuTitle.trim(),
+                        dueAt: fuDate || undefined,
+                        status: 'open',
+                      })
                       setFuTitle('')
                       setShowFuForm(false)
                     }}
@@ -226,7 +222,9 @@ export function DashboardPane({ customerId }: Props) {
                   <button
                     onClick={() => setShowFuForm(false)}
                     style={{ fontSize: 11, padding: '4px 8px', color: 'var(--fg-muted)' }}
-                  >✕</button>
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
             ) : (
@@ -271,12 +269,17 @@ export function DashboardPane({ customerId }: Props) {
                 </svg>
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[var(--text)] truncate leading-snug">{nextAction.title}</p>
-                {'dueDate' in nextAction && nextAction.dueDate && (
-                  <p className="text-xs mt-0.5" style={{ color: formatDue(nextAction.dueDate) === 'Überfällig' ? '#ef4444' : 'var(--text2)' }}>
-                    {formatDue(nextAction.dueDate)}
-                  </p>
-                )}
+                <p className="text-sm font-medium text-[var(--text)] truncate leading-snug">
+                  {'title' in nextAction ? (nextAction.title ?? 'Follow-up') : nextAction.title}
+                </p>
+                {(() => {
+                  const due: string | undefined = (nextAction as any).dueAt ?? (nextAction as any).dueDate
+                  return due ? (
+                    <p className="text-xs mt-0.5" style={{ color: formatDue(due) === 'Überfällig' ? '#ef4444' : 'var(--text2)' }}>
+                      {formatDue(due)}
+                    </p>
+                  ) : null
+                })()}
               </div>
             </div>
           ) : (
