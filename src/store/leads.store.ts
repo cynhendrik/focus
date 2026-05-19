@@ -11,7 +11,7 @@ interface LeadsState {
   error: AppError | null
   load: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertLeadPayload) => Promise<void>
-  bulkUpdate: (payload: BulkUpdateLeadsPayload) => Promise<void>
+  bulkUpdate: (payload: BulkUpdateLeadsPayload, workspaceId: string) => Promise<void>
   convertToClient: (id: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
   newLeads: () => Lead[]
@@ -54,20 +54,20 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to upsert lead', { error })
+      throw err
     }
   },
 
-  bulkUpdate: async (payload) => {
+  bulkUpdate: async (payload, workspaceId) => {
     set({ error: null })
     try {
       await LeadsService.bulkUpdate(payload)
-      const current = get().leads
-      const workspaceId = current[0]?.workspaceId
-      if (workspaceId) await get().load(workspaceId)
+      await get().load(workspaceId)
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to bulk update leads', { error })
+      throw err
     }
   },
 
@@ -80,6 +80,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to convert lead to client', { error })
+      throw err
     }
   },
 
@@ -88,7 +89,8 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       const count = await LeadsService.syncPending(workspaceId)
       if (count > 0) await get().load(workspaceId)
     } catch (err) {
-      log.error('Sync pending leads failed', { err })
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      log.error('Sync pending leads failed', { error })
     }
   },
 
