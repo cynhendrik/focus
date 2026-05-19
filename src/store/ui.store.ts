@@ -2,11 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'dashboard' | 'workflow' | 'kommunikation' | 'dateien' | 'historie' | 'sales' | 'activities'
+export type CustomerTab = 'dashboard' | 'workflow' | 'kommunikation' | 'dateien' | 'historie' | 'sales'
 export type AppView =
-  | 'dashboard' | 'profile'
-  | 'clients'   | 'pipeline' | 'invoices' | 'tasks' | 'kpis' | 'insights'
-  | 'calendar'  | 'mail'     | 'crm'      | 'settings'
+  | 'dashboard' | 'profile'   | 'workstation'
+  | 'clients'   | 'pipeline'  | 'invoices'  | 'tasks'    | 'kpis' | 'insights'
+  | 'calendar'  | 'mail'      | 'crm'       | 'settings' | 'followups'
+  | 'smartlists'| 'chat'      | 'leads'
 
 interface UiState {
   theme: Theme
