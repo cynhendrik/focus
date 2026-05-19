@@ -7,27 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { DealModal } from '@/components/pipeline/DealModal'
 import { ActivityModal } from '@/components/pipeline/ActivityModal'
 import type { Deal, ActivityType, PipelineStage } from '@/types/pipeline.types'
-import { Phone, Users, Mail, FileText, Bell, Check, Trash2, Plus, Calendar, ChevronDown } from 'lucide-react'
-
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; Icon: typeof Phone }> = {
-  call:     { label: 'Anruf',      color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  Icon: Phone },
-  meeting:  { label: 'Meeting',    color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  Icon: Users },
-  email:    { label: 'E-Mail',     color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)', Icon: Mail },
-  note:     { label: 'Notiz',      color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', Icon: FileText },
-  followup: { label: 'Follow-up',  color: '#4ade80', bg: 'rgba(74,222,128,0.12)', Icon: Bell },
-}
-
-const QUICK_TYPES: ActivityType[] = ['call', 'meeting', 'email', 'note']
-
-const FEED_GROUPS: { key: string; types: string[]; label: string; color: string; bg: string; Icon: typeof Phone }[] = [
-  { key: 'call',     types: ['call'],     label: 'Anrufe',              color: '#fb923c', bg: 'rgba(251,146,60,0.12)',   Icon: Phone },
-  { key: 'meeting',  types: ['meeting'],  label: 'Meetings',            color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   Icon: Users },
-  { key: 'email',    types: ['email'],    label: 'E-Mails',             color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  Icon: Mail },
-  { key: 'note',     types: ['note'],     label: 'Notizen',             color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', Icon: FileText },
-  { key: 'followup', types: ['followup'], label: 'Erledigte Follow-ups', color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  Icon: Bell },
-]
+import { Phone, Users, Mail, FileText, Bell, Check, Trash2, Plus, Calendar, ChevronDown, MessageCircle } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -57,6 +37,14 @@ function fmtDue(iso: string): { label: string; overdue: boolean } {
   return { label: new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }), overdue: false }
 }
 
+const TYPE_ICON: Record<string, typeof Phone> = {
+  call: Phone, meeting: Users, email: Mail, note: FileText, followup: Bell,
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  call: 'Anruf', meeting: 'Meeting', email: 'E-Mail', note: 'Notiz', followup: 'Follow-up',
+}
+
 // ── Pipeline Stepper ──────────────────────────────────────────────────────────
 
 function PipelineStepper({ deal, stages, onMove }: {
@@ -64,9 +52,7 @@ function PipelineStepper({ deal, stages, onMove }: {
   stages: PipelineStage[]
   onMove: (s: string) => void
 }) {
-  const active = stages
-    .filter(s => !s.isWon && !s.isLost)
-    .sort((a, b) => a.orderIndex - b.orderIndex)
+  const active = stages.filter(s => !s.isWon && !s.isLost).sort((a, b) => a.orderIndex - b.orderIndex)
   const wonStage  = stages.find(s => s.isWon)
   const lostStage = stages.find(s => s.isLost)
   const currentIdx = active.findIndex(s => s.name === deal.stage)
@@ -79,50 +65,36 @@ function PipelineStepper({ deal, stages, onMove }: {
         const isPast    = idx < currentIdx || isWon
         const isCurrent = stage.name === deal.stage
         return (
-          <button
-            key={stage.id}
-            onClick={() => onMove(stage.name)}
-            style={{
-              padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700,
-              cursor: 'pointer', border: 'none', transition: 'all 120ms',
-              background: isCurrent
-                ? stage.color
-                : isPast ? `${stage.color}28` : 'rgba(255,255,255,0.05)',
-              color: isCurrent ? '#000' : isPast ? stage.color : 'rgba(255,255,255,0.28)',
-            }}
-          >
+          <button key={stage.id} onClick={() => onMove(stage.name)} style={{
+            padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+            cursor: 'pointer', border: 'none', transition: 'all 120ms',
+            background: isCurrent ? 'var(--accent)' : isPast ? 'var(--accent-soft)' : 'rgba(0,0,0,0.05)',
+            color: isCurrent ? 'var(--accent-ink)' : isPast ? 'var(--accent)' : 'var(--fg-dim)',
+          }}>
             {stage.label}
           </button>
         )
       })}
-
       {wonStage && (
         <>
-          <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 10, margin: '0 1px' }}>·</span>
-          <button
-            onClick={() => onMove(wonStage.name)}
-            style={{
-              padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-              border: isWon ? 'none' : '1px solid rgba(74,222,128,0.28)',
-              background: isWon ? '#4ade80' : 'transparent',
-              color: isWon ? '#000' : '#4ade80',
-            }}
-          >
+          <span style={{ color: 'var(--border)', fontSize: 10, margin: '0 2px' }}>·</span>
+          <button onClick={() => onMove(wonStage.name)} style={{
+            padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+            border: isWon ? 'none' : '1px solid var(--accent)',
+            background: isWon ? 'var(--accent)' : 'transparent',
+            color: isWon ? 'var(--accent-ink)' : 'var(--accent)',
+          }}>
             ✓ Gewonnen
           </button>
         </>
       )}
-
       {lostStage && (
-        <button
-          onClick={() => onMove(lostStage.name)}
-          style={{
-            padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            border: isLost ? 'none' : '1px solid rgba(248,113,113,0.22)',
-            background: isLost ? '#f87171' : 'transparent',
-            color: isLost ? '#000' : '#f87171',
-          }}
-        >
+        <button onClick={() => onMove(lostStage.name)} style={{
+          padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+          border: isLost ? 'none' : '1px solid var(--border)',
+          background: isLost ? 'var(--fg-dim)' : 'transparent',
+          color: isLost ? 'var(--bg)' : 'var(--fg-dim)',
+        }}>
           Lost
         </button>
       )}
@@ -163,14 +135,11 @@ function DealCard({ deal, stages, onEdit, onMove }: {
             )}
           </div>
         </div>
-        <button
-          onClick={onEdit}
-          style={{
-            fontSize: 10, padding: '3px 9px', borderRadius: 6, flexShrink: 0,
-            background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
-            color: 'var(--fg-dim)', cursor: 'pointer',
-          }}
-        >
+        <button onClick={onEdit} style={{
+          fontSize: 10, padding: '3px 9px', borderRadius: 6, flexShrink: 0,
+          background: 'transparent', border: '1px solid var(--border)',
+          color: 'var(--fg-dim)', cursor: 'pointer',
+        }}>
           Bearbeiten
         </button>
       </div>
@@ -179,72 +148,122 @@ function DealCard({ deal, stages, onEdit, onMove }: {
   )
 }
 
-// ── Follow-Up Row ─────────────────────────────────────────────────────────────
+// ── Section Header ────────────────────────────────────────────────────────────
 
-function FollowUpRow({ fu, onToggle, onRemove }: {
+function SectionHeader({ label, count, isOpen, onToggle, onAdd }: {
+  label: string
+  count: number
+  isOpen: boolean
+  onToggle: () => void
+  onAdd?: () => void
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '11px 0', cursor: 'pointer', userSelect: 'none',
+        borderBottom: '1px solid var(--border)',
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg)', flex: 1 }}>{label}</span>
+      {count > 0 && (
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: 'var(--fg-dim)',
+          background: 'var(--bg1)', border: '1px solid var(--border)',
+          borderRadius: 99, padding: '1px 6px', lineHeight: 1.6,
+        }}>
+          {count}
+        </span>
+      )}
+      {onAdd && (
+        <button
+          onClick={e => { e.stopPropagation(); onAdd() }}
+          style={{
+            width: 20, height: 20, borderRadius: 5, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', color: 'var(--accent)', cursor: 'pointer',
+            background: 'transparent', border: 'none', flexShrink: 0,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-soft)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <Plus size={12} />
+        </button>
+      )}
+      <ChevronDown size={13} style={{
+        color: 'var(--fg-dim)', flexShrink: 0, transition: 'transform 150ms',
+        transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+      }} />
+    </div>
+  )
+}
+
+// ── Follow-Up Item ────────────────────────────────────────────────────────────
+
+function FollowUpItem({ fu, onToggle, onRemove }: {
   fu: { id: string; title?: string; dueAt?: string; status: string }
   onToggle: () => void
   onRemove: () => void
 }) {
-  const due = fu.dueAt ? fmtDue(fu.dueAt) : null
+  const due  = fu.dueAt ? fmtDue(fu.dueAt) : null
+  const done = fu.status === 'done'
+
   return (
-    <div
-      className="fu-row"
-      style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 8px',
-        borderRadius: 8, background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)', marginBottom: 4, position: 'relative',
-      }}
-    >
-      <button
-        onClick={onToggle}
-        style={{
-          width: 15, height: 15, borderRadius: '50%', flexShrink: 0,
-          cursor: 'pointer', marginTop: 1,
-          border: '1.5px solid var(--border-strong)', background: 'transparent',
-        }}
-      />
+    <div className="fu-item" style={{
+      display: 'flex', alignItems: 'center', gap: 9,
+      padding: '8px 0', borderBottom: '1px solid var(--border)',
+      position: 'relative',
+    }}>
+      <button onClick={onToggle} style={{
+        width: 16, height: 16, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
+        border: done ? 'none' : '1.5px solid var(--border-strong)',
+        background: done ? 'var(--accent)' : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {done && <Check size={9} strokeWidth={3} style={{ color: '#000' }} />}
+      </button>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.3 }}>{fu.title ?? '—'}</div>
-        {due && (
-          <div style={{
-            fontSize: 10, marginTop: 2, fontFamily: 'var(--font-mono)',
-            color: due.overdue ? '#f87171' : 'var(--fg-dim)',
+        <span style={{
+          fontSize: 12, fontWeight: 600, color: 'var(--fg)',
+          textDecoration: done ? 'line-through' : 'none',
+          opacity: done ? 0.45 : 1,
+        }}>
+          {fu.title ?? '—'}
+        </span>
+        {due && !done && (
+          <span style={{
+            marginLeft: 8, fontSize: 10, fontFamily: 'var(--font-mono)',
+            color: due.overdue ? '#e53e3e' : 'var(--fg-dim)',
           }}>
             {due.label}
-          </div>
+          </span>
         )}
       </div>
-      <button
-        onClick={onRemove}
-        className="fu-del"
-        style={{
-          width: 20, height: 20, borderRadius: 5, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: 'var(--fg-dim)', cursor: 'pointer',
-          opacity: 0, transition: 'opacity 150ms', background: 'transparent', flexShrink: 0,
-        }}
-      >
+      <button onClick={onRemove} className="fu-del" style={{
+        width: 20, height: 20, borderRadius: 5, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: 'var(--fg-dim)', cursor: 'pointer',
+        opacity: 0, transition: 'opacity 150ms', background: 'transparent', flexShrink: 0, border: 'none',
+      }}>
         <Trash2 size={10} />
       </button>
     </div>
   )
 }
 
-// ── Feed Item ─────────────────────────────────────────────────────────────────
+// ── Activity Item ─────────────────────────────────────────────────────────────
 
 const BODY_TRUNCATE = 140
 
-function FeedItem({ item, onRemove }: {
+function ActivityItem({ item, onRemove }: {
   item: { id: string; type: string; title?: string; body?: string; status: string; createdAt: string }
   onRemove: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.note
-  const { Icon } = cfg
-  const isDoneFu = item.type === 'followup' && item.status === 'done'
+  const Icon      = TYPE_ICON[item.type] ?? FileText
+  const typeLabel = TYPE_LABEL[item.type] ?? item.type
+  const isDoneFu  = item.type === 'followup' && item.status === 'done'
 
-  // title from modal (custom or type-label), body = Gesprächsnotiz
-  const headline = item.title
+  const headline = item.title && item.title !== typeLabel ? item.title : null
   const note     = item.body
   const isLong   = (note?.length ?? 0) > BODY_TRUNCATE
   const noteText = note
@@ -252,139 +271,88 @@ function FeedItem({ item, onRemove }: {
     : undefined
 
   return (
-    <div
-      className="feed-item"
-      style={{
-        display: 'flex', gap: 10, alignItems: 'flex-start',
-        padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
-        position: 'relative',
-      }}
-    >
+    <div className="act-item" style={{
+      display: 'flex', gap: 10, alignItems: 'flex-start',
+      padding: '10px 0', borderBottom: '1px solid var(--border)',
+      position: 'relative',
+    }}>
       <div style={{
-        width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-        background: isDoneFu ? 'rgba(74,222,128,0.08)' : cfg.bg,
+        width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+        background: isDoneFu ? 'var(--accent-soft)' : 'var(--bg1)',
+        border: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {isDoneFu
-          ? <Check size={13} style={{ color: '#4ade80' }} />
-          : <Icon size={13} style={{ color: cfg.color }} />
+          ? <Check size={12} style={{ color: 'var(--accent)' }} />
+          : <Icon size={12} style={{ color: 'var(--fg-dim)' }} />
         }
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Header row: type label + timestamp */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: isDoneFu ? '#4ade80' : cfg.color }}>
-            {isDoneFu ? 'Follow-up erledigt' : cfg.label}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)' }}>
+            {isDoneFu ? 'Follow-up erledigt' : typeLabel}
           </span>
           <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
             {fmtTime(item.createdAt)}
           </span>
         </div>
-
-        {/* Custom title (if set and different from type label) */}
-        {headline && headline !== cfg.label && (
-          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)', marginTop: 3, lineHeight: 1.4 }}>
+        {headline && (
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg)', marginTop: 2, lineHeight: 1.4 }}>
             {headline}
           </p>
         )}
-
-        {/* Gesprächsnotiz / body */}
         {noteText && (
           <>
-            <p style={{
-              fontSize: 11, color: 'var(--fg-muted)', marginTop: 4,
-              lineHeight: 1.6, whiteSpace: 'pre-wrap',
-            }}>
+            <p style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 3, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
               {noteText}
             </p>
             {isLong && (
               <button
                 onClick={() => setExpanded(v => !v)}
                 style={{
-                  marginTop: 4, fontSize: 10, fontWeight: 600, color: 'var(--fg-dim)',
+                  marginTop: 3, fontSize: 10, fontWeight: 600, color: 'var(--fg-dim)',
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-dim)')}
               >
-                {expanded ? 'Weniger anzeigen ↑' : 'Mehr lesen ↓'}
+                {expanded ? 'Weniger ↑' : 'Mehr ↓'}
               </button>
             )}
           </>
         )}
       </div>
 
-      <button
-        onClick={onRemove}
-        className="feed-del"
-        style={{
-          width: 24, height: 24, borderRadius: 6, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: 'var(--fg-dim)', cursor: 'pointer',
-          opacity: 0, transition: 'opacity 150ms', background: 'transparent', flexShrink: 0,
-        }}
-      >
+      <button onClick={onRemove} className="act-del" style={{
+        width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: 'var(--fg-dim)', cursor: 'pointer',
+        opacity: 0, transition: 'opacity 150ms', background: 'transparent', flexShrink: 0, border: 'none',
+      }}>
         <Trash2 size={11} />
       </button>
     </div>
   )
 }
 
-// ── Group Section ─────────────────────────────────────────────────────────────
+// ── Chat Placeholder ──────────────────────────────────────────────────────────
 
-function GroupSection({ group, items, isOpen, onToggle, onRemove }: {
-  group: typeof FEED_GROUPS[number]
-  items: { id: string; type: string; title?: string; body?: string; status: string; createdAt: string }[]
-  isOpen: boolean
-  onToggle: () => void
-  onRemove: (id: string) => void
-}) {
-  const { Icon } = group
+function WhatsAppPlaceholder() {
   return (
     <div style={{
-      borderLeft: isOpen ? `2px solid ${group.color}30` : '2px solid transparent',
-      marginBottom: 2, transition: 'border-color 150ms',
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '9px 0', borderBottom: '1px solid var(--border)',
+      opacity: 0.4,
     }}>
-      <button
-        onClick={onToggle}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '9px 0 9px 10px', background: 'none', border: 'none',
-          cursor: 'pointer', textAlign: 'left',
-          borderBottom: '1px solid rgba(255,255,255,0.04)',
-        }}
-      >
-        <div style={{
-          width: 24, height: 24, borderRadius: 7, flexShrink: 0,
-          background: group.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Icon size={11} style={{ color: group.color }} />
-        </div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: group.color, flex: 1 }}>{group.label}</span>
-        <span style={{
-          fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)',
-          background: 'rgba(255,255,255,0.06)', borderRadius: 99,
-          padding: '1px 7px', marginRight: 4,
-        }}>
-          {items.length}
-        </span>
-        <ChevronDown
-          size={13}
-          style={{
-            color: 'var(--fg-dim)', flexShrink: 0, marginRight: 4,
-            transition: 'transform 150ms',
-            transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-          }}
-        />
-      </button>
-
-      {isOpen && (
-        <div style={{ paddingLeft: 10 }}>
-          {items.map(item => (
-            <FeedItem key={item.id} item={item} onRemove={() => onRemove(item.id)} />
-          ))}
-        </div>
-      )}
+      <div style={{
+        width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+        background: 'var(--bg1)', border: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <MessageCircle size={12} style={{ color: 'var(--fg-dim)' }} />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg)' }}>WhatsApp Business</div>
+        <div style={{ fontSize: 10, color: 'var(--fg-dim)' }}>Nicht verbunden · Bald verfügbar</div>
+      </div>
     </div>
   )
 }
@@ -406,9 +374,11 @@ export function SalesPane({ customerId }: Props) {
   const [fuTitle,    setFuTitle]    = useState('')
   const [fuDate,     setFuDate]     = useState('')
   const [fuSaving,   setFuSaving]   = useState(false)
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(FEED_GROUPS.map(g => g.key)))
+  const [openSects,  setOpenSects]  = useState<Set<string>>(
+    () => new Set(['followups', 'calls', 'chat', 'notes'])
+  )
 
-  const toggleGroup = (key: string) => setOpenGroups(prev => {
+  const toggleSect = (key: string) => setOpenSects(prev => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key)
     else next.add(key)
@@ -423,269 +393,241 @@ export function SalesPane({ customerId }: Props) {
   const openDeals   = customerDeals.filter(d => d.stage !== 'won' && d.stage !== 'lost')
   const closedDeals = customerDeals.filter(d => d.stage === 'won' || d.stage === 'lost')
 
-  const openFollowUps = activities
-    .filter(a => a.type === 'followup' && a.status === 'open')
-    .sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'))
-
-  const feedItems = activities
-    .filter(a => !(a.type === 'followup' && a.status === 'open'))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-
-  const hasOverdue = openFollowUps.some(f => f.dueAt && new Date(f.dueAt) < new Date())
+  const openFollowUps   = activities.filter(a => a.type === 'followup' && a.status === 'open').sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999'))
+  const doneFollowUps   = activities.filter(a => a.type === 'followup' && a.status === 'done').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const callActivities  = activities.filter(a => a.type === 'call' || a.type === 'meeting').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const emailActivities = activities.filter(a => a.type === 'email').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const noteActivities  = activities.filter(a => a.type === 'note').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
   const handleCreateFu = async () => {
     if (!fuTitle.trim()) return
     setFuSaving(true)
     try {
       await create({
-        workspaceId,
-        createdBy: user?.email ?? 'user',
-        accountId: customerId,
-        customerId,
-        type: 'followup',
-        title: fuTitle.trim(),
-        dueAt: fuDate || undefined,
-        status: 'open',
+        workspaceId, createdBy: user?.email ?? 'user',
+        accountId: customerId, customerId,
+        type: 'followup', title: fuTitle.trim(),
+        dueAt: fuDate || undefined, status: 'open',
       })
-      setFuTitle('')
-      setFuDate('')
-      setShowFuForm(false)
-    } finally {
-      setFuSaving(false)
-    }
+      setFuTitle(''); setFuDate(''); setShowFuForm(false)
+    } finally { setFuSaving(false) }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
-      {/* ── Zone 1 + 2: Deals + Offene Aktionen ── */}
+      {/* ── Deals ── */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 256px',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0, maxHeight: 288,
+        padding: '14px 20px', borderBottom: '1px solid var(--border)',
+        flexShrink: 0, overflowY: 'auto', maxHeight: 240,
       }}>
-
-        {/* Deals */}
-        <div style={{ padding: '14px 20px', borderRight: '1px solid var(--border)', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--fg-muted)' }}>
-              Deals{openDeals.length > 0 && <span style={{ fontWeight: 600, color: 'var(--fg-dim)', marginLeft: 5 }}>{openDeals.length}</span>}
-            </span>
-            <button
-              onClick={() => setEditDeal('new')}
-              className="btn-ghost"
-              style={{ fontSize: 11, padding: '3px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              <Plus size={10} /> Deal hinzufügen
-            </button>
-          </div>
-
-          {openDeals.length === 0 && closedDeals.length === 0 ? (
-            <div
-              onClick={() => setEditDeal('new')}
-              style={{
-                textAlign: 'center', padding: '18px 16px', borderRadius: 10, cursor: 'pointer',
-                border: '1.5px dashed rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-            >
-              <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
-                Noch kein Deal — klicken um zu starten
-              </div>
-            </div>
-          ) : (
-            <>
-              {openDeals.map(deal => (
-                <DealCard
-                  key={deal.id}
-                  deal={deal}
-                  stages={stages}
-                  onEdit={() => setEditDeal(deal)}
-                  onMove={stage => moveToStage(deal.id, stage)}
-                />
-              ))}
-              {closedDeals.length > 0 && (
-                <div style={{ marginTop: 4 }}>
-                  {closedDeals.map(deal => (
-                    <div
-                      key={deal.id}
-                      onClick={() => setEditDeal(deal)}
-                      style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '5px 10px', borderRadius: 7, marginBottom: 3,
-                        cursor: 'pointer', opacity: 0.5,
-                      }}
-                    >
-                      <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{deal.title}</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: deal.stage === 'won' ? '#4ade80' : '#f87171' }}>
-                        {deal.stage === 'won' ? '✓ Gewonnen' : 'Lost'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--fg-muted)' }}>
+            Deals{openDeals.length > 0 && <span style={{ fontWeight: 600, color: 'var(--fg-dim)', marginLeft: 5 }}>{openDeals.length}</span>}
+          </span>
+          <button
+            onClick={() => setEditDeal('new')}
+            style={{
+              fontSize: 11, padding: '3px 10px', display: 'flex', alignItems: 'center', gap: 4,
+              background: 'transparent', border: '1px solid var(--accent)',
+              borderRadius: 7, color: 'var(--accent)', cursor: 'pointer',
+            }}
+          >
+            <Plus size={10} /> Deal hinzufügen
+          </button>
         </div>
 
-        {/* Offene Aktionen */}
-        <div style={{ padding: '14px 14px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--fg-muted)' }}>
-              Aktionen{openFollowUps.length > 0 && (
-                <span style={{ fontWeight: 600, color: hasOverdue ? '#f87171' : 'var(--fg-dim)', marginLeft: 5 }}>
-                  {openFollowUps.length}
-                </span>
-              )}
-            </span>
-            <button
-              onClick={() => setShowFuForm(v => !v)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 2 }}
-            >
-              <Plus size={13} />
-            </button>
+        {openDeals.length === 0 && closedDeals.length === 0 ? (
+          <div
+            onClick={() => setEditDeal('new')}
+            style={{
+              textAlign: 'center', padding: '14px 16px', borderRadius: 10, cursor: 'pointer',
+              border: '1.5px dashed var(--border)', color: 'var(--fg-dim)', fontSize: 11,
+            }}
+          >
+            Noch kein Deal — klicken um zu starten
           </div>
-
-          {showFuForm && (
-            <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <input
-                autoFocus
-                className="mock-input"
-                value={fuTitle}
-                onChange={e => setFuTitle(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleCreateFu()}
-                placeholder="Was ist zu tun?"
-                style={{ fontSize: 11 }}
-              />
-              <div style={{ display: 'flex', gap: 5 }}>
-                <input
-                  className="mock-input"
-                  type="date"
-                  value={fuDate}
-                  onChange={e => setFuDate(e.target.value)}
-                  style={{ flex: 1, fontSize: 11 }}
-                />
-                <button
-                  onClick={handleCreateFu}
-                  disabled={fuSaving || !fuTitle.trim()}
-                  className="btn-primary"
-                  style={{ fontSize: 10, padding: '4px 10px', flexShrink: 0 }}
-                >
-                  {fuSaving ? '…' : 'OK'}
-                </button>
+        ) : (
+          <>
+            {openDeals.map(deal => (
+              <DealCard key={deal.id} deal={deal} stages={stages}
+                onEdit={() => setEditDeal(deal)} onMove={s => moveToStage(deal.id, s)} />
+            ))}
+            {closedDeals.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {closedDeals.map(deal => (
+                  <div key={deal.id} onClick={() => setEditDeal(deal)} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '5px 10px', borderRadius: 7, marginBottom: 3,
+                    cursor: 'pointer', opacity: 0.5,
+                  }}>
+                    <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{deal.title}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: deal.stage === 'won' ? 'var(--accent)' : 'var(--fg-dim)' }}>
+                      {deal.stage === 'won' ? '✓ Gewonnen' : 'Lost'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
-
-          {openFollowUps.length === 0 && !showFuForm ? (
-            <div
-              onClick={() => setShowFuForm(true)}
-              style={{ textAlign: 'center', padding: '14px 0', cursor: 'pointer' }}
-            >
-              <Bell size={14} style={{ color: 'var(--fg-dim)', margin: '0 auto 6px' }} />
-              <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Keine offenen Aktionen</div>
-            </div>
-          ) : (
-            openFollowUps.map(fu => (
-              <FollowUpRow
-                key={fu.id}
-                fu={fu}
-                onToggle={() => update(fu.id, { status: 'done' })}
-                onRemove={() => remove(fu.id)}
-              />
-            ))
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* ── Zone 3: Activity Feed ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* ── 4 Sections ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 28px' }}>
 
-        {/* Quick log bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '9px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0,
-        }}>
-          {QUICK_TYPES.map(type => {
-            const cfg = TYPE_CONFIG[type]
-            const { Icon } = cfg
-            return (
-              <button
-                key={type}
-                onClick={() => setActModal(type)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', borderRadius: 8, fontSize: 11, fontWeight: 600,
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
-                  color: 'var(--fg-muted)', cursor: 'pointer', transition: 'background 120ms, color 120ms, border-color 120ms',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = cfg.bg
-                  e.currentTarget.style.color = cfg.color
-                  e.currentTarget.style.borderColor = `${cfg.color}44`
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                  e.currentTarget.style.color = 'var(--fg-muted)'
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                }}
-              >
-                <Icon size={12} />
-                {cfg.label}
-              </button>
-            )
-          })}
-          <div style={{ flex: 1 }} />
-          {feedItems.length > 0 && (
-            <span style={{ fontSize: 10, color: 'var(--fg-dim)' }}>{feedItems.length} Einträge</span>
+        {/* 1 · Follow-ups */}
+        <div>
+          <SectionHeader
+            label="Follow-ups"
+            count={openFollowUps.length + doneFollowUps.length}
+            isOpen={openSects.has('followups')}
+            onToggle={() => toggleSect('followups')}
+            onAdd={() => setShowFuForm(v => !v)}
+          />
+          {openSects.has('followups') && (
+            <div>
+              {showFuForm && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <input
+                    autoFocus className="mock-input"
+                    value={fuTitle} onChange={e => setFuTitle(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCreateFu()}
+                    placeholder="Was ist zu tun?" style={{ fontSize: 11 }}
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input className="mock-input" type="date" value={fuDate}
+                      onChange={e => setFuDate(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
+                    <button onClick={() => setShowFuForm(false)} className="btn-secondary" style={{ fontSize: 10, padding: '4px 10px' }}>
+                      Abb.
+                    </button>
+                    <button onClick={handleCreateFu} disabled={fuSaving || !fuTitle.trim()}
+                      className="btn-primary" style={{ fontSize: 10, padding: '4px 10px' }}>
+                      {fuSaving ? '…' : 'OK'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {openFollowUps.length === 0 && doneFollowUps.length === 0 && !showFuForm ? (
+                <div onClick={() => setShowFuForm(true)} style={{
+                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                  cursor: 'pointer', textAlign: 'center', borderBottom: '1px solid var(--border)',
+                }}>
+                  Keine Follow-ups — klicken zum Erstellen
+                </div>
+              ) : (
+                <>
+                  {openFollowUps.map(fu => (
+                    <FollowUpItem key={fu.id} fu={fu}
+                      onToggle={() => update(fu.id, { status: 'done' })}
+                      onRemove={() => remove(fu.id)} />
+                  ))}
+                  {doneFollowUps.map(fu => (
+                    <FollowUpItem key={fu.id} fu={fu}
+                      onToggle={() => update(fu.id, { status: 'open' })}
+                      onRemove={() => remove(fu.id)} />
+                  ))}
+                </>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Feed — grouped accordion */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
-          {feedItems.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--fg-dim)', fontSize: 12 }}>
-              Noch keine Aktivitäten — log den ersten Kontakt oben
+        {/* 2 · Anrufe & Meetings */}
+        <div>
+          <SectionHeader
+            label="Anrufe & Meetings"
+            count={callActivities.length}
+            isOpen={openSects.has('calls')}
+            onToggle={() => toggleSect('calls')}
+            onAdd={() => setActModal('call')}
+          />
+          {openSects.has('calls') && (
+            <div>
+              {callActivities.length === 0 ? (
+                <div onClick={() => setActModal('call')} style={{
+                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                  cursor: 'pointer', textAlign: 'center', borderBottom: '1px solid var(--border)',
+                }}>
+                  Noch kein Anruf oder Meeting — jetzt erfassen
+                </div>
+              ) : (
+                callActivities.map(item => (
+                  <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />
+                ))
+              )}
             </div>
-          ) : (
-            FEED_GROUPS.map(group => {
-              const items = feedItems.filter(item => group.types.includes(item.type))
-              if (items.length === 0) return null
-              return (
-                <GroupSection
-                  key={group.key}
-                  group={group}
-                  items={items}
-                  isOpen={openGroups.has(group.key)}
-                  onToggle={() => toggleGroup(group.key)}
-                  onRemove={id => remove(id)}
-                />
-              )
-            })
+          )}
+        </div>
+
+        {/* 3 · Chat */}
+        <div>
+          <SectionHeader
+            label="Chat"
+            count={emailActivities.length}
+            isOpen={openSects.has('chat')}
+            onToggle={() => toggleSect('chat')}
+            onAdd={() => setActModal('email')}
+          />
+          {openSects.has('chat') && (
+            <div>
+              <WhatsAppPlaceholder />
+              {emailActivities.length === 0 ? (
+                <div onClick={() => setActModal('email')} style={{
+                  padding: '10px 0', color: 'var(--fg-dim)', fontSize: 11,
+                  cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                }}>
+                  Keine E-Mails protokolliert
+                </div>
+              ) : (
+                emailActivities.map(item => (
+                  <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 4 · Notizen & Protokolle */}
+        <div>
+          <SectionHeader
+            label="Notizen & Protokolle"
+            count={noteActivities.length}
+            isOpen={openSects.has('notes')}
+            onToggle={() => toggleSect('notes')}
+            onAdd={() => setActModal('note')}
+          />
+          {openSects.has('notes') && (
+            <div>
+              {noteActivities.length === 0 ? (
+                <div onClick={() => setActModal('note')} style={{
+                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                  cursor: 'pointer', textAlign: 'center',
+                }}>
+                  Noch keine Notizen — jetzt erstellen
+                </div>
+              ) : (
+                noteActivities.map(item => (
+                  <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />
+                ))
+              )}
+            </div>
           )}
         </div>
       </div>
 
       {/* Modals */}
       {editDeal !== null && (
-        <DealModal
-          initial={editDeal === 'new' ? undefined : editDeal}
-          presetCustomerId={customerId}
-          onClose={() => setEditDeal(null)}
-        />
+        <DealModal initial={editDeal === 'new' ? undefined : editDeal}
+          presetCustomerId={customerId} onClose={() => setEditDeal(null)} />
       )}
       {actModal && (
-        <ActivityModal
-          customerId={customerId}
-          presetType={actModal}
-          onClose={() => setActModal(null)}
-        />
+        <ActivityModal customerId={customerId} presetType={actModal} onClose={() => setActModal(null)} />
       )}
 
       <style>{`
-        .fu-row:hover .fu-del { opacity: 1 !important; }
-        .feed-item:hover .feed-del { opacity: 1 !important; }
+        .fu-item:hover .fu-del { opacity: 1 !important; }
+        .act-item:hover .act-del { opacity: 1 !important; }
       `}</style>
     </div>
   )
