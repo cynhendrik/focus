@@ -7,6 +7,7 @@ import { useNotesStore } from '@/store/notes.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useFilesStore } from '@/store/files.store'
+import { useActivitiesStore } from '@/store/activities.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { DashboardPane } from '@/components/customer/tabs/DashboardPane'
 import { WorkflowPane } from '@/components/customer/tabs/WorkflowPane'
@@ -15,7 +16,6 @@ import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { HistoriePane } from '@/components/customer/tabs/HistoriePane'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
 import { SalesPane } from '@/components/customer/tabs/SalesPane'
-import { ActivitiesPane } from '@/components/customer/tabs/ActivitiesPane'
 
 function avatarBg(name: string): string {
   const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
@@ -40,7 +40,6 @@ function TabIcon({ id }: { id: CustomerTab }) {
     dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
     historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
     sales:         ['M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
-    activities:    ['M13 2H6a2 2 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z', 'M13 2v7h7'],
   }
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -55,8 +54,7 @@ const TABS: { id: CustomerTab; label: string }[] = [
   { id: 'kommunikation', label: 'Kommunikation' },
   { id: 'dateien',       label: 'Dateien' },
   { id: 'historie',      label: 'Historie' },
-  { id: 'sales',         label: 'Sales' },
-  { id: 'activities',    label: 'Activities' },
+  { id: 'sales',         label: 'Deals' },
 ]
 
 interface Props { customerId: string }
@@ -72,8 +70,9 @@ export function CustomerRoute({ customerId }: Props) {
   const loadTodos     = useTodosStore(s => s.loadForCustomer)
   const loadNotes     = useNotesStore(s => s.loadForCustomer)
   const loadDeadlines = useDeadlinesStore(s => s.loadForCustomer)
-  const loadFollowUps = useCrmStore(s => s.loadForCustomer)
-  const loadFolders   = useFilesStore(s => s.loadForCustomer)
+  const loadFollowUps  = useCrmStore(s => s.loadForCustomer)
+  const loadFolders    = useFilesStore(s => s.loadForCustomer)
+  const loadActivities = useActivitiesStore(s => s.loadForCustomer)
 
   useEffect(() => {
     loadTodos(customerId)
@@ -81,6 +80,7 @@ export function CustomerRoute({ customerId }: Props) {
     loadDeadlines(customerId)
     loadFollowUps(customerId)
     loadFolders(customerId)
+    loadActivities(customerId)
   }, [customerId])
 
   const tabsRef = useRef<HTMLDivElement>(null)
@@ -106,7 +106,6 @@ export function CustomerRoute({ customerId }: Props) {
       case 'dateien':       return <DateienPane customerId={customerId} />
       case 'historie':      return <HistoriePane customerId={customerId} />
       case 'sales':         return <SalesPane customerId={customerId} />
-      case 'activities':    return <ActivitiesPane customerId={customerId} />
     }
   }
 
@@ -123,7 +122,7 @@ export function CustomerRoute({ customerId }: Props) {
         <div style={{ flex: 1 }}>
           <h1>{customer.name}</h1>
           <div className="sub">
-            Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status} · Score {customer.leadScore}
+            Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status}
           </div>
         </div>
         <button className="btn-ghost"><Phone size={13} /> Anrufen</button>
