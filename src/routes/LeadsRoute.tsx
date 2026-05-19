@@ -51,6 +51,14 @@ function dayColor(iso: string): string {
   return 'var(--fg-dim)'
 }
 
+function dotColor(iso: string): string {
+  const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
+  if (diff < 0) return '#f87171'
+  if (diff <= 7) return '#fbbf24'
+  if (diff <= 30) return '#4ade80'
+  return 'rgba(74,222,128,0.4)'
+}
+
 // ── Board columns ─────────────────────────────────────────────────────────────
 
 const COLUMNS: { id: LeadStatus; label: string; hoverBg: string; dot: string }[] = [
@@ -406,58 +414,85 @@ function ReEngageSidebar({ leads }: { leads: Lead[] }) {
 
   return (
     <div style={{
-      width: 210, flexShrink: 0,
+      width: 230, flexShrink: 0,
       borderLeft: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
-      overflowY: 'auto',
     }}>
+      {/* Header */}
       <div style={{
-        padding: '14px 14px 10px', flexShrink: 0,
-        display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--fg-muted)',
-        borderBottom: '1px solid var(--border)',
+        padding: '13px 16px 11px', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 8,
+        borderBottom: '1px solid rgba(74,222,128,0.15)',
+        background: 'linear-gradient(to bottom, rgba(74,222,128,0.04), transparent)',
       }}>
-        Re-Engage
+        <div style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: '#4ade80',
+          boxShadow: '0 0 6px rgba(74,222,128,0.7)',
+        }} />
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
+          Re-Engage
+        </span>
         {sorted.length > 0 && (
-          <span style={{ fontWeight: 600, fontSize: 10, textTransform: 'none', letterSpacing: 0, color: 'var(--fg-dim)' }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-dim)', marginLeft: 2 }}>
             {sorted.length}
           </span>
         )}
       </div>
 
       {sorted.length === 0 ? (
-        <div style={{ padding: '16px 14px', fontSize: 11, color: 'var(--fg-dim)' }}>
+        <div style={{ padding: '20px 16px', fontSize: 11, color: 'var(--fg-dim)' }}>
           Keine geplant
         </div>
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 14px' }}>
-          {visible.map(lead => (
-            <div key={lead.id} style={{
-              padding: '9px 6px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-            }}>
-              <div style={{
-                fontSize: 12, fontWeight: 600, lineHeight: 1.3,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                marginBottom: 2,
-              }}>
-                {lead.name}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 14px' }}>
+          {visible.map((lead, idx) => {
+            const isLast = idx === visible.length - 1
+            const color = dotColor(lead.reEngageDate!)
+            return (
+              <div key={lead.id} style={{ display: 'flex', alignItems: 'stretch' }}>
+                {/* Timeline gutter */}
+                <div style={{ width: 20, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{
+                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                    background: color,
+                    boxShadow: `0 0 8px ${color}88`,
+                    border: '1.5px solid var(--bg)',
+                    marginTop: 3,
+                  }} />
+                  {!isLast && (
+                    <div style={{
+                      width: 1.5, flex: 1, marginTop: 3,
+                      background: 'linear-gradient(to bottom, rgba(74,222,128,0.35), rgba(74,222,128,0.08))',
+                      minHeight: 16,
+                    }} />
+                  )}
+                </div>
+
+                {/* Content */}
+                <div style={{ flex: 1, minWidth: 0, paddingLeft: 10, paddingBottom: isLast ? 4 : 22 }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 600, lineHeight: 1.3,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {lead.name}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: dayColor(lead.reEngageDate!), marginTop: 3 }}>
+                    {relDays(lead.reEngageDate!)}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 1 }}>
+                    {fmtDate(lead.reEngageDate!)}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: dayColor(lead.reEngageDate!) }}>
-                {relDays(lead.reEngageDate!)}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 1 }}>
-                {fmtDate(lead.reEngageDate!)}
-              </div>
-            </div>
-          ))}
+            )
+          })}
 
           {!expanded && hiddenCount > 0 && (
             <button
               onClick={() => setExpanded(true)}
               className="btn-ghost"
-              style={{ width: '100%', marginTop: 10, fontSize: 11, padding: '5px 0' }}
+              style={{ width: '100%', marginTop: 6, fontSize: 11, padding: '5px 0' }}
             >
               + {hiddenCount} weitere
             </button>
@@ -466,7 +501,7 @@ function ReEngageSidebar({ leads }: { leads: Lead[] }) {
             <button
               onClick={() => setExpanded(false)}
               className="btn-ghost"
-              style={{ width: '100%', marginTop: 10, fontSize: 11, padding: '5px 0' }}
+              style={{ width: '100%', marginTop: 6, fontSize: 11, padding: '5px 0' }}
             >
               Weniger anzeigen
             </button>
