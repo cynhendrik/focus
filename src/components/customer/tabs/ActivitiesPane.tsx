@@ -55,7 +55,7 @@ export function ActivitiesPane({ customerId }: Props) {
             style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: '7px 8px', borderRadius: 9, border: '1px solid var(--border)',
-              background: 'rgba(255,255,255,0.04)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+              background: 'var(--surface-2)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
               color: 'var(--fg-muted)',
             }}
           >
@@ -86,7 +86,7 @@ export function ActivitiesPane({ customerId }: Props) {
             >
               <div style={{
                 width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Icon size={14} style={{ color: 'var(--fg-muted)' }} />

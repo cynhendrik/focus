@@ -68,7 +68,7 @@ function PipelineStepper({ deal, stages, onMove }: {
           <button key={stage.id} onClick={() => onMove(stage.name)} style={{
             padding: '3px 10px', borderRadius: 99, fontSize: 10, fontWeight: 700,
             cursor: 'pointer', border: 'none', transition: 'all 120ms',
-            background: isCurrent ? 'var(--accent)' : isPast ? 'var(--accent-soft)' : 'rgba(0,0,0,0.05)',
+            background: isCurrent ? 'var(--accent)' : isPast ? 'var(--accent-soft)' : 'var(--surface-2)',
             color: isCurrent ? 'var(--accent-ink)' : isPast ? 'var(--accent)' : 'var(--fg-dim)',
           }}>
             {stage.label}
@@ -220,7 +220,7 @@ function FollowUpItem({ fu, onToggle, onRemove }: {
         background: done ? 'var(--accent)' : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {done && <Check size={9} strokeWidth={3} style={{ color: '#000' }} />}
+        {done && <Check size={9} strokeWidth={3} style={{ color: 'var(--accent-ink)' }} />}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{
@@ -233,7 +233,7 @@ function FollowUpItem({ fu, onToggle, onRemove }: {
         {due && !done && (
           <span style={{
             marginLeft: 8, fontSize: 10, fontFamily: 'var(--font-mono)',
-            color: due.overdue ? '#e53e3e' : 'var(--fg-dim)',
+            color: due.overdue ? 'var(--danger)' : 'var(--fg-dim)',
           }}>
             {due.label}
           </span>
@@ -340,19 +340,25 @@ function WhatsAppPlaceholder() {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '9px 0', borderBottom: '1px solid var(--border)',
-      opacity: 0.4,
     }}>
       <div style={{
         width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-        background: 'var(--bg1)', border: '1px solid var(--border)',
+        background: 'var(--surface-2)', border: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <MessageCircle size={12} style={{ color: 'var(--fg-dim)' }} />
       </div>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg)' }}>WhatsApp Business</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)' }}>WhatsApp Business</div>
         <div style={{ fontSize: 10, color: 'var(--fg-dim)' }}>Nicht verbunden · Bald verfügbar</div>
       </div>
+      <span style={{
+        fontSize: 9, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+        color: 'var(--fg-dim)', border: '1px solid var(--border)',
+        borderRadius: 99, padding: '2px 7px',
+      }}>
+        Bald
+      </span>
     </div>
   )
 }
