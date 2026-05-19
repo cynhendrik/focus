@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 10;
+const CURRENT_VERSION: u32 = 11;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -254,6 +254,25 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             }
             if table_exists(conn, "activities") && !column_exists(conn, "activities", "customer_id") {
                 conn.execute_batch("ALTER TABLE activities ADD COLUMN customer_id TEXT")?;
+            }
+            Ok(())
+        }
+        11 => {
+            if !column_exists(conn, "accounts", "account_type") {
+                conn.execute_batch(
+                    "ALTER TABLE accounts ADD COLUMN account_type TEXT NOT NULL DEFAULT 'client';
+                     ALTER TABLE accounts ADD COLUMN lead_status TEXT;
+                     ALTER TABLE accounts ADD COLUMN lead_source TEXT;
+                     ALTER TABLE accounts ADD COLUMN lead_source_detail TEXT;
+                     ALTER TABLE accounts ADD COLUMN email TEXT;
+                     ALTER TABLE accounts ADD COLUMN engagement_score INTEGER DEFAULT 0;
+                     ALTER TABLE accounts ADD COLUMN re_engage_date TEXT;
+                     ALTER TABLE accounts ADD COLUMN converted_at TEXT;"
+                )?;
+                conn.execute_batch(
+                    "CREATE INDEX IF NOT EXISTS idx_accounts_type
+                     ON accounts(workspace_id, account_type);"
+                )?;
             }
             Ok(())
         }
@@ -732,5 +751,40 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(count, 15);
+    }
+
+    fn setup() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::schema::create_tables(&conn).unwrap();
+        run(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn v11_adds_lead_columns_to_accounts() {
+        let conn = setup();
+        assert!(column_exists(&conn, "accounts", "account_type"));
+        assert!(column_exists(&conn, "accounts", "lead_status"));
+        assert!(column_exists(&conn, "accounts", "lead_source"));
+        assert!(column_exists(&conn, "accounts", "lead_source_detail"));
+        assert!(column_exists(&conn, "accounts", "email"));
+        assert!(column_exists(&conn, "accounts", "engagement_score"));
+        assert!(column_exists(&conn, "accounts", "re_engage_date"));
+        assert!(column_exists(&conn, "accounts", "converted_at"));
+    }
+
+    #[test]
+    fn v11_existing_accounts_default_to_client() {
+        let conn = setup();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test AG',?1,?1)",
+            [&now],
+        ).unwrap();
+        let account_type: String = conn
+            .query_row("SELECT account_type FROM accounts WHERE id='a1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(account_type, "client");
     }
 }
