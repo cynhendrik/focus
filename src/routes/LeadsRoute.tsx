@@ -10,13 +10,11 @@ import { useAuthStore } from '@/store/auth.store'
 import { ActivitiesService } from '@/services/activities.service'
 import type { Lead, LeadSource, LeadStatus, UpsertLeadPayload } from '@/types/lead.types'
 
-type Tab = 'phasen' | 'reengage'
-
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function todayPlus90(): string {
+function todayPlus(days: number): string {
   const d = new Date()
-  d.setDate(d.getDate() + 90)
+  d.setDate(d.getDate() + days)
   return d.toISOString().split('T')[0]
 }
 
@@ -38,6 +36,21 @@ function sourceLabel(source: LeadSource, detail: string | null): string {
   return source
 }
 
+function relDays(iso: string): string {
+  const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
+  if (diff < 0) return 'Überfällig'
+  if (diff === 0) return 'Heute'
+  if (diff === 1) return 'Morgen'
+  return `in ${diff} Tagen`
+}
+
+function dayColor(iso: string): string {
+  const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000)
+  if (diff < 0) return '#f87171'
+  if (diff <= 7) return '#fbbf24'
+  return 'var(--fg-dim)'
+}
+
 // ── Board columns ─────────────────────────────────────────────────────────────
 
 const COLUMNS: { id: LeadStatus; label: string; hoverBg: string; dot: string }[] = [
@@ -45,6 +58,8 @@ const COLUMNS: { id: LeadStatus; label: string; hoverBg: string; dot: string }[]
   { id: 'attempted', label: 'Attempted', hoverBg: 'rgba(251,191,36,0.10)',  dot: '#fbbf24' },
   { id: 'warm',      label: 'Warm Lead', hoverBg: 'rgba(74,222,128,0.10)',  dot: '#4ade80' },
 ]
+
+const SIDEBAR_LIMIT = 8
 
 // ── Follow-Up Modal ───────────────────────────────────────────────────────────
 
@@ -99,14 +114,10 @@ function FollowUpModal({
       }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Follow-Up erstellen</h2>
         {leads.length > 1 && (
-          <p style={{ fontSize: 12, color: 'var(--fg-dim)', marginBottom: 16 }}>
-            Für {leads.length} Leads
-          </p>
+          <p style={{ fontSize: 12, color: 'var(--fg-dim)', marginBottom: 16 }}>Für {leads.length} Leads</p>
         )}
         {leads.length === 1 && (
-          <p style={{ fontSize: 12, color: 'var(--fg-dim)', marginBottom: 16 }}>
-            {leads[0].name}
-          </p>
+          <p style={{ fontSize: 12, color: 'var(--fg-dim)', marginBottom: 16 }}>{leads[0].name}</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -165,6 +176,7 @@ function ContextMenu({
 }) {
   const convertToClient = useLeadsStore(s => s.convertToClient)
   const deleteLead = useLeadsStore(s => s.deleteLead)
+  const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -203,6 +215,22 @@ function ContextMenu({
         label="Zu Kunde machen ✓"
         color="#4ade80"
         onClick={() => act(() => convertToClient(menu.lead.id))}
+      />
+
+      <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+      <CtxItem
+        label="Re-Engage (90 Tage)"
+        onClick={() => act(() =>
+          bulkUpdate({ ids: [menu.lead.id], status: 'lost_reengage', reEngageDate: todayPlus(90) }, workspaceId)
+        )}
+      />
+      <CtxItem
+        label="Lost (6 Monate)"
+        color="var(--fg-dim)"
+        onClick={() => act(() =>
+          bulkUpdate({ ids: [menu.lead.id], status: 'lost_reengage', reEngageDate: todayPlus(180) }, workspaceId)
+        )}
       />
 
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
@@ -363,6 +391,92 @@ function LeadColumn({ col, leads, selected, onToggle, onContext }: {
   )
 }
 
+// ── Re-Engage Sidebar ─────────────────────────────────────────────────────────
+
+function ReEngageSidebar({ leads }: { leads: Lead[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const sorted = useMemo(
+    () => [...leads].sort((a, b) => (a.reEngageDate ?? '') < (b.reEngageDate ?? '') ? -1 : 1),
+    [leads],
+  )
+
+  const visible = expanded ? sorted : sorted.slice(0, SIDEBAR_LIMIT)
+  const hiddenCount = sorted.length - SIDEBAR_LIMIT
+
+  return (
+    <div style={{
+      width: 210, flexShrink: 0,
+      borderLeft: '1px solid var(--border)',
+      display: 'flex', flexDirection: 'column',
+      overflowY: 'auto',
+    }}>
+      <div style={{
+        padding: '14px 14px 10px', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 10, fontWeight: 800, letterSpacing: '0.08em',
+        textTransform: 'uppercase', color: 'var(--fg-muted)',
+        borderBottom: '1px solid var(--border)',
+      }}>
+        Re-Engage
+        {sorted.length > 0 && (
+          <span style={{ fontWeight: 600, fontSize: 10, textTransform: 'none', letterSpacing: 0, color: 'var(--fg-dim)' }}>
+            {sorted.length}
+          </span>
+        )}
+      </div>
+
+      {sorted.length === 0 ? (
+        <div style={{ padding: '16px 14px', fontSize: 11, color: 'var(--fg-dim)' }}>
+          Keine geplant
+        </div>
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 14px' }}>
+          {visible.map(lead => (
+            <div key={lead.id} style={{
+              padding: '9px 6px',
+              borderBottom: '1px solid rgba(255,255,255,0.05)',
+            }}>
+              <div style={{
+                fontSize: 12, fontWeight: 600, lineHeight: 1.3,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                marginBottom: 2,
+              }}>
+                {lead.name}
+              </div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: dayColor(lead.reEngageDate!) }}>
+                {relDays(lead.reEngageDate!)}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 1 }}>
+                {fmtDate(lead.reEngageDate!)}
+              </div>
+            </div>
+          ))}
+
+          {!expanded && hiddenCount > 0 && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="btn-ghost"
+              style={{ width: '100%', marginTop: 10, fontSize: 11, padding: '5px 0' }}
+            >
+              + {hiddenCount} weitere
+            </button>
+          )}
+          {expanded && sorted.length > SIDEBAR_LIMIT && (
+            <button
+              onClick={() => setExpanded(false)}
+              className="btn-ghost"
+              style={{ width: '100%', marginTop: 10, fontSize: 11, padding: '5px 0' }}
+            >
+              Weniger anzeigen
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Phasen Board ──────────────────────────────────────────────────────────────
 
 function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onShowCreate: () => void }) {
@@ -378,6 +492,11 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
 
   const boardLeads = useMemo(
     () => allLeads.filter(l => l.leadStatus === 'new' || l.leadStatus === 'attempted' || l.leadStatus === 'warm'),
+    [allLeads],
+  )
+
+  const reEngageLeads = useMemo(
+    () => allLeads.filter(l => l.reEngageDate != null),
     [allLeads],
   )
 
@@ -421,7 +540,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
 
   return (
     <>
-      {/* Top bar */}
+      {/* Action bar */}
       <div style={{
         padding: '10px 16px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, minHeight: 50,
@@ -464,26 +583,30 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
         </button>
       </div>
 
-      {/* Board */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {COLUMNS.map(col => (
-            <LeadColumn
-              key={col.id}
-              col={col}
-              leads={leadsForCol(col.id)}
-              selected={selected}
-              onToggle={toggleSelect}
-              onContext={handleContext}
-            />
-          ))}
-        </div>
-        <DragOverlay>
-          {activeLead
-            ? <LeadCard lead={activeLead} onContext={() => {}} isDragging />
-            : null}
-        </DragOverlay>
-      </DndContext>
+      {/* Board + Sidebar */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div style={{ display: 'flex', flex: 1, overflow: 'auto' }}>
+            {COLUMNS.map(col => (
+              <LeadColumn
+                key={col.id}
+                col={col}
+                leads={leadsForCol(col.id)}
+                selected={selected}
+                onToggle={toggleSelect}
+                onContext={handleContext}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeLead
+              ? <LeadCard lead={activeLead} onContext={() => {}} isDragging />
+              : null}
+          </DragOverlay>
+        </DndContext>
+
+        <ReEngageSidebar leads={reEngageLeads} />
+      </div>
 
       {ctxMenu && (
         <ContextMenu
@@ -502,79 +625,6 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
         />
       )}
     </>
-  )
-}
-
-// ── Re-Engage Tab ─────────────────────────────────────────────────────────────
-
-function ReEngageTab({ workspaceId }: { workspaceId: string }) {
-  const allLeads = useLeadsStore(s => s.leads)
-  const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
-  const [followUpLeads, setFollowUpLeads] = useState<Lead[] | null>(null)
-
-  const leads = useMemo(
-    () => allLeads
-      .filter(l => l.reEngageDate != null)
-      .sort((a, b) => {
-        const da = a.reEngageDate ?? ''
-        const db = b.reEngageDate ?? ''
-        return da < db ? -1 : da > db ? 1 : 0
-      }),
-    [allLeads],
-  )
-
-  return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-      {leads.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)', fontSize: 13 }}>
-          Keine Re-Engage-Leads
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {leads.map(lead => (
-            <div key={lead.id} style={{
-              display: 'grid', gridTemplateColumns: '1fr 130px 240px',
-              alignItems: 'center', gap: 12, padding: '10px 14px',
-              borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)',
-            }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{lead.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
-                  {sourceLabel(lead.leadSource, lead.leadSourceDetail)} · Score: {lead.engagementScore}
-                </div>
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#f87171' }}>
-                {lead.reEngageDate ? fmtDate(lead.reEngageDate) : '—'}
-              </div>
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                <button
-                  className="btn-ghost"
-                  style={{ fontSize: 11, padding: '4px 10px' }}
-                  onClick={() => setFollowUpLeads([lead])}
-                >
-                  Follow-Up
-                </button>
-                <button
-                  className="btn-ghost"
-                  style={{ fontSize: 11, padding: '4px 10px', color: '#f87171' }}
-                  onClick={() => bulkUpdate({ ids: [lead.id], status: 'lost_reengage', reEngageDate: todayPlus90() }, workspaceId)}
-                >
-                  +90 Tage
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {followUpLeads && (
-        <FollowUpModal
-          leads={followUpLeads}
-          workspaceId={workspaceId}
-          onClose={() => setFollowUpLeads(null)}
-        />
-      )}
-    </div>
   )
 }
 
@@ -677,52 +727,17 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
 // ── LeadsRoute ────────────────────────────────────────────────────────────────
 
 export function LeadsRoute() {
-  const [activeTab, setActiveTab] = useState<Tab>('phasen')
   const [showCreate, setShowCreate] = useState(false)
-  const isLoading     = useLeadsStore(s => s.isLoading)
-  const totalLeads    = useLeadsStore(s => s.leads.length)
-  const reEngageCount = useLeadsStore(s => s.leads.filter(l => l.reEngageDate != null).length)
-  const workspaceId   = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-
-  const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: 'phasen',   label: 'Phasen'                             },
-    { id: 'reengage', label: 'Re-Engage', count: reEngageCount    },
-  ]
+  const isLoading   = useLeadsStore(s => s.isLoading)
+  const totalLeads  = useLeadsStore(s => s.leads.length)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
-      <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
+      <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Leads.</h1>
           <span style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>{totalLeads} gesamt</span>
-        </div>
-        <div style={{ display: 'flex', gap: 2 }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                fontSize: 13, fontWeight: 600,
-                padding: '8px 14px', borderRadius: '8px 8px 0 0',
-                border: 'none',
-                background: activeTab === tab.id ? 'var(--surface)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-dim)',
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-                transition: 'color 120ms, background 120ms',
-              }}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
-                  background: 'rgba(248,113,113,0.2)', color: '#f87171',
-                }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -732,8 +747,7 @@ export function LeadsRoute() {
         </div>
       ) : (
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          {activeTab === 'phasen'   && <PhasenBoard workspaceId={workspaceId} onShowCreate={() => setShowCreate(true)} />}
-          {activeTab === 'reengage' && <ReEngageTab workspaceId={workspaceId} />}
+          <PhasenBoard workspaceId={workspaceId} onShowCreate={() => setShowCreate(true)} />
         </div>
       )}
 
