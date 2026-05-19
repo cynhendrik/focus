@@ -13,6 +13,7 @@ interface LeadsState {
   upsert: (payload: UpsertLeadPayload) => Promise<void>
   bulkUpdate: (payload: BulkUpdateLeadsPayload, workspaceId: string) => Promise<void>
   convertToClient: (id: string) => Promise<void>
+  deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
   newLeads: () => Lead[]
   attemptedLeads: () => Lead[]
@@ -80,6 +81,19 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to convert lead to client', { error })
+      throw err
+    }
+  },
+
+  deleteLead: async (id, workspaceId) => {
+    set({ error: null })
+    try {
+      await LeadsService.deleteLead(id, workspaceId)
+      set(s => ({ leads: s.leads.filter(l => l.id !== id) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to delete lead', { error })
       throw err
     }
   },

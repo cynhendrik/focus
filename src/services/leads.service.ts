@@ -34,6 +34,10 @@ export const LeadsService = {
     return invoke('convert_lead_to_client', { id })
   },
 
+  deleteLead(id: string, workspaceId: string): Promise<void> {
+    return invoke('delete_account', { id, workspaceId })
+  },
+
   async syncPending(workspaceId: string): Promise<number> {
     const { data, error } = await supabase
       .from('pending_leads')
