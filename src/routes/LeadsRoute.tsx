@@ -19,7 +19,8 @@ function sourceLabel(source: LeadSource, detail: string | null): string {
   if (detail) return detail
   if (source === 'zoom') return 'Zoom Webinar'
   if (source === 'generic') return 'Web'
-  return 'Manuell'
+  if (source === 'manual') return 'Manuell'
+  return source
 }
 
 function SourceBadge({ source, detail }: { source: LeadSource; detail: string | null }) {
@@ -39,36 +40,34 @@ function SourceBadge({ source, detail }: { source: LeadSource; detail: string | 
 
 function StatusBadge({ status }: { status: LeadStatus }) {
   const map: Record<LeadStatus, { label: string; bg: string; color: string }> = {
-    new:           { label: 'Neu',        bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa' },
-    attempted:     { label: 'Kontakt',    bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
-    warm:          { label: 'Warm',       bg: 'rgba(74,222,128,0.15)',  color: '#4ade80' },
-    lost_reengage: { label: 'Lost',       bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
+    new:           { label: 'Neu',     bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa' },
+    attempted:     { label: 'Kontakt', bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24' },
+    warm:          { label: 'Warm',    bg: 'rgba(74,222,128,0.15)',  color: '#4ade80' },
+    lost_reengage: { label: 'Lost',    bg: 'rgba(248,113,113,0.15)', color: '#f87171' },
   }
   const { label, bg, color } = map[status]
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-      background: bg, color,
-    }}>
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: bg, color }}>
       {label}
     </span>
   )
 }
 
-function Checkbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Checkbox({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <input
       type="checkbox"
       checked={checked}
-      onChange={e => onChange(e.target.checked)}
+      onChange={onChange}
       style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--accent)' }}
     />
   )
 }
 
 function NewInTab({ workspaceId }: { workspaceId: string }) {
-  const leads = useLeadsStore(s => s.newLeads())
+  const allLeads = useLeadsStore(s => s.leads)
   const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
+  const leads = useMemo(() => allLeads.filter(l => l.leadStatus === 'new'), [allLeads])
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   function toggleAll() {
@@ -130,7 +129,7 @@ function NewInTab({ workspaceId }: { workspaceId: string }) {
             <button
               className="btn-ghost"
               style={{ fontSize: 11, padding: '4px 10px', color: '#f87171' }}
-              onClick={() => applyBulk('lost_reengage', todayPlus90())}
+              onClick={() => applyBulk('lost_reengage')}
             >
               Lost
             </button>
@@ -151,9 +150,7 @@ function NewInTab({ workspaceId }: { workspaceId: string }) {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px' }}>
         {leads.length === 0 ? (
-          <div style={{
-            textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)', fontSize: 13,
-          }}>
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)', fontSize: 13 }}>
             Keine neuen Leads — Webhooks konfigurieren unter Settings → Integrationen
           </div>
         ) : (
@@ -173,17 +170,18 @@ function NewInTab({ workspaceId }: { workspaceId: string }) {
 
 function LeadRow({ lead, checked, onToggle }: { lead: Lead; checked: boolean; onToggle: () => void }) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '32px 1fr 130px 80px 80px 100px',
-      alignItems: 'center',
-      gap: 8,
-      padding: '9px 10px',
-      borderRadius: 8,
-      border: '1px solid transparent',
-      borderBottom: '1px solid var(--border)',
-      transition: 'background 120ms',
-    }}
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '32px 1fr 130px 80px 80px 100px',
+        alignItems: 'center',
+        gap: 8,
+        padding: '9px 10px',
+        borderRadius: 8,
+        border: '1px solid transparent',
+        borderBottom: '1px solid var(--border)',
+        transition: 'background 120ms',
+      }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
@@ -208,11 +206,13 @@ function LeadRow({ lead, checked, onToggle }: { lead: Lead; checked: boolean; on
   )
 }
 
-function PhasesTab({ workspaceId }: { workspaceId: string }) {
-  const attempted = useLeadsStore(s => s.attemptedLeads())
-  const warm      = useLeadsStore(s => s.warmLeads())
-  const lost      = useLeadsStore(s => s.lostLeads())
+function PhasesTab() {
+  const allLeads = useLeadsStore(s => s.leads)
   const convertToClient = useLeadsStore(s => s.convertToClient)
+
+  const attempted = useMemo(() => allLeads.filter(l => l.leadStatus === 'attempted'), [allLeads])
+  const warm      = useMemo(() => allLeads.filter(l => l.leadStatus === 'warm'), [allLeads])
+  const lost      = useMemo(() => allLeads.filter(l => l.leadStatus === 'lost_reengage'), [allLeads])
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
@@ -242,7 +242,6 @@ function PhasesTab({ workspaceId }: { workspaceId: string }) {
         leads={lost}
         renderRight={() => null}
       />
-
       {attempted.length === 0 && warm.length === 0 && lost.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)', fontSize: 13 }}>
           Keine Leads in aktiven Phasen
@@ -283,9 +282,8 @@ function PhaseGroup({
         {leads.map(lead => (
           <div key={lead.id} style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            padding: '9px 12px',
-            borderRadius: 8, background: 'var(--surface)',
-            border: '1px solid var(--border)',
+            padding: '9px 12px', borderRadius: 8,
+            background: 'var(--surface)', border: '1px solid var(--border)',
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{lead.name}</span>
@@ -307,16 +305,18 @@ function PhaseGroup({
 }
 
 function ReEngageTab({ workspaceId }: { workspaceId: string }) {
-  const rawLeads   = useLeadsStore(s => s.reEngageLeads())
+  const allLeads   = useLeadsStore(s => s.leads)
   const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
 
   const leads = useMemo(
-    () => [...rawLeads].sort((a, b) => {
-      const da = a.reEngageDate ?? ''
-      const db = b.reEngageDate ?? ''
-      return da < db ? -1 : da > db ? 1 : 0
-    }),
-    [rawLeads],
+    () => allLeads
+      .filter(l => l.reEngageDate != null)
+      .sort((a, b) => {
+        const da = a.reEngageDate ?? ''
+        const db = b.reEngageDate ?? ''
+        return da < db ? -1 : da > db ? 1 : 0
+      }),
+    [allLeads],
   )
 
   return (
@@ -329,14 +329,9 @@ function ReEngageTab({ workspaceId }: { workspaceId: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {leads.map(lead => (
             <div key={lead.id} style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 130px 200px',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 14px',
-              borderRadius: 8,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
+              display: 'grid', gridTemplateColumns: '1fr 130px 200px',
+              alignItems: 'center', gap: 12, padding: '10px 14px',
+              borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)',
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -375,36 +370,24 @@ function ReEngageTab({ workspaceId }: { workspaceId: string }) {
 
 export function LeadsRoute() {
   const [activeTab, setActiveTab] = useState<Tab>('new')
-  const isLoading      = useLeadsStore(s => s.isLoading)
-  const totalLeads     = useLeadsStore(s => s.leads.length)
-  const newLeads       = useLeadsStore(s => s.newLeads())
-  const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const isLoading  = useLeadsStore(s => s.isLoading)
+  const totalLeads = useLeadsStore(s => s.leads.length)
+  const newCount   = useLeadsStore(s => s.leads.filter(l => l.leadStatus === 'new').length)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: 'new',      label: 'New In',       count: newLeads.length },
-    { id: 'phases',   label: 'Lead Phases'                          },
-    { id: 'reengage', label: 'Re-Engage'                            },
+    { id: 'new',      label: 'New In',     count: newCount },
+    { id: 'phases',   label: 'Lead Phases'                 },
+    { id: 'reengage', label: 'Re-Engage'                   },
   ]
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      background: 'var(--bg)',
-    }}>
-      <div style={{
-        padding: '20px 24px 0',
-        borderBottom: '1px solid var(--border)',
-        flexShrink: 0,
-      }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg)' }}>
+      <div style={{ padding: '20px 24px 0', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 18 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>
-            Leads.
-          </h1>
-          <span style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>
-            {totalLeads} gesamt
-          </span>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Leads.</h1>
+          <span style={{ fontSize: 12, color: 'var(--fg-dim)', fontWeight: 500 }}>{totalLeads} gesamt</span>
         </div>
-
         <div style={{ display: 'flex', gap: 2 }}>
           {tabs.map(tab => (
             <button
@@ -412,8 +395,7 @@ export function LeadsRoute() {
               onClick={() => setActiveTab(tab.id)}
               style={{
                 fontSize: 13, fontWeight: 600,
-                padding: '8px 14px',
-                borderRadius: '8px 8px 0 0',
+                padding: '8px 14px', borderRadius: '8px 8px 0 0',
                 border: 'none',
                 background: activeTab === tab.id ? 'var(--surface)' : 'transparent',
                 color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-dim)',
@@ -444,9 +426,9 @@ export function LeadsRoute() {
         </div>
       ) : (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {activeTab === 'new'      && <NewInTab      workspaceId={workspaceId} />}
-          {activeTab === 'phases'   && <PhasesTab     workspaceId={workspaceId} />}
-          {activeTab === 'reengage' && <ReEngageTab   workspaceId={workspaceId} />}
+          {activeTab === 'new'      && <NewInTab    workspaceId={workspaceId} />}
+          {activeTab === 'phases'   && <PhasesTab   />}
+          {activeTab === 'reengage' && <ReEngageTab workspaceId={workspaceId} />}
         </div>
       )}
     </div>
