@@ -169,6 +169,7 @@ fn main() {
             commands::activity::get_open_tasks,
             commands::activity::get_last_activity_dates,
             commands::activity::get_activities_by_customer,
+            commands::activity::get_open_followups,
             commands::pipeline_stage::cmd_seed_pipeline_stages,
             commands::kpi::get_kpis,
             commands::kpi::upsert_kpi,
@@ -204,6 +205,11 @@ fn main() {
             commands::smart_list::upsert_smart_list,
             commands::smart_list::delete_smart_list,
             commands::smart_list::seed_system_smart_lists,
+            commands::lead::get_leads,
+            commands::lead::upsert_lead,
+            commands::lead::bulk_update_leads,
+            commands::lead::convert_lead_to_client,
+            commands::lead::insert_synced_leads,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
