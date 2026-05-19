@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { DealModal } from '@/components/pipeline/DealModal'
 import { ActivityModal } from '@/components/pipeline/ActivityModal'
 import type { Deal, ActivityType, PipelineStage } from '@/types/pipeline.types'
-import { Phone, Users, Mail, FileText, Bell, Check, Trash2, Plus, Calendar } from 'lucide-react'
+import { Phone, Users, Mail, FileText, Bell, Check, Trash2, Plus, Calendar, ChevronDown } from 'lucide-react'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,14 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; Ic
 }
 
 const QUICK_TYPES: ActivityType[] = ['call', 'meeting', 'email', 'note']
+
+const FEED_GROUPS: { key: string; types: string[]; label: string; color: string; bg: string; Icon: typeof Phone }[] = [
+  { key: 'call',     types: ['call'],     label: 'Anrufe',              color: '#fb923c', bg: 'rgba(251,146,60,0.12)',   Icon: Phone },
+  { key: 'meeting',  types: ['meeting'],  label: 'Meetings',            color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   Icon: Users },
+  { key: 'email',    types: ['email'],    label: 'E-Mails',             color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)',  Icon: Mail },
+  { key: 'note',     types: ['note'],     label: 'Notizen',             color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', Icon: FileText },
+  { key: 'followup', types: ['followup'], label: 'Erledigte Follow-ups', color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  Icon: Bell },
+]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -322,6 +330,65 @@ function FeedItem({ item, onRemove }: {
   )
 }
 
+// ── Group Section ─────────────────────────────────────────────────────────────
+
+function GroupSection({ group, items, isOpen, onToggle, onRemove }: {
+  group: typeof FEED_GROUPS[number]
+  items: { id: string; type: string; title?: string; body?: string; status: string; createdAt: string }[]
+  isOpen: boolean
+  onToggle: () => void
+  onRemove: (id: string) => void
+}) {
+  const { Icon } = group
+  return (
+    <div style={{
+      borderLeft: isOpen ? `2px solid ${group.color}30` : '2px solid transparent',
+      marginBottom: 2, transition: 'border-color 150ms',
+    }}>
+      <button
+        onClick={onToggle}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          padding: '9px 0 9px 10px', background: 'none', border: 'none',
+          cursor: 'pointer', textAlign: 'left',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
+        }}
+      >
+        <div style={{
+          width: 24, height: 24, borderRadius: 7, flexShrink: 0,
+          background: group.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon size={11} style={{ color: group.color }} />
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: group.color, flex: 1 }}>{group.label}</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)',
+          background: 'rgba(255,255,255,0.06)', borderRadius: 99,
+          padding: '1px 7px', marginRight: 4,
+        }}>
+          {items.length}
+        </span>
+        <ChevronDown
+          size={13}
+          style={{
+            color: 'var(--fg-dim)', flexShrink: 0, marginRight: 4,
+            transition: 'transform 150ms',
+            transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+          }}
+        />
+      </button>
+
+      {isOpen && (
+        <div style={{ paddingLeft: 10 }}>
+          {items.map(item => (
+            <FeedItem key={item.id} item={item} onRemove={() => onRemove(item.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── SalesPane ─────────────────────────────────────────────────────────────────
 
 interface Props { customerId: string }
@@ -339,6 +406,14 @@ export function SalesPane({ customerId }: Props) {
   const [fuTitle,    setFuTitle]    = useState('')
   const [fuDate,     setFuDate]     = useState('')
   const [fuSaving,   setFuSaving]   = useState(false)
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(FEED_GROUPS.map(g => g.key)))
+
+  const toggleGroup = (key: string) => setOpenGroups(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
 
   useEffect(() => {
     loadDeals(customerId)
@@ -567,16 +642,27 @@ export function SalesPane({ customerId }: Props) {
           )}
         </div>
 
-        {/* Feed */}
+        {/* Feed — grouped accordion */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 20px' }}>
           {feedItems.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--fg-dim)', fontSize: 12 }}>
               Noch keine Aktivitäten — log den ersten Kontakt oben
             </div>
           ) : (
-            feedItems.map(item => (
-              <FeedItem key={item.id} item={item} onRemove={() => remove(item.id)} />
-            ))
+            FEED_GROUPS.map(group => {
+              const items = feedItems.filter(item => group.types.includes(item.type))
+              if (items.length === 0) return null
+              return (
+                <GroupSection
+                  key={group.key}
+                  group={group}
+                  items={items}
+                  isOpen={openGroups.has(group.key)}
+                  onToggle={() => toggleGroup(group.key)}
+                  onRemove={id => remove(id)}
+                />
+              )
+            })
           )}
         </div>
       </div>
