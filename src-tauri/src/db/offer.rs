@@ -37,6 +37,8 @@ pub struct OfferItem {
     pub tax_rate: f64,
     pub total: f64,
     pub sort_order: i64,
+    pub item_date: Option<String>,
+    pub unit:      Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -75,6 +77,8 @@ pub struct UpsertOfferItemPayload {
     pub tax_rate: f64,
     pub total: f64,
     pub sort_order: i64,
+    pub item_date: Option<String>,
+    pub unit:      Option<String>,
 }
 
 fn map_offer(r: &rusqlite::Row<'_>) -> rusqlite::Result<Offer> {
@@ -111,6 +115,8 @@ fn map_item(r: &rusqlite::Row<'_>) -> rusqlite::Result<OfferItem> {
         tax_rate:    r.get(6)?,
         total:       r.get(7)?,
         sort_order:  r.get(8)?,
+        item_date:   r.get(9)?,
+        unit:        r.get(10)?,
     })
 }
 
@@ -121,7 +127,7 @@ const OFFER_COLS: &str =
 
 fn fetch_items(conn: &Connection, offer_id: &str) -> Result<Vec<OfferItem>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, offer_id, title, description, quantity, unit_price, tax_rate, total, sort_order
+        "SELECT id, offer_id, title, description, quantity, unit_price, tax_rate, total, sort_order, item_date, unit
          FROM offer_items WHERE offer_id = ?1 ORDER BY sort_order"
     )?;
     let rows = stmt.query_map([offer_id], map_item)?.collect::<Result<Vec<_>, _>>()?;
@@ -133,9 +139,13 @@ fn replace_items(conn: &Connection, offer_id: &str, items: &[UpsertOfferItemPayl
     for item in items {
         let id = item.id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
         conn.execute(
-            "INSERT INTO offer_items (id, offer_id, title, description, quantity, unit_price, tax_rate, total, sort_order)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-            rusqlite::params![id, offer_id, item.title, item.description, item.quantity, item.unit_price, item.tax_rate, item.total, item.sort_order],
+            "INSERT INTO offer_items (id, offer_id, title, description, quantity, unit_price, tax_rate, total, sort_order, item_date, unit)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            rusqlite::params![
+                id, offer_id, item.title, item.description,
+                item.quantity, item.unit_price, item.tax_rate, item.total, item.sort_order,
+                item.item_date, item.unit,
+            ],
         )?;
     }
     Ok(())
@@ -353,6 +363,8 @@ mod tests {
             tax_rate: 19.0,
             total: 2380.0,
             sort_order: 0,
+            item_date: None,
+            unit: None,
         }
     }
 
@@ -404,6 +416,8 @@ mod tests {
             tax_rate: 19.0,
             total: 142.8,
             sort_order: 1,
+            item_date: None,
+            unit: None,
         }]);
         p.title = "Angebot Updated".into();
         let updated = update(&conn, &created.offer.id, p).unwrap();
@@ -465,6 +479,40 @@ mod tests {
     fn update_status_not_found_returns_error() {
         let conn = setup();
         assert!(matches!(update_status(&conn, "x", "sent"), Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn offer_item_date_and_unit_round_trip() {
+        let conn = setup();
+        let payload = UpsertOfferPayload {
+            id: None,
+            workspace_id: "ws-1".into(),
+            created_by: "u-1".into(),
+            account_id: "acc-1".into(),
+            title: "Angebot Test".into(),
+            status: None,
+            valid_until: "2026-06-22".into(),
+            tax_mode: Some("kleinunternehmer".into()),
+            subtotal: 200.0,
+            tax_amount: 0.0,
+            total: 200.0,
+            notes: None,
+            items: vec![UpsertOfferItemPayload {
+                id: None,
+                title: "Beratung".into(),
+                description: None,
+                quantity: 2.0,
+                unit_price: 100.0,
+                tax_rate: 0.0,
+                total: 200.0,
+                sort_order: 0,
+                item_date: Some("2026-05-22".into()),
+                unit: Some("Std.".into()),
+            }],
+        };
+        let result = create(&conn, payload).unwrap();
+        assert_eq!(result.items[0].item_date.as_deref(), Some("2026-05-22"));
+        assert_eq!(result.items[0].unit.as_deref(), Some("Std."));
     }
 
     #[test]
