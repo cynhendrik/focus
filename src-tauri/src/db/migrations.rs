@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 11;
+const CURRENT_VERSION: u32 = 13;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -274,6 +274,109 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                      ON accounts(workspace_id, account_type);"
                 )?;
             }
+            Ok(())
+        }
+        12 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS invoice_sequences (
+                    workspace_id TEXT PRIMARY KEY,
+                    next_number  INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS offer_sequences (
+                    workspace_id TEXT PRIMARY KEY,
+                    next_number  INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS invoices (
+                    id              TEXT PRIMARY KEY,
+                    workspace_id    TEXT NOT NULL DEFAULT '',
+                    created_by      TEXT NOT NULL DEFAULT '',
+                    account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
+                    number          TEXT,
+                    date            TEXT NOT NULL,
+                    due_date        TEXT NOT NULL,
+                    status          TEXT NOT NULL DEFAULT 'draft',
+                    tax_mode        TEXT NOT NULL DEFAULT 'standard',
+                    subtotal        REAL NOT NULL DEFAULT 0,
+                    tax_amount      REAL NOT NULL DEFAULT 0,
+                    total           REAL NOT NULL DEFAULT 0,
+                    bank_info       TEXT NOT NULL DEFAULT '{}',
+                    notes           TEXT,
+                    pdf_path        TEXT,
+                    is_suggestion   INTEGER NOT NULL DEFAULT 0,
+                    suggested_by    TEXT,
+                    approved_by     TEXT,
+                    pending_sync    INTEGER NOT NULL DEFAULT 0,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_invoices_workspace
+                    ON invoices(workspace_id, status);
+                CREATE INDEX IF NOT EXISTS idx_invoices_account
+                    ON invoices(account_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS invoice_items (
+                    id          TEXT PRIMARY KEY,
+                    invoice_id  TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+                    title       TEXT NOT NULL,
+                    description TEXT,
+                    quantity    REAL NOT NULL DEFAULT 1,
+                    unit_price  REAL NOT NULL DEFAULT 0,
+                    tax_rate    REAL NOT NULL DEFAULT 19,
+                    total       REAL NOT NULL DEFAULT 0,
+                    sort_order  INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS offers (
+                    id                   TEXT PRIMARY KEY,
+                    workspace_id         TEXT NOT NULL DEFAULT '',
+                    created_by           TEXT NOT NULL DEFAULT '',
+                    account_id           TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    number               TEXT,
+                    title                TEXT NOT NULL,
+                    status               TEXT NOT NULL DEFAULT 'draft',
+                    valid_until          TEXT NOT NULL,
+                    tax_mode             TEXT NOT NULL DEFAULT 'standard',
+                    subtotal             REAL NOT NULL DEFAULT 0,
+                    tax_amount           REAL NOT NULL DEFAULT 0,
+                    total                REAL NOT NULL DEFAULT 0,
+                    notes                TEXT,
+                    pdf_path             TEXT,
+                    converted_invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,
+                    pending_sync         INTEGER NOT NULL DEFAULT 0,
+                    created_at           TEXT NOT NULL,
+                    updated_at           TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_offers_workspace
+                    ON offers(workspace_id, status);
+                CREATE INDEX IF NOT EXISTS idx_offers_account
+                    ON offers(account_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS offer_items (
+                    id          TEXT PRIMARY KEY,
+                    offer_id    TEXT NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+                    title       TEXT NOT NULL,
+                    description TEXT,
+                    quantity    REAL NOT NULL DEFAULT 1,
+                    unit_price  REAL NOT NULL DEFAULT 0,
+                    tax_rate    REAL NOT NULL DEFAULT 19,
+                    total       REAL NOT NULL DEFAULT 0,
+                    sort_order  INTEGER NOT NULL DEFAULT 0
+                );
+            "#)?;
+            Ok(())
+        }
+        13 => {
+            conn.execute_batch(
+                "ALTER TABLE invoice_items ADD COLUMN item_date TEXT;
+                 ALTER TABLE invoice_items ADD COLUMN unit TEXT;
+                 ALTER TABLE offer_items ADD COLUMN item_date TEXT;
+                 ALTER TABLE offer_items ADD COLUMN unit TEXT;"
+            )?;
             Ok(())
         }
         _ => Ok(()),
@@ -786,5 +889,75 @@ mod tests {
             .query_row("SELECT account_type FROM accounts WHERE id='a1'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(account_type, "client");
+    }
+
+    #[test]
+    fn migration_v12_creates_finance_tables() {
+        let conn = setup();
+        assert_eq!(get_version(&conn).unwrap(), CURRENT_VERSION);
+        for table in ["invoice_sequences", "offer_sequences", "invoices", "invoice_items", "offers", "offer_items"] {
+            assert!(table_exists_helper(&conn, table), "{table} fehlt nach v12");
+        }
+    }
+
+    #[test]
+    fn migration_v13_adds_item_date_and_unit() {
+        let conn = Connection::open_in_memory().unwrap();
+        schema::create_tables(&conn).unwrap();
+        run(&conn).unwrap();
+        // Disable FK for synthetic test rows (we only verify columns exist)
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").unwrap();
+        // item_date und unit in invoice_items
+        conn.execute(
+            "INSERT INTO invoice_items (id, invoice_id, title, quantity, unit_price, tax_rate, total, sort_order, item_date, unit)
+             VALUES ('i1','dummy','Test',1,10,0,10,0,'2026-05-22','Stk.')",
+            [],
+        ).unwrap();
+        let (d, u): (Option<String>, Option<String>) = conn.query_row(
+            "SELECT item_date, unit FROM invoice_items WHERE id='i1'",
+            [], |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(d.as_deref(), Some("2026-05-22"));
+        assert_eq!(u.as_deref(), Some("Stk."));
+        // offer_items ebenfalls
+        conn.execute(
+            "INSERT INTO offer_items (id, offer_id, title, quantity, unit_price, tax_rate, total, sort_order, item_date, unit)
+             VALUES ('o1','dummy','Test',1,10,0,10,0,'2026-05-22','Std.')",
+            [],
+        ).unwrap();
+        let (d2, u2): (Option<String>, Option<String>) = conn.query_row(
+            "SELECT item_date, unit FROM offer_items WHERE id='o1'",
+            [], |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(d2.as_deref(), Some("2026-05-22"));
+        assert_eq!(u2.as_deref(), Some("Std."));
+    }
+
+    #[test]
+    fn migration_v12_invoice_fk_cascade() {
+        let conn = setup();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('acc-fin','ws-fin','u1','Finanz GmbH',?1,?1)",
+            [&now],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, created_at, updated_at)
+             VALUES ('inv-1','ws-fin','u1','acc-fin',?1,?1,?1,?1)",
+            [&now],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO invoice_items (id, invoice_id, title)
+             VALUES ('item-1','inv-1','Beratung')",
+            [],
+        ).unwrap();
+        conn.execute("DELETE FROM invoices WHERE id = 'inv-1'", []).unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM invoice_items WHERE invoice_id = 'inv-1'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 0, "invoice_items sollten per CASCADE gelöscht werden");
     }
 }
