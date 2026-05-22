@@ -17,6 +17,8 @@ import type { LucideIcon } from 'lucide-react'
 
 type SectionKey = 'workspace' | 'sales' | 'inbox'
 
+const SALES_VIEWS = new Set<string>(['leads', 'pipeline', 'smartlists', 'followups'])
+
 function readExpanded(): Record<SectionKey, boolean> {
   try {
     const saved = localStorage.getItem('nav-sections-v1')
@@ -91,10 +93,8 @@ export function NavSidebar() {
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
 
-  const SALES_VIEWS = new Set(['leads', 'pipeline', 'smartlists', 'followups'] as const)
-
   useEffect(() => {
-    if (modules.sales === false && SALES_VIEWS.has(appView as 'leads' | 'pipeline' | 'smartlists' | 'followups')) {
+    if (modules.sales === false && SALES_VIEWS.has(appView)) {
       setAppView('dashboard')
     }
   }, [modules.sales, appView, setAppView])
