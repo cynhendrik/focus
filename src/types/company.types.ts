@@ -1,3 +1,5 @@
+export type UserRole = 'admin' | 'employee'
+
 export interface CompanyProfile {
   name?: string
   address?: string
@@ -5,6 +7,19 @@ export interface CompanyProfile {
   email?: string
   website?: string
   taxId?: string
+  iban?: string
+  bic?: string
+  bankName?: string
+  handelsregister?: string
+  registergericht?: string
+  geschaeftsfuehrer?: string
+  invoiceIntro?: string
+  userRole?: UserRole
+  kleinunternehmer?: boolean
+  steuernummer?: string
+  zahlungszielTage?: number
+  leistungszeitpunkt?: 'rechnungsdatum' | 'monatsende'
+  logoBase64?: string
 }
 
 export interface CompanyModules {
