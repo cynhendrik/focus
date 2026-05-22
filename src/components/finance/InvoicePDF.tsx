@@ -22,7 +22,7 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
 
 function InitialsBadge({ name }: { name?: string }) {
-  const initials = (name ?? 'U')
+  const initials = (name || 'U')
     .split(/\s+/)
     .slice(0, 2)
     .map(w => w[0]?.toUpperCase() ?? '')
@@ -33,8 +33,6 @@ function InitialsBadge({ name }: { name?: string }) {
     </View>
   )
 }
-
-const ACCENT = 'oklch(92% 0.2 125)'
 
 const s = StyleSheet.create({
   page:        { padding: '14mm 16mm', fontSize: 9.5, fontFamily: 'Helvetica', color: '#111' },
@@ -175,7 +173,7 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
 
         {/* Table header */}
         <View style={s.tableHeader}>
-          <Text style={s.colDesc}>Bezeichnung</Text>
+          <Text style={s.colDesc}>Beschreibung</Text>
           <Text style={s.colDate}>Datum</Text>
           <Text style={s.colQty}>Menge</Text>
           <Text style={s.colUnit}>Einheit</Text>
