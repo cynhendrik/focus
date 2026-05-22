@@ -3,6 +3,7 @@ import { useCompanyStore } from '@/store/company.store'
 import type { CompanyProfile, CompanyModules } from '@/types/company.types'
 
 const MODULE_LABELS: Record<keyof CompanyModules, string> = {
+  sales: 'Sales',
   crm: 'CRM',
   mail: 'Mail-Client',
   instagram: 'Instagram',
@@ -79,9 +80,10 @@ export function CompanyRoute() {
 }
 
 function fieldLabel(field: keyof CompanyProfile): string {
-  const labels: Record<keyof CompanyProfile, string> = {
+  const labels: Partial<Record<keyof CompanyProfile, string>> = {
     name: 'Firmenname', address: 'Adresse', phone: 'Telefon',
     email: 'E-Mail', website: 'Website', taxId: 'USt-IdNr.',
+    iban: 'IBAN', bic: 'BIC', bankName: 'Bank',
   }
-  return labels[field]
+  return labels[field] ?? String(field)
 }

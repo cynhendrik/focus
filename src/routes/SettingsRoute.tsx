@@ -9,6 +9,7 @@ const SUPABASE_URL    = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const WEBHOOK_SECRET  = import.meta.env.VITE_LEAD_WEBHOOK_SECRET as string | undefined
 
 const MODULE_LABELS: Record<keyof CompanyModules, string> = {
+  sales: 'Sales',
   crm: 'CRM', mail: 'Mail-Client', instagram: 'Instagram',
   focusAi: 'FOCUS AI', zeiterfassung: 'Zeiterfassung',
 }
