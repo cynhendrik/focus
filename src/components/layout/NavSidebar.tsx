@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUiStore, type AppView } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useCustomersStore } from '@/store/customers.store'
@@ -6,6 +6,7 @@ import { useTodosStore } from '@/store/todos.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useCompanyStore } from '@/store/company.store'
 import {
   Monitor, Home, CheckSquare, Users, CreditCard,
   TrendingUp, ListFilter, Bell, Target,
@@ -85,8 +86,18 @@ export function NavSidebar() {
   )
   const followupCount = useActivitiesStore(s => s.followups.length)
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
+  const isAdmin = useCompanyStore(s => s.isAdmin)
+  const modules = useCompanyStore(s => s.modules)
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
+
+  const SALES_VIEWS = new Set(['leads', 'pipeline', 'smartlists', 'followups'] as const)
+
+  useEffect(() => {
+    if (modules.sales === false && SALES_VIEWS.has(appView as 'leads' | 'pipeline' | 'smartlists' | 'followups')) {
+      setAppView('dashboard')
+    }
+  }, [modules.sales, appView, setAppView])
 
   const toggle = (key: SectionKey) => {
     setExpanded(prev => {
@@ -123,17 +134,21 @@ export function NavSidebar() {
           <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
           <SidebarNavItem icon={CheckSquare} label="Tasks"       active={appView === 'tasks'}       onClick={() => setAppView('tasks')}       kbd="T" badge={openTaskCount || undefined} />
           <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
-          <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />
+          {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
         </>
       )}
 
-      <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
-      {expanded.sales && (
+      {modules.sales !== false && (
         <>
-          <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
-          <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
-          <SidebarNavItem icon={ListFilter}  label="Smart Lists" active={appView === 'smartlists'}  onClick={() => setAppView('smartlists')}  kbd="L" />
-          <SidebarNavItem icon={Bell}        label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" badge={followupCount || undefined} />
+          <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
+          {expanded.sales && (
+            <>
+              <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
+              <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
+              <SidebarNavItem icon={ListFilter}  label="Smart Lists" active={appView === 'smartlists'}  onClick={() => setAppView('smartlists')}  kbd="L" />
+              <SidebarNavItem icon={Bell}        label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" badge={followupCount || undefined} />
+            </>
+          )}
         </>
       )}
 
