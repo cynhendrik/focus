@@ -640,7 +640,7 @@ mod tests {
         }
         let invoices = get_by_workspace(&conn, "ws-1", Some("open")).unwrap();
         let numbers: Vec<_> = invoices.iter().filter_map(|i| i.number.as_deref()).collect();
-        assert!(numbers.iter().any(|n| n.ends_with("-003")));
+        assert!(numbers.iter().any(|n| n.ends_with("-00003")));
     }
 
     #[test]
