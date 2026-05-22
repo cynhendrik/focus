@@ -59,13 +59,17 @@ const s = StyleSheet.create({
   grandLabel:  { width: 100, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
   grandValue:  { width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
   hint:        { marginTop: 20, fontSize: 9, color: '#666', borderTopWidth: 0.5, borderColor: '#ddd', paddingTop: 10 },
-  footer:      { position: 'absolute', bottom: 32, left: 48, right: 48, fontSize: 8, color: '#aaa', textAlign: 'center' },
+  footer:      { position: 'absolute', bottom: 32, left: 48, right: 48, fontSize: 8, color: '#aaa' },
 })
 
 function OfferPDFDoc({ data, profile, account }: Props) {
   const { offer, items } = data
   const noTax = offer.taxMode === 'reverse_charge' || offer.taxMode === 'kleinunternehmer'
-  const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}` }
+  const fmtDate = (iso: string) => {
+    if (!iso) return ''
+    const [y, m, d] = iso.split('-')
+    return `${d}.${m}.${y}`
+  }
 
   const address = [account.street, `${account.zip ?? ''} ${account.city ?? ''}`.trim(), account.country]
     .filter(Boolean).join(', ')
@@ -102,7 +106,7 @@ function OfferPDFDoc({ data, profile, account }: Props) {
           {[
             { label: 'Angebotsnr.',  value: offer.number ?? '—' },
             { label: 'Titel',        value: offer.title },
-            { label: 'Gültig bis',   value: offer.validUntil },
+            { label: 'Gültig bis',   value: fmtDate(offer.validUntil) },
           ].map(m => (
             <View key={m.label} style={s.metaItem}>
               <Text style={s.label}>{m.label}</Text>
@@ -122,7 +126,12 @@ function OfferPDFDoc({ data, profile, account }: Props) {
         </View>
         {items.map((item, i) => (
           <View key={i} style={s.row}>
-            <Text style={s.colTitle}>{item.title}</Text>
+            <View style={s.colTitle}>
+              <Text>{item.title}</Text>
+              {item.description && (
+                <Text style={{ fontSize: 8, color: '#888', marginTop: 1 }}>{item.description}</Text>
+              )}
+            </View>
             <Text style={s.colDate}>{fmtDate(item.itemDate ?? offer.createdAt)}</Text>
             <Text style={s.colQty}>{item.quantity}</Text>
             <Text style={s.colUnit}>{item.unit ?? ''}</Text>
@@ -154,9 +163,13 @@ function OfferPDFDoc({ data, profile, account }: Props) {
         )}
         {offer.notes && <Text style={[s.hint, { marginTop: 12 }]}>{offer.notes}</Text>}
 
-        <Text style={s.footer}>
-          {profile.name} · {profile.address} · {profile.website}
-        </Text>
+        {/* Footer */}
+        <View style={s.footer} fixed>
+          <Text style={{ textAlign: 'center' }}>
+            {[profile.name, profile.address, profile.email, profile.phone, profile.website]
+              .filter(Boolean).join('  ·  ')}
+          </Text>
+        </View>
       </Page>
     </Document>
   )
