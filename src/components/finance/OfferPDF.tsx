@@ -24,15 +24,16 @@ function InitialsBadge({ name }: { name?: string }) {
     .map(w => w[0]?.toUpperCase() ?? '')
     .join('')
   return (
-    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Helvetica-Bold' }}>{initials}</Text>
+    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Helvetica-Bold' }}>{initials}</Text>
     </View>
   )
 }
 
 const s = StyleSheet.create({
   page:        { padding: 48, fontSize: 10, fontFamily: 'Helvetica', color: '#111' },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 36 },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  rule:        { height: 1.5, backgroundColor: '#e0e0e0', marginBottom: 14 },
   company:     { fontSize: 12, fontFamily: 'Helvetica-Bold' },
   companyMeta: { fontSize: 9, color: '#666', marginTop: 2 },
   docTitle:    { fontSize: 20, fontFamily: 'Helvetica-Bold', marginBottom: 4 },
@@ -81,13 +82,15 @@ function OfferPDFDoc({ data, profile, account }: Props) {
           </View>
           <View style={{ alignItems: 'flex-end', gap: 6 }}>
             {profile.logoBase64
-              ? <Image src={profile.logoBase64} style={{ width: 44, height: 44, objectFit: 'contain' as const }} />
+              ? <Image src={profile.logoBase64} style={{ width: 48, height: 48, objectFit: 'contain' as const }} />
               : <InitialsBadge name={profile.name} />
             }
             <Text style={s.docTitle}>ANGEBOT</Text>
             <Text style={s.docNumber}>{offer.number ?? '—'}</Text>
           </View>
         </View>
+
+        <View style={s.rule} />
 
         <View style={s.recipientBox}>
           <Text style={s.label}>Empfänger</Text>
@@ -120,7 +123,7 @@ function OfferPDFDoc({ data, profile, account }: Props) {
         {items.map((item, i) => (
           <View key={i} style={s.row}>
             <Text style={s.colTitle}>{item.title}</Text>
-            <Text style={s.colDate}>{fmtDate(item.itemDate ?? offer.validUntil)}</Text>
+            <Text style={s.colDate}>{fmtDate(item.itemDate ?? offer.createdAt)}</Text>
             <Text style={s.colQty}>{item.quantity}</Text>
             <Text style={s.colUnit}>{item.unit ?? ''}</Text>
             <Text style={s.colPrice}>{item.unitPrice.toFixed(2)}</Text>
