@@ -371,12 +371,14 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             Ok(())
         }
         13 => {
-            conn.execute_batch(
-                "ALTER TABLE invoice_items ADD COLUMN item_date TEXT;
-                 ALTER TABLE invoice_items ADD COLUMN unit TEXT;
-                 ALTER TABLE offer_items ADD COLUMN item_date TEXT;
-                 ALTER TABLE offer_items ADD COLUMN unit TEXT;"
-            )?;
+            if !column_exists(conn, "invoice_items", "item_date") {
+                conn.execute_batch(
+                    "ALTER TABLE invoice_items ADD COLUMN item_date TEXT;
+                     ALTER TABLE invoice_items ADD COLUMN unit TEXT;
+                     ALTER TABLE offer_items ADD COLUMN item_date TEXT;
+                     ALTER TABLE offer_items ADD COLUMN unit TEXT;"
+                )?;
+            }
             Ok(())
         }
         _ => Ok(()),
