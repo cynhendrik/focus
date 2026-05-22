@@ -96,13 +96,6 @@ export function PositionsEditor({ items, onChange, taxMode, invoiceDate }: Props
                 placeholder="Einheit"
                 style={{ ...inputStyle, width: 80, fontSize: 11, padding: '3px 6px' }}
               />
-              <datalist id="cynera-units">
-                <option value="Stk." />
-                <option value="Std." />
-                <option value="Tag" />
-                <option value="Monat" />
-                <option value="Pauschal" />
-              </datalist>
             </div>
           </div>
           {/* Spalten 2–6: unverändert */}
@@ -139,6 +132,14 @@ export function PositionsEditor({ items, onChange, taxMode, invoiceDate }: Props
           </button>
         </div>
       ))}
+
+      <datalist id="cynera-units">
+        <option value="Stk." />
+        <option value="Std." />
+        <option value="Tag" />
+        <option value="Monat" />
+        <option value="Pauschal" />
+      </datalist>
 
       <button onClick={addRow} style={addBtnStyle}>
         <Plus size={13} /> Position hinzufügen
