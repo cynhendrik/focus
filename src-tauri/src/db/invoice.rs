@@ -216,6 +216,14 @@ pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<Invoic
             is_suggestion as i32, payload.suggested_by, now,
         ],
     )?;
+    // Assign invoice number immediately when creating a published (non-draft) invoice
+    if !is_suggestion && status == "open" {
+        let number = next_invoice_number(conn, &payload.workspace_id)?;
+        conn.execute(
+            "UPDATE invoices SET number=?1 WHERE id=?2",
+            rusqlite::params![number, id],
+        )?;
+    }
     replace_items(conn, &id, &payload.items)?;
     let invoice = conn.query_row(
         &format!("SELECT {INVOICE_COLS} FROM invoices WHERE id = ?1"),
@@ -228,15 +236,40 @@ pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<Invoic
 pub fn update(conn: &Connection, id: &str, payload: UpsertInvoicePayload) -> Result<InvoiceWithItems, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
     let bank_info = payload.bank_info.unwrap_or_else(|| "{}".into());
+
+    // Resolve the new status; fall back to the current DB value if not provided
+    let new_status = match payload.status.as_deref() {
+        Some(s) => s.to_string(),
+        None => conn.query_row(
+            "SELECT status FROM invoices WHERE id = ?1", [id],
+            |r| r.get::<_, String>(0),
+        ).map_err(|_| AppError::NotFound(format!("Invoice {id} not found")))?,
+    };
+
+    // Assign a number the first time an invoice is published
+    if new_status == "open" {
+        let current_number: Option<String> = conn.query_row(
+            "SELECT number FROM invoices WHERE id = ?1", [id],
+            |r| r.get(0),
+        ).map_err(|_| AppError::NotFound(format!("Invoice {id} not found")))?;
+        if current_number.is_none() {
+            let number = next_invoice_number(conn, &payload.workspace_id)?;
+            conn.execute(
+                "UPDATE invoices SET number=?1 WHERE id=?2",
+                rusqlite::params![number, id],
+            )?;
+        }
+    }
+
     let n = conn.execute(
         "UPDATE invoices SET account_id=?1, deal_id=?2, date=?3, due_date=?4,
          tax_mode=?5, subtotal=?6, tax_amount=?7, total=?8, bank_info=?9,
-         notes=?10, pending_sync=1, updated_at=?11 WHERE id=?12",
+         notes=?10, status=?11, pending_sync=1, updated_at=?12 WHERE id=?13",
         rusqlite::params![
             payload.account_id, payload.deal_id, payload.date, payload.due_date,
             payload.tax_mode.unwrap_or_else(|| "standard".into()),
             payload.subtotal, payload.tax_amount, payload.total, bank_info,
-            payload.notes, now, id,
+            payload.notes, new_status, now, id,
         ],
     )?;
     if n == 0 { return Err(AppError::NotFound(format!("Invoice {id} not found"))); }
@@ -547,6 +580,56 @@ mod tests {
         let conn = setup();
         let result = update(&conn, "ghost", sample_payload(vec![]));
         assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn create_open_invoice_assigns_number() {
+        let conn = setup();
+        let mut p = sample_payload(vec![]);
+        p.status = Some("open".into());
+        let result = create(&conn, p).unwrap();
+        assert!(result.invoice.number.is_some(), "open invoice must have a number");
+        let n = result.invoice.number.unwrap();
+        assert!(n.contains('-'), "number should be YYYY-NNNNN format");
+        assert!(n.ends_with("-00001"), "first invoice should end with -00001, got {n}");
+    }
+
+    #[test]
+    fn create_draft_invoice_has_no_number() {
+        let conn = setup();
+        // default status is draft
+        let result = create(&conn, sample_payload(vec![])).unwrap();
+        assert!(result.invoice.number.is_none(), "draft invoice must not have a number yet");
+    }
+
+    #[test]
+    fn update_draft_to_open_assigns_number() {
+        let conn = setup();
+        // Create as draft (no number)
+        let created = create(&conn, sample_payload(vec![])).unwrap();
+        assert!(created.invoice.number.is_none());
+        // Publish by updating status to open
+        let mut p = sample_payload(vec![]);
+        p.status = Some("open".into());
+        let result = update(&conn, &created.invoice.id, p).unwrap();
+        assert!(result.invoice.number.is_some(), "publishing a draft must assign a number");
+        assert_eq!(result.invoice.status, "open");
+    }
+
+    #[test]
+    fn update_open_invoice_does_not_change_number() {
+        let conn = setup();
+        let mut p = sample_payload(vec![]);
+        p.status = Some("open".into());
+        let created = create(&conn, p).unwrap();
+        let original_number = created.invoice.number.clone().unwrap();
+        // Edit the open invoice — number must stay the same
+        let mut p2 = sample_payload(vec![]);
+        p2.status = Some("open".into());
+        p2.total = 999.0;
+        let result = update(&conn, &created.invoice.id, p2).unwrap();
+        assert_eq!(result.invoice.number.as_deref(), Some(original_number.as_str()),
+            "editing an open invoice must not re-assign the number");
     }
 
     #[test]
