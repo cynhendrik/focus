@@ -28,7 +28,7 @@ export function MailRoute() {
 
   useEffect(() => {
     loadAccounts()
-    const unlisten = listen<SyncProgress>('sync-progress', e => setSyncProgress(e.payload))
+    const unlisten = listen<SyncProgress>('email-sync-progress', e => setSyncProgress(e.payload))
     return () => { unlisten.then(fn => fn()) }
   }, [])
 
