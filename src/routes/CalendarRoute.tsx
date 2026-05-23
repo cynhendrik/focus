@@ -1,101 +1,793 @@
-const DAYS  = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-const DATES = ['18', '19', '20', '21', '22', '23', '24']
-const HOURS = Array.from({ length: 11 }, (_, i) => 8 + i)
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useAccountsStore } from '@/store/accounts.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
+import type { CalendarEvent, UpsertCalendarEventPayload, EventColor } from '@/types/calendar.types'
 
-const EVENTS = [
-  { day: 0, start: 9,  end: 10, title: 'Q2 Strategy Call',         client: 'GreenLeaf',  tone: 'accent' },
-  { day: 0, start: 10, end: 11, title: 'Brand Guidelines Review',   client: 'TechCorp',   tone: 'accent' },
-  { day: 1, start: 14, end: 15, title: 'Website Deployment',        client: 'PixelStudio', tone: 'warn'  },
-  { day: 2, start: 11, end: 12, title: 'Kick-off Meeting',          client: 'StartupXY',  tone: ''       },
-  { day: 3, start: 15, end: 16, title: 'Rechnung Q1 besprechen',    client: 'BigCo',      tone: ''       },
-  { day: 4, start: 9,  end: 10, title: 'Weekly Sync',               client: 'Intern',     tone: ''       },
-]
+// ── Konstanten ────────────────────────────────────────────────────────────────
 
-function eventBg(tone: string) {
-  if (tone === 'accent') return 'var(--accent)'
-  if (tone === 'warn')   return 'oklch(82% 0.16 70 / 0.18)'
+const HOUR_H   = 56          // px pro Stunde
+const DAY_START = 8          // 08:00
+const DAY_END   = 19         // 19:00
+const HOURS     = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i)
+const DE_DAYS   = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+const DE_MONTHS = ['Januar','Februar','März','April','Mai','Juni',
+                   'Juli','August','September','Oktober','November','Dezember']
+const DE_MONTHS_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+
+// ── Farb-Helpers ──────────────────────────────────────────────────────────────
+
+function evtBg(color?: string)     {
+  if (color === 'accent') return 'var(--accent)'
+  if (color === 'warn')   return 'oklch(82% 0.16 70 / 0.18)'
+  if (color === 'ok')     return 'oklch(78% 0.18 145 / 0.18)'
+  if (color === 'danger') return 'oklch(65% 0.22 25 / 0.18)'
   return 'var(--surface-2)'
 }
-function eventFg(tone: string) {
-  if (tone === 'accent') return 'var(--accent-ink)'
-  if (tone === 'warn')   return 'var(--warn)'
+function evtFg(color?: string)     {
+  if (color === 'accent') return 'var(--accent-ink)'
+  if (color === 'warn')   return 'var(--warn)'
+  if (color === 'ok')     return 'var(--ok)'
+  if (color === 'danger') return 'var(--danger)'
   return 'var(--fg)'
 }
-function eventBorder(tone: string) {
-  if (tone === 'accent') return 'transparent'
-  if (tone === 'warn')   return 'oklch(82% 0.16 70 / 0.4)'
+function evtBorder(color?: string) {
+  if (color === 'accent') return 'transparent'
+  if (color === 'warn')   return 'oklch(82% 0.16 70 / 0.4)'
+  if (color === 'ok')     return 'oklch(78% 0.18 145 / 0.4)'
+  if (color === 'danger') return 'oklch(65% 0.22 25 / 0.4)'
   return 'var(--border-strong)'
 }
 
-export function CalendarRoute() {
+// ── Datum-Helpers ─────────────────────────────────────────────────────────────
+
+function isoDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+function isToday(d: Date) {
+  const n = new Date(); return isoDate(d) === isoDate(n)
+}
+function mondayOf(d: Date) {
+  const c = new Date(d); const dow = (c.getDay() + 6) % 7; c.setDate(c.getDate() - dow); c.setHours(0,0,0,0); return c
+}
+function weekDays(anchor: Date): Date[] {
+  const mon = mondayOf(anchor)
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d })
+}
+function kwOf(d: Date) {
+  const tmp = new Date(d); tmp.setHours(0,0,0,0); tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay()+6)%7))
+  const jan4 = new Date(tmp.getFullYear(), 0, 4)
+  return 1 + Math.round(((tmp.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay()+6)%7)) / 7)
+}
+
+// ── EventChip ─────────────────────────────────────────────────────────────────
+
+function EventChip({ event, onClick, compact }: { event: CalendarEvent; onClick: () => void; compact?: boolean }) {
   return (
-    <div className="main-inner">
-      <div className="greeting" style={{ marginBottom: 18 }}>
-        <h1 className="greeting-title">Calendar<em>.</em></h1>
+    <div
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        background: evtBg(event.color), color: evtFg(event.color),
+        border: `1px solid ${evtBorder(event.color)}`,
+        borderRadius: 6, padding: compact ? '2px 6px' : '5px 9px',
+        fontSize: compact ? 11 : 11.5, lineHeight: 1.3,
+        cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+        transition: 'transform 140ms ease',
+        fontWeight: 500,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+      onMouseLeave={e => (e.currentTarget.style.transform = '')}
+      title={event.title}
+    >
+      {event.title}
+    </div>
+  )
+}
+
+// ── WeekView ──────────────────────────────────────────────────────────────────
+
+function WeekView({
+  events, days, onSlotClick, onEventClick,
+}: {
+  events: CalendarEvent[]
+  days: Date[]
+  onSlotClick: (date: Date, hour: number) => void
+  onEventClick: (event: CalendarEvent) => void
+}) {
+  const nowRef = useRef<HTMLDivElement>(null)
+  const [nowPct, setNowPct] = useState(0)
+
+  useEffect(() => {
+    function update() {
+      const now = new Date()
+      const mins = (now.getHours() - DAY_START) * 60 + now.getMinutes()
+      setNowPct(mins / ((DAY_END - DAY_START) * 60))
+    }
+    update()
+    const t = setInterval(update, 60_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const eventsForDay = (day: Date) =>
+    events.filter(e => {
+      if (e.allDay) return false
+      const start = new Date(e.startAt)
+      return isoDate(start) === isoDate(day)
+    })
+
+  function eventTop(e: CalendarEvent) {
+    const s = new Date(e.startAt)
+    return ((s.getHours() - DAY_START) + s.getMinutes() / 60) * HOUR_H
+  }
+  function eventHeight(e: CalendarEvent) {
+    const s = new Date(e.startAt), end = new Date(e.endAt)
+    const dur = (end.getTime() - s.getTime()) / 3_600_000
+    return Math.max(dur * HOUR_H - 4, 20)
+  }
+
+  const totalH = HOURS.length * HOUR_H
+  const nowTop = nowPct * totalH
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)' }}>
+      {/* Time column */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {HOURS.map(h => (
+          <div key={h} style={{ height: HOUR_H, paddingRight: 10, paddingTop: 4, textAlign: 'right', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+              {String(h).padStart(2,'0')}:00
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Day columns */}
+      {days.map((day, col) => {
+        const dayEvents = eventsForDay(day)
+        const today = isToday(day)
+
+        return (
+          <div
+            key={col}
+            style={{
+              borderLeft: '1px solid var(--border)',
+              position: 'relative',
+              minHeight: totalH,
+              background: today ? 'oklch(100% 0 0 / 0.012)' : 'transparent',
+            }}
+          >
+            {/* Hour slots (clickable) */}
+            {HOURS.map((h, hi) => (
+              <div
+                key={hi}
+                onClick={() => onSlotClick(day, h)}
+                style={{
+                  height: HOUR_H,
+                  borderBottom: hi < HOURS.length - 1 ? '1px solid oklch(100% 0 0 / 0.03)' : 'none',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
+              />
+            ))}
+
+            {/* Now-line */}
+            {today && nowPct > 0 && nowPct < 1 && (
+              <div ref={nowRef} style={{
+                position: 'absolute', left: 0, right: 0,
+                top: nowTop, height: 2,
+                background: 'var(--danger)', opacity: 0.8,
+                pointerEvents: 'none',
+                zIndex: 10,
+              }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', marginTop: -2.5, marginLeft: -3.5 }} />
+              </div>
+            )}
+
+            {/* Events */}
+            {dayEvents.map((ev, ei) => (
+              <div
+                key={ei}
+                style={{
+                  position: 'absolute', left: 4, right: 4,
+                  top: eventTop(ev) + 2, height: eventHeight(ev),
+                  background: evtBg(ev.color), color: evtFg(ev.color),
+                  border: `1px solid ${evtBorder(ev.color)}`,
+                  borderRadius: 8, padding: '5px 9px',
+                  fontSize: 11.5, lineHeight: 1.3,
+                  overflow: 'hidden', cursor: 'pointer',
+                  transition: 'transform 140ms ease',
+                  zIndex: 5,
+                }}
+                onClick={e => { e.stopPropagation(); onEventClick(ev) }}
+                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                onMouseLeave={e => (e.currentTarget.style.transform = '')}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {ev.title}
+                </div>
+                <div style={{ opacity: 0.7, fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>
+                  {new Date(ev.startAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── MonthView ─────────────────────────────────────────────────────────────────
+
+function MonthView({
+  events, anchor, onDayClick, onEventClick,
+}: {
+  events: CalendarEvent[]
+  anchor: Date
+  onDayClick: (date: Date) => void
+  onEventClick: (event: CalendarEvent) => void
+}) {
+  const firstOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
+  const gridStart    = mondayOf(firstOfMonth)
+
+  const cells: Date[] = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d
+  })
+
+  function eventsForDay(day: Date) {
+    return events.filter(e => isoDate(new Date(e.startAt)) === isoDate(day))
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+      {DE_DAYS.map(d => (
+        <div key={d} style={{
+          padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid var(--border)',
+          borderLeft: '1px solid var(--border)', fontSize: 11, fontFamily: 'var(--font-mono)',
+          color: 'var(--fg-dim)', letterSpacing: '0.08em',
+        }}>
+          {d.toUpperCase()}
+        </div>
+      ))}
+
+      {cells.map((day, i) => {
+        const inMonth  = day.getMonth() === anchor.getMonth()
+        const today    = isToday(day)
+        const dayEvts  = eventsForDay(day)
+        const overflow = dayEvts.length - 3
+
+        return (
+          <div
+            key={i}
+            onClick={() => onDayClick(day)}
+            style={{
+              minHeight: 110,
+              borderLeft: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
+              padding: '8px 6px',
+              opacity: inMonth ? 1 : 0.35,
+              cursor: 'pointer',
+              position: 'relative',
+              background: today ? 'oklch(100% 0 0 / 0.02)' : 'transparent',
+              transition: 'background 80ms',
+            }}
+            onMouseEnter={e => { if (!today) (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.02)') }}
+            onMouseLeave={e => { if (!today) (e.currentTarget.style.background = '') }}
+          >
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: today ? 700 : 400,
+              background: today ? 'var(--accent)' : 'transparent',
+              color: today ? 'var(--accent-ink)' : 'var(--fg)',
+              marginBottom: 4, flexShrink: 0,
+            }}>
+              {day.getDate()}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {dayEvts.slice(0, 3).map((ev, ei) => (
+                <EventChip key={ei} event={ev} onClick={() => onEventClick(ev)} compact />
+              ))}
+              {overflow > 0 && (
+                <div style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', paddingLeft: 2 }}>
+                  +{overflow} mehr
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── DayView ───────────────────────────────────────────────────────────────────
+
+function DayView({
+  events, day, onSlotClick, onEventClick,
+}: {
+  events: CalendarEvent[]
+  day: Date
+  onSlotClick: (date: Date, hour: number) => void
+  onEventClick: (event: CalendarEvent) => void
+}) {
+  const dayEvents = events.filter(e => !e.allDay && isoDate(new Date(e.startAt)) === isoDate(day))
+
+  function eventTop(e: CalendarEvent) {
+    const s = new Date(e.startAt)
+    return ((s.getHours() - DAY_START) + s.getMinutes() / 60) * HOUR_H
+  }
+  function eventHeight(e: CalendarEvent) {
+    const s = new Date(e.startAt), end = new Date(e.endAt)
+    return Math.max((end.getTime() - s.getTime()) / 3_600_000 * HOUR_H - 4, 20)
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr' }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {HOURS.map(h => (
+          <div key={h} style={{ height: HOUR_H, paddingRight: 10, paddingTop: 4, textAlign: 'right', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+              {String(h).padStart(2,'0')}:00
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ borderLeft: '1px solid var(--border)', position: 'relative', minHeight: HOURS.length * HOUR_H }}>
+        {HOURS.map((h, hi) => (
+          <div
+            key={hi}
+            onClick={() => onSlotClick(day, h)}
+            style={{
+              height: HOUR_H,
+              borderBottom: hi < HOURS.length - 1 ? '1px solid oklch(100% 0 0 / 0.03)' : 'none',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)')}
+            onMouseLeave={e => (e.currentTarget.style.background = '')}
+          />
+        ))}
+        {dayEvents.map((ev, ei) => (
+          <div
+            key={ei}
+            style={{
+              position: 'absolute', left: 8, right: 8,
+              top: eventTop(ev) + 2, height: eventHeight(ev),
+              background: evtBg(ev.color), color: evtFg(ev.color),
+              border: `1px solid ${evtBorder(ev.color)}`,
+              borderRadius: 8, padding: '6px 12px',
+              fontSize: 12, cursor: 'pointer',
+              transition: 'transform 140ms ease', zIndex: 5,
+            }}
+            onClick={e => { e.stopPropagation(); onEventClick(ev) }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = '')}
+          >
+            <div style={{ fontWeight: 600 }}>{ev.title}</div>
+            <div style={{ fontSize: 11, opacity: 0.7, fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+              {new Date(ev.startAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} –{' '}
+              {new Date(ev.endAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            {ev.location && <div style={{ fontSize: 10.5, opacity: 0.6, marginTop: 2 }}>📍 {ev.location}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── EventForm ─────────────────────────────────────────────────────────────────
+
+const COLOR_OPTIONS: { value: EventColor | ''; label: string; bg: string }[] = [
+  { value: '',       label: 'Standard', bg: 'var(--surface-2)' },
+  { value: 'accent', label: 'Grün',     bg: 'var(--accent)' },
+  { value: 'ok',     label: 'Blau',     bg: 'var(--ok)' },
+  { value: 'warn',   label: 'Gelb',     bg: 'var(--warn)' },
+  { value: 'danger', label: 'Rot',      bg: 'var(--danger)' },
+]
+
+interface EventFormProps {
+  initial?: CalendarEvent
+  defaultDate?: Date
+  defaultHour?: number
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: EventFormProps) {
+  const upsert      = useCalendarStore(s => s.upsert)
+  const remove      = useCalendarStore(s => s.remove)
+  const accounts    = useAccountsStore(s => s.accounts)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user        = useAuthStore(s => s.user)
+
+  const baseDate = defaultDate ?? (initial ? new Date(initial.startAt) : new Date())
+  const baseHour = defaultHour ?? (initial ? new Date(initial.startAt).getHours() : 10)
+
+  function toDatetimeLocal(iso: string) {
+    return iso.slice(0, 16)
+  }
+  function fromDatetimeLocal(val: string): string {
+    return val.length === 16 ? val + ':00' : val
+  }
+
+  const defaultStart = initial
+    ? toDatetimeLocal(initial.startAt)
+    : `${isoDate(baseDate)}T${String(baseHour).padStart(2,'0')}:00`
+  const defaultEnd = initial
+    ? toDatetimeLocal(initial.endAt)
+    : `${isoDate(baseDate)}T${String(baseHour + 1).padStart(2,'0')}:00`
+
+  const [title,       setTitle]       = useState(initial?.title ?? '')
+  const [startAt,     setStartAt]     = useState(defaultStart)
+  const [endAt,       setEndAt]       = useState(defaultEnd)
+  const [allDay,      setAllDay]      = useState(initial?.allDay ?? false)
+  const [accountId,   setAccountId]   = useState(initial?.accountId ?? '')
+  const [location,    setLocation]    = useState(initial?.location ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [color,       setColor]       = useState<EventColor | ''>(initial?.color ?? '')
+  const [isSaving,    setIsSaving]    = useState(false)
+  const [isDeleting,  setIsDeleting]  = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+
+  const handleSave = async () => {
+    if (!title.trim()) { setError('Titel ist Pflichtfeld'); return }
+    const start = fromDatetimeLocal(startAt)
+    const end   = fromDatetimeLocal(endAt)
+    if (!allDay && end <= start) { setError('Ende muss nach Start liegen'); return }
+    setIsSaving(true); setError(null)
+    try {
+      const payload: UpsertCalendarEventPayload = {
+        id: initial?.id,
+        workspaceId,
+        createdBy: user?.id ?? '',
+        accountId: accountId || undefined,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        location: location.trim() || undefined,
+        startAt: allDay ? `${startAt.slice(0,10)}T00:00:00` : start,
+        endAt:   allDay ? `${startAt.slice(0,10)}T23:59:59` : end,
+        allDay,
+        color: color || undefined,
+      }
+      await upsert(payload)
+      onSaved()
+    } catch (e) { setError(String(e)) }
+    finally { setIsSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!initial) return
+    setIsDeleting(true)
+    try { await remove(initial.id, workspaceId); onSaved() }
+    catch (e) { setError(String(e)); setIsDeleting(false) }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'oklch(0% 0 0 / 0.45)', backdropFilter: 'blur(8px)',
+      display: 'flex', justifyContent: 'flex-end',
+    }} onClick={onClose}>
+      <div
+        className="card"
+        style={{
+          width: 480, height: '100vh', borderRadius: '16px 0 0 16px',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ padding: '22px 24px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+            {initial ? 'Event bearbeiten' : 'Neues Event'}
+          </div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em' }}>
+            {title || <span style={{ color: 'var(--fg-dim)', fontWeight: 400, fontStyle: 'italic' }}>Titel…</span>}
+          </h2>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              Titel *
+            </label>
+            <input
+              autoFocus
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="z.B. Q2 Strategy Call"
+              style={{ width: '100%', padding: '9px 12px', fontSize: 14, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+            <input type="checkbox" checked={allDay} onChange={e => setAllDay(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+            Ganztägiges Event
+          </label>
+
+          {!allDay ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Start</label>
+                <input type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Ende</label>
+                <input type="datetime-local" value={endAt} onChange={e => setEndAt(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Datum</label>
+              <input type="date" value={startAt.slice(0,10)} onChange={e => setStartAt(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          )}
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              Client (optional)
+            </label>
+            <select value={accountId} onChange={e => setAccountId(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }}>
+              <option value="">Kein Client</option>
+              {accounts.filter(a => !a.isPrivate).map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Ort</label>
+            <input value={location} onChange={e => setLocation(e.target.value)}
+              placeholder="z.B. Zoom, Büro, Adresse…"
+              style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Beschreibung</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="Notizen, Agenda…"
+              rows={3}
+              style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Farbe</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {COLOR_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setColor(opt.value as EventColor | '')}
+                  title={opt.label}
+                  style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: opt.bg, border: color === opt.value ? '3px solid var(--fg)' : '2px solid var(--border)',
+                    cursor: 'pointer', transition: 'transform 120ms',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+                  onMouseLeave={e => (e.currentTarget.style.transform = '')}
+                />
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ padding: '10px 14px', borderRadius: 9, background: 'oklch(65% 0.22 25 / 0.12)', color: 'var(--danger)', fontSize: 13, border: '1px solid oklch(65% 0.22 25 / 0.3)' }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            {initial && (
+              <button
+                className="btn-ghost"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                style={{ color: 'var(--danger)' }}
+              >
+                {isDeleting ? 'Löschen…' : 'Löschen'}
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost" onClick={onClose}>Abbrechen</button>
+            <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Speichern…' : 'Speichern'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── CalendarRoute ─────────────────────────────────────────────────────────────
+
+export function CalendarRoute() {
+  const events      = useCalendarStore(s => s.events)
+  const view        = useCalendarStore(s => s.view)
+  const currentDate = useCalendarStore(s => s.currentDate)
+  const isLoading   = useCalendarStore(s => s.isLoading)
+  const load        = useCalendarStore(s => s.load)
+  const setView     = useCalendarStore(s => s.setView)
+  const navigate    = useCalendarStore(s => s.navigate)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+
+  const [formOpen,      setFormOpen]      = useState(false)
+  const [editingEvent,  setEditingEvent]  = useState<CalendarEvent | undefined>()
+  const [defaultDate,   setDefaultDate]   = useState<Date | undefined>()
+  const [defaultHour,   setDefaultHour]   = useState<number | undefined>()
+
+  useEffect(() => { if (workspaceId) load(workspaceId) }, [workspaceId, view, currentDate.toDateString()])
+
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+    if (e.key === 'ArrowLeft')  navigate('prev', workspaceId)
+    if (e.key === 'ArrowRight') navigate('next', workspaceId)
+    if (e.key === 't' || e.key === 'T') navigate('today', workspaceId)
+    if (e.key === 'd' || e.key === 'D') setView('day')
+    if (e.key === 'w' || e.key === 'W') setView('week')
+    if (e.key === 'm' || e.key === 'M') setView('month')
+    if ((e.key === 'n' || e.key === 'N') && !formOpen) {
+      setEditingEvent(undefined); setDefaultDate(new Date()); setDefaultHour(10); setFormOpen(true)
+    }
+    if (e.key === 'Escape' && formOpen) setFormOpen(false)
+  }, [workspaceId, view, formOpen, navigate, setView])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [handleKey])
+
+  function openNew(date?: Date, hour?: number) {
+    setEditingEvent(undefined); setDefaultDate(date); setDefaultHour(hour); setFormOpen(true)
+  }
+  function openEdit(event: CalendarEvent) {
+    setEditingEvent(event); setDefaultDate(undefined); setDefaultHour(undefined); setFormOpen(true)
+  }
+  function onFormSaved() {
+    setFormOpen(false); load(workspaceId)
+  }
+
+  function headingLabel() {
+    if (view === 'day') {
+      return `${DE_DAYS[(currentDate.getDay() + 6) % 7]}, ${currentDate.getDate()}. ${DE_MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+    }
+    if (view === 'week') {
+      const days = weekDays(currentDate)
+      const kw = kwOf(currentDate)
+      const first = days[0], last = days[6]
+      if (first.getMonth() === last.getMonth()) {
+        return `KW ${kw} · ${first.getDate()}. – ${last.getDate()}. ${DE_MONTHS[first.getMonth()]} ${first.getFullYear()}`
+      }
+      return `KW ${kw} · ${first.getDate()}. ${DE_MONTHS_SHORT[first.getMonth()]} – ${last.getDate()}. ${DE_MONTHS_SHORT[last.getMonth()]} ${last.getFullYear()}`
+    }
+    return `${DE_MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+  }
+
+  const days = weekDays(currentDate)
+
+  return (
+    <div className="main-inner" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      <div className="greeting">
+        <h1 className="greeting-title">Kalender<em>.</em></h1>
         <div className="greeting-sub">
-          <span>KW 20 · 18.–24. Mai</span>
-          <span>13 Termine · 2 Konflikte</span>
+          <span>{headingLabel()}</span>
+          <span>{events.length} Events</span>
         </div>
       </div>
 
-      <div className="section-head" style={{ marginTop: 0 }}>
-        <h2>Diese Woche</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-ghost">← Zurück</button>
-          <button className="btn-ghost">Heute</button>
-          <button className="btn-ghost">Weiter →</button>
-          <button className="btn-primary">+ Event</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn-ghost" onClick={() => navigate('prev', workspaceId)} title="← (Pfeil links)">
+            <ChevronLeft size={15} />
+          </button>
+          <button className="btn-ghost" onClick={() => navigate('today', workspaceId)} title="T">
+            Heute
+          </button>
+          <button className="btn-ghost" onClick={() => navigate('next', workspaceId)} title="→ (Pfeil rechts)">
+            <ChevronRight size={15} />
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 600, marginLeft: 8, letterSpacing: '-0.01em' }}>
+            {headingLabel()}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {(['day','week','month'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  padding: '6px 14px', fontSize: 12, fontWeight: 500,
+                  border: 'none', cursor: 'pointer',
+                  background: view === v ? 'var(--accent)' : 'none',
+                  color: view === v ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  transition: 'background 150ms, color 150ms',
+                }}
+              >
+                {v === 'day' ? 'Tag' : v === 'week' ? 'Woche' : 'Monat'}
+              </button>
+            ))}
+          </div>
+          <button className="btn-primary" onClick={() => openNew()} title="N">
+            <Plus size={13} /> Event
+          </button>
         </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
-          <div />
-          {DAYS.map((d, i) => (
-            <div key={d} style={{ padding: '14px 12px', textAlign: 'center', borderLeft: '1px solid var(--border)' }}>
-              <div className="mono" style={{ fontSize: 11, color: 'var(--fg-dim)', letterSpacing: '0.1em' }}>{d.toUpperCase()}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, marginTop: 4, color: i === 0 ? 'var(--accent)' : 'var(--fg)' }}>{DATES[i]}</div>
-            </div>
-          ))}
-        </div>
 
-        {/* Time grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', position: 'relative' }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {HOURS.map(h => (
-              <div key={h} style={{ height: 56, paddingRight: 12, paddingTop: 4, textAlign: 'right' }}>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{String(h).padStart(2,'0')}:00</span>
+        {(view === 'week' || view === 'day') && (
+          <div style={{ display: 'grid', gridTemplateColumns: view === 'week' ? '60px repeat(7, 1fr)' : '60px 1fr', borderBottom: '1px solid var(--border)' }}>
+            <div />
+            {(view === 'week' ? days : [currentDate]).map((d, i) => (
+              <div
+                key={i}
+                style={{ padding: '12px 10px', textAlign: 'center', borderLeft: '1px solid var(--border)', cursor: 'pointer' }}
+                onClick={() => setView('day')}
+              >
+                <div style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>
+                  {DE_DAYS[(d.getDay() + 6) % 7].toUpperCase()}
+                </div>
+                <div style={{
+                  fontSize: 20, fontWeight: 600, marginTop: 3,
+                  width: 34, height: 34, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '3px auto 0',
+                  background: isToday(d) ? 'var(--accent)' : 'transparent',
+                  color: isToday(d) ? 'var(--accent-ink)' : 'var(--fg)',
+                }}>
+                  {d.getDate()}
+                </div>
               </div>
             ))}
           </div>
-          {DAYS.map((_d, col) => (
-            <div key={col} style={{ borderLeft: '1px solid var(--border)', position: 'relative', minHeight: HOURS.length * 56 }}>
-              {HOURS.map((_, hi) => (
-                <div key={hi} style={{ height: 56, borderBottom: hi < HOURS.length - 1 ? '1px solid oklch(100% 0 0 / 0.025)' : 'none' }} />
-              ))}
-              {EVENTS.filter(e => e.day === col).map((e, ei) => (
-                <div key={ei} style={{
-                  position: 'absolute', left: 4, right: 4,
-                  top: (e.start - 8) * 56 + 2,
-                  height: (e.end - e.start) * 56 - 4,
-                  background: eventBg(e.tone), color: eventFg(e.tone),
-                  padding: '6px 10px', borderRadius: 8,
-                  border: `1px solid ${eventBorder(e.tone)}`,
-                  fontSize: 11.5, lineHeight: 1.3,
-                  overflow: 'hidden', cursor: 'pointer',
-                  transition: 'transform 180ms ease',
-                }}
-                onMouseEnter={ev => (ev.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'}
-                onMouseLeave={ev => (ev.currentTarget as HTMLDivElement).style.transform = ''}>
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{e.title}</div>
-                  <div style={{ opacity: 0.7, fontSize: 10.5 }}>{e.client}</div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        )}
+
+        {isLoading && (
+          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 13 }}>Laden…</div>
+        )}
+
+        {!isLoading && view === 'week' && (
+          <WeekView events={events} days={days} onSlotClick={openNew} onEventClick={openEdit} />
+        )}
+        {!isLoading && view === 'day' && (
+          <DayView events={events} day={currentDate} onSlotClick={openNew} onEventClick={openEdit} />
+        )}
+        {!isLoading && view === 'month' && (
+          <MonthView
+            events={events}
+            anchor={currentDate}
+            onDayClick={d => { setView('day'); useCalendarStore.setState({ currentDate: d }) }}
+            onEventClick={openEdit}
+          />
+        )}
       </div>
+
+      {formOpen && (
+        <EventForm
+          initial={editingEvent}
+          defaultDate={defaultDate}
+          defaultHour={defaultHour}
+          onClose={() => setFormOpen(false)}
+          onSaved={onFormSaved}
+        />
+      )}
     </div>
   )
 }
