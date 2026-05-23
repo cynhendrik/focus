@@ -64,7 +64,12 @@ function kwOf(d: Date) {
 
 // ── EventChip ─────────────────────────────────────────────────────────────────
 
-function EventChip({ event, onClick, compact }: { event: CalendarEvent; onClick: () => void; compact?: boolean }) {
+interface EventChipProps {
+  event: CalendarEvent
+  onClick: () => void
+  compact?: boolean
+}
+function EventChip({ event, onClick, compact }: EventChipProps) {
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick() }}
@@ -96,9 +101,8 @@ function computeLanes(events: CalendarEvent[]): Array<{ event: CalendarEvent; la
   const laneEnds: string[] = []
   const assigned: number[] = []
   for (const ev of sorted) {
-    let lane = laneEnds.findIndex((end, i) => i < 3 && end <= ev.startAt)
-    if (lane === -1 && laneEnds.length < 3) lane = laneEnds.length
-    if (lane === -1) lane = 0
+    let lane = laneEnds.findIndex(end => end <= ev.startAt)
+    if (lane === -1) lane = laneEnds.length  // open a new lane
     laneEnds[lane] = ev.endAt
     assigned.push(lane)
   }
@@ -828,7 +832,7 @@ export function CalendarRoute() {
           <MonthView
             events={events}
             anchor={currentDate}
-            onDayClick={d => { setView('day'); useCalendarStore.setState({ currentDate: d }) }}
+            onDayClick={d => { useCalendarStore.setState({ view: 'day', currentDate: d }) }}
             onEventClick={openEdit}
           />
         )}
