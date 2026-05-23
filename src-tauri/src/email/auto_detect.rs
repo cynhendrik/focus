@@ -31,6 +31,23 @@ pub fn detect(email: &str) -> Option<(&'static str, u16)> {
     }
 }
 
+/// Derives the SMTP host from an IMAP host by replacing the "imap" prefix.
+/// "imap.gmx.net"           → "smtp.gmx.net"
+/// "secureimap.t-online.de" → "securesmtp.t-online.de"
+/// Falls back to the original host if "imap" not found.
+pub fn derive_smtp_host(imap_host: &str) -> String {
+    if imap_host.starts_with("imap.") {
+        format!("smtp.{}", &imap_host[5..])
+    } else if imap_host.contains("imap") {
+        imap_host.replace("imap", "smtp")
+    } else {
+        imap_host.to_string()
+    }
+}
+
+/// Default SMTP port for new accounts — 587 (STARTTLS).
+pub const DEFAULT_SMTP_PORT: u16 = 587;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -78,5 +95,19 @@ mod tests {
     #[test]
     fn case_insensitive() {
         assert_eq!(detect("user@GMX.DE"), Some(("imap.gmx.net", 993)));
+    }
+
+    #[test]
+    fn derives_smtp_from_imap_prefix() {
+        assert_eq!(derive_smtp_host("imap.gmx.net"), "smtp.gmx.net");
+        assert_eq!(derive_smtp_host("imap.gmail.com"), "smtp.gmail.com");
+    }
+
+    #[test]
+    fn derives_smtp_without_imap_prefix() {
+        // t-online uses "secureimap.t-online.de" → "securesmtp.t-online.de"
+        assert_eq!(derive_smtp_host("secureimap.t-online.de"), "securesmtp.t-online.de");
+        // fallback: no "imap" in host → return unchanged
+        assert_eq!(derive_smtp_host("mail.example.com"), "mail.example.com");
     }
 }
