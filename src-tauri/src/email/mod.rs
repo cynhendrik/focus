@@ -3,4 +3,5 @@ pub mod commands;
 pub mod db;
 pub mod imap;
 pub mod keychain;
+pub mod smtp;
 pub mod types;
