@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { MailService } from '@/services/mail.service'
 import { log } from '@/lib/logger'
-import type { EmailAccount, EmailHeader, EmailBody, SyncProgress, AddAccountPayload } from '@/types/mail.types'
+import type {
+  EmailAccount, EmailHeader, EmailBody, EmailAttachment,
+  SyncProgress, AddAccountPayload, SendEmailPayload,
+} from '@/types/mail.types'
 import type { AppError } from '@/types/error.types'
 import { formatError } from '@/types/error.types'
 
@@ -17,6 +20,8 @@ interface MailState {
   isSyncing: boolean
   isLoading: boolean
   error: AppError | null
+  attachments: EmailAttachment[]
+  isSending: boolean
 
   loadAccounts: () => Promise<void>
   selectAccount: (id: string) => void
@@ -31,6 +36,9 @@ interface MailState {
   markRead: (emailId: string, isRead: boolean) => void
   assignCustomer: (emailId: string, customerId: string | null) => Promise<void>
   deleteEmail: (emailId: string) => Promise<void>
+  sendEmail: (payload: SendEmailPayload) => Promise<void>
+  getAttachments: (emailId: string) => Promise<void>
+  downloadAttachment: (attachmentId: string) => Promise<void>
 }
 
 export const useMailStore = create<MailState>()((set, get) => ({
@@ -45,6 +53,8 @@ export const useMailStore = create<MailState>()((set, get) => ({
   isSyncing: false,
   isLoading: false,
   error: null,
+  attachments: [],
+  isSending: false,
 
   loadAccounts: async () => {
     try {
@@ -81,17 +91,20 @@ export const useMailStore = create<MailState>()((set, get) => ({
   },
 
   selectEmail: async (email) => {
-    set({ selectedEmail: email, emailBody: null })
+    set({ selectedEmail: email, emailBody: null, attachments: [] })
     if (!email) return
     if (!email.isRead) {
       MailService.markRead(email.id, true).catch(() => {})
       set(s => ({ emails: s.emails.map(e => e.id === email.id ? { ...e, isRead: true } : e) }))
     }
     try {
-      const body = await MailService.getBody(email.id)
-      set({ emailBody: body })
+      const [body, attachments] = await Promise.all([
+        MailService.getBody(email.id),
+        MailService.getAttachments(email.id),
+      ])
+      set({ emailBody: body, attachments })
     } catch (err) {
-      log.error('Failed to load email body', { err })
+      log.error('Failed to load email body or attachments', { err })
     }
   },
 
@@ -144,5 +157,33 @@ export const useMailStore = create<MailState>()((set, get) => ({
       emails: s.emails.filter(e => e.id !== emailId),
       selectedEmail: s.selectedEmail?.id === emailId ? null : s.selectedEmail,
     }))
+  },
+
+  getAttachments: async (emailId) => {
+    try {
+      const attachments = await MailService.getAttachments(emailId)
+      set({ attachments })
+    } catch (err) {
+      log.error('Failed to load attachments', { err })
+      set({ attachments: [] })
+    }
+  },
+
+  sendEmail: async (payload) => {
+    set({ isSending: true })
+    try {
+      await MailService.sendEmail(payload)
+    } finally {
+      set({ isSending: false })
+    }
+  },
+
+  downloadAttachment: async (attachmentId) => {
+    try {
+      await MailService.downloadAttachment(attachmentId)
+    } catch (err) {
+      log.error('Failed to download attachment', { err })
+      throw err
+    }
   },
 }))

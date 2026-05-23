@@ -1,5 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { EmailAccount, EmailHeader, EmailBody, AddAccountPayload } from '@/types/mail.types'
+import type {
+  EmailAccount, EmailHeader, EmailBody, EmailAttachment,
+  AddAccountPayload, SendEmailPayload,
+} from '@/types/mail.types'
 
 export const MailService = {
   getAccounts(): Promise<EmailAccount[]> {
@@ -15,6 +18,9 @@ export const MailService = {
     return invoke<EmailAccount>('email_add_account', {
       email: p.email, password: p.password,
       imapHost: p.imapHost, imapPort: p.imapPort, displayName: p.displayName,
+      smtpHost: p.smtpHost ?? null,
+      smtpPort: p.smtpPort ?? null,
+      smtpStarttls: p.smtpStarttls ?? null,
     })
   },
   removeAccount(accountId: string): Promise<void> {
@@ -37,5 +43,17 @@ export const MailService = {
   },
   delete(emailId: string): Promise<void> {
     return invoke<void>('email_delete', { emailId })
+  },
+  testSmtp(email: string, password: string, smtpHost: string, smtpPort: number, starttls: boolean): Promise<void> {
+    return invoke<void>('email_test_smtp', { email, password, smtpHost, smtpPort, starttls })
+  },
+  sendEmail(payload: SendEmailPayload): Promise<void> {
+    return invoke<void>('email_send', { payload })
+  },
+  getAttachments(emailId: string): Promise<EmailAttachment[]> {
+    return invoke<EmailAttachment[]>('email_get_attachments', { emailId })
+  },
+  downloadAttachment(attachmentId: string): Promise<string> {
+    return invoke<string>('email_download_attachment', { attachmentId })
   },
 }
