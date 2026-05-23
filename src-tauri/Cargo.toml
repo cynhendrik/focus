@@ -31,10 +31,16 @@ tokio-native-tls = "0.3"
 native-tls       = "0.2"
 mailparse        = "0.14"
 keyring          = "2"
+lettre           = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "builder"] }
+open             = "5"
 
 # ── Utils ────────────────────────────────────────────────────────────────────
 uuid             = { version = "1", features = ["v4"] }
 chrono           = { version = "0.4", features = ["serde"] }
+
+# ── Export / File Dialog ─────────────────────────────────────────────────────
+dirs             = "5"
+zip              = "0.6"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
