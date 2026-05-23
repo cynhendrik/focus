@@ -83,6 +83,31 @@ pub struct SyncResult {
     pub skipped: usize,
 }
 
+/// IMAP-Ordner — gecacht in emails.db, an Frontend serialisiert
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Folder {
+    pub id: String,
+    pub account_id: String,
+    pub path: String,
+    pub delimiter: String,
+    pub display_name: String,
+    pub parent_path: Option<String>,
+    pub flags: Vec<String>,
+    pub is_selectable: bool,
+}
+
+/// Interner Typ — frisch aus IMAP, noch nicht in DB
+#[derive(Debug, Clone)]
+pub struct RawFolder {
+    pub path: String,
+    pub delimiter: String,
+    pub display_name: String,
+    pub parent_path: Option<String>,
+    pub flags: Vec<String>,
+    pub is_selectable: bool,
+}
+
 /// Minimal customer ref passed from frontend for auto-matching
 #[derive(Debug, Deserialize)]
 pub struct CustomerRef {
@@ -121,5 +146,24 @@ mod tests {
         };
         assert_eq!(a.smtp_host, "smtp.b.de");
         assert!(a.smtp_starttls);
+    }
+
+    #[test]
+    fn folder_serializes_camel_case() {
+        let f = Folder {
+            id: "id1".into(),
+            account_id: "acc1".into(),
+            path: "INBOX.Projekte".into(),
+            delimiter: ".".into(),
+            display_name: "Projekte".into(),
+            parent_path: Some("INBOX".into()),
+            flags: vec!["\\HasChildren".into()],
+            is_selectable: true,
+        };
+        let json = serde_json::to_string(&f).unwrap();
+        assert!(json.contains("\"accountId\""), "should use camelCase");
+        assert!(json.contains("\"displayName\""), "should use camelCase");
+        assert!(json.contains("\"isSelectable\""), "should use camelCase");
+        assert!(json.contains("\"parentPath\""), "should use camelCase");
     }
 }
