@@ -73,9 +73,11 @@ function EventChip({ event, onClick, compact }: { event: CalendarEvent; onClick:
         border: `1px solid ${evtBorder(event.color)}`,
         borderRadius: 6, padding: compact ? '2px 6px' : '5px 9px',
         fontSize: compact ? 11 : 11.5, lineHeight: 1.3,
+        height: compact ? 22 : undefined,
         cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
         transition: 'transform 140ms ease',
         fontWeight: 500,
+        boxSizing: 'border-box' as const,
       }}
       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = '')}
@@ -84,6 +86,32 @@ function EventChip({ event, onClick, compact }: { event: CalendarEvent; onClick:
       {event.title}
     </div>
   )
+}
+
+// ── WeekView helpers ──────────────────────────────────────────────────────────
+
+function computeLanes(events: CalendarEvent[]): Array<{ event: CalendarEvent; lane: number; totalLanes: number }> {
+  if (events.length === 0) return []
+  const sorted = [...events].sort((a, b) => a.startAt.localeCompare(b.startAt))
+  const laneEnds: string[] = []
+  const assigned: number[] = []
+  for (const ev of sorted) {
+    let lane = laneEnds.findIndex((end, i) => i < 3 && end <= ev.startAt)
+    if (lane === -1 && laneEnds.length < 3) lane = laneEnds.length
+    if (lane === -1) lane = 0
+    laneEnds[lane] = ev.endAt
+    assigned.push(lane)
+  }
+  return sorted.map((event, i) => {
+    const lane = assigned[i]
+    let totalLanes = 1
+    for (let j = 0; j < sorted.length; j++) {
+      if (sorted[j].startAt < event.endAt && sorted[j].endAt > event.startAt) {
+        totalLanes = Math.max(totalLanes, assigned[j] + 1)
+      }
+    }
+    return { event, lane, totalLanes }
+  })
 }
 
 // ── WeekView ──────────────────────────────────────────────────────────────────
@@ -167,10 +195,13 @@ function WeekView({
                   height: HOUR_H,
                   borderBottom: hi < HOURS.length - 1 ? '1px solid oklch(100% 0 0 / 0.03)' : 'none',
                   cursor: 'pointer',
+                  position: 'relative',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
-              />
+              >
+                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'oklch(100% 0 0 / 0.02)', pointerEvents: 'none' }} />
+              </div>
             ))}
 
             {/* Now-line */}
@@ -187,11 +218,13 @@ function WeekView({
             )}
 
             {/* Events */}
-            {dayEvents.map((ev, ei) => (
+            {computeLanes(dayEvents).map(({ event: ev, lane, totalLanes }, ei) => (
               <div
                 key={ei}
                 style={{
-                  position: 'absolute', left: 4, right: 4,
+                  position: 'absolute',
+                  left: `calc(${lane / totalLanes * 100}% + 2px)`,
+                  width: `calc(${100 / totalLanes}% - 4px)`,
                   top: eventTop(ev) + 2, height: eventHeight(ev),
                   background: evtBg(ev.color), color: evtFg(ev.color),
                   border: `1px solid ${evtBorder(ev.color)}`,
@@ -238,7 +271,9 @@ function MonthView({
   })
 
   function eventsForDay(day: Date) {
-    return events.filter(e => isoDate(new Date(e.startAt)) === isoDate(day))
+    return events
+      .filter(e => isoDate(new Date(e.startAt)) === isoDate(day))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt))
   }
 
   return (
@@ -293,7 +328,10 @@ function MonthView({
                 <EventChip key={ei} event={ev} onClick={() => onEventClick(ev)} compact />
               ))}
               {overflow > 0 && (
-                <div style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', paddingLeft: 2 }}>
+                <div
+                  onClick={e => { e.stopPropagation(); onDayClick(day) }}
+                  style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', paddingLeft: 2, cursor: 'pointer', textDecoration: 'underline' }}
+                >
                   +{overflow} mehr
                 </div>
               )}
@@ -347,10 +385,13 @@ function DayView({
               height: HOUR_H,
               borderBottom: hi < HOURS.length - 1 ? '1px solid oklch(100% 0 0 / 0.03)' : 'none',
               cursor: 'pointer',
+              position: 'relative',
             }}
             onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)')}
             onMouseLeave={e => (e.currentTarget.style.background = '')}
-          />
+          >
+            <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'oklch(100% 0 0 / 0.02)', pointerEvents: 'none' }} />
+          </div>
         ))}
         {dayEvents.map((ev, ei) => (
           <div
@@ -463,6 +504,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
 
   const handleDelete = async () => {
     if (!initial) return
+    if (!window.confirm(`"${initial.title}" wirklich löschen?`)) return
     setIsDeleting(true)
     try { await remove(initial.id, workspaceId); onSaved() }
     catch (e) { setError(String(e)); setIsDeleting(false) }
@@ -620,6 +662,7 @@ export function CalendarRoute() {
   const view        = useCalendarStore(s => s.view)
   const currentDate = useCalendarStore(s => s.currentDate)
   const isLoading   = useCalendarStore(s => s.isLoading)
+  const error       = useCalendarStore(s => s.error)
   const load        = useCalendarStore(s => s.load)
   const setView     = useCalendarStore(s => s.setView)
   const navigate    = useCalendarStore(s => s.navigate)
@@ -761,6 +804,18 @@ export function CalendarRoute() {
 
         {isLoading && (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 13 }}>Laden…</div>
+        )}
+
+        {error && !isLoading && (
+          <div style={{ margin: '0 0 8px', padding: '10px 16px', borderRadius: 10, background: 'oklch(65% 0.22 25 / 0.12)', color: 'var(--danger)', fontSize: 13, border: '1px solid oklch(65% 0.22 25 / 0.3)' }}>
+            Fehler beim Laden: {error}
+          </div>
+        )}
+
+        {!isLoading && events.length === 0 && (
+          <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--fg-dim)', fontStyle: 'italic', borderBottom: view !== 'month' ? '1px solid var(--border)' : 'none' }}>
+            Keine Events in diesem Zeitraum — klicke auf einen Slot oder drücke N.
+          </div>
         )}
 
         {!isLoading && view === 'week' && (
