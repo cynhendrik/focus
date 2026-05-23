@@ -66,6 +66,78 @@ fn extract_from_part(part: &mailparse::ParsedMail) -> (String, String) {
     (text, html)
 }
 
+// ── Extended MIME parsing with attachments ────────────────────────────────────
+
+pub struct ExtractedParts {
+    pub body_text: String,
+    pub body_html: String,
+    pub attachments: Vec<crate::email::types::RawAttachment>,
+}
+
+pub fn extract_parts(raw: &[u8]) -> ExtractedParts {
+    let Ok(parsed) = parse_mail(raw) else {
+        return ExtractedParts { body_text: String::new(), body_html: String::new(), attachments: vec![] }
+    };
+    let mut result = ExtractedParts { body_text: String::new(), body_html: String::new(), attachments: vec![] };
+    collect_parts(&parsed, &mut result);
+    result
+}
+
+fn collect_parts(part: &mailparse::ParsedMail, out: &mut ExtractedParts) {
+    let ct = part.ctype.mimetype.to_lowercase();
+    let disposition = part.headers.get_first_value("Content-Disposition")
+        .unwrap_or_default()
+        .to_lowercase();
+
+    if part.subparts.is_empty() {
+        // Leaf node — check disposition first
+        if disposition.starts_with("attachment") {
+            let filename = extract_filename(part);
+            let mime_type = part.ctype.mimetype.clone();
+            if let Ok(content) = part.get_body_raw() {
+                out.attachments.push(crate::email::types::RawAttachment {
+                    email_id: String::new(), // filled in by sync loop
+                    filename: if filename.is_empty() { "anhang".to_string() } else { filename },
+                    mime_type,
+                    content,
+                });
+            }
+        } else {
+            let body = part.get_body().unwrap_or_default();
+            match ct.as_str() {
+                "text/plain" => if out.body_text.is_empty() { out.body_text = body; },
+                "text/html"  => if out.body_html.is_empty() { out.body_html = body; },
+                _ => {}
+            }
+        }
+    } else {
+        // Container — recurse into subparts
+        for sub in &part.subparts {
+            collect_parts(sub, out);
+        }
+    }
+}
+
+fn extract_filename(part: &mailparse::ParsedMail) -> String {
+    // Try Content-Disposition filename param
+    let disp = part.headers.get_first_value("Content-Disposition").unwrap_or_default();
+    if let Some(pos) = disp.to_lowercase().find("filename=") {
+        let after = &disp[pos + 9..];
+        let name = after.trim_start_matches('"')
+            .split('"').next()
+            .or_else(|| after.split(';').next())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if !name.is_empty() { return name; }
+    }
+    // Fallback: Content-Type name param
+    if let Some(name) = part.ctype.params.get("name") {
+        return name.clone();
+    }
+    String::new()
+}
+
 fn parse_addr(raw: &str) -> (String, String) {
     if let (Some(s), Some(e)) = (raw.find('<'), raw.find('>')) {
         let addr = raw[s + 1..e].trim().to_string();
@@ -138,6 +210,7 @@ async fn find_sent_folder(session: &mut async_imap::Session<TlsStream>) -> Strin
 
 pub struct SyncOutput {
     pub rows: Vec<EmailRow>,
+    pub attachments: Vec<crate::email::types::RawAttachment>,
     pub max_uid: u32,
     pub inserted_count: usize,
 }
@@ -174,6 +247,7 @@ where
     ];
 
     let mut all_rows: Vec<EmailRow> = Vec::new();
+    let mut all_attachments: Vec<crate::email::types::RawAttachment> = Vec::new();
     let mut max_uid: u32 = last_uid;
 
     for (server_folder, normalized_folder) in folders {
@@ -255,11 +329,20 @@ where
                     .map(|d| d.to_rfc3339())
                     .unwrap_or_else(|_| Utc::now().to_rfc3339());
 
-                let (body_text, body_html) = extract_bodies(body_bytes);
+                let parts = extract_parts(body_bytes);
+                let body_text = parts.body_text;
+                let body_html = parts.body_html;
                 let customer_id = match_customer(&from_addr, customers);
 
+                let email_id = Uuid::new_v4().to_string();
+                let mut row_attachments = parts.attachments;
+                for att in &mut row_attachments {
+                    att.email_id = email_id.clone();
+                }
+                all_attachments.extend(row_attachments);
+
                 all_rows.push(EmailRow {
-                    id: Uuid::new_v4().to_string(),
+                    id: email_id,
                     account_id: account_id.to_string(),
                     uid,
                     folder: normalized_folder.clone(),
@@ -289,5 +372,29 @@ where
 
     let _ = session.logout().await;
     let count = all_rows.len();
-    Ok(SyncOutput { rows: all_rows, max_uid, inserted_count: count })
+    Ok(SyncOutput { rows: all_rows, attachments: all_attachments, max_uid, inserted_count: count })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_plain_email() -> Vec<u8> {
+        b"From: a@b.de\r\nTo: c@d.de\r\nSubject: Test\r\nContent-Type: text/plain\r\n\r\nHello World".to_vec()
+    }
+
+    #[test]
+    fn extract_parts_plain_text_no_attachments() {
+        let parts = extract_parts(&make_plain_email());
+        assert_eq!(parts.body_text, "Hello World");
+        assert!(parts.body_html.is_empty());
+        assert!(parts.attachments.is_empty());
+    }
+
+    #[test]
+    fn extract_parts_returns_struct() {
+        let parts = extract_parts(b"Content-Type: text/plain\r\n\r\nHi");
+        // Just verifies no panic
+        let _ = parts;
+    }
 }
