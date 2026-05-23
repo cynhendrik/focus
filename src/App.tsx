@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { useClientPickerStore } from '@/store/client-picker.store'
+import { ClientPicker } from '@/components/clients/ClientPicker'
 import { AppShell }    from '@/components/layout/AppShell'
 import { NavSidebar }  from '@/components/layout/NavSidebar'
 import { Topbar }      from '@/components/layout/Topbar'
@@ -24,7 +26,7 @@ import { useSyncBridge } from '@/core/sync/useSyncBridge'
 
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
-import { InvoicesRoute }   from '@/routes/InvoicesRoute'
+import { FinanceRoute }    from '@/routes/FinanceRoute'
 import { TasksRoute }      from '@/routes/TasksRoute'
 import { KpisRoute }       from '@/routes/KpisRoute'
 import { InsightsRoute }   from '@/routes/InsightsRoute'
@@ -40,6 +42,8 @@ import { SmartListsRoute }      from '@/routes/SmartListsRoute'
 import { ChatRoute }            from '@/routes/ChatRoute'
 import { LeadsRoute }           from '@/routes/LeadsRoute'
 import { useLeadsStore }        from '@/store/leads.store'
+import { useCalendarStore }     from '@/store/calendar.store'
+import { DownloadToast }        from '@/components/ui/DownloadToast'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -56,12 +60,26 @@ export default function App() {
   const loadAllTodos    = useTodosStore(s => s.loadAll)
   const syncLeads       = useLeadsStore(s => s.syncPending)
   const loadLeads       = useLeadsStore(s => s.load)
+  const loadCalendar    = useCalendarStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
-  const cmdOpen         = useUiStore(s => s.cmdPaletteOpen)
+  const cmdOpen           = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
+  const pickerOpen        = useClientPickerStore(s => s.isOpen)
+  const openPicker        = useClientPickerStore(s => s.open)
 
   useEffect(() => { initAuth() }, [initAuth])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        openPicker()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [openPicker])
 
   useEffect(() => {
     if (DEV_BYPASS && !activeWorkspaceId) {
@@ -88,8 +106,9 @@ export default function App() {
       loadAllTodos(activeWorkspaceId)
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
+      loadCalendar(activeWorkspaceId)
     }
-  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads])
+  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
   useSyncBridge()
 
@@ -116,7 +135,7 @@ export default function App() {
       case 'smartlists':   return <SmartListsRoute />
       case 'chat':         return <ChatRoute />
       case 'leads':        return <LeadsRoute />
-      case 'invoices':   return <InvoicesRoute />
+      case 'invoices':   return <FinanceRoute />
       case 'tasks':      return <TasksRoute />
       case 'kpis':       return <KpisRoute />
       case 'insights':   return <InsightsRoute />
@@ -140,6 +159,8 @@ export default function App() {
         </main>
       </div>
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
+      {pickerOpen && <ClientPicker />}
+      <DownloadToast />
     </AppShell>
   )
 }
