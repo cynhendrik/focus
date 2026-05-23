@@ -39,33 +39,6 @@ pub async fn test_connection(email: &str, password: &str, host: &str, port: u16)
     Ok(())
 }
 
-// ── MIME parsing ──────────────────────────────────────────────────────────────
-
-fn extract_bodies(raw: &[u8]) -> (String, String) {
-    let Ok(parsed) = parse_mail(raw) else { return (String::new(), String::new()) };
-    extract_from_part(&parsed)
-}
-
-fn extract_from_part(part: &mailparse::ParsedMail) -> (String, String) {
-    let ct = part.ctype.mimetype.to_lowercase();
-    if part.subparts.is_empty() {
-        let body = part.get_body().unwrap_or_default();
-        return match ct.as_str() {
-            "text/plain" => (body, String::new()),
-            "text/html"  => (String::new(), body),
-            _            => (String::new(), String::new()),
-        };
-    }
-    let mut text = String::new();
-    let mut html = String::new();
-    for sub in &part.subparts {
-        let (t, h) = extract_from_part(sub);
-        if text.is_empty() { text = t; }
-        if html.is_empty() { html = h; }
-    }
-    (text, html)
-}
-
 // ── Extended MIME parsing with attachments ────────────────────────────────────
 
 pub struct ExtractedParts {
