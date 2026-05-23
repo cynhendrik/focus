@@ -19,25 +19,31 @@ interface CalendarState {
   navigate: (dir: 'prev' | 'next' | 'today', workspaceId: string) => void
 }
 
+// Lokales ISO-8601 ohne Timezone-Offset — muss zum Format der gespeicherten start_at-Werte passen
+function localIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 function rangeForDate(date: Date, view: CalendarView): { from: string; to: string } {
   const d = new Date(date)
   if (view === 'day') {
     const from = new Date(d); from.setHours(0, 0, 0, 0)
-    const to   = new Date(d); to.setHours(23, 59, 59, 999)
-    return { from: from.toISOString(), to: to.toISOString() }
+    const to   = new Date(d); to.setHours(23, 59, 59, 0)
+    return { from: localIso(from), to: localIso(to) }
   }
   if (view === 'week') {
     const dow = (d.getDay() + 6) % 7  // Mo=0
     const mon = new Date(d); mon.setDate(d.getDate() - dow); mon.setHours(0, 0, 0, 0)
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23, 59, 59, 999)
-    return { from: mon.toISOString(), to: sun.toISOString() }
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6); sun.setHours(23, 59, 59, 0)
+    return { from: localIso(mon), to: localIso(sun) }
   }
   // month — ±1 Woche Puffer für Grid-Zellen außerhalb des Monats
   const first = new Date(d.getFullYear(), d.getMonth(), 1)
   const last  = new Date(d.getFullYear(), d.getMonth() + 1, 0)
   const from  = new Date(first); from.setDate(first.getDate() - 7); from.setHours(0, 0, 0, 0)
-  const to    = new Date(last);  to.setDate(last.getDate() + 7);    to.setHours(23, 59, 59, 999)
-  return { from: from.toISOString(), to: to.toISOString() }
+  const to    = new Date(last);  to.setDate(last.getDate() + 7);    to.setHours(23, 59, 59, 0)
+  return { from: localIso(from), to: localIso(to) }
 }
 
 export const useCalendarStore = create<CalendarState>()((set, get) => ({
