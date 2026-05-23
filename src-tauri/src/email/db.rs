@@ -51,7 +51,8 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             mime_type   TEXT NOT NULL DEFAULT 'application/octet-stream',
             size_bytes  INTEGER NOT NULL DEFAULT 0,
             content     BLOB NOT NULL,
-            created_at  TEXT NOT NULL
+            created_at  TEXT NOT NULL,
+            UNIQUE(email_id, filename)
         );
 
         CREATE INDEX IF NOT EXISTS idx_email_attachments_email ON email_attachments(email_id);
@@ -115,7 +116,7 @@ pub fn get_account(conn: &Connection, id: &str) -> rusqlite::Result<Option<Accou
     Ok(rows.next().transpose()?)
 }
 
-/// Returns (email, smtp_host, smtp_port, smtp_starttls) for the send command
+/// Returns `(email, smtp_host, smtp_port, smtp_starttls)` for the `email_send` command.
 pub fn get_account_smtp(conn: &Connection, id: &str) -> rusqlite::Result<(String, String, u16, bool)> {
     conn.query_row(
         "SELECT email, smtp_host, smtp_port, smtp_starttls FROM accounts WHERE id = ?1",
