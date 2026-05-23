@@ -40,6 +40,9 @@ pub fn email_add_account(
         display_name,
         imap_host,
         imap_port,
+        smtp_host:      String::new(),
+        smtp_port:      587,
+        smtp_starttls:  true,
         last_synced_at: None,
         status:         "active".to_string(),
     };
