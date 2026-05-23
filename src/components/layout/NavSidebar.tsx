@@ -115,10 +115,9 @@ export function NavSidebar() {
       <div className="sidebar-brand" data-tauri-drag-region>
         <div className="sidebar-brand-logo">
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-            <path
-              d="M58 18c-5 1-9 5-10 10-1 6 2 11 7 14 6 3 13 1 17-4 4-6 3-14-3-19-3-2-7-2-11-1Zm-22 38c-5 1-9 6-10 11-1 6 3 12 9 14 7 2 14-2 17-9 2-7-2-15-9-17-2-1-5-1-7 1Z"
-              fill="oklch(15% 0 0)"
-            />
+            <rect width="100" height="100" rx="22" fill="oklch(92% 0.2 125)"/>
+            <rect x="36" y="19" width="40" height="13" rx="6.5" fill="oklch(15% 0 0)" transform="rotate(-28 56 25.5)"/>
+            <rect x="24" y="46" width="44" height="13" rx="6.5" fill="oklch(15% 0 0)" transform="rotate(-23 46 52.5)"/>
           </svg>
         </div>
         <div className="sidebar-brand-text">
