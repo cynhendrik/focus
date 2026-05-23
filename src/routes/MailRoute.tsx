@@ -44,13 +44,11 @@ export function MailRoute() {
         <button onClick={() => setShowSetup(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-dark">
           Konto hinzufügen
         </button>
-        {showSetup && <AccountSetupForm onAdd={() => { setShowSetup(false); loadAccounts() }} onCancel={() => setShowSetup(false)} />}
       </div>
     )
   }
 
   const selectedAccount = accounts.find(a => a.id === selectedAccountId)
-  const unread = emails.filter(e => !e.isRead).length
 
   return (
     <div className="main-inner" style={{ paddingBottom: 24 }}>
@@ -176,19 +174,21 @@ export function MailRoute() {
                   Von: {selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>` : selectedEmail.fromAddr}
                 </p>
                 <p className="text-xs text-[var(--text2)]">
-                  {new Date(selectedEmail.sentAt).toLocaleString('de-DE')}
+                  {selectedEmail.sentAt ? new Date(selectedEmail.sentAt).toLocaleString('de-DE') : '—'}
                 </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <button
                   onClick={() => { setComposeMode('reply'); setShowCompose(true) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--fg)', cursor: 'pointer' }}
+                  disabled={!emailBody}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--fg)', cursor: 'pointer', opacity: emailBody ? 1 : 0.4 }}
                 >
                   <Reply size={13} /> Antworten
                 </button>
                 <button
                   onClick={() => { setComposeMode('forward'); setShowCompose(true) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--fg)', cursor: 'pointer' }}
+                  disabled={!emailBody}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--fg)', cursor: 'pointer', opacity: emailBody ? 1 : 0.4 }}
                 >
                   <Forward size={13} /> Weiterleiten
                 </button>
@@ -307,8 +307,10 @@ function AccountSetupForm({ onAdd, onCancel }: { onAdd: () => void; onCancel: ()
       if (errorStr.startsWith('SMTP_AUTODETECT_FAILED:')) {
         try {
           const json = errorStr.slice('SMTP_AUTODETECT_FAILED:'.length)
-          const parsed = JSON.parse(json) as { smtpHost: string; smtpPort: number }
-          setSmtpForm(prev => ({ ...prev, smtpHost: parsed.smtpHost, smtpPort: String(parsed.smtpPort) }))
+          const parsed = JSON.parse(json) as { smtpHost?: string; smtpPort?: number }
+          if (typeof parsed?.smtpHost === 'string') {
+            setSmtpForm(prev => ({ ...prev, smtpHost: parsed.smtpHost!, smtpPort: String(parsed.smtpPort ?? 587) }))
+          }
         } catch { /* ignore parse error */ }
         setShowSmtpFields(true)
         setError('SMTP konnte nicht automatisch erkannt werden. Bitte SMTP-Einstellungen prüfen und erneut versuchen.')
