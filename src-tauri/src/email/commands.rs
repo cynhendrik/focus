@@ -288,7 +288,10 @@ pub fn email_download_attachment(
             .ok_or_else(|| "Anhang nicht gefunden".to_string())?
     };
 
-    let temp_path = std::env::temp_dir().join(&filename);
+    let temp_dir = std::env::temp_dir().join(Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|e| format!("Konnte temporäres Verzeichnis nicht erstellen: {}", e))?;
+    let temp_path = temp_dir.join(&filename);
     std::fs::write(&temp_path, &content)
         .map_err(|e| format!("Konnte Anhang nicht speichern: {}", e))?;
 
