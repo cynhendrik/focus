@@ -299,6 +299,117 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         );
         CREATE INDEX IF NOT EXISTS idx_smart_lists_workspace
             ON smart_lists(workspace_id, order_index);
+
+        CREATE TABLE IF NOT EXISTS invoice_sequences (
+            workspace_id TEXT PRIMARY KEY,
+            next_number  INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS offer_sequences (
+            workspace_id TEXT PRIMARY KEY,
+            next_number  INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS invoices (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
+            number          TEXT,
+            date            TEXT NOT NULL,
+            due_date        TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'draft',
+            tax_mode        TEXT NOT NULL DEFAULT 'standard',
+            subtotal        REAL NOT NULL DEFAULT 0,
+            tax_amount      REAL NOT NULL DEFAULT 0,
+            total           REAL NOT NULL DEFAULT 0,
+            bank_info       TEXT NOT NULL DEFAULT '{}',
+            notes           TEXT,
+            pdf_path        TEXT,
+            is_suggestion   INTEGER NOT NULL DEFAULT 0,
+            suggested_by    TEXT,
+            approved_by     TEXT,
+            pending_sync    INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_invoices_workspace
+            ON invoices(workspace_id, status);
+        CREATE INDEX IF NOT EXISTS idx_invoices_account
+            ON invoices(account_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS invoice_items (
+            id          TEXT PRIMARY KEY,
+            invoice_id  TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            title       TEXT NOT NULL,
+            description TEXT,
+            quantity    REAL NOT NULL DEFAULT 1,
+            unit_price  REAL NOT NULL DEFAULT 0,
+            tax_rate    REAL NOT NULL DEFAULT 19,
+            total       REAL NOT NULL DEFAULT 0,
+            sort_order  INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS offers (
+            id                   TEXT PRIMARY KEY,
+            workspace_id         TEXT NOT NULL DEFAULT '',
+            created_by           TEXT NOT NULL DEFAULT '',
+            account_id           TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            number               TEXT,
+            title                TEXT NOT NULL,
+            status               TEXT NOT NULL DEFAULT 'draft',
+            valid_until          TEXT NOT NULL,
+            tax_mode             TEXT NOT NULL DEFAULT 'standard',
+            subtotal             REAL NOT NULL DEFAULT 0,
+            tax_amount           REAL NOT NULL DEFAULT 0,
+            total                REAL NOT NULL DEFAULT 0,
+            notes                TEXT,
+            pdf_path             TEXT,
+            converted_invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,
+            pending_sync         INTEGER NOT NULL DEFAULT 0,
+            created_at           TEXT NOT NULL,
+            updated_at           TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_offers_workspace
+            ON offers(workspace_id, status);
+        CREATE INDEX IF NOT EXISTS idx_offers_account
+            ON offers(account_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS offer_items (
+            id          TEXT PRIMARY KEY,
+            offer_id    TEXT NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+            title       TEXT NOT NULL,
+            description TEXT,
+            quantity    REAL NOT NULL DEFAULT 1,
+            unit_price  REAL NOT NULL DEFAULT 0,
+            tax_rate    REAL NOT NULL DEFAULT 19,
+            total       REAL NOT NULL DEFAULT 0,
+            sort_order  INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS calendar_events (
+            id              TEXT PRIMARY KEY,
+            workspace_id    TEXT NOT NULL DEFAULT '',
+            created_by      TEXT NOT NULL DEFAULT '',
+            account_id      TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+            title           TEXT NOT NULL,
+            description     TEXT,
+            location        TEXT,
+            start_at        TEXT NOT NULL,
+            end_at          TEXT NOT NULL,
+            all_day         INTEGER NOT NULL DEFAULT 0,
+            color           TEXT,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_calendar_events_workspace
+            ON calendar_events(workspace_id, start_at);
+        CREATE INDEX IF NOT EXISTS idx_calendar_events_account
+            ON calendar_events(account_id, start_at);
     "#)?;
     Ok(())
 }
@@ -324,6 +435,12 @@ mod tests {
         assert!(tables.contains(&"deals".to_string()));
         assert!(tables.contains(&"activities".to_string()));
         assert!(tables.contains(&"pipeline_stages".to_string()));
+        assert!(tables.contains(&"invoices".to_string()));
+        assert!(tables.contains(&"invoice_items".to_string()));
+        assert!(tables.contains(&"offers".to_string()));
+        assert!(tables.contains(&"offer_items".to_string()));
+        assert!(tables.contains(&"invoice_sequences".to_string()));
+        assert!(tables.contains(&"offer_sequences".to_string()));
     }
 
     #[test]
@@ -350,5 +467,28 @@ mod tests {
             .query_map([], |r| r.get(1)).unwrap()
             .filter_map(|r| r.ok()).collect();
         assert!(ps_cols.contains(&"updated_at".to_string()));
+    }
+
+    #[test]
+    fn schema_has_calendar_events_table() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        create_tables(&conn).unwrap();
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(tables.contains(&"calendar_events".to_string()));
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(calendar_events)").unwrap()
+            .query_map([], |r| r.get(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(cols.contains(&"start_at".to_string()));
+        assert!(cols.contains(&"end_at".to_string()));
+        assert!(cols.contains(&"all_day".to_string()));
+        assert!(cols.contains(&"account_id".to_string()));
     }
 }
