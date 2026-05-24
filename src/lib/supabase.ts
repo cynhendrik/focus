@@ -7,4 +7,11 @@ if (!url || !key) {
   throw new Error('VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY müssen in .env gesetzt sein')
 }
 
-export const supabase = createClient(url, key)
+export const supabase = createClient(url, key, {
+  auth: {
+    persistSession:   true,
+    autoRefreshToken: true,
+    storageKey:       'cynera-focus-auth',
+    detectSessionInUrl: false,
+  },
+})

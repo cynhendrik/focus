@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const IS_DEV = import.meta.env.DEV
+
+async function minimizeWin() { await getCurrentWindow().minimize() }
+async function closeWin()    { await getCurrentWindow().close() }
 
 // ── Starburst SVG ────────────────────────────────────────────────────────────
 
@@ -123,6 +127,47 @@ export function LoginScreen() {
       position: 'fixed', inset: 0, background: '#000',
       display: 'grid', gridTemplateColumns: '40% 60%',
     }}>
+
+      {/* ── Window controls ─────────────────────────────────────────────── */}
+      <div style={{
+        position: 'absolute', top: 16, right: 16, zIndex: 10,
+        display: 'flex', gap: 6,
+      }}>
+        {(['minimize', 'close'] as const).map(action => (
+          <button
+            key={action}
+            onClick={action === 'minimize' ? minimizeWin : closeWin}
+            title={action === 'minimize' ? 'Minimieren' : 'Schließen'}
+            style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.3)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, fontFamily: 'var(--font-sans)',
+              transition: 'background 150ms, color 150ms, border-color 150ms',
+            }}
+            onMouseEnter={e => {
+              if (action === 'close') {
+                e.currentTarget.style.background = 'oklch(28% 0.08 15)'
+                e.currentTarget.style.color = 'oklch(72% 0.18 25)'
+                e.currentTarget.style.borderColor = 'oklch(40% 0.1 15)'
+              } else {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                e.currentTarget.style.color = 'rgba(255,255,255,0.6)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'
+              }
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'rgba(255,255,255,0.3)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+            }}
+          >
+            {action === 'minimize' ? '−' : '✕'}
+          </button>
+        ))}
+      </div>
 
       {/* ── LEFT: Decorative ────────────────────────────────────────────── */}
       <div style={{
