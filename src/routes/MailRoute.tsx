@@ -245,9 +245,25 @@ export function MailRoute() {
             </div>
             <div className="border-t border-[var(--border)] pt-4">
               {emailBody ? (
-                <pre className="text-xs text-[var(--text)] whitespace-pre-wrap leading-relaxed font-sans">
-                  {emailBody.bodyText || '(kein Inhalt)'}
-                </pre>
+                emailBody.bodyHtml ? (
+                  <iframe
+                    title="E-Mail Inhalt"
+                    srcDoc={emailBody.bodyHtml}
+                    sandbox="allow-same-origin"
+                    style={{
+                      border: 'none',
+                      width: '100%',
+                      minHeight: 400,
+                      flex: 1,
+                      borderRadius: 8,
+                      background: '#fff',
+                    }}
+                  />
+                ) : (
+                  <pre className="text-xs text-[var(--text)] whitespace-pre-wrap leading-relaxed font-sans">
+                    {emailBody.bodyText || '(kein Inhalt)'}
+                  </pre>
+                )
               ) : (
                 <p className="text-xs text-[var(--text2)]">Lädt…</p>
               )}
