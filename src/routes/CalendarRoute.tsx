@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/store/calendar.store'
+import { TagesplanCard } from '@/components/calendar/TagesplanCard'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -672,12 +673,20 @@ export function CalendarRoute() {
   const navigate    = useCalendarStore(s => s.navigate)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
+  const todayEvents    = useCalendarStore(s => s.todayEvents)
+  const isTodayLoading = useCalendarStore(s => s.isTodayLoading)
+  const loadToday      = useCalendarStore(s => s.loadToday)
+
   const [formOpen,      setFormOpen]      = useState(false)
   const [editingEvent,  setEditingEvent]  = useState<CalendarEvent | undefined>()
   const [defaultDate,   setDefaultDate]   = useState<Date | undefined>()
   const [defaultHour,   setDefaultHour]   = useState<number | undefined>()
 
   useEffect(() => { if (workspaceId) load(workspaceId) }, [workspaceId, view, currentDate.toDateString()])
+
+  useEffect(() => {
+    if (workspaceId) loadToday(workspaceId)
+  }, [workspaceId])
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -736,6 +745,10 @@ export function CalendarRoute() {
           <span>{events.length} Events</span>
         </div>
       </div>
+
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      {/* Left: nav controls + calendar card */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -837,6 +850,14 @@ export function CalendarRoute() {
           />
         )}
       </div>
+
+      </div>{/* end left column */}
+
+      {/* Tagesplan sidebar */}
+      <div style={{ width: 280, flexShrink: 0 }}>
+        <TagesplanCard events={todayEvents} isLoading={isTodayLoading} />
+      </div>
+    </div>{/* end flex row */}
 
       {formOpen && (
         <EventForm
