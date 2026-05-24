@@ -75,7 +75,7 @@ export default function App() {
   const [splashGone,   setSplashGone]   = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setMinTimeDone(true), 3600)
+    const t = setTimeout(() => setMinTimeDone(true), 5400)
     return () => clearTimeout(t)
   }, [])
 
