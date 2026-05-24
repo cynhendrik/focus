@@ -479,6 +479,16 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
+/* ── Calendar: Now-line ripple ring ── */
+.now-ring {
+  animation: now-ring-expand 2.4s ease-out infinite;
+}
+@keyframes now-ring-expand {
+  0%   { transform: scale(0.4); opacity: 0.9; }
+  75%  { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
 .stat-row { display: flex; align-items: baseline; gap: 8px; }
 .stat-value { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
 .stat-trend { font-family: var(--font-mono); font-size: 11px; color: var(--ok); }
@@ -799,6 +809,61 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 .stat-tile[data-tone="ok"] .value   { color: var(--ok); }
 
 .deadlines-block { padding: 22px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }
+
+/* ========== Invoice Form ========== */
+.inv-input {
+  width: 100%; padding: 10px 14px; font-size: 13.5px;
+  border-radius: 10px; border: 1.5px solid #e8e8e8;
+  background: #fff; color: #111; outline: none;
+  box-sizing: border-box; font-family: inherit;
+  transition: border-color 150ms;
+  -webkit-appearance: none; appearance: none;
+}
+.inv-input:focus { border-color: oklch(72% 0.2 125); box-shadow: 0 0 0 3px oklch(92% 0.2 125 / 0.25); }
+.inv-item-input {
+  background: #f5f5f5; border: 1.5px solid transparent;
+  border-radius: 7px; padding: 7px 10px; font-size: 13px;
+  color: #111; width: 100%; box-sizing: border-box;
+  outline: none; font-family: inherit;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms;
+}
+.inv-item-input:focus { background: #fff; border-color: oklch(72% 0.2 125); box-shadow: 0 0 0 3px oklch(92% 0.2 125 / 0.18); }
+.inv-delete-btn {
+  background: none; border: none; cursor: pointer; color: #d0d0d0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 5px; border-radius: 6px; transition: color 150ms, background 150ms;
+}
+.inv-delete-btn:hover { color: #888; background: #f0f0f0; }
+.inv-add-btn {
+  display: flex; align-items: center; gap: 7px;
+  background: transparent; border: 1.5px dashed #ddd;
+  border-radius: 10px; padding: 10px 16px; font-size: 13px;
+  color: #bbb; cursor: pointer; font-family: inherit;
+  transition: border-color 200ms, color 200ms;
+}
+.inv-add-btn:hover { border-color: oklch(72% 0.2 125); color: oklch(38% 0.14 125); }
+.inv-ghost-btn {
+  background: transparent; border: 1.5px solid #e8e8e8;
+  border-radius: 10px; padding: 11px 20px; font-size: 13px;
+  color: #999; cursor: pointer; font-family: inherit; font-weight: 500;
+  transition: border-color 150ms, color 150ms;
+}
+.inv-ghost-btn:hover { border-color: #bbb; color: #555; }
+.inv-ghost-btn:disabled { opacity: 0.5; cursor: default; }
+.inv-primary-btn {
+  background: oklch(92% 0.2 125); border: none; border-radius: 10px;
+  padding: 11px 24px; font-size: 13px; color: #111;
+  cursor: pointer; font-family: inherit; font-weight: 700;
+  letter-spacing: -0.015em; transition: opacity 150ms, transform 80ms;
+}
+.inv-primary-btn:hover { opacity: 0.88; }
+.inv-primary-btn:active { transform: scale(0.98); }
+.inv-primary-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ========== Remove number input spinners globally ========== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
 
 /* ========== Kanban (Tasks) ========== */
 

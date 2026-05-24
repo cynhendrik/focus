@@ -130,13 +130,15 @@ function WeekView({
   onEventClick: (event: CalendarEvent) => void
 }) {
   const nowRef = useRef<HTMLDivElement>(null)
-  const [nowPct, setNowPct] = useState(0)
+  const [nowPct,  setNowPct]  = useState(0)
+  const [nowTime, setNowTime] = useState('')
 
   useEffect(() => {
     function update() {
-      const now = new Date()
+      const now  = new Date()
       const mins = (now.getHours() - DAY_START) * 60 + now.getMinutes()
       setNowPct(mins / ((DAY_END - DAY_START) * 60))
+      setNowTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)
     }
     update()
     const t = setInterval(update, 60_000)
@@ -213,12 +215,50 @@ function WeekView({
             {today && nowPct > 0 && nowPct < 1 && (
               <div ref={nowRef} style={{
                 position: 'absolute', left: 0, right: 0,
-                top: nowTop, height: 2,
-                background: 'var(--danger)', opacity: 0.8,
+                top: nowTop, height: 0,
                 pointerEvents: 'none',
                 zIndex: 10,
+                overflow: 'visible',
               }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--danger)', marginTop: -2.5, marginLeft: -3.5 }} />
+                {/* Gradient line */}
+                <div style={{
+                  position: 'absolute', left: 0, right: 0, top: 0, height: 1,
+                  background: 'linear-gradient(to right, var(--accent) 0%, transparent 92%)',
+                }} />
+                {/* Pulsing ring */}
+                <div className="now-ring" style={{
+                  position: 'absolute',
+                  width: 14, height: 14,
+                  borderRadius: '50%',
+                  border: '1.5px solid var(--accent)',
+                  top: -7, left: -7,
+                }} />
+                {/* Solid dot with glow */}
+                <div style={{
+                  position: 'absolute',
+                  width: 9, height: 9,
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  boxShadow: '0 0 8px var(--accent-glow)',
+                  top: -4.5, left: -4.5,
+                }} />
+                {/* Time badge */}
+                <div style={{
+                  position: 'absolute',
+                  left: 12, top: -9,
+                  background: 'var(--accent)',
+                  color: 'var(--accent-ink)',
+                  fontSize: 9,
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  padding: '1px 5px 2px',
+                  borderRadius: 3,
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.6,
+                }}>
+                  {nowTime}
+                </div>
               </div>
             )}
 
@@ -358,6 +398,21 @@ function DayView({
   onSlotClick: (date: Date, hour: number) => void
   onEventClick: (event: CalendarEvent) => void
 }) {
+  const [nowPct,  setNowPct]  = useState(0)
+  const [nowTime, setNowTime] = useState('')
+
+  useEffect(() => {
+    function update() {
+      const now  = new Date()
+      const mins = (now.getHours() - DAY_START) * 60 + now.getMinutes()
+      setNowPct(mins / ((DAY_END - DAY_START) * 60))
+      setNowTime(`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`)
+    }
+    update()
+    const t = setInterval(update, 60_000)
+    return () => clearInterval(t)
+  }, [])
+
   const dayEvents = events.filter(e => !e.allDay && isoDate(new Date(e.startAt)) === isoDate(day))
 
   function eventTop(e: CalendarEvent) {
@@ -398,6 +453,53 @@ function DayView({
             <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'oklch(100% 0 0 / 0.02)', pointerEvents: 'none' }} />
           </div>
         ))}
+        {/* Now-line */}
+        {isToday(day) && nowPct > 0 && nowPct < 1 && (
+          <div style={{
+            position: 'absolute', left: 0, right: 0,
+            top: nowPct * HOURS.length * HOUR_H, height: 0,
+            pointerEvents: 'none',
+            zIndex: 10,
+            overflow: 'visible',
+          }}>
+            <div style={{
+              position: 'absolute', left: 0, right: 0, top: 0, height: 1,
+              background: 'linear-gradient(to right, var(--accent) 0%, transparent 92%)',
+            }} />
+            <div className="now-ring" style={{
+              position: 'absolute',
+              width: 14, height: 14,
+              borderRadius: '50%',
+              border: '1.5px solid var(--accent)',
+              top: -7, left: -7,
+            }} />
+            <div style={{
+              position: 'absolute',
+              width: 9, height: 9,
+              borderRadius: '50%',
+              background: 'var(--accent)',
+              boxShadow: '0 0 8px var(--accent-glow)',
+              top: -4.5, left: -4.5,
+            }} />
+            <div style={{
+              position: 'absolute',
+              left: 12, top: -9,
+              background: 'var(--accent)',
+              color: 'var(--accent-ink)',
+              fontSize: 9,
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              padding: '1px 5px 2px',
+              borderRadius: 3,
+              whiteSpace: 'nowrap',
+              lineHeight: 1.6,
+            }}>
+              {nowTime}
+            </div>
+          </div>
+        )}
+
         {dayEvents.map((ev, ei) => (
           <div
             key={ei}
