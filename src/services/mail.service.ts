@@ -1,12 +1,15 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   EmailAccount, EmailHeader, EmailBody, EmailAttachment,
-  AddAccountPayload, SendEmailPayload,
+  AddAccountPayload, SendEmailPayload, MailFolder,
 } from '@/types/mail.types'
 
 export const MailService = {
   getAccounts(): Promise<EmailAccount[]> {
     return invoke<EmailAccount[]>('email_get_accounts')
+  },
+  listFolders(accountId: string): Promise<MailFolder[]> {
+    return invoke<MailFolder[]>('email_list_folders', { accountId })
   },
   detectProvider(email: string): Promise<[string, number] | null> {
     return invoke<[string, number] | null>('email_detect_provider', { email })
@@ -26,8 +29,16 @@ export const MailService = {
   removeAccount(accountId: string): Promise<void> {
     return invoke<void>('email_remove_account', { accountId })
   },
-  sync(accountId: string, customersJson: string): Promise<{ inserted: number; skipped: number }> {
-    return invoke('email_sync', { accountId, customersJson })
+  sync(
+    accountId: string,
+    customersJson: string,
+    folder?: string,
+  ): Promise<{ inserted: number; skipped: number }> {
+    return invoke('email_sync', {
+      accountId,
+      folder: folder ?? null,
+      customersJson,
+    })
   },
   list(accountId: string, folder: string, limit: number, offset: number, search: string): Promise<EmailHeader[]> {
     return invoke<EmailHeader[]>('email_list', { accountId, folder, limit, offset, search })

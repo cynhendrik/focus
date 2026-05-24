@@ -72,3 +72,15 @@ export interface SmtpAutoDetectFailed {
   smtpHost: string
   smtpPort: number
 }
+
+export interface MailFolder {
+  id: string
+  accountId: string
+  path: string           // vollständiger IMAP-Pfad, z.B. "INBOX.Projekte.Kunde-A"
+  delimiter: string      // Trennzeichen aus IMAP (meist "." oder "/")
+  displayName: string    // letztes Pfad-Segment, z.B. "Kunde-A"
+  parentPath: string | null
+  flags: string[]        // IMAP-Attribute, z.B. ["\\HasChildren", "\\Sent"]
+  isSelectable: boolean  // false wenn \Noselect-Flag gesetzt
+  children?: MailFolder[] // nur im Frontend befüllt (nicht aus DB)
+}
