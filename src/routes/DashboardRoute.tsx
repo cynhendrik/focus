@@ -8,18 +8,13 @@ import type { Customer } from '@/types/customer.types'
 import { useMailStore } from '@/store/mail.store'
 import { DashboardEmailWidget } from '@/components/dashboard/DashboardEmailWidget'
 import type { EmailHeader } from '@/types/mail.types'
+import { useCalendarStore } from '@/store/calendar.store'
+import { TagesplanCard } from '@/components/calendar/TagesplanCard'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
-const AGENDA = [
-  { time: '09:00', title: 'Q2 Strategy Call',         sub: 'GreenLeaf Organic · Video', pill: 'JETZT', tone: 'now',    now: true  },
-  { time: '10:00', title: 'Brand Guidelines Review',   sub: 'TechCorp · Zoom',           pill: 'CALL',  tone: 'accent', now: false },
-  { time: '12:00', title: 'Mittagspause',              sub: '',                           pill: '',      tone: '',       now: false },
-  { time: '14:00', title: 'Website Deployment',        sub: 'PixelStudio',               pill: 'DEPLOY', tone: 'warn', now: false },
-  { time: '16:00', title: 'Daily Standup',             sub: 'Intern',                    pill: 'INTERN', tone: '',     now: false },
-]
 
 const DAYS    = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag']
 
@@ -71,6 +66,9 @@ export function DashboardRoute() {
   const isLoadingMails    = useMailStore(s => s.isLoading)
   const selectedAccountId = useMailStore(s => s.selectedAccountId)
   const setAppView        = useUiStore(s => s.setAppView)
+  const todayEvents    = useCalendarStore(s => s.todayEvents)
+  const isTodayLoading = useCalendarStore(s => s.isTodayLoading)
+  const loadToday      = useCalendarStore(s => s.loadToday)
 
   useEffect(() => {
     if (workspaceId) loadKpis(workspaceId)
@@ -81,6 +79,10 @@ export function DashboardRoute() {
       loadEmails()
     }
   }, [selectedAccountId, emails, loadEmails])
+
+  useEffect(() => {
+    if (workspaceId) loadToday(workspaceId)
+  }, [workspaceId])
 
   const unreadEmails = useMemo<EmailHeader[]>(
     () => emails
@@ -155,26 +157,7 @@ export function DashboardRoute() {
 
       {/* Row: Tagesplan + Aufmerksamkeit */}
       <div className="row">
-        <div className="card" style={{ padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0, letterSpacing: '-0.01em' }}>Tagesplan</h2>
-            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{AGENDA.length} EVENTS</span>
-          </div>
-          <div className="timeline">
-            <div className="tl-bar" />
-            {AGENDA.map((a, i) => (
-              <div key={i} className="tl-row" data-now={String(a.now)}>
-                <span className="tl-time">{a.time}</span>
-                <div className="tl-dot" />
-                <div className="tl-body" style={{ paddingLeft: 14 }}>
-                  <span className="tl-title">{a.title}</span>
-                  {a.sub && <span className="tl-sub">{a.sub}</span>}
-                </div>
-                {a.pill && <span className="tl-pill" data-tone={a.tone}>{a.pill}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
+        <TagesplanCard events={todayEvents} isLoading={isTodayLoading} />
 
         <div className="card" style={{ padding: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
