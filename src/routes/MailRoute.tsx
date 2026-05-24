@@ -15,7 +15,7 @@ export function MailRoute() {
     folders, expandedFolders, foldersLastFetched, isFolderLoading,
     loadAccounts, selectAccount, selectFolder, selectEmail, setSearch, sync,
     removeAccount, setSyncProgress, assignCustomer, deleteEmail, downloadAttachment,
-    loadFolders, toggleFolder,
+    loadFolders, toggleFolder, loadEmails,
   } = useMailStore()
 
   const customers = useCustomersStore(s => s.customers)
@@ -37,6 +37,12 @@ export function MailRoute() {
     }, 15 * 60 * 1000)
     return () => clearInterval(interval)
   }, [selectedAccountId])
+
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const timer = setTimeout(() => loadEmails(), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const handleSync = () => {
     const customersJson = JSON.stringify(customers.map(c => ({ id: c.id, email: c.email ?? null })))
