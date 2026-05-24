@@ -298,30 +298,29 @@ export function LoginScreen() {
           </form>
         </div>
 
-        {/* Dev skip — bottom right */}
-        {IS_DEV && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={handleDevSkip}
-              style={{
-                fontSize: 9.5, color: 'rgba(255,255,255,0.15)',
-                background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 5, padding: '3px 8px', cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                textTransform: 'uppercase', transition: 'color 150ms, border-color 150ms',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.45)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.color = 'rgba(255,255,255,0.15)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-              }}
-            >
-              dev skip
-            </button>
-          </div>
+        {/* Skip — bottom right */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={handleDevSkip}
+            style={{
+              fontSize: 9.5, color: 'rgba(255,255,255,0.15)',
+              background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 5, padding: '3px 8px', cursor: 'pointer',
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
+              textTransform: 'uppercase', transition: 'color 150ms, border-color 150ms',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.45)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.15)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+            }}
+          >
+            überspringen
+          </button>
+        </div>
         )}
       </div>
 
