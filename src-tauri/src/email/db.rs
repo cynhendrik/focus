@@ -71,6 +71,26 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
         conn.execute_batch("PRAGMA user_version = 2")?;
     }
 
+    if version < 3 {
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS folders (
+                id           TEXT PRIMARY KEY,
+                account_id   TEXT NOT NULL,
+                path         TEXT NOT NULL,
+                delimiter    TEXT NOT NULL DEFAULT '.',
+                display_name TEXT NOT NULL,
+                parent_path  TEXT,
+                flags        TEXT NOT NULL DEFAULT '[]',
+                is_selectable INTEGER NOT NULL DEFAULT 1,
+                sort_order   INTEGER NOT NULL DEFAULT 0,
+                last_fetched_at TEXT,
+                UNIQUE(account_id, path)
+            );
+            CREATE INDEX IF NOT EXISTS idx_folders_account ON folders(account_id);
+        ")?;
+        conn.execute_batch("PRAGMA user_version = 3")?;
+    }
+
     Ok(())
 }
 
@@ -294,6 +314,77 @@ pub fn delete_email(conn: &Connection, id: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
+// ── Folder CRUD ───────────────────────────────────────────────────────────────
+
+pub fn upsert_folders(
+    conn: &Connection,
+    account_id: &str,
+    folders: &[crate::email::types::RawFolder],
+) -> rusqlite::Result<()> {
+    // Komplett neu schreiben: alte Einträge löschen, neue inserieren
+    conn.execute("DELETE FROM folders WHERE account_id = ?1", params![account_id])?;
+    for (i, f) in folders.iter().enumerate() {
+        let id = format!("{}-{}", account_id, f.path);
+        let flags_json = serde_json::to_string(&f.flags).unwrap_or_else(|_| "[]".to_string());
+        conn.execute(
+            "INSERT OR REPLACE INTO folders
+             (id, account_id, path, delimiter, display_name, parent_path, flags, is_selectable, sort_order)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                id,
+                account_id,
+                f.path,
+                f.delimiter,
+                f.display_name,
+                f.parent_path,
+                flags_json,
+                f.is_selectable as i32,
+                i as i64,
+            ],
+        )?;
+    }
+    Ok(())
+}
+
+pub fn get_folders(
+    conn: &Connection,
+    account_id: &str,
+) -> rusqlite::Result<Vec<crate::email::types::Folder>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, account_id, path, delimiter, display_name, parent_path, flags, is_selectable
+         FROM folders WHERE account_id = ?1 ORDER BY sort_order"
+    )?;
+    let rows = stmt.query_map(params![account_id], |row| {
+        let flags_json: String = row.get(6)?;
+        let flags: Vec<String> = serde_json::from_str(&flags_json).unwrap_or_default();
+        Ok(crate::email::types::Folder {
+            id:           row.get(0)?,
+            account_id:   row.get(1)?,
+            path:         row.get(2)?,
+            delimiter:    row.get(3)?,
+            display_name: row.get(4)?,
+            parent_path:  row.get(5)?,
+            flags,
+            is_selectable: row.get::<_, i32>(7)? != 0,
+        })
+    })?;
+    rows.collect()
+}
+
+/// Gibt die höchste UID zurück, die für account_id + folder bereits in der DB liegt.
+/// Gibt 0 zurück wenn der Ordner noch nie synchronisiert wurde.
+pub fn get_folder_last_uid(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+) -> rusqlite::Result<u32> {
+    conn.query_row(
+        "SELECT COALESCE(MAX(uid), 0) FROM emails WHERE account_id = ?1 AND folder = ?2",
+        params![account_id, folder],
+        |row| row.get::<_, u32>(0),
+    )
+}
+
 // ── Attachment CRUD ───────────────────────────────────────────────────────────
 
 pub fn insert_attachments(conn: &Connection, attachments: &[crate::email::types::RawAttachment]) -> rusqlite::Result<()> {
@@ -387,5 +478,51 @@ mod tests {
         assert_eq!(accounts[0].smtp_host, "smtp.b.de");
         assert_eq!(accounts[0].smtp_port, 587);
         assert!(accounts[0].smtp_starttls);
+    }
+
+    #[test]
+    fn migration_v3_creates_folders_table() {
+        let conn = in_memory_db();
+        // Should exist after init_schema (which runs migrations)
+        conn.execute_batch(
+            "INSERT INTO folders (id, account_id, path, delimiter, display_name, is_selectable, sort_order)
+             VALUES ('f1', 'acc1', 'INBOX', '.', 'INBOX', 1, 0)"
+        ).unwrap();
+    }
+
+    #[test]
+    fn upsert_and_get_folders() {
+        use crate::email::types::RawFolder;
+        let conn = in_memory_db();
+        let raw = vec![
+            RawFolder {
+                path: "INBOX".into(),
+                delimiter: ".".into(),
+                display_name: "INBOX".into(),
+                parent_path: None,
+                flags: vec![],
+                is_selectable: true,
+            },
+            RawFolder {
+                path: "INBOX.Projekte".into(),
+                delimiter: ".".into(),
+                display_name: "Projekte".into(),
+                parent_path: Some("INBOX".into()),
+                flags: vec!["\\HasChildren".into()],
+                is_selectable: true,
+            },
+        ];
+        upsert_folders(&conn, "acc1", &raw).unwrap();
+        let folders = get_folders(&conn, "acc1").unwrap();
+        assert_eq!(folders.len(), 2);
+        assert_eq!(folders[0].path, "INBOX");
+        assert_eq!(folders[1].parent_path, Some("INBOX".into()));
+    }
+
+    #[test]
+    fn get_folder_last_uid_returns_zero_when_empty() {
+        let conn = in_memory_db();
+        let uid = get_folder_last_uid(&conn, "acc1", "INBOX").unwrap();
+        assert_eq!(uid, 0);
     }
 }
