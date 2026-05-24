@@ -28,6 +28,7 @@ interface MailState {
   expandedFolders: Set<string>
   foldersLastFetched: number
   isFolderLoading: boolean
+  syncedFolders: Set<string>
 
   loadAccounts: () => Promise<void>
   selectAccount: (id: string) => void
@@ -90,6 +91,7 @@ export const useMailStore = create<MailState>()((set, get) => ({
   expandedFolders: new Set<string>(),
   foldersLastFetched: 0,
   isFolderLoading: false,
+  syncedFolders: new Set<string>(),
 
   loadAccounts: async () => {
     try {
@@ -104,7 +106,7 @@ export const useMailStore = create<MailState>()((set, get) => ({
   },
 
   selectAccount: (id) => {
-    set({ selectedAccountId: id, emails: [], selectedEmail: null, emailBody: null })
+    set({ selectedAccountId: id, emails: [], selectedEmail: null, emailBody: null, syncedFolders: new Set<string>() })
     get().loadEmails()
   },
 
@@ -112,16 +114,18 @@ export const useMailStore = create<MailState>()((set, get) => ({
     set({ selectedFolder: folder, emails: [], selectedEmail: null, emailBody: null })
     await get().loadEmails()
     // On-demand Sync: wenn kein Kunden-Filter-Ordner und Ergebnis leer → Ordner synchronisieren
-    const { emails, selectedAccountId, isSyncing } = get()
+    const { emails, selectedAccountId, isSyncing, syncedFolders } = get()
     if (
       folder !== 'UNASSIGNED' &&
       emails.length === 0 &&
       selectedAccountId &&
-      !isSyncing
+      !isSyncing &&
+      !syncedFolders.has(folder)
     ) {
       set({ isFolderLoading: true })
       try {
         await MailService.sync(selectedAccountId, '[]', folder)
+        set(s => ({ syncedFolders: new Set([...s.syncedFolders, folder]) }))
         await get().loadEmails()
       } catch (err) {
         log.error('On-demand folder sync failed', { err })

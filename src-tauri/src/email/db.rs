@@ -321,15 +321,16 @@ pub fn upsert_folders(
     account_id: &str,
     folders: &[crate::email::types::RawFolder],
 ) -> rusqlite::Result<()> {
-    // Komplett neu schreiben: alte Einträge löschen, neue inserieren
-    conn.execute("DELETE FROM folders WHERE account_id = ?1", params![account_id])?;
+    // Komplett neu schreiben in einer Transaktion — atomisch: entweder alles oder nichts
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM folders WHERE account_id = ?1", params![account_id])?;
     for (i, f) in folders.iter().enumerate() {
         let id = format!("{}-{}", account_id, f.path);
         let flags_json = serde_json::to_string(&f.flags).unwrap_or_else(|_| "[]".to_string());
-        conn.execute(
+        tx.execute(
             "INSERT OR REPLACE INTO folders
-             (id, account_id, path, delimiter, display_name, parent_path, flags, is_selectable, sort_order)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             (id, account_id, path, delimiter, display_name, parent_path, flags, is_selectable, sort_order, last_fetched_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 id,
                 account_id,
@@ -340,10 +341,11 @@ pub fn upsert_folders(
                 flags_json,
                 f.is_selectable as i32,
                 i as i64,
+                chrono::Utc::now().to_rfc3339(),
             ],
         )?;
     }
-    Ok(())
+    tx.commit()
 }
 
 pub fn get_folders(
