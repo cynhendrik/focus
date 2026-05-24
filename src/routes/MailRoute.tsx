@@ -4,21 +4,18 @@ import { Reply, Forward, Plus } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { ComposeModal } from '@/components/mail/ComposeModal'
-import type { SyncProgress } from '@/types/mail.types'
-
-const FOLDERS = [
-  { id: 'INBOX', label: 'Posteingang' },
-  { id: 'Sent', label: 'Gesendet' },
-  { id: 'UNASSIGNED', label: 'Nicht zugeordnet' },
-]
+import { FolderTree } from '@/components/mail/FolderTree'
+import type { SyncProgress, MailFolder } from '@/types/mail.types'
 
 export function MailRoute() {
   const {
     accounts, selectedAccountId, selectedFolder, emails, selectedEmail, emailBody,
     attachments,
     search, syncProgress, isSyncing, isLoading,
+    folders, expandedFolders, foldersLastFetched, isFolderLoading,
     loadAccounts, selectAccount, selectFolder, selectEmail, setSearch, sync,
     removeAccount, setSyncProgress, assignCustomer, deleteEmail, downloadAttachment,
+    loadFolders, toggleFolder,
   } = useMailStore()
 
   const customers = useCustomersStore(s => s.customers)
@@ -31,6 +28,15 @@ export function MailRoute() {
     const unlisten = listen<SyncProgress>('email-sync-progress', e => setSyncProgress(e.payload))
     return () => { unlisten.then(fn => fn()) }
   }, [])
+
+  useEffect(() => {
+    if (!selectedAccountId) return
+    loadFolders(selectedAccountId)
+    const interval = setInterval(() => {
+      loadFolders(selectedAccountId)
+    }, 15 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [selectedAccountId])
 
   const handleSync = () => {
     const customersJson = JSON.stringify(customers.map(c => ({ id: c.id, email: c.email ?? null })))
@@ -77,17 +83,33 @@ export function MailRoute() {
         <button onClick={() => setShowSetup(s => !s)} className="text-xs px-2 py-1 text-[var(--text2)] hover:text-[var(--text)] text-left">+ Konto</button>
 
         <div className="h-px bg-[var(--border)] my-1" />
+        {/* Pinned virtual filter */}
+        <p className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider px-2 py-1">Filter</p>
+        <button
+          onClick={() => selectFolder('UNASSIGNED')}
+          className={`text-left text-xs px-2 py-1.5 rounded-lg transition-colors
+            ${selectedFolder === 'UNASSIGNED' ? 'bg-primary text-white' : 'text-[var(--text)] hover:bg-[var(--bg1)]'}`}
+        >
+          🔍 Nicht zugeordnet
+        </button>
+
+        <div className="h-px bg-[var(--border)] my-1" />
         <p className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider px-2 py-1">Ordner</p>
-        {FOLDERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => selectFolder(f.id)}
-            className={`text-left text-xs px-2 py-1.5 rounded-lg transition-colors
-              ${selectedFolder === f.id ? 'bg-primary text-white' : 'text-[var(--text)] hover:bg-[var(--bg1)]'}`}
-          >
-            {f.label}
-          </button>
-        ))}
+        {isFolderLoading && folders.length === 0 && (
+          <p className="text-xs text-[var(--text2)] px-2">Lädt…</p>
+        )}
+        {folders.length > 0 && (
+          <FolderTree
+            folders={folders}
+            selectedPath={selectedFolder}
+            expandedPaths={expandedFolders}
+            onSelect={(folder: MailFolder) => selectFolder(folder.path)}
+            onToggle={toggleFolder}
+          />
+        )}
+        {folders.length === 0 && !isFolderLoading && (
+          <p className="text-xs text-[var(--text2)] px-2">Keine Ordner</p>
+        )}
 
         <div className="mt-auto">
           <button
@@ -104,6 +126,11 @@ export function MailRoute() {
                 style={{ width: syncProgress.total ? `${(syncProgress.done / syncProgress.total) * 100}%` : '0%' }}
               />
             </div>
+          )}
+          {foldersLastFetched > 0 && (
+            <p className="text-center" style={{ fontSize: 10, color: 'var(--text2)', padding: '2px 0' }}>
+              {formatLastFetched(foldersLastFetched)}
+            </p>
           )}
         </div>
       </div>
@@ -272,6 +299,15 @@ export function MailRoute() {
       </div>
     </div>
   )
+}
+
+function formatLastFetched(ts: number): string {
+  if (!ts) return ''
+  const diffMs = Date.now() - ts
+  const diffMin = Math.floor(diffMs / 60_000)
+  if (diffMin < 1) return 'Zuletzt: gerade eben'
+  if (diffMin === 1) return 'Zuletzt: vor 1 Min.'
+  return `Zuletzt: vor ${diffMin} Min.`
 }
 
 function AccountSetupForm({ onAdd, onCancel }: { onAdd: () => void; onCancel: () => void }) {
