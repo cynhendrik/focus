@@ -11,6 +11,9 @@ interface CalendarState {
   currentDate: Date
   isLoading: boolean
   error: string | null
+  todayEvents: CalendarEvent[]
+  isTodayLoading: boolean
+  loadToday: (workspaceId: string) => Promise<void>
 
   load: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertCalendarEventPayload) => Promise<CalendarEvent>
@@ -52,6 +55,8 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
   currentDate: new Date(),
   isLoading: false,
   error: null,
+  todayEvents: [],
+  isTodayLoading: false,
 
   load: async (workspaceId) => {
     const { view, currentDate } = get()
@@ -63,6 +68,20 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
     } catch (err) {
       log.error('calendar load failed', { err })
       set({ isLoading: false, error: String(err) })
+    }
+  },
+
+  loadToday: async (workspaceId) => {
+    const today = new Date()
+    const from = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0))
+    const to   = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59))
+    set({ isTodayLoading: true })
+    try {
+      const todayEvents = await CalendarService.getEvents(workspaceId, from, to)
+      set({ todayEvents: todayEvents.sort((a, b) => a.startAt.localeCompare(b.startAt)), isTodayLoading: false })
+    } catch (err) {
+      log.error('calendar loadToday failed', { err })
+      set({ isTodayLoading: false })
     }
   },
 
