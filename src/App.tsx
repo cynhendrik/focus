@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { ClientPicker } from '@/components/clients/ClientPicker'
 import { AppShell }    from '@/components/layout/AppShell'
@@ -44,6 +44,7 @@ import { LeadsRoute }           from '@/routes/LeadsRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
+import { SplashScreen }        from '@/components/ui/SplashScreen'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -67,6 +68,25 @@ export default function App() {
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
   const openPicker        = useClientPickerStore(s => s.open)
+
+  // ── Splash ────────────────────────────────────────────────────────────────
+  const [minTimeDone,  setMinTimeDone]  = useState(false)
+  const [splashExit,   setSplashExit]   = useState(false)
+  const [splashGone,   setSplashGone]   = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimeDone(true), 2400)
+    return () => clearTimeout(t)
+  }, [])
+
+  useEffect(() => {
+    if (minTimeDone && !authLoading) {
+      setSplashExit(true)
+      const t = setTimeout(() => setSplashGone(true), 580)
+      return () => clearTimeout(t)
+    }
+  }, [minTimeDone, authLoading])
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { initAuth() }, [initAuth])
 
@@ -112,13 +132,7 @@ export default function App() {
 
   useSyncBridge()
 
-  if (authLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[var(--bg)]">
-        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-      </div>
-    )
-  }
+  if (!splashGone) return <SplashScreen exiting={splashExit} />
 
   if (!user && !DEV_BYPASS) return <LoginScreen />
 
