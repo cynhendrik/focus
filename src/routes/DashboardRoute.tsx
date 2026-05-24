@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -80,12 +80,15 @@ export function DashboardRoute() {
     if (selectedAccountId && emails.length === 0) {
       loadEmails()
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, emails, loadEmails])
 
-  const unreadEmails: EmailHeader[] = emails
-    .filter(e => !e.isRead)
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-    .slice(0, 8)
+  const unreadEmails = useMemo<EmailHeader[]>(
+    () => emails
+      .filter(e => !e.isRead)
+      .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+      .slice(0, 8),
+    [emails]
+  )
 
   function handleEmailClick(email: EmailHeader): void {
     selectEmail(email)
