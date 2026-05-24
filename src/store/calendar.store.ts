@@ -88,15 +88,26 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
   upsert: async (payload) => {
     const event = await CalendarService.upsert(payload)
     set(s => {
-      const filtered = s.events.filter(e => e.id !== event.id)
-      return { events: [...filtered, event].sort((a, b) => a.startAt.localeCompare(b.startAt)) }
+      const filtered      = s.events.filter(e => e.id !== event.id)
+      const filteredToday = s.todayEvents.filter(e => e.id !== event.id)
+      const todayPrefix   = localIso(new Date()).slice(0, 10)   // "YYYY-MM-DD"
+      const isToday       = event.startAt.startsWith(todayPrefix)
+      return {
+        events:      [...filtered, event].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+        todayEvents: isToday
+          ? [...filteredToday, event].sort((a, b) => a.startAt.localeCompare(b.startAt))
+          : filteredToday,
+      }
     })
     return event
   },
 
   remove: async (id, workspaceId) => {
     await CalendarService.delete(id, workspaceId)
-    set(s => ({ events: s.events.filter(e => e.id !== id) }))
+    set(s => ({
+      events:      s.events.filter(e => e.id !== id),
+      todayEvents: s.todayEvents.filter(e => e.id !== id),
+    }))
   },
 
   setView: (view) => set({ view }),
