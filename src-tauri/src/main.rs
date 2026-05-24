@@ -202,6 +202,7 @@ fn main() {
             email::commands::email_send,
             email::commands::email_get_attachments,
             email::commands::email_download_attachment,
+            email::commands::email_list_folders,
             core::auth::set_auth_token,
             core::sync::get_sync_status,
             core::sync::sync_now,

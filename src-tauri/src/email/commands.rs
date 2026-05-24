@@ -119,6 +119,7 @@ pub fn email_detect_provider(email: String) -> Option<(String, u16)> {
 #[tauri::command]
 pub async fn email_sync(
     account_id: String,
+    folder: Option<String>,       // NEU — None = INBOX + Sent; Some(path) = nur dieser Ordner
     customers_json: String,
     window: Window,
     db: tauri::State<'_, EmailDb>,
@@ -126,19 +127,28 @@ pub async fn email_sync(
     let customers: Vec<CustomerRef> = serde_json::from_str(&customers_json)
         .map_err(|e| format!("Ungültiges customers_json: {}", e))?;
 
-    // Get account info — release lock before any await
-    let (email, imap_host, imap_port, last_uid) = {
+    // Account-Daten holen — Lock vor dem await freigeben
+    let (email, imap_host, imap_port, account_last_uid) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         db::get_account_sync_info(&conn, &account_id).map_err(|e| e.to_string())?
+    };
+
+    // last_uid: für On-Demand-Sync eines einzelnen Ordners aus emails-Tabelle ableiten
+    let last_uid = if let Some(ref f) = folder {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        db::get_folder_last_uid(&conn, &account_id, f).map_err(|e| e.to_string())?
+    } else {
+        account_last_uid
     };
 
     let password = keychain::get(&email)?;
 
     let w = window.clone();
+    let specific_folder_ref = folder.as_deref();
     let output = imap::sync_account(
         &email, &password, &imap_host, imap_port,
         &account_id, last_uid, &customers,
-        None, // specific_folder — None = INBOX + Sent (default behavior)
+        specific_folder_ref,
         move |progress: SyncProgress| {
             let _ = w.emit("email-sync-progress", &progress);
         },
@@ -154,8 +164,11 @@ pub async fn email_sync(
             };
             {
                 let conn = db.0.lock().map_err(|e| e.to_string())?;
-                db::update_last_synced(&conn, &account_id, out.max_uid, &Utc::now().to_rfc3339())
-                    .map_err(|e| e.to_string())?;
+                // last_synced_uid nur bei Voll-Sync aktualisieren, nicht bei On-Demand-Sync
+                if folder.is_none() {
+                    db::update_last_synced(&conn, &account_id, out.max_uid, &Utc::now().to_rfc3339())
+                        .map_err(|e| e.to_string())?;
+                }
                 db::update_account_status(&conn, &account_id, "active")
                     .map_err(|e| e.to_string())?;
             }
@@ -173,6 +186,44 @@ pub async fn email_sync(
             Err(e)
         }
     }
+}
+
+// ── Folder listing ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn email_list_folders(
+    account_id: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<Vec<crate::email::types::Folder>, String> {
+    // 1. Account-Daten holen
+    let (email, imap_host, imap_port) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let account = db::get_account(&conn, &account_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Konto nicht gefunden".to_string())?;
+        (account.email, account.imap_host, account.imap_port)
+    };
+
+    // 2. Passwort aus Keychain
+    let password = keychain::get(&email)?;
+
+    // 3. Ordner via IMAP holen — bei Fehler: gecachte Daten zurückgeben
+    match crate::email::folders::fetch_folders(&email, &password, &imap_host, imap_port).await {
+        Ok(raw_folders) => {
+            // 4. In DB speichern (vollständige Aktualisierung)
+            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            db::upsert_folders(&conn, &account_id, &raw_folders)
+                .map_err(|e| e.to_string())?;
+        }
+        Err(e) => {
+            // IMAP nicht erreichbar — stale Cache ist okay, kein Fehler propagieren
+            eprintln!("email_list_folders: IMAP nicht erreichbar, verwende Cache. Fehler: {}", e);
+        }
+    }
+
+    // 5. Aus DB zurückgeben (frisch oder gecacht)
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::get_folders(&conn, &account_id).map_err(|e| e.to_string())
 }
 
 // ── Email CRUD ────────────────────────────────────────────────────────────────
