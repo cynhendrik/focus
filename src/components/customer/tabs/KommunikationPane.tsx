@@ -72,7 +72,7 @@ export function KommunikationPane({ customerId }: Props) {
 
   useEffect(() => {
     loadEmails()
-  }, [])
+  }, [customerId])
 
   const emails = allEmails
     .filter(e => e.customerId === customerId)
