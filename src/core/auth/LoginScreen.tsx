@@ -321,7 +321,6 @@ export function LoginScreen() {
             überspringen
           </button>
         </div>
-        )}
       </div>
 
     </div>
