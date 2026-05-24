@@ -43,7 +43,7 @@ export function TagesplanCard({ events, isLoading }: TagesplanCardProps) {
       </div>
 
       {/* Loading */}
-      {isLoading && (
+      {isLoading && events.length === 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
           <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
