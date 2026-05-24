@@ -2,6 +2,10 @@ interface SplashScreenProps {
   exiting: boolean
 }
 
+const WORDS = ['If', 'we', 'build,', 'we', 'build', 'to', 'lead.']
+const STAGGER = 320   // ms zwischen jedem Wort
+const START   = 300   // ms Pause bevor erstes Wort erscheint
+
 export function SplashScreen({ exiting }: SplashScreenProps) {
   return (
     <div style={{
@@ -11,54 +15,35 @@ export function SplashScreen({ exiting }: SplashScreenProps) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 18,
       zIndex: 9999,
-      animation: exiting ? 'splash-exit 550ms cubic-bezier(.4,0,1,1) forwards' : 'none',
+      animation: exiting ? 'splash-exit 600ms cubic-bezier(.4,0,1,1) forwards' : 'none',
     }}>
-
-      {/* Brand wordmark */}
       <div style={{
-        fontSize: 10.5,
-        letterSpacing: '0.28em',
-        textTransform: 'uppercase',
-        color: '#bbb',
-        fontWeight: 500,
-        fontFamily: '"SF Mono", "Fira Code", "Fira Mono", monospace',
-        animation: 'splash-rise 700ms cubic-bezier(.2,.7,.1,1) 150ms both',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '0.3em',
+        justifyContent: 'center',
+        maxWidth: 480,
+        padding: '0 32px',
       }}>
-        Cynera
+        {WORDS.map((word, i) => (
+          <span
+            key={i}
+            style={{
+              fontSize: 30,
+              fontWeight: 300,
+              color: '#0f0f0f',
+              letterSpacing: '-0.025em',
+              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+              lineHeight: 1.2,
+              opacity: 0,
+              animation: `splash-word 700ms cubic-bezier(.2,.7,.1,1) ${START + i * STAGGER}ms forwards`,
+            }}
+          >
+            {word}
+          </span>
+        ))}
       </div>
-
-      {/* Slogan */}
-      <div style={{
-        fontSize: 23,
-        fontWeight: 380,
-        color: '#111',
-        letterSpacing: '-0.025em',
-        lineHeight: 1.25,
-        textAlign: 'center',
-        maxWidth: 380,
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        animation: 'splash-rise 900ms cubic-bezier(.2,.7,.1,1) 550ms both',
-      }}>
-        If we build,<br />we build to lead.
-      </div>
-
-      {/* Subtle bottom line */}
-      <div style={{
-        position: 'absolute',
-        bottom: 36,
-        fontSize: 10,
-        letterSpacing: '0.14em',
-        color: '#ddd',
-        fontFamily: '"SF Mono", monospace',
-        textTransform: 'uppercase',
-        animation: 'splash-rise 600ms cubic-bezier(.2,.7,.1,1) 1000ms both',
-      }}>
-        Focus
-      </div>
-
     </div>
   )
 }

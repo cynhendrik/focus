@@ -3,79 +3,210 @@ import { useAuthStore } from '@/store/auth.store'
 
 export function LoginScreen() {
   const signIn = useAuthStore(s => s.signIn)
-  const [email, setEmail] = useState('')
+  const signUp = useAuthStore(s => s.signUp)
+
+  const [mode,     setMode]     = useState<'login' | 'register'>('login')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(false)
+  const [success,  setSuccess]  = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setLoading(true)
     try {
-      await signIn(email, password)
+      if (mode === 'login') {
+        await signIn(email, password)
+      } else {
+        await signUp(email, password)
+        setSuccess('Konto erstellt! Bitte bestätige deine E-Mail-Adresse und logge dich dann ein.')
+        setMode('login')
+        setPassword('')
+      }
     } catch (err: any) {
-      setError(err?.message ?? 'Login fehlgeschlagen')
+      setError(err?.message ?? (mode === 'login' ? 'Login fehlgeschlagen' : 'Registrierung fehlgeschlagen'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="h-screen flex items-center justify-center bg-[var(--bg)]">
-      <div className="w-full max-w-sm p-8 rounded-2xl bg-[var(--bg1)] border border-[var(--border)]">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
+    <div style={{
+      height: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#fff',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 360,
+        padding: '40px 36px',
+        borderRadius: 20,
+        background: '#fff',
+        border: '1px solid #ebebeb',
+        boxShadow: '0 2px 32px rgba(0,0,0,0.06)',
+      }}>
+
+        {/* Logo + Titel */}
+        <div style={{ marginBottom: 32, textAlign: 'center' }}>
+          <div style={{
+            fontSize: 11,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase' as const,
+            color: '#bbb',
+            fontFamily: 'var(--font-mono)',
+            marginBottom: 10,
+          }}>
+            Cynera Focus
           </div>
-          <div>
-            <p className="text-sm font-bold text-[var(--text)]">Cynera Focus</p>
-            <p className="text-xs text-[var(--text2)]">Einloggen</p>
-          </div>
+          <h1 style={{
+            fontSize: 22,
+            fontWeight: 300,
+            color: '#111',
+            letterSpacing: '-0.02em',
+            margin: 0,
+          }}>
+            {mode === 'login' ? 'Willkommen zurück.' : 'Konto erstellen.'}
+          </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="text-xs text-[var(--text2)] mb-1 block">E-Mail</label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* E-Mail */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: 11, color: '#999', letterSpacing: '0.04em' }}>
+              E-Mail
+            </label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               autoFocus
-              className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text)] focus:outline-none focus:border-primary placeholder-[var(--text2)]"
               placeholder="deine@email.de"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1px solid #e5e5e5',
+                fontSize: 13.5,
+                color: '#111',
+                background: '#fafafa',
+                outline: 'none',
+                width: '100%',
+                boxSizing: 'border-box' as const,
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#111')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#e5e5e5')}
             />
           </div>
 
-          <div>
-            <label className="text-xs text-[var(--text2)] mb-1 block">Passwort</label>
+          {/* Passwort */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <label style={{ fontSize: 11, color: '#999', letterSpacing: '0.04em' }}>
+              Passwort
+            </label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border)] text-sm text-[var(--text)] focus:outline-none focus:border-primary"
               placeholder="••••••••"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1px solid #e5e5e5',
+                fontSize: 13.5,
+                color: '#111',
+                background: '#fafafa',
+                outline: 'none',
+                width: '100%',
+                boxSizing: 'border-box' as const,
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#111')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#e5e5e5')}
             />
           </div>
 
+          {/* Fehler */}
           {error && (
-            <p className="text-xs text-red-400 bg-red-400/10 px-3 py-2 rounded-lg border border-red-400/20">
+            <div style={{
+              fontSize: 12,
+              color: '#e55',
+              background: 'rgba(220,50,50,0.06)',
+              border: '1px solid rgba(220,50,50,0.15)',
+              borderRadius: 8,
+              padding: '9px 12px',
+            }}>
               {error}
-            </p>
+            </div>
           )}
 
+          {/* Erfolg */}
+          {success && (
+            <div style={{
+              fontSize: 12,
+              color: '#2a9',
+              background: 'rgba(40,180,120,0.06)',
+              border: '1px solid rgba(40,180,120,0.2)',
+              borderRadius: 8,
+              padding: '9px 12px',
+            }}>
+              {success}
+            </div>
+          )}
+
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              marginTop: 4,
+              padding: '11px 0',
+              borderRadius: 10,
+              background: '#111',
+              color: '#fff',
+              fontSize: 13.5,
+              fontWeight: 500,
+              border: 'none',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'opacity 150ms',
+              letterSpacing: '-0.01em',
+            }}
           >
-            {loading ? 'Einloggen…' : 'Einloggen'}
+            {loading
+              ? (mode === 'login' ? 'Einloggen…' : 'Konto erstellen…')
+              : (mode === 'login' ? 'Einloggen' : 'Konto erstellen')
+            }
           </button>
         </form>
+
+        {/* Toggle Login / Registrieren */}
+        <div style={{ marginTop: 22, textAlign: 'center' }}>
+          <span style={{ fontSize: 12, color: '#aaa' }}>
+            {mode === 'login' ? 'Noch kein Konto?' : 'Bereits registriert?'}
+          </span>
+          {' '}
+          <button
+            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); setSuccess(null) }}
+            style={{
+              fontSize: 12,
+              color: '#111',
+              fontWeight: 500,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textUnderlineOffset: 2,
+            }}
+          >
+            {mode === 'login' ? 'Registrieren' : 'Einloggen'}
+          </button>
+        </div>
+
       </div>
     </div>
   )
