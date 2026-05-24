@@ -18,13 +18,14 @@ function getInitials(name: string, addr: string): string {
 }
 
 function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '–'
+  const diff = Date.now() - d.getTime()
   const min  = Math.floor(diff / 60_000)
   const hrs  = Math.floor(diff / 3_600_000)
   if (min < 1)   return 'gerade eben'
   if (min < 60)  return `vor ${min} Min.`
   if (hrs < 24)  return `vor ${hrs} Std.`
-  const d         = new Date(iso)
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
   if (d.toDateString() === yesterday.toDateString()) return 'gestern'
@@ -43,7 +44,7 @@ export function DashboardEmailWidget({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Ungelesene E-Mails</h2>
         {emails.length > 0 && (
-          <span className="chip" data-tone="bad">{emails.length} ungelesen</span>
+          <span className="chip" data-tone="warn">{emails.length} ungelesen</span>
         )}
       </div>
 
