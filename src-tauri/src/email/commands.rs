@@ -138,6 +138,7 @@ pub async fn email_sync(
     let output = imap::sync_account(
         &email, &password, &imap_host, imap_port,
         &account_id, last_uid, &customers,
+        None, // specific_folder — None = INBOX + Sent (default behavior)
         move |progress: SyncProgress| {
             let _ = w.emit("email-sync-progress", &progress);
         },

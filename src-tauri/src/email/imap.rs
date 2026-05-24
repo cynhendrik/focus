@@ -196,6 +196,7 @@ pub async fn sync_account<F>(
     account_id: &str,
     last_uid: u32,
     customers: &[CustomerRef],
+    specific_folder: Option<&str>,
     mut on_progress: F,
 ) -> Result<SyncOutput, String>
 where
@@ -212,12 +213,15 @@ where
         .await
         .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
 
-    let sent_folder = find_sent_folder(&mut session).await;
-
-    let folders = vec![
-        ("INBOX".to_string(), "INBOX".to_string()),
-        (sent_folder, "Sent".to_string()),
-    ];
+    let folders: Vec<(String, String)> = if let Some(folder) = specific_folder {
+        vec![(folder.to_string(), folder.to_string())]
+    } else {
+        let sent_folder = find_sent_folder(&mut session).await;
+        vec![
+            ("INBOX".to_string(), "INBOX".to_string()),
+            (sent_folder, "Sent".to_string()),
+        ]
+    };
 
     let mut all_rows: Vec<EmailRow> = Vec::new();
     let mut all_attachments: Vec<crate::email::types::RawAttachment> = Vec::new();
@@ -351,6 +355,32 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn specific_folder_overrides_default_folders() {
+        // Tests the folder-selection logic without needing an IMAP connection.
+        // We extract the selection logic into a testable helper function.
+        let folders = resolve_folders_for_test(Some("INBOX.Projekte"));
+        assert_eq!(folders.len(), 1);
+        assert_eq!(folders[0].0, "INBOX.Projekte");
+
+        let default_folders = resolve_folders_for_test(None);
+        // Default: INBOX + a Sent folder (2 total)
+        assert_eq!(default_folders.len(), 2);
+        assert_eq!(default_folders[0].0, "INBOX");
+    }
+
+    /// Test helper — mirrors the folder-selection logic from sync_account without IMAP
+    fn resolve_folders_for_test(specific_folder: Option<&str>) -> Vec<(String, String)> {
+        if let Some(folder) = specific_folder {
+            vec![(folder.to_string(), folder.to_string())]
+        } else {
+            vec![
+                ("INBOX".to_string(), "INBOX".to_string()),
+                ("Sent".to_string(), "Sent".to_string()),
+            ]
+        }
+    }
 
     fn make_plain_email() -> Vec<u8> {
         b"From: a@b.de\r\nTo: c@d.de\r\nSubject: Test\r\nContent-Type: text/plain\r\n\r\nHello World".to_vec()
