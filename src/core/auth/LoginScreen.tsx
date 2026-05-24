@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+
+const IS_DEV = import.meta.env.DEV
 
 export function LoginScreen() {
   const signIn = useAuthStore(s => s.signIn)
   const signUp = useAuthStore(s => s.signUp)
+  const setActiveWorkspace = useWorkspaceStore(s => s.setActiveWorkspace)
 
   const [mode,     setMode]     = useState<'login' | 'register'>('login')
   const [email,    setEmail]    = useState('')
@@ -22,7 +26,7 @@ export function LoginScreen() {
         await signIn(email, password)
       } else {
         await signUp(email, password)
-        setSuccess('Konto erstellt! Bitte bestätige deine E-Mail-Adresse und logge dich dann ein.')
+        setSuccess('Konto erstellt! Bestätige deine E-Mail und logge dich dann ein.')
         setMode('login')
         setPassword('')
       }
@@ -33,51 +37,66 @@ export function LoginScreen() {
     }
   }
 
+  function handleDevSkip() {
+    useWorkspaceStore.getState().setActiveWorkspace('dev')
+    useAuthStore.setState({ user: { id: 'dev', email: 'dev@cynera.local' } as any, loading: false })
+  }
+
   return (
     <div style={{
-      height: '100vh',
+      position: 'fixed',
+      inset: 0,
+      background: '#000',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#fff',
     }}>
+
+      {/* Login-Karte */}
       <div style={{
-        width: '100%',
-        maxWidth: 360,
-        padding: '40px 36px',
+        width: 360,
+        background: 'var(--accent)',
         borderRadius: 20,
-        background: '#fff',
-        border: '1px solid #ebebeb',
-        boxShadow: '0 2px 32px rgba(0,0,0,0.06)',
+        padding: '40px 36px 36px',
+        animation: 'login-card-in 600ms cubic-bezier(.2,.7,.1,1) 80ms both',
+        position: 'relative',
       }}>
 
-        {/* Logo + Titel */}
-        <div style={{ marginBottom: 32, textAlign: 'center' }}>
-          <div style={{
+        {/* Toggle oben rechts */}
+        <button
+          onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(null); setSuccess(null) }}
+          style={{
+            position: 'absolute',
+            top: 20, right: 22,
             fontSize: 11,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase' as const,
-            color: '#bbb',
-            fontFamily: 'var(--font-mono)',
-            marginBottom: 10,
-          }}>
-            Cynera Focus
-          </div>
-          <h1 style={{
-            fontSize: 22,
-            fontWeight: 300,
-            color: '#111',
-            letterSpacing: '-0.02em',
-            margin: 0,
-          }}>
-            {mode === 'login' ? 'Willkommen zurück.' : 'Konto erstellen.'}
-          </h1>
-        </div>
+            color: 'rgba(0,0,0,0.45)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            letterSpacing: '0.03em',
+            padding: 0,
+          }}
+        >
+          {mode === 'login' ? 'Konto erstellen' : 'Einloggen'}
+        </button>
+
+        {/* Heading */}
+        <h1 style={{
+          fontSize: 36,
+          fontWeight: 400,
+          color: '#000',
+          letterSpacing: '-0.03em',
+          margin: '0 0 32px',
+          lineHeight: 1,
+        }}>
+          {mode === 'login' ? 'Login' : 'Registrieren'}
+        </h1>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
           {/* E-Mail */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label style={{ fontSize: 11, color: '#999', letterSpacing: '0.04em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 10.5, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               E-Mail
             </label>
             <input
@@ -88,24 +107,24 @@ export function LoginScreen() {
               autoFocus
               placeholder="deine@email.de"
               style={{
-                padding: '10px 14px',
-                borderRadius: 10,
-                border: '1px solid #e5e5e5',
+                padding: '10px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid rgba(0,0,0,0.2)',
                 fontSize: 13.5,
-                color: '#111',
-                background: '#fafafa',
+                color: '#000',
                 outline: 'none',
                 width: '100%',
-                boxSizing: 'border-box' as const,
+                transition: 'border-color 150ms',
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = '#111')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#e5e5e5')}
+              onFocus={e => (e.currentTarget.style.borderBottomColor = '#000')}
+              onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(0,0,0,0.2)')}
             />
           </div>
 
           {/* Passwort */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label style={{ fontSize: 11, color: '#999', letterSpacing: '0.04em' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 10.5, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
               Passwort
             </label>
             <input
@@ -115,99 +134,95 @@ export function LoginScreen() {
               required
               placeholder="••••••••"
               style={{
-                padding: '10px 14px',
-                borderRadius: 10,
-                border: '1px solid #e5e5e5',
+                padding: '10px 0',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid rgba(0,0,0,0.2)',
                 fontSize: 13.5,
-                color: '#111',
-                background: '#fafafa',
+                color: '#000',
                 outline: 'none',
                 width: '100%',
-                boxSizing: 'border-box' as const,
+                transition: 'border-color 150ms',
               }}
-              onFocus={e => (e.currentTarget.style.borderColor = '#111')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#e5e5e5')}
+              onFocus={e => (e.currentTarget.style.borderBottomColor = '#000')}
+              onBlur={e => (e.currentTarget.style.borderBottomColor = 'rgba(0,0,0,0.2)')}
             />
           </div>
 
-          {/* Fehler */}
+          {/* Fehler / Erfolg */}
           {error && (
-            <div style={{
-              fontSize: 12,
-              color: '#e55',
-              background: 'rgba(220,50,50,0.06)',
-              border: '1px solid rgba(220,50,50,0.15)',
-              borderRadius: 8,
-              padding: '9px 12px',
-            }}>
+            <p style={{ fontSize: 12, color: '#000', background: 'rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', margin: 0 }}>
               {error}
-            </div>
+            </p>
           )}
-
-          {/* Erfolg */}
           {success && (
-            <div style={{
-              fontSize: 12,
-              color: '#2a9',
-              background: 'rgba(40,180,120,0.06)',
-              border: '1px solid rgba(40,180,120,0.2)',
-              borderRadius: 8,
-              padding: '9px 12px',
-            }}>
+            <p style={{ fontSize: 12, color: '#000', background: 'rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', margin: 0 }}>
               {success}
-            </div>
+            </p>
           )}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: 4,
-              padding: '11px 0',
-              borderRadius: 10,
-              background: '#111',
-              color: '#fff',
-              fontSize: 13.5,
-              fontWeight: 500,
-              border: 'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-              transition: 'opacity 150ms',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {loading
-              ? (mode === 'login' ? 'Einloggen…' : 'Konto erstellen…')
-              : (mode === 'login' ? 'Einloggen' : 'Konto erstellen')
-            }
-          </button>
+          {/* Submit — runder schwarzer Button, rechts ausgerichtet */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: 54, height: 54,
+                borderRadius: '50%',
+                background: '#000',
+                color: 'var(--accent)',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                transition: 'transform 150ms, opacity 150ms',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={e => { if (!loading) (e.currentTarget.style.transform = 'scale(1.06)') }}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+            >
+              {loading ? '…' : '→'}
+            </button>
+          </div>
+
         </form>
-
-        {/* Toggle Login / Registrieren */}
-        <div style={{ marginTop: 22, textAlign: 'center' }}>
-          <span style={{ fontSize: 12, color: '#aaa' }}>
-            {mode === 'login' ? 'Noch kein Konto?' : 'Bereits registriert?'}
-          </span>
-          {' '}
-          <button
-            onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null); setSuccess(null) }}
-            style={{
-              fontSize: 12,
-              color: '#111',
-              fontWeight: 500,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-              textUnderlineOffset: 2,
-            }}
-          >
-            {mode === 'login' ? 'Registrieren' : 'Einloggen'}
-          </button>
-        </div>
-
       </div>
+
+      {/* Dev-Skip — nur in Entwicklung sichtbar */}
+      {IS_DEV && (
+        <button
+          onClick={handleDevSkip}
+          style={{
+            position: 'fixed',
+            bottom: 16, right: 16,
+            fontSize: 10,
+            color: 'rgba(255,255,255,0.2)',
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 6,
+            padding: '4px 8px',
+            cursor: 'pointer',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            transition: 'color 150ms, border-color 150ms',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.5)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.2)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+          }}
+        >
+          dev skip
+        </button>
+      )}
+
     </div>
   )
 }

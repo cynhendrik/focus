@@ -2,28 +2,28 @@ interface SplashScreenProps {
   exiting: boolean
 }
 
-const WORDS = ['If', 'we', 'build,', 'we', 'build', 'to', 'lead.']
-const STAGGER = 320   // ms zwischen jedem Wort
-const START   = 300   // ms Pause bevor erstes Wort erscheint
+const WORDS   = ['If', 'we', 'build,', 'we', 'build', 'to', 'lead.']
+const STAGGER = 320
+const START   = 300
 
 export function SplashScreen({ exiting }: SplashScreenProps) {
   return (
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: '#ffffff',
+      background: '#000',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 9999,
-      animation: exiting ? 'splash-exit 600ms cubic-bezier(.4,0,1,1) forwards' : 'none',
+      animation: exiting ? 'splash-text-exit 500ms ease forwards' : 'none',
     }}>
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
         gap: '0.3em',
         justifyContent: 'center',
-        maxWidth: 480,
+        maxWidth: 500,
         padding: '0 32px',
       }}>
         {WORDS.map((word, i) => (
@@ -32,7 +32,7 @@ export function SplashScreen({ exiting }: SplashScreenProps) {
             style={{
               fontSize: 30,
               fontWeight: 300,
-              color: '#0f0f0f',
+              color: 'var(--accent)',
               letterSpacing: '-0.025em',
               fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
               lineHeight: 1.2,
