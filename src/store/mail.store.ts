@@ -3,7 +3,7 @@ import { MailService } from '@/services/mail.service'
 import { log } from '@/lib/logger'
 import type {
   EmailAccount, EmailHeader, EmailBody, EmailAttachment,
-  SyncProgress, AddAccountPayload, SendEmailPayload,
+  SyncProgress, AddAccountPayload, SendEmailPayload, MailFolder,
 } from '@/types/mail.types'
 import type { AppError } from '@/types/error.types'
 import { formatError } from '@/types/error.types'
@@ -23,9 +23,18 @@ interface MailState {
   attachments: EmailAttachment[]
   isSending: boolean
 
+  // Folder-Tree
+  folders: MailFolder[]
+  expandedFolders: Set<string>
+  foldersLastFetched: number
+  isFolderLoading: boolean
+
   loadAccounts: () => Promise<void>
   selectAccount: (id: string) => void
-  selectFolder: (folder: string) => void
+  selectFolder: (folder: string) => Promise<void>
+
+  loadFolders: (accountId: string) => Promise<void>
+  toggleFolder: (path: string) => void
   loadEmails: () => Promise<void>
   selectEmail: (email: EmailHeader | null) => Promise<void>
   setSearch: (q: string) => void
@@ -39,6 +48,28 @@ interface MailState {
   sendEmail: (payload: SendEmailPayload) => Promise<void>
   getAttachments: (emailId: string) => Promise<void>
   downloadAttachment: (attachmentId: string) => Promise<void>
+}
+
+function buildFolderTree(flat: MailFolder[]): MailFolder[] {
+  const byPath = new Map(flat.map(f => [f.path, { ...f, children: [] as MailFolder[] }]))
+  const roots: MailFolder[] = []
+  for (const folder of byPath.values()) {
+    if (folder.parentPath && byPath.has(folder.parentPath)) {
+      byPath.get(folder.parentPath)!.children!.push(folder)
+    } else {
+      roots.push(folder)
+    }
+  }
+  // INBOX zuerst
+  const PRIORITY_PATHS = ['INBOX']
+  roots.sort((a, b) => {
+    const ai = PRIORITY_PATHS.indexOf(a.path)
+    const bi = PRIORITY_PATHS.indexOf(b.path)
+    if (ai !== -1 && bi === -1) return -1
+    if (bi !== -1 && ai === -1) return 1
+    return 0
+  })
+  return roots
 }
 
 export const useMailStore = create<MailState>()((set, get) => ({
@@ -55,6 +86,10 @@ export const useMailStore = create<MailState>()((set, get) => ({
   error: null,
   attachments: [],
   isSending: false,
+  folders: [],
+  expandedFolders: new Set<string>(),
+  foldersLastFetched: 0,
+  isFolderLoading: false,
 
   loadAccounts: async () => {
     try {
@@ -73,9 +108,27 @@ export const useMailStore = create<MailState>()((set, get) => ({
     get().loadEmails()
   },
 
-  selectFolder: (folder) => {
+  selectFolder: async (folder) => {
     set({ selectedFolder: folder, emails: [], selectedEmail: null, emailBody: null })
-    get().loadEmails()
+    await get().loadEmails()
+    // On-demand Sync: wenn kein Kunden-Filter-Ordner und Ergebnis leer → Ordner synchronisieren
+    const { emails, selectedAccountId, isSyncing } = get()
+    if (
+      folder !== 'UNASSIGNED' &&
+      emails.length === 0 &&
+      selectedAccountId &&
+      !isSyncing
+    ) {
+      set({ isFolderLoading: true })
+      try {
+        await MailService.sync(selectedAccountId, '[]', folder)
+        await get().loadEmails()
+      } catch (err) {
+        log.error('On-demand folder sync failed', { err })
+      } finally {
+        set({ isFolderLoading: false })
+      }
+    }
   },
 
   loadEmails: async () => {
@@ -185,5 +238,27 @@ export const useMailStore = create<MailState>()((set, get) => ({
       log.error('Failed to download attachment', { err })
       throw err
     }
+  },
+
+  loadFolders: async (accountId) => {
+    try {
+      const flat = await MailService.listFolders(accountId)
+      const tree = buildFolderTree(flat)
+      set({ folders: tree, foldersLastFetched: Date.now() })
+    } catch (err) {
+      log.error('Failed to load folders', { err })
+    }
+  },
+
+  toggleFolder: (path) => {
+    set(s => {
+      const next = new Set(s.expandedFolders)
+      if (next.has(path)) {
+        next.delete(path)
+      } else {
+        next.add(path)
+      }
+      return { expandedFolders: next }
+    })
   },
 }))
