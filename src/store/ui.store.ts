@@ -7,7 +7,7 @@ export type AppView =
   | 'dashboard' | 'profile'   | 'workstation'
   | 'clients'   | 'pipeline'  | 'invoices'  | 'tasks'    | 'kpis' | 'insights'
   | 'calendar'  | 'mail'      | 'crm'       | 'settings' | 'followups'
-  | 'smartlists'| 'chat'      | 'leads'     | 'ablage'
+  | 'smartlists'| 'chat'      | 'leads'
 
 interface UiState {
   theme: Theme

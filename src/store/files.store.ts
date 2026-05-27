@@ -68,11 +68,20 @@ export const useFilesStore = create<FilesState>()((set, get) => ({
   removeFolder: async (id) => {
     try {
       await FolderService.deleteFolder(id)
-      set(s => ({
-        folders: s.folders.filter(f => f.id !== id),
-        files: s.files.filter(f => f.folderId !== id),
-        activeFolderId: s.activeFolderId === id ? null : s.activeFolderId,
-      }))
+      set(s => {
+        // Collect all descendant folder IDs recursively (DB cascade only handles direct files)
+        const toRemove = new Set<string>()
+        const collect = (fid: string) => {
+          toRemove.add(fid)
+          s.folders.filter(f => f.parentId === fid).forEach(c => collect(c.id))
+        }
+        collect(id)
+        return {
+          folders: s.folders.filter(f => !toRemove.has(f.id)),
+          files: s.files.filter(f => f.folderId === null || !toRemove.has(f.folderId)),
+          activeFolderId: s.activeFolderId !== null && toRemove.has(s.activeFolderId) ? null : s.activeFolderId,
+        }
+      })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err

@@ -11,7 +11,7 @@ import {
   Monitor, Home, CheckSquare, Users, CreditCard,
   TrendingUp, ListFilter, Bell, Target,
   Calendar, Mail, MessageCircle, Settings,
-  ChevronRight, FolderOpen,
+  ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -134,7 +134,6 @@ export function NavSidebar() {
           <SidebarNavItem icon={CheckSquare} label="Tasks"       active={appView === 'tasks'}       onClick={() => setAppView('tasks')}       kbd="T" badge={openTaskCount || undefined} />
           <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
           {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
-          <SidebarNavItem icon={FolderOpen} label="Ablage"  active={appView === 'ablage'}  onClick={() => setAppView('ablage')}  kbd="B" />
         </>
       )}
 
