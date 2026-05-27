@@ -3,6 +3,7 @@ import type { TimestampedEntity } from './common.types'
 export type ActivityType =
   | 'note' | 'task' | 'call' | 'meeting'
   | 'email' | 'file' | 'time_entry' | 'stage_change'
+  | 'email_out' | 'email_in' | 'dm' | 'system_event'
 
 export type ActivityStatus = 'open' | 'done' | 'cancelled'
 
@@ -27,6 +28,8 @@ export interface Activity extends TimestampedEntity {
   dueAt?: string
   assignee?: string
   outcome?: ActivityOutcome
+  direction?: 'in' | 'out'
+  emailId?: string
 }
 
 export interface CreateActivityPayload {
@@ -43,6 +46,8 @@ export interface CreateActivityPayload {
   dueAt?: string
   assignee?: string
   outcome?: ActivityOutcome
+  direction?: 'in' | 'out'
+  emailId?: string
 }
 
 export interface UpdateActivityPayload {

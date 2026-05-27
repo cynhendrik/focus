@@ -1,5 +1,10 @@
+export type PipelineStage =
+  | 'inbox' | 'waiting_reply' | 'replied' | 'call_booked' | 'won' | 'lost'
+
+// Kept for backward compat (legacy DB field, still present)
 export type LeadStatus = 'new' | 'attempted' | 'warm' | 'lost_reengage'
-export type LeadSource = 'zoom' | 'generic' | 'manual'
+
+export type LeadSource = 'zoom' | 'generic' | 'manual' | 'inbox' | 'linkedin' | 'website' | 'event'
 
 export interface Lead {
   id: string
@@ -7,9 +12,16 @@ export interface Lead {
   name: string
   email: string | null
   accountType: 'lead'
+  // Canonical pipeline stage
+  pipelineStage: PipelineStage
+  // Legacy (still on DB, preserved for compat)
   leadStatus: LeadStatus
   leadSource: LeadSource
   leadSourceDetail: string | null
+  companyName: string | null
+  linkedinUrl: string | null
+  lastActivityAt: string | null
+  nextFollowUpAt: string | null
   engagementScore: number
   reEngageDate: string | null
   convertedAt: string | null
@@ -22,9 +34,12 @@ export interface UpsertLeadPayload {
   workspaceId: string
   name: string
   email?: string
+  pipelineStage?: PipelineStage
   leadStatus?: LeadStatus
   leadSource: LeadSource
   leadSourceDetail?: string
+  companyName?: string
+  linkedinUrl?: string
   reEngageDate?: string
 }
 

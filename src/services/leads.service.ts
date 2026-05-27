@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { supabase } from '@/lib/supabase'
-import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PendingLead } from '@/types/lead.types'
+import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PendingLead, PipelineStage } from '@/types/lead.types'
 
 function normalizePendingLead(row: PendingLead): UpsertLeadPayload {
   return {
@@ -36,6 +36,10 @@ export const LeadsService = {
 
   deleteLead(id: string, workspaceId: string): Promise<void> {
     return invoke('delete_account', { id, workspaceId })
+  },
+
+  updateStage(id: string, stage: PipelineStage): Promise<Lead> {
+    return invoke('update_lead_stage', { id, stage })
   },
 
   async syncPending(workspaceId: string): Promise<number> {
