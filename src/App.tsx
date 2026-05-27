@@ -41,6 +41,7 @@ import { WorkstationRoute }     from '@/routes/WorkstationRoute'
 import { SmartListsRoute }      from '@/routes/SmartListsRoute'
 import { ChatRoute }            from '@/routes/ChatRoute'
 import { LeadsRoute }           from '@/routes/LeadsRoute'
+import { AblageRoute }          from '@/routes/AblageRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
@@ -149,6 +150,7 @@ export default function App() {
       case 'smartlists':   return <SmartListsRoute />
       case 'chat':         return <ChatRoute />
       case 'leads':        return <LeadsRoute />
+      case 'ablage':       return <AblageRoute />
       case 'invoices':   return <FinanceRoute />
       case 'tasks':      return <TasksRoute />
       case 'kpis':       return <KpisRoute />
