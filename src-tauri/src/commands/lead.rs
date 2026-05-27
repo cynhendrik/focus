@@ -34,3 +34,12 @@ pub fn insert_synced_leads(
 ) -> Result<usize, AppError> {
     db::lead::insert_synced_leads(&db.conn(), leads)
 }
+
+#[tauri::command]
+pub fn update_lead_stage(
+    db: State<'_, DbPool>,
+    id: String,
+    stage: String,
+) -> Result<Lead, AppError> {
+    db::lead::update_pipeline_stage(&db.conn(), &id, &stage)
+}
