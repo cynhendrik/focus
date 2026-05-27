@@ -37,6 +37,8 @@ const CATS: Record<Category, CatDef> = {
 
 const CAT_ORDER: Category[] = ['reply', 'email', 'call', 'whatsapp', 'task']
 
+const FOLLOW_UP_SEQUENCE_LENGTH = 4
+
 const TEMPLATE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
   value:        { label: 'Mehrwert',      color: '#a3e635', bg: 'rgba(163,230,53,0.12)' },
   social_proof: { label: 'Social Proof',  color: '#2dd4bf', bg: 'rgba(45,212,191,0.12)' },
@@ -653,8 +655,7 @@ function AutoFollowUpRow({
   onSkip: (id: string) => void
 }) {
   const tpl = TEMPLATE_LABELS[item.templateKey] ?? TEMPLATE_LABELS.none
-  const total = 4
-  const seqLabel = `Follow-up ${item.sequenceIndex + 1}/${total}`
+  const seqLabel = `Follow-up ${item.sequenceIndex + 1}/${FOLLOW_UP_SEQUENCE_LENGTH}`
   const bodyPreview = item.draftBody ? item.draftBody.slice(0, 80) + (item.draftBody.length > 80 ? '…' : '') : ''
 
   return (
@@ -748,12 +749,10 @@ function DraftEditorModal({
   item,
   leadName,
   onClose,
-  onSent,
 }: {
   item: FollowUpQueueItem
   leadName: string
   onClose: () => void
-  onSent: () => void
 }) {
   const updateDraft = useFollowUpQueueStore(s => s.updateDraft)
   const markSent    = useFollowUpQueueStore(s => s.markSent)
@@ -782,7 +781,6 @@ function DraftEditorModal({
       })
       // Mark queue item as sent
       await markSent(item.id, activity.id)
-      onSent()
       onClose()
     } catch {
       // keep modal open on error
@@ -897,7 +895,6 @@ export function FollowupsDashboardRoute() {
 
   const loadDue     = useFollowUpQueueStore(s => s.loadDue)
   const markSkipped = useFollowUpQueueStore(s => s.markSkipped)
-  const dueToday    = useFollowUpQueueStore(s => s.dueToday)
   const leads       = useLeadsStore(s => s.leads)
 
   const [showCreate, setShowCreate] = useState(false)
@@ -929,7 +926,7 @@ export function FollowupsDashboardRoute() {
 
   const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c])), [customers])
   const leadMap = useMemo(() => new Map(leads.map(l => [l.id, l])), [leads])
-  const dueQueueItems = useMemo(() => dueToday(), [dueToday, leads])
+  const dueQueueItems = useFollowUpQueueStore(s => s.dueToday())
 
   const handleCreate = async (params: { category: Category; customerId?: string; title: string; dueAt?: string }) => {
     await create({
@@ -947,6 +944,14 @@ export function FollowupsDashboardRoute() {
   }
 
   const handleDone = (id: string) => { update(id, { status: 'done' }) }
+
+  const handleSkip = async (id: string) => {
+    try {
+      await markSkipped(id)
+    } catch {
+      // silently ignore — store already sets error state
+    }
+  }
 
   const handleAction = (fu: Activity, customer: Customer | undefined, cat: Category) => {
     switch (cat) {
@@ -1018,7 +1023,7 @@ export function FollowupsDashboardRoute() {
                     leadName={lead?.name ?? 'Unbekannt'}
                     companyName={lead?.companyName ?? null}
                     onEdit={setDraftItem}
-                    onSkip={markSkipped}
+                    onSkip={handleSkip}
                   />
                 </div>
               )
@@ -1100,7 +1105,6 @@ export function FollowupsDashboardRoute() {
           item={draftItem}
           leadName={leadMap.get(draftItem.leadId)?.name ?? 'Unbekannt'}
           onClose={() => setDraftItem(null)}
-          onSent={() => setDraftItem(null)}
         />
       )}
     </div>
