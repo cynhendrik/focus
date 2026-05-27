@@ -770,16 +770,16 @@ function DraftEditorModal({
       // Save latest draft edits first
       await updateDraft(item.id, subject || null, body || null)
       // Create email_out activity directly via service to get the returned Activity
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const activity = await ActivitiesService.create({
         workspaceId,
         createdBy: user?.email ?? 'user',
         accountId: item.leadId,
-        type: 'email' as never,
+        type: 'email_out',
+        direction: 'out' as const,
         title: subject || `Follow-up an ${leadName}`,
         payload: body || undefined,
         status: 'done',
-      } as any)
+      })
       // Mark queue item as sent
       await markSent(item.id, activity.id)
       onSent()

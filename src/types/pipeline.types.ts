@@ -53,7 +53,8 @@ export interface UpsertDealPayload {
   expectedClose?: string
 }
 
-export type ActivityType = 'call' | 'meeting' | 'email' | 'note'
+export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'followup'
+  | 'email_out' | 'email_in' | 'dm' | 'system_event'
 
 export interface Activity {
   id: string
@@ -64,7 +65,9 @@ export interface Activity {
   type: string
   title?: string
   body?: string
+  payload?: string
   status: string
+  dueAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -77,5 +80,16 @@ export interface CreateActivityPayload {
   type: ActivityType
   title?: string
   body?: string
+  payload?: string
   durationMinutes?: number
+  status?: string
+  dueAt?: string
+  direction?: 'in' | 'out'
+}
+
+export interface UpdateActivityPayload {
+  title?: string
+  body?: string
+  status?: string
+  dueAt?: string
 }
