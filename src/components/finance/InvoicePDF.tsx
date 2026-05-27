@@ -261,11 +261,18 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
   )
 }
 
-async function pdfToBytes(data: InvoiceWithItems, profile: CompanyProfile, account: Account): Promise<Uint8Array> {
+export async function getInvoicePdfBytes(
+  data: InvoiceWithItems,
+  profile: CompanyProfile,
+  account: Account,
+): Promise<Uint8Array> {
   const blob = await pdf(<InvoicePDFDoc data={data} profile={profile} account={account} />).toBlob()
   const buf = await blob.arrayBuffer()
   return new Uint8Array(buf)
 }
+
+// Keep internal alias for existing callers
+const pdfToBytes = getInvoicePdfBytes
 
 export async function downloadInvoicePDF(data: InvoiceWithItems, profile: CompanyProfile, account: Account) {
   const toast = useDownloadToastStore.getState()
