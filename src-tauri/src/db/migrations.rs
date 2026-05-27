@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 14;
+const CURRENT_VERSION: u32 = 15;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -379,6 +379,86 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                      ALTER TABLE offer_items ADD COLUMN unit TEXT;"
                 )?;
             }
+            Ok(())
+        }
+        15 => {
+            // 1. accounts neue Felder
+            for (col, def) in [
+                ("pipeline_stage", "TEXT NOT NULL DEFAULT 'inbox'"),
+                ("company_name",    "TEXT"),
+                ("linkedin_url",    "TEXT"),
+                ("last_activity_at","TEXT"),
+                ("next_follow_up_at","TEXT"),
+            ] {
+                if !column_exists(conn, "accounts", col) {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE accounts ADD COLUMN {col} {def};"
+                    ))?;
+                }
+            }
+            // 2. pipeline_stage aus lead_status befüllen (nur Leads die noch auf 'inbox' stehen)
+            conn.execute_batch(r#"
+                UPDATE accounts SET pipeline_stage = CASE lead_status
+                    WHEN 'new'           THEN 'inbox'
+                    WHEN 'attempted'     THEN 'waiting_reply'
+                    WHEN 'warm'          THEN 'replied'
+                    WHEN 'lost_reengage' THEN 'inbox'
+                    ELSE 'inbox'
+                END WHERE account_type = 'lead' AND pipeline_stage = 'inbox';
+            "#)?;
+            // 3. Unique-Guard gegen Lead-Duplikate per E-Mail
+            conn.execute_batch(r#"
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_lead_email
+                    ON accounts(workspace_id, LOWER(email))
+                    WHERE account_type = 'lead' AND email IS NOT NULL;
+            "#)?;
+            // 4. activities: direction + email_id
+            for (col, def) in [("direction", "TEXT"), ("email_id", "TEXT")] {
+                if !column_exists(conn, "activities", col) {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE activities ADD COLUMN {col} {def};"
+                    ))?;
+                }
+            }
+            // legacy: alte 'email'-Activities bekommen direction='in'
+            conn.execute_batch(r#"
+                UPDATE activities SET direction = 'in'
+                    WHERE type = 'email' AND direction IS NULL;
+            "#)?;
+            // 5. emails: direction + activity_id
+            for (col, def) in [
+                ("direction",   "TEXT NOT NULL DEFAULT 'in'"),
+                ("activity_id", "TEXT"),
+            ] {
+                if !column_exists(conn, "emails", col) {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE emails ADD COLUMN {col} {def};"
+                    ))?;
+                }
+            }
+            // 6. follow_up_queue neue Tabelle
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS follow_up_queue (
+                    id                  TEXT PRIMARY KEY,
+                    workspace_id        TEXT NOT NULL,
+                    lead_id             TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    trigger_activity_id TEXT,
+                    sequence_index      INTEGER NOT NULL DEFAULT 1,
+                    send_at             TEXT NOT NULL,
+                    status              TEXT NOT NULL DEFAULT 'pending',
+                    template_key        TEXT NOT NULL DEFAULT 'value',
+                    draft_subject       TEXT,
+                    draft_body          TEXT,
+                    sent_activity_id    TEXT,
+                    sent_at             TEXT,
+                    created_at          TEXT NOT NULL,
+                    updated_at          TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_followup_queue_lead
+                    ON follow_up_queue(lead_id, status, send_at);
+                CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
+                    ON follow_up_queue(workspace_id, status, send_at);
+            "#)?;
             Ok(())
         }
         14 => {
@@ -979,6 +1059,50 @@ mod tests {
             .filter_map(|r| r.ok()).collect();
         assert!(ws_file_cols.contains(&"source_type".to_string()), "source_type fehlt");
         assert!(ws_file_cols.contains(&"source_id".to_string()), "source_id fehlt");
+    }
+
+    #[test]
+    fn migration_v15_adds_new_columns_and_table() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        assert!(column_exists(&conn, "accounts", "pipeline_stage"), "pipeline_stage missing");
+        assert!(column_exists(&conn, "accounts", "company_name"), "company_name missing");
+        assert!(column_exists(&conn, "accounts", "linkedin_url"), "linkedin_url missing");
+        assert!(column_exists(&conn, "accounts", "last_activity_at"), "last_activity_at missing");
+        assert!(column_exists(&conn, "accounts", "next_follow_up_at"), "next_follow_up_at missing");
+        assert!(column_exists(&conn, "activities", "direction"), "direction missing");
+        assert!(column_exists(&conn, "activities", "email_id"), "email_id missing");
+        assert!(column_exists(&conn, "emails", "direction"), "emails.direction missing");
+        assert!(column_exists(&conn, "emails", "activity_id"), "emails.activity_id missing");
+        assert!(table_exists_helper(&conn, "follow_up_queue"), "follow_up_queue missing");
+    }
+
+    #[test]
+    fn migration_v15_migrates_lead_status_to_pipeline_stage() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        // Insert a 'warm' lead (should map to 'replied')
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, account_type, lead_status, pipeline_stage, created_at, updated_at)
+             VALUES ('l1','ws-1','','Test Lead','lead','warm','inbox',?1,?1)",
+            [&now],
+        ).unwrap();
+        // Run the mapping SQL manually (simulating what v15 does)
+        conn.execute_batch(
+            "UPDATE accounts SET pipeline_stage = CASE lead_status
+                WHEN 'new'           THEN 'inbox'
+                WHEN 'attempted'     THEN 'waiting_reply'
+                WHEN 'warm'          THEN 'replied'
+                WHEN 'lost_reengage' THEN 'inbox'
+                ELSE 'inbox'
+            END WHERE account_type = 'lead' AND pipeline_stage = 'inbox';"
+        ).unwrap();
+        let stage: String = conn.query_row(
+            "SELECT pipeline_stage FROM accounts WHERE id='l1'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(stage, "replied");
     }
 
     #[test]

@@ -22,6 +22,11 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             primary_deal_id TEXT,
             lead_score      REAL NOT NULL DEFAULT 0,
             score_factors   TEXT NOT NULL DEFAULT '{}',
+            pipeline_stage  TEXT NOT NULL DEFAULT 'inbox',
+            company_name    TEXT,
+            linkedin_url    TEXT,
+            last_activity_at TEXT,
+            next_follow_up_at TEXT,
             street          TEXT,
             zip             TEXT,
             city            TEXT,
@@ -83,6 +88,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             due_at          TEXT,
             assignee        TEXT,
             outcome         TEXT,
+            direction       TEXT,
+            email_id        TEXT,
             pending_sync    INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL
@@ -270,7 +277,9 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             received_at TEXT,
             read        INTEGER NOT NULL DEFAULT 0,
             customer_id TEXT REFERENCES customers(id),
-            tags        TEXT NOT NULL DEFAULT '[]'
+            tags        TEXT NOT NULL DEFAULT '[]',
+            direction   TEXT NOT NULL DEFAULT 'in',
+            activity_id TEXT
         );
 
         CREATE TABLE IF NOT EXISTS company_settings (
@@ -437,6 +446,27 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             ON workspace_files(workspace_id, folder_id);
         CREATE INDEX IF NOT EXISTS idx_ws_files_source
             ON workspace_files(source_type, source_id);
+
+        CREATE TABLE IF NOT EXISTS follow_up_queue (
+            id                  TEXT PRIMARY KEY,
+            workspace_id        TEXT NOT NULL,
+            lead_id             TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            trigger_activity_id TEXT,
+            sequence_index      INTEGER NOT NULL DEFAULT 1,
+            send_at             TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'pending',
+            template_key        TEXT NOT NULL DEFAULT 'value',
+            draft_subject       TEXT,
+            draft_body          TEXT,
+            sent_activity_id    TEXT,
+            sent_at             TEXT,
+            created_at          TEXT NOT NULL,
+            updated_at          TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_followup_queue_lead
+            ON follow_up_queue(lead_id, status, send_at);
+        CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
+            ON follow_up_queue(workspace_id, status, send_at);
     "#)?;
     Ok(())
 }
@@ -468,6 +498,7 @@ mod tests {
         assert!(tables.contains(&"offer_items".to_string()));
         assert!(tables.contains(&"invoice_sequences".to_string()));
         assert!(tables.contains(&"offer_sequences".to_string()));
+        assert!(tables.contains(&"follow_up_queue".to_string()));
     }
 
     #[test]
