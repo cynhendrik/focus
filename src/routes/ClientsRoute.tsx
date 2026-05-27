@@ -1,63 +1,384 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
-import { useSmartListsStore } from '@/store/smart-lists.store'
-import { useCrmStore }         from '@/store/crm.store'
-import { applySmartListFilter } from '@/lib/smart-list-filter'
-import { SmartListsSection }    from '@/components/smart-lists/SmartListsSection'
+import { useTodosStore } from '@/store/todos.store'
+import { useCrmStore } from '@/store/crm.store'
+import { useClientPickerStore } from '@/store/client-picker.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
-import type { Customer } from '@/types/customer.types'
-import { Search } from 'lucide-react'
+import type { Customer, CustomerStatus } from '@/types/customer.types'
+import type { Todo } from '@/types/todo.types'
+import type { CustomerTab } from '@/store/ui.store'
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diff / 86400000)
-  if (days === 0) return 'Heute'
-  if (days === 1) return 'Gestern'
-  return `vor ${days} Tagen`
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function isToday(iso: string) {
+  const d = new Date(iso), n = new Date()
+  return d.getFullYear() === n.getFullYear()
+    && d.getMonth() === n.getMonth()
+    && d.getDate() === n.getDate()
 }
 
-function scoreTone(score: number): 'ok' | 'warn' | 'bad' {
-  if (score >= 70) return 'ok'
-  if (score >= 40) return 'warn'
-  return 'bad'
+function isOverdue(iso: string) {
+  const d = new Date(iso); d.setHours(23, 59, 59, 999)
+  return d < new Date()
 }
 
-function attentionScore(c: Customer): number {
-  let score = 75
-  if (c.priority === 'high')   score -= 30
-  if (c.status  === 'inaktiv') score -= 20
-  if (c.status  === 'lead')    score -= 10
-  if (c.status  === 'lost')    score -= 40
-  return Math.max(10, Math.min(99, score))
+function relTime(iso: string) {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (d === 0) return 'Heute'
+  if (d === 1) return 'Gestern'
+  if (d < 7)  return `vor ${d}T`
+  if (d < 30) return `vor ${Math.floor(d / 7)}W`
+  return `vor ${Math.floor(d / 30)}M`
 }
 
-function ClientOverviewContent({ customers, onOpen }: { customers: Customer[]; onOpen: (id: string) => void }) {
-  const highPrio    = customers.filter(c => c.priority === 'high')
-  const needAttn    = customers.filter(c => c.priority === 'high' || c.status === 'inaktiv')
-  const aktiv       = customers.filter(c => c.status === 'aktiv')
-  const attnSorted  = [...needAttn].sort((a, b) => attentionScore(a) - attentionScore(b)).slice(0, 4)
+function overdueLabel(iso: string) {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  return d === 1 ? 'Gestern' : `Seit ${d}T`
+}
 
-  const deadlines = [
-    { pill: 'Heute',     tone: 'today',   title: 'Brand Guidelines Review',  meta: 'TechCorp · 10:00'  },
-    { pill: 'Heute',     tone: 'today',   title: 'Website Deployment',       meta: 'PixelStudio · 14:00' },
-    { pill: 'Überfällig', tone: 'overdue', title: 'Budget Discussion',       meta: 'Sunrise Coffee · ASAP' },
-  ]
+const STATUS_TONE: Record<CustomerStatus, string> = {
+  aktiv: 'ok', lead: 'accent', inaktiv: 'warn', lost: 'bad',
+}
+const STATUS_LABEL: Record<CustomerStatus, string> = {
+  aktiv: 'Aktiv', lead: 'Lead', inaktiv: 'Inaktiv', lost: 'Lost',
+}
+
+// ── Quick Strip ───────────────────────────────────────────────────────────────
+
+function ClientChip({
+  customer, pinned, onOpen, onTogglePin,
+}: {
+  customer: Customer
+  pinned: boolean
+  onOpen: () => void
+  onTogglePin: (e: React.MouseEvent) => void
+}) {
+  const [hovered, setHovered] = useState(false)
 
   return (
-    <>
-      <div className="client-overview-head">
-        <h1>Client Overview</h1>
-        <div className="sub">Deine wichtigsten Prioritäten auf einen Blick</div>
+    <div
+      style={{ position: 'relative', flexShrink: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        onClick={onOpen}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '5px 12px 5px 7px', borderRadius: 99,
+          background: 'var(--surface)',
+          border: `1px solid ${pinned ? 'var(--accent)' : 'var(--border)'}`,
+          cursor: 'pointer', fontSize: 12, fontWeight: 500,
+          color: 'var(--fg)', transition: 'border-color 150ms, box-shadow 150ms',
+          boxShadow: pinned ? '0 0 0 2px oklch(92% 0.2 125 / 0.15)' : 'none',
+        }}
+      >
+        <div style={{
+          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+          background: pinned ? 'var(--accent)' : 'var(--surface-2)',
+          color: pinned ? 'var(--accent-ink)' : 'var(--fg-muted)',
+          border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, fontWeight: 700,
+          transition: 'background 150ms, color 150ms',
+        }}>
+          {customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
+        </div>
+        <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {customer.name.split(' ')[0]}
+        </span>
+      </button>
+
+      {/* Pin/Unpin button — appears on hover */}
+      {hovered && (
+        <button
+          onClick={onTogglePin}
+          title={pinned ? 'Entpinnen' : 'Anpinnen'}
+          style={{
+            position: 'absolute', top: -7, right: -7,
+            width: 18, height: 18, borderRadius: '50%',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 1,
+            color: pinned ? 'var(--accent)' : 'var(--fg-dim)',
+          }}
+        >
+          {pinned ? <PinOff size={9} /> : <Pin size={9} />}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function QuickStrip({
+  customers, pinnedIds, recentClients, onOpen, onTogglePin,
+}: {
+  customers: Customer[]
+  pinnedIds: string[]
+  recentClients: Customer[]
+  onOpen: (id: string) => void
+  onTogglePin: (id: string) => void
+}) {
+  const pinned = useMemo(
+    () => pinnedIds.map(id => customers.find(c => c.id === id)).filter(Boolean) as Customer[],
+    [customers, pinnedIds],
+  )
+  const recent = useMemo(
+    () => recentClients.filter(c => !pinnedIds.includes(c.id)).slice(0, 6),
+    [recentClients, pinnedIds],
+  )
+  const strip = [...pinned, ...recent].slice(0, 8)
+
+  if (strip.length === 0) return null
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '14px 0', overflowX: 'auto',
+    }}>
+      <span style={{
+        fontSize: 11, color: 'var(--fg-dim)', fontWeight: 500,
+        letterSpacing: '0.06em', textTransform: 'uppercase',
+        fontFamily: 'var(--font-mono)', flexShrink: 0,
+        userSelect: 'none',
+      }}>
+        Zuletzt
+      </span>
+      <div style={{ width: 1, height: 14, background: 'var(--border)', flexShrink: 0 }} />
+      {strip.map(c => (
+        <ClientChip
+          key={c.id}
+          customer={c}
+          pinned={pinnedIds.includes(c.id)}
+          onOpen={() => onOpen(c.id)}
+          onTogglePin={(e) => { e.stopPropagation(); onTogglePin(c.id) }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── Board section card ────────────────────────────────────────────────────────
+
+function SectionCard({
+  title, icon, count, empty, children,
+}: {
+  title: string
+  icon: React.ReactNode
+  count?: number
+  empty?: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '15px 20px', borderBottom: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ color: 'var(--fg-muted)', display: 'flex' }}>{icon}</span>
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>{title}</h3>
+        </div>
+        {count !== undefined && count > 0 && (
+          <span className="chip">{count}</span>
+        )}
+      </div>
+      <div style={{ padding: '12px 20px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+        {children ?? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--fg-dim)', fontSize: 12 }}>
+            {empty}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Deadline row ──────────────────────────────────────────────────────────────
+
+function DeadlineRow({ todo, name, tone, label, onClick }: {
+  todo: Todo; name: string; tone: 'overdue' | 'today'; label: string; onClick: () => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+        background: 'var(--surface-2)', border: '1px solid var(--border)',
+        transition: 'opacity 100ms',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.opacity = '0.72')}
+      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+    >
+      <div style={{
+        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+        background: tone === 'overdue' ? 'oklch(72% 0.18 25 / 0.12)' : 'oklch(85% 0.18 90 / 0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {tone === 'overdue'
+          ? <AlertTriangle size={12} style={{ color: 'var(--danger)' }} />
+          : <Clock size={12} style={{ color: 'var(--warn)' }} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {todo.title}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>{name}</div>
+      </div>
+      <span className="chip" data-tone={tone === 'overdue' ? 'bad' : 'warn'} style={{ fontSize: 10, flexShrink: 0 }}>
+        {label}
+      </span>
+    </div>
+  )
+}
+
+// ── Client row ────────────────────────────────────────────────────────────────
+
+function ClientRow({ customer, lastAct, tab, onClick }: {
+  customer: Customer; lastAct: string; tab: CustomerTab; onClick: () => void
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '7px 8px', borderRadius: 10, cursor: 'pointer',
+        transition: 'background 80ms',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+    >
+      <div style={{
+        width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+        background: 'var(--surface-2)', border: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)',
+      }}>
+        {customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {customer.name}
+        </div>
+        {customer.company && (
+          <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{customer.company}</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
+          {relTime(lastAct)}
+        </span>
+        <span className="chip" data-tone={STATUS_TONE[customer.status]} style={{ fontSize: 10 }}>
+          {STATUS_LABEL[customer.status]}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Client Board ──────────────────────────────────────────────────────────────
+
+function ClientBoard() {
+  const customers      = useCustomersStore(s => s.customers)
+  const openCustomerAt = useUiStore(s => s.openCustomerAt)
+  const allTodos       = useTodosStore(s => s.allTodos)
+  const lastActivity   = useCrmStore(s => s.lastActivity)
+  const pinnedIds      = useClientPickerStore(s => s.pinnedIds)
+  const togglePin      = useClientPickerStore(s => s.togglePin)
+  const [showModal, setShowModal] = useState(false)
+
+  const activityMap = useMemo(
+    () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
+    [lastActivity],
+  )
+  const customerMap = useMemo(
+    () => new Map(customers.map(c => [c.id, c])),
+    [customers],
+  )
+
+  const activeCount  = useMemo(() => customers.filter(c => c.status === 'aktiv').length, [customers])
+  const todayTodos   = useMemo(
+    () => allTodos.filter(t => t.dueDate && isToday(t.dueDate) && t.status !== 'done'),
+    [allTodos],
+  )
+  const overdueTodos = useMemo(
+    () => allTodos.filter(t => t.dueDate && isOverdue(t.dueDate) && !isToday(t.dueDate) && t.status !== 'done'),
+    [allTodos],
+  )
+
+  const deadlineItems = useMemo(() => [
+    ...overdueTodos.map(t => ({ todo: t, tone: 'overdue' as const, label: overdueLabel(t.dueDate!) })),
+    ...todayTodos.map(t => ({ todo: t, tone: 'today' as const, label: 'Heute' })),
+  ], [overdueTodos, todayTodos])
+
+  // Risk: aktiv but no contact for 45+ days, or inaktiv
+  const riskClients = useMemo(() => {
+    const cutoff = Date.now() - 45 * 86400000
+    return customers
+      .filter(c => {
+        const t = new Date(activityMap.get(c.id) ?? c.updatedAt).getTime()
+        return (c.status === 'aktiv' && t < cutoff) || c.status === 'inaktiv'
+      })
+      .sort((a, b) => {
+        const aT = new Date(activityMap.get(a.id) ?? a.updatedAt).getTime()
+        const bT = new Date(activityMap.get(b.id) ?? b.updatedAt).getTime()
+        return aT - bT
+      })
+      .slice(0, 6)
+  }, [customers, activityMap])
+
+  const recentClients = useMemo(() =>
+    [...customers]
+      .sort((a, b) => {
+        const aT = new Date(activityMap.get(a.id) ?? a.updatedAt).getTime()
+        const bT = new Date(activityMap.get(b.id) ?? b.updatedAt).getTime()
+        return bT - aT
+      })
+      .slice(0, 6),
+    [customers, activityMap],
+  )
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 20,
+      padding: '28px 32px',
+      maxWidth: 1160, margin: '0 auto', width: '100%',
+    }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em' }}>
+            Client Board
+          </h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>
+            Prioritäten, Risiken und letzte Aktivitäten auf einen Blick
+          </p>
+        </div>
+        <button className="btn-ghost" onClick={() => setShowModal(true)}>
+          <UserPlus size={14} /> Neuer Client
+        </button>
       </div>
 
+      {/* Quick Strip */}
+      <QuickStrip
+        customers={customers}
+        pinnedIds={pinnedIds}
+        recentClients={recentClients}
+        onOpen={id => openCustomerAt(id, 'dashboard')}
+        onTogglePin={togglePin}
+      />
+
+      {/* Stats */}
       <div className="stat-grid">
         {[
-          { label: 'Gesamt Clients',             value: customers.length,   tone: ''     },
-          { label: 'Benötigen Aufmerksamkeit',   value: needAttn.length,    tone: 'warn' },
-          { label: 'Urgent Follow-Ups',           value: highPrio.length,    tone: 'warn' },
-          { label: 'Aktive Clients',              value: aktiv.length,       tone: ''     },
+          { label: 'Gesamt Clients', value: customers.length,       tone: '' },
+          { label: 'Aktive Clients', value: activeCount,            tone: '' },
+          { label: 'Heute fällig',   value: todayTodos.length,   tone: todayTodos.length   > 0 ? 'warn' : '' },
+          { label: 'Überfällig',     value: overdueTodos.length, tone: overdueTodos.length > 0 ? 'bad'  : '' },
         ].map(s => (
           <div key={s.label} className="stat-tile" data-tone={s.tone}>
             <span className="label">{s.label}</span>
@@ -66,174 +387,86 @@ function ClientOverviewContent({ customers, onOpen }: { customers: Customer[]; o
         ))}
       </div>
 
-      <div className="overview-split">
-        <div className="overview-block">
-          <h3>Heute wichtig</h3>
-          {highPrio.slice(0, 4).map(c => (
-            <div key={c.id} className="heute-item" onClick={() => onOpen(c.id)}>
-              <div className="top">
-                <strong>{c.name}</strong>
-                <span className="time-pill" data-tone="">Aufmerksamkeit</span>
-              </div>
-              <div className="desc">{c.company ?? c.status}</div>
-            </div>
-          ))}
-        </div>
-        <div className="overview-block">
-          <h3>Clients benötigen Aufmerksamkeit</h3>
-          {attnSorted.map(c => (
-            <div key={c.id} className="attn-item" onClick={() => onOpen(c.id)}>
-              <div className="attn-score" data-tone={attentionScore(c) > 50 ? 'warn' : 'bad'}>
-                {attentionScore(c)}
-              </div>
-              <div className="attn-body">
-                <strong>{c.name}</strong>
-                <span>{c.company ?? c.status}</span>
-              </div>
-              <span className="chip" data-tone="bad">urgent</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Main grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
 
-      <div className="deadlines-block">
-        <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-          Upcoming Deadlines
-        </h3>
-        <div className="deadlines-grid">
-          {deadlines.map((d, i) => (
-            <div key={i} className="deadline-card">
-              <span className="pill" data-tone={d.tone}>{d.pill}</span>
-              <h4>{d.title}</h4>
-              <span className="meta">{d.meta}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
-  )
-}
-
-export function ClientsRoute() {
-  const customers          = useCustomersStore(s => s.customers)
-  const isLoading          = useCustomersStore(s => s.isLoading)
-  const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
-  const setSelected        = useUiStore(s => s.setSelectedCustomer)
-
-  const [search, setSearch]     = useState('')
-  const [showModal, setShowModal] = useState(false)
-
-  const activeListId = useSmartListsStore(s => s.activeListId)
-  const smartLists   = useSmartListsStore(s => s.lists)
-  const setActive    = useSmartListsStore(s => s.setActive)
-  const lastActivity = useCrmStore(s => s.lastActivity)
-  const activityMap  = useMemo(
-    () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
-    [lastActivity],
-  )
-  const activeList = useMemo(
-    () => activeListId ? smartLists.find(l => l.id === activeListId) ?? null : null,
-    [activeListId, smartLists],
-  )
-
-  const filtered = useMemo(() => {
-    let result = activeList
-      ? applySmartListFilter(customers, activeList.filter, activityMap)
-      : customers
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        (c.company ?? '').toLowerCase().includes(q)
-      )
-    }
-    return result
-  }, [customers, activeList, activityMap, search])
-
-  return (
-    <div className="clients-layout">
-      {/* Left panel — sticky list */}
-      <aside className="clients-panel">
-        <div className="clients-panel-head">
-          <h2>Clients</h2>
-          <div className="client-search">
-            <Search size={14} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search clients…"
-            />
-          </div>
-        </div>
-
-        <div
-          className="client-tile-overview"
-          data-active={String(!selectedCustomerId)}
-          onClick={() => { setSelected(null); setActive(null) }}
+        {/* Left: Upcoming Deadlines — öffnet direkt Aktivitäten-Tab */}
+        <SectionCard
+          title="Upcoming Deadlines"
+          icon={<Clock size={14} />}
+          count={deadlineItems.length}
+          empty="Keine fälligen To-Dos — alles im grünen Bereich."
         >
-          <div className="client-tile-overview-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="9" rx="1.5"/>
-              <rect x="14" y="3" width="7" height="5" rx="1.5"/>
-              <rect x="14" y="12" width="7" height="9" rx="1.5"/>
-              <rect x="3" y="16" width="7" height="5" rx="1.5"/>
-            </svg>
-          </div>
-          <div className="client-tile-overview-text">
-            <strong>Overview Dashboard</strong>
-            <span>Alle Clients im Überblick</span>
-          </div>
+          {deadlineItems.length > 0
+            ? deadlineItems.map(({ todo, tone, label }) => {
+                const c = customerMap.get(todo.customerId)
+                return (
+                  <DeadlineRow
+                    key={todo.id}
+                    todo={todo}
+                    name={c?.name ?? '—'}
+                    tone={tone}
+                    label={label}
+                    onClick={() => c && openCustomerAt(c.id, 'aktivitaeten')}
+                  />
+                )
+              })
+            : undefined}
+        </SectionCard>
+
+        {/* Right column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* At Risk — öffnet Dashboard-Tab */}
+          <SectionCard
+            title="At Risk"
+            icon={<AlertTriangle size={14} />}
+            count={riskClients.length}
+            empty="Alle Clients sind up to date."
+          >
+            {riskClients.length > 0
+              ? riskClients.map(c => (
+                  <ClientRow
+                    key={c.id}
+                    customer={c}
+                    lastAct={activityMap.get(c.id) ?? c.updatedAt}
+                    tab="dashboard"
+                    onClick={() => openCustomerAt(c.id, 'dashboard')}
+                  />
+                ))
+              : undefined}
+          </SectionCard>
+
+          {/* Recent — öffnet Dashboard-Tab */}
+          <SectionCard title="Letzte Aktivität" icon={<Activity size={14} />} empty="Noch keine Clients.">
+            {recentClients.length > 0
+              ? recentClients.map(c => (
+                  <ClientRow
+                    key={c.id}
+                    customer={c}
+                    lastAct={activityMap.get(c.id) ?? c.updatedAt}
+                    tab="dashboard"
+                    onClick={() => openCustomerAt(c.id, 'dashboard')}
+                  />
+                ))
+              : undefined}
+          </SectionCard>
         </div>
-
-        <SmartListsSection />
-
-        <div className="clients-list">
-          {isLoading ? (
-            <p style={{ fontSize: 12, color: 'var(--fg-dim)', padding: '8px 4px' }}>Lädt…</p>
-          ) : (
-            filtered.map(c => (
-              <div
-                key={c.id}
-                className="client-tile"
-                data-active={String(selectedCustomerId === c.id)}
-                onClick={() => setSelected(c.id)}
-              >
-                <div className="client-tile-avatar">
-                  {c.name.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="client-tile-body">
-                  <strong>{c.name}</strong>
-                  <span>{relativeTime(c.updatedAt)}</span>
-                </div>
-                {c.leadScore > 0 && (
-                  <span className="client-tile-meta">
-                    <span className="chip" data-tone={scoreTone(c.leadScore)}>{c.leadScore}</span>
-                  </span>
-                )}
-              </div>
-            ))
-          )}
-          {!isLoading && filtered.length === 0 && customers.length === 0 && (
-            <button
-              className="btn-ghost"
-              style={{ fontSize: 12, marginTop: 8, justifyContent: 'center' }}
-              onClick={() => setShowModal(true)}
-            >
-              + Ersten Client anlegen
-            </button>
-          )}
-        </div>
-      </aside>
-
-      {/* Right content */}
-      <div className="client-content">
-        {selectedCustomerId
-          ? <CustomerRoute customerId={selectedCustomerId} />
-          : <ClientOverviewContent customers={customers} onOpen={setSelected} />
-        }
       </div>
 
       {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
     </div>
   )
+}
+
+// ── route entry ───────────────────────────────────────────────────────────────
+
+export function ClientsRoute() {
+  const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
+
+  if (selectedCustomerId) {
+    return <CustomerRoute customerId={selectedCustomerId} />
+  }
+
+  return <ClientBoard />
 }
