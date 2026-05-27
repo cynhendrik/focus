@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { LeadsService } from '@/services/leads.service'
 import { log } from '@/lib/logger'
-import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload } from '@/types/lead.types'
+import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
 
@@ -15,6 +15,7 @@ interface LeadsState {
   convertToClient: (id: string) => Promise<void>
   deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
+  updateStage: (id: string, stage: PipelineStage) => Promise<void>
   newLeads: () => Lead[]
   attemptedLeads: () => Lead[]
   warmLeads: () => Lead[]
@@ -108,9 +109,19 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     }
   },
 
-  newLeads: () => get().leads.filter(l => l.leadStatus === 'new'),
-  attemptedLeads: () => get().leads.filter(l => l.leadStatus === 'attempted'),
-  warmLeads: () => get().leads.filter(l => l.leadStatus === 'warm'),
-  lostLeads: () => get().leads.filter(l => l.leadStatus === 'lost_reengage'),
+  updateStage: async (id, stage) => {
+    try {
+      const lead = await LeadsService.updateStage(id, stage)
+      set(s => ({ leads: s.leads.map(l => l.id === id ? lead : l) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  newLeads: () => get().leads.filter(l => l.pipelineStage === 'inbox'),
+  attemptedLeads: () => get().leads.filter(l => l.pipelineStage === 'waiting_reply'),
+  warmLeads: () => get().leads.filter(l => l.pipelineStage === 'replied'),
+  lostLeads: () => get().leads.filter(l => l.pipelineStage === 'lost'),
   reEngageLeads: () => get().leads.filter(l => l.reEngageDate != null),
 }))
