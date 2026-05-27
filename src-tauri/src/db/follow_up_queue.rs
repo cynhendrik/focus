@@ -87,12 +87,12 @@ pub fn cancel_for_lead(conn: &Connection, lead_id: &str) -> Result<usize, AppErr
 }
 
 pub fn get_due(conn: &Connection, workspace_id: &str) -> Result<Vec<FollowUpQueueItem>, AppError> {
-    let mut stmt = conn.prepare(&format!(
-        "{SELECT}
-         WHERE workspace_id=?1 AND status='pending' AND send_at <= datetime('now')
-         ORDER BY send_at ASC"
-    ))?;
-    let rows = stmt.query_map([workspace_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let mut stmt = conn.prepare(
+        &format!("{SELECT} WHERE workspace_id=?1 AND status='pending' AND send_at <= ?2 ORDER BY send_at ASC")
+    )?;
+    let rows = stmt.query_map(rusqlite::params![workspace_id, now], map_row)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
 
@@ -106,20 +106,22 @@ pub fn get_for_lead(conn: &Connection, lead_id: &str) -> Result<Vec<FollowUpQueu
 
 pub fn mark_sent(conn: &Connection, id: &str, sent_activity_id: &str) -> Result<FollowUpQueueItem, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    let n = conn.execute(
         "UPDATE follow_up_queue SET status='sent', sent_activity_id=?1, sent_at=?2, updated_at=?2 WHERE id=?3",
         rusqlite::params![sent_activity_id, now, id],
     )?;
+    if n == 0 { return Err(AppError::NotFound(format!("FollowUpQueueItem {id} not found"))); }
     conn.query_row(&format!("{SELECT} WHERE id=?1"), [id], map_row)
         .map_err(AppError::from)
 }
 
 pub fn mark_skipped(conn: &Connection, id: &str) -> Result<FollowUpQueueItem, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    let n = conn.execute(
         "UPDATE follow_up_queue SET status='skipped', updated_at=?1 WHERE id=?2",
         rusqlite::params![now, id],
     )?;
+    if n == 0 { return Err(AppError::NotFound(format!("FollowUpQueueItem {id} not found"))); }
     conn.query_row(&format!("{SELECT} WHERE id=?1"), [id], map_row)
         .map_err(AppError::from)
 }
@@ -131,7 +133,7 @@ pub fn update_draft(
     body: Option<&str>,
 ) -> Result<FollowUpQueueItem, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
+    let n = conn.execute(
         "UPDATE follow_up_queue SET
            draft_subject = COALESCE(?1, draft_subject),
            draft_body = COALESCE(?2, draft_body),
@@ -139,6 +141,7 @@ pub fn update_draft(
          WHERE id = ?4",
         rusqlite::params![subject, body, now, id],
     )?;
+    if n == 0 { return Err(AppError::NotFound(format!("FollowUpQueueItem {id} not found"))); }
     conn.query_row(&format!("{SELECT} WHERE id=?1"), [id], map_row)
         .map_err(AppError::from)
 }
@@ -168,7 +171,7 @@ pub fn create_sequence(
 
         let (draft_subject, draft_body) = match template_key {
             "value" => (
-                format!("Noch eine Gedanke — für {company_or_name}"),
+                format!("Noch ein Gedanke — für {company_or_name}"),
                 format!(
                     "Hallo {lead_name},\n\nich wollte kurz nachfassen und dir gleichzeitig etwas Konkretes mitgeben.\n\n[Füge hier einen relevanten Mehrwert ein: Insight, Mini-Case oder Ressource]\n\nGibt es eine passende Zeit für ein kurzes Gespräch diese Woche?\n\nViele Grüße"
                 ),
