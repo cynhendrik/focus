@@ -16,3 +16,4 @@ pub mod lead;
 pub mod invoice;
 pub mod offer;
 pub mod calendar;
+pub mod workspace_ablage;
