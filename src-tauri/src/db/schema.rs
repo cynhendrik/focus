@@ -455,7 +455,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             sequence_index      INTEGER NOT NULL DEFAULT 1,
             send_at             TEXT NOT NULL,
             status              TEXT NOT NULL DEFAULT 'pending',
-            template_key        TEXT NOT NULL DEFAULT 'value',
+            template_key        TEXT NOT NULL DEFAULT 'none',
             draft_subject       TEXT,
             draft_body          TEXT,
             sent_activity_id    TEXT,

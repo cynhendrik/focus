@@ -381,6 +381,37 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             }
             Ok(())
         }
+        14 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS workspace_folders (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    name         TEXT NOT NULL,
+                    parent_id    TEXT REFERENCES workspace_folders(id) ON DELETE CASCADE,
+                    created_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_ws_folders_workspace
+                    ON workspace_folders(workspace_id, name);
+
+                CREATE TABLE IF NOT EXISTS workspace_files (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    folder_id    TEXT REFERENCES workspace_folders(id) ON DELETE SET NULL,
+                    name         TEXT NOT NULL,
+                    path         TEXT NOT NULL,
+                    size         INTEGER,
+                    mime_type    TEXT,
+                    source_type  TEXT NOT NULL DEFAULT 'manual',
+                    source_id    TEXT,
+                    created_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_ws_files_workspace
+                    ON workspace_files(workspace_id, folder_id);
+                CREATE INDEX IF NOT EXISTS idx_ws_files_source
+                    ON workspace_files(source_type, source_id);
+            "#)?;
+            Ok(())
+        }
         15 => {
             // 1. accounts neue Felder
             for (col, def) in [
@@ -446,7 +477,7 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     sequence_index      INTEGER NOT NULL DEFAULT 1,
                     send_at             TEXT NOT NULL,
                     status              TEXT NOT NULL DEFAULT 'pending',
-                    template_key        TEXT NOT NULL DEFAULT 'value',
+                    template_key        TEXT NOT NULL DEFAULT 'none',
                     draft_subject       TEXT,
                     draft_body          TEXT,
                     sent_activity_id    TEXT,
@@ -458,37 +489,6 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     ON follow_up_queue(lead_id, status, send_at);
                 CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
                     ON follow_up_queue(workspace_id, status, send_at);
-            "#)?;
-            Ok(())
-        }
-        14 => {
-            conn.execute_batch(r#"
-                CREATE TABLE IF NOT EXISTS workspace_folders (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    name         TEXT NOT NULL,
-                    parent_id    TEXT REFERENCES workspace_folders(id) ON DELETE CASCADE,
-                    created_at   TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_ws_folders_workspace
-                    ON workspace_folders(workspace_id, name);
-
-                CREATE TABLE IF NOT EXISTS workspace_files (
-                    id           TEXT PRIMARY KEY,
-                    workspace_id TEXT NOT NULL,
-                    folder_id    TEXT REFERENCES workspace_folders(id) ON DELETE SET NULL,
-                    name         TEXT NOT NULL,
-                    path         TEXT NOT NULL,
-                    size         INTEGER,
-                    mime_type    TEXT,
-                    source_type  TEXT NOT NULL DEFAULT 'manual',
-                    source_id    TEXT,
-                    created_at   TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_ws_files_workspace
-                    ON workspace_files(workspace_id, folder_id);
-                CREATE INDEX IF NOT EXISTS idx_ws_files_source
-                    ON workspace_files(source_type, source_id);
             "#)?;
             Ok(())
         }
@@ -1079,25 +1079,38 @@ mod tests {
 
     #[test]
     fn migration_v15_migrates_lead_status_to_pipeline_stage() {
-        let conn = in_memory_db();
-        run(&conn).unwrap();
+        // Use in_memory_db (creates base schema without migrations),
+        // run migrations up to v14 manually, insert a warm lead, then run v15
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        crate::db::schema::create_tables(&conn).unwrap();
+
         let now = chrono::Utc::now().to_rfc3339();
-        // Insert a 'warm' lead (should map to 'replied')
+
+        // Run migrations 1–14 only (stop before v15)
+        for v in 1..=14u32 {
+            apply(&conn, v).unwrap();
+            set_version(&conn, v).unwrap();
+        }
+
+        // Insert a lead with lead_status='warm' — pipeline_stage will be 'inbox' (default)
         conn.execute(
-            "INSERT INTO accounts (id, workspace_id, created_by, name, account_type, lead_status, pipeline_stage, created_at, updated_at)
-             VALUES ('l1','ws-1','','Test Lead','lead','warm','inbox',?1,?1)",
+            "INSERT INTO accounts (id, workspace_id, created_by, name, account_type, lead_status, created_at, updated_at)
+             VALUES ('l1','ws-1','','Test Lead','lead','warm',?1,?1)",
             [&now],
         ).unwrap();
-        // Run the mapping SQL manually (simulating what v15 does)
-        conn.execute_batch(
-            "UPDATE accounts SET pipeline_stage = CASE lead_status
-                WHEN 'new'           THEN 'inbox'
-                WHEN 'attempted'     THEN 'waiting_reply'
-                WHEN 'warm'          THEN 'replied'
-                WHEN 'lost_reengage' THEN 'inbox'
-                ELSE 'inbox'
-            END WHERE account_type = 'lead' AND pipeline_stage = 'inbox';"
+
+        // Verify it starts as 'inbox'
+        let stage_before: String = conn.query_row(
+            "SELECT pipeline_stage FROM accounts WHERE id='l1'",
+            [], |r| r.get(0),
         ).unwrap();
+        assert_eq!(stage_before, "inbox");
+
+        // Now run v15
+        apply(&conn, 15).unwrap();
+
+        // Assert it was migrated to 'replied' (warm → replied)
         let stage: String = conn.query_row(
             "SELECT pipeline_stage FROM accounts WHERE id='l1'",
             [], |r| r.get(0),
