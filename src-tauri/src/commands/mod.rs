@@ -14,3 +14,4 @@ pub mod invoice;
 pub mod offer;
 pub mod export;
 pub mod calendar;
+pub mod workspace_ablage;
