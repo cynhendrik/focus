@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 13;
+const CURRENT_VERSION: u32 = 14;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -379,6 +379,37 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                      ALTER TABLE offer_items ADD COLUMN unit TEXT;"
                 )?;
             }
+            Ok(())
+        }
+        14 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS workspace_folders (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    name         TEXT NOT NULL,
+                    parent_id    TEXT REFERENCES workspace_folders(id) ON DELETE CASCADE,
+                    created_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_ws_folders_workspace
+                    ON workspace_folders(workspace_id, name);
+
+                CREATE TABLE IF NOT EXISTS workspace_files (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    folder_id    TEXT REFERENCES workspace_folders(id) ON DELETE SET NULL,
+                    name         TEXT NOT NULL,
+                    path         TEXT NOT NULL,
+                    size         INTEGER,
+                    mime_type    TEXT,
+                    source_type  TEXT NOT NULL DEFAULT 'manual',
+                    source_id    TEXT,
+                    created_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_ws_files_workspace
+                    ON workspace_files(workspace_id, folder_id);
+                CREATE INDEX IF NOT EXISTS idx_ws_files_source
+                    ON workspace_files(source_type, source_id);
+            "#)?;
             Ok(())
         }
         _ => Ok(()),
@@ -933,6 +964,21 @@ mod tests {
         ).unwrap();
         assert_eq!(d2.as_deref(), Some("2026-05-22"));
         assert_eq!(u2.as_deref(), Some("Std."));
+    }
+
+    #[test]
+    fn migration_v14_creates_workspace_ablage_tables() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        for table in ["workspace_folders", "workspace_files"] {
+            assert!(table_exists_helper(&conn, table), "{table} fehlt nach v14");
+        }
+        let ws_file_cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(workspace_files)").unwrap()
+            .query_map([], |r| r.get::<_, String>(1)).unwrap()
+            .filter_map(|r| r.ok()).collect();
+        assert!(ws_file_cols.contains(&"source_type".to_string()), "source_type fehlt");
+        assert!(ws_file_cols.contains(&"source_id".to_string()), "source_id fehlt");
     }
 
     #[test]

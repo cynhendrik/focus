@@ -410,6 +410,33 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             ON calendar_events(workspace_id, start_at);
         CREATE INDEX IF NOT EXISTS idx_calendar_events_account
             ON calendar_events(account_id, start_at);
+
+        CREATE TABLE IF NOT EXISTS workspace_folders (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            name         TEXT NOT NULL,
+            parent_id    TEXT REFERENCES workspace_folders(id) ON DELETE CASCADE,
+            created_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ws_folders_workspace
+            ON workspace_folders(workspace_id, name);
+
+        CREATE TABLE IF NOT EXISTS workspace_files (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            folder_id    TEXT REFERENCES workspace_folders(id) ON DELETE SET NULL,
+            name         TEXT NOT NULL,
+            path         TEXT NOT NULL,
+            size         INTEGER,
+            mime_type    TEXT,
+            source_type  TEXT NOT NULL DEFAULT 'manual',
+            source_id    TEXT,
+            created_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ws_files_workspace
+            ON workspace_files(workspace_id, folder_id);
+        CREATE INDEX IF NOT EXISTS idx_ws_files_source
+            ON workspace_files(source_type, source_id);
     "#)?;
     Ok(())
 }
