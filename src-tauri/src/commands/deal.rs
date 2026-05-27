@@ -43,14 +43,21 @@ pub fn update_deal_stage(
         due_at: None,
         assignee: None,
         outcome: None,
+        direction: None,
+        email_id: None,
     });
     engine::evaluate(&*conn, engine::CrmEvent::DealStageChanged {
         account_id:   updated.account_id.clone(),
         workspace_id: updated.workspace_id.clone(),
         deal_id:      id,
         from_stage:   prev_stage,
-        to_stage:     stage,
+        to_stage:     stage.clone(),
     })?;
+    if stage == "won" {
+        if let Err(e) = db::invoice::create_suggestion_from_deal(&*conn, &updated) {
+            eprintln!("[invoice] create_suggestion_from_deal failed for deal {}: {e}", updated.id);
+        }
+    }
     Ok(updated)
 }
 
