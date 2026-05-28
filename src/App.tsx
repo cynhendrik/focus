@@ -75,14 +75,14 @@ export default function App() {
   const [splashGone,   setSplashGone]   = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setMinTimeDone(true), 4600)
+    const t = setTimeout(() => setMinTimeDone(true), 2800)
     return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
     if (minTimeDone && !authLoading) {
       setSplashExit(true)
-      const t = setTimeout(() => setSplashGone(true), 580)
+      const t = setTimeout(() => setSplashGone(true), 450)
       return () => clearTimeout(t)
     }
   }, [minTimeDone, authLoading])
