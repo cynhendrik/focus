@@ -467,6 +467,38 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             ON follow_up_queue(lead_id, status, send_at);
         CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
             ON follow_up_queue(workspace_id, status, send_at);
+
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id                TEXT PRIMARY KEY,
+            workspace_id      TEXT NOT NULL,
+            name              TEXT NOT NULL,
+            subject           TEXT NOT NULL,
+            body              TEXT NOT NULL,
+            sender_account_id TEXT NOT NULL,
+            smart_list_id     TEXT,
+            status            TEXT NOT NULL DEFAULT 'draft',
+            sent_at           TEXT,
+            created_at        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_campaigns_workspace
+            ON campaigns(workspace_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS campaign_recipients (
+            id          TEXT PRIMARY KEY,
+            campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            lead_id     TEXT NOT NULL,
+            email       TEXT NOT NULL,
+            sent_at     TEXT,
+            replied_at  TEXT,
+            error       TEXT,
+            activity_id TEXT,
+            created_at  TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_campaign_recipients_campaign
+            ON campaign_recipients(campaign_id);
+        CREATE INDEX IF NOT EXISTS idx_campaign_recipients_email
+            ON campaign_recipients(email);
     "#)?;
     Ok(())
 }

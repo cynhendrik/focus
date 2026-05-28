@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 15;
+const CURRENT_VERSION: u32 = 16;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -489,6 +489,42 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     ON follow_up_queue(lead_id, status, send_at);
                 CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
                     ON follow_up_queue(workspace_id, status, send_at);
+            "#)?;
+            Ok(())
+        }
+        16 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS campaigns (
+                    id                TEXT PRIMARY KEY,
+                    workspace_id      TEXT NOT NULL,
+                    name              TEXT NOT NULL,
+                    subject           TEXT NOT NULL,
+                    body              TEXT NOT NULL,
+                    sender_account_id TEXT NOT NULL,
+                    smart_list_id     TEXT,
+                    status            TEXT NOT NULL DEFAULT 'draft',
+                    sent_at           TEXT,
+                    created_at        TEXT NOT NULL,
+                    updated_at        TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_campaigns_workspace
+                    ON campaigns(workspace_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS campaign_recipients (
+                    id          TEXT PRIMARY KEY,
+                    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+                    lead_id     TEXT NOT NULL,
+                    email       TEXT NOT NULL,
+                    sent_at     TEXT,
+                    replied_at  TEXT,
+                    error       TEXT,
+                    activity_id TEXT,
+                    created_at  TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_campaign_recipients_campaign
+                    ON campaign_recipients(campaign_id);
+                CREATE INDEX IF NOT EXISTS idx_campaign_recipients_email
+                    ON campaign_recipients(email);
             "#)?;
             Ok(())
         }
@@ -1116,6 +1152,23 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(stage, "replied");
+    }
+
+    #[test]
+    fn migration_v16_creates_campaign_tables() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::schema::create_tables(&conn).unwrap();
+        for v in 1..=16 { apply(&conn, v).unwrap(); set_version(&conn, v).unwrap(); }
+        let n: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='campaigns'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(n, 1, "campaigns table missing");
+        let m: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='campaign_recipients'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(m, 1, "campaign_recipients table missing");
     }
 
     #[test]
