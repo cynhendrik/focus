@@ -6,11 +6,10 @@ const SLOGAN  = 'If we build, we build to lead.'
 const NUMS    = '0123456789'
 const ALPHNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&'
 
-// Timing (ms)
-const PHASE_NOISE    = 350    // pure numeric noise
-const PHASE_EXPAND   = 250    // pool expands to alphnum
-const PHASE_DECODE   = 1900   // left-to-right char lock-in
-const TOTAL          = PHASE_NOISE + PHASE_EXPAND + PHASE_DECODE
+// Timing (ms) — slow and deliberate, not rushed
+const PHASE_NOISE    = 700    // pure numeric noise in mono
+const PHASE_EXPAND   = 400    // blend nums → alphanum
+const PHASE_DECODE   = 3000   // left-to-right lock-in, easy pace
 const FPS            = 60
 
 function rnd(pool: string) { return pool[Math.floor(Math.random() * pool.length)] }
@@ -43,20 +42,18 @@ export function SplashScreen({ exiting }: SplashScreenProps) {
       }
 
       if (elapsed < PHASE_NOISE + PHASE_EXPAND) {
-        // Phase 2 — gradually blend NUMS → ALPHNUM based on how far into this phase we are
-        const t    = (elapsed - PHASE_NOISE) / PHASE_EXPAND       // 0 → 1
-        const pool = t < 0.5 ? NUMS + NUMS + ALPHNUM : ALPHNUM    // weighted towards nums early
+        // Phase 2 — gradually blend NUMS → ALPHNUM
+        const t    = (elapsed - PHASE_NOISE) / PHASE_EXPAND
+        const pool = t < 0.5 ? NUMS + NUMS + ALPHNUM : ALPHNUM
         setChars(SLOGAN.split('').map(c => (c === ' ' ? ' ' : rnd(pool))))
         timerId = window.setTimeout(tick, 1000 / FPS)
         return
       }
 
-      // Phase 3 — decode sweep (cubic ease-in-out)
+      // Phase 3 — decode sweep (ease-in: starts slow, builds momentum)
       const raw   = elapsed - PHASE_NOISE - PHASE_EXPAND
       const t     = Math.min(raw / PHASE_DECODE, 1)
-      const eased = t < 0.5
-        ? 4 * t * t * t
-        : 1 - Math.pow(-2 * t + 2, 3) / 2
+      const eased = t * t * t                          // ease-in — deliberate start
       const res   = Math.floor(eased * SLOGAN.length)
 
       setResolved(res)
@@ -80,7 +77,6 @@ export function SplashScreen({ exiting }: SplashScreenProps) {
       animation: exiting ? 'splash-text-exit 600ms ease forwards' : 'none',
     }}>
       <div style={{
-        fontFamily:    'var(--font-sans)',
         fontSize:      28,
         fontWeight:    300,
         letterSpacing: '-0.02em',
@@ -93,8 +89,11 @@ export function SplashScreen({ exiting }: SplashScreenProps) {
           <span
             key={i}
             style={{
-              color:             i < resolved ? 'var(--accent)' : 'oklch(42% 0.09 125)',
-              transition:        'color 180ms ease',
+              color:             i < resolved ? 'var(--accent)' : 'oklch(38% 0.07 125)',
+              // mono for scramble noise, sans once resolved — char materialises from code
+              fontFamily:        i < resolved ? 'var(--font-sans)' : 'var(--font-mono)',
+              fontWeight:        i < resolved ? 300 : 400,
+              transition:        'color 200ms ease',
               fontVariantNumeric:'tabular-nums',
             }}
           >
