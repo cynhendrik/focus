@@ -1172,6 +1172,42 @@ mod tests {
     }
 
     #[test]
+    fn migration_v16_campaign_recipients_cascade_delete() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::schema::create_tables(&conn).unwrap();
+        for v in 1..=16 { apply(&conn, v).unwrap(); set_version(&conn, v).unwrap(); }
+        // Enable FK enforcement (SQLite disables it by default)
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+
+        let now = chrono::Utc::now().to_rfc3339();
+        // Insert campaign
+        conn.execute(
+            "INSERT INTO campaigns (id, workspace_id, name, subject, body, sender_account_id, created_at, updated_at)
+             VALUES ('c1', 'ws1', 'Test', 'Subj', 'Body', 'acc1', ?1, ?1)",
+            [&now],
+        ).unwrap();
+        // Insert recipient
+        conn.execute(
+            "INSERT INTO campaign_recipients (id, campaign_id, lead_id, email, created_at)
+             VALUES ('r1', 'c1', 'l1', 'test@example.com', ?1)",
+            [&now],
+        ).unwrap();
+        // Verify recipient exists
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM campaign_recipients WHERE campaign_id='c1'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 1);
+        // Delete campaign — should cascade-delete recipient
+        conn.execute("DELETE FROM campaigns WHERE id='c1'", []).unwrap();
+        let count_after: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM campaign_recipients WHERE campaign_id='c1'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count_after, 0, "recipient should be cascade-deleted");
+    }
+
+    #[test]
     fn migration_v12_invoice_fk_cascade() {
         let conn = setup();
         conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
