@@ -16,3 +16,4 @@ pub mod export;
 pub mod calendar;
 pub mod workspace_ablage;
 pub mod follow_up;
+pub mod campaign;

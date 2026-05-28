@@ -4,6 +4,7 @@ use chrono::Utc;
 
 use crate::email::{auto_detect, db, imap, keychain, smtp};
 use crate::email::db::EmailDb;
+use crate::db::pool::DbPool;
 use crate::email::types::{Account, CustomerRef, EmailAttachment, EmailBody, EmailHeader, SendEmailPayload, SyncProgress, SyncResult};
 
 // ── Account management ────────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ pub async fn email_sync(
     customers_json: String,
     window: Window,
     db: tauri::State<'_, EmailDb>,
+    pool: tauri::State<'_, DbPool>,   // für Reply-Detection
 ) -> Result<SyncResult, String> {
     let customers: Vec<CustomerRef> = serde_json::from_str(&customers_json)
         .map_err(|e| format!("Ungültiges customers_json: {}", e))?;
@@ -162,6 +164,15 @@ pub async fn email_sync(
                 db::insert_attachments(&conn, &out.attachments).map_err(|e| e.to_string())?;
                 n
             };
+            // Reply-Detection: newly synced incoming emails may be campaign replies
+            if inserted > 0 {
+                for row in &out.rows {
+                    // Only process inbound emails (skip own-account sent messages)
+                    if !row.from_addr.is_empty() && row.from_addr != email {
+                        let _ = crate::db::campaign::mark_replied(&pool.conn(), &row.from_addr);
+                    }
+                }
+            }
             {
                 let conn = db.0.lock().map_err(|e| e.to_string())?;
                 // last_synced_uid nur bei Voll-Sync aktualisieren, nicht bei On-Demand-Sync

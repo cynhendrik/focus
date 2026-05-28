@@ -254,6 +254,11 @@ fn main() {
             commands::calendar::get_calendar_events,
             commands::calendar::upsert_calendar_event,
             commands::calendar::delete_calendar_event,
+            commands::campaign::cmd_list_campaigns,
+            commands::campaign::cmd_get_campaign,
+            commands::campaign::cmd_get_campaign_recipients,
+            commands::campaign::cmd_create_campaign,
+            commands::campaign::cmd_send_campaign,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
