@@ -18,3 +18,4 @@ pub mod offer;
 pub mod calendar;
 pub mod workspace_ablage;
 pub mod follow_up_queue;
+pub mod campaign;
