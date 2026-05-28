@@ -7,9 +7,9 @@ const NUMS    = '0123456789'
 const ALPHNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&'
 
 // Timing (ms)
-const PHASE_NOISE    = 600    // pure numeric noise
-const PHASE_EXPAND   = 400    // pool expands to alphnum
-const PHASE_DECODE   = 3200   // left-to-right char lock-in
+const PHASE_NOISE    = 350    // pure numeric noise
+const PHASE_EXPAND   = 250    // pool expands to alphnum
+const PHASE_DECODE   = 1900   // left-to-right char lock-in
 const TOTAL          = PHASE_NOISE + PHASE_EXPAND + PHASE_DECODE
 const FPS            = 60
 
