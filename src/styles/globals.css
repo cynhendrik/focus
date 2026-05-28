@@ -601,25 +601,9 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   0%   { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
 }
-@keyframes splash-name-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes splash-line-in {
-  from { transform: scaleX(0); opacity: 0; }
-  to   { transform: scaleX(1); opacity: 1; }
-}
-@keyframes splash-slogan-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes splash-exit {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(-8px); }
-}
 @keyframes splash-text-exit {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
 }
 @keyframes login-card-in {
   from { opacity: 0; transform: translateY(24px) scale(0.97); }
