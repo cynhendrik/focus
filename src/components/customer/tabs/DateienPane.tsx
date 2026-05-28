@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import {
   Folder, FolderOpen, File, FileText, Image, Film, Archive,
   Upload, FolderPlus, Trash2, ChevronRight, ChevronDown, Search, Plus, X,
@@ -35,6 +35,45 @@ function relDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: '2-digit' })
 }
 
+// ── FolderIllustration ────────────────────────────────────────────────────────
+// Reusable — used in both FolderCard and NewFolderCard
+
+function FolderIllustration() {
+  return (
+    <div style={{ position: 'relative', width: 62, height: 56, flexShrink: 0 }}>
+      {/* back paper */}
+      <div style={{
+        position: 'absolute', bottom: 4, left: '50%',
+        transform: 'translateX(-50%) rotate(-7deg)',
+        width: 36, height: 42, borderRadius: 3,
+        background: 'oklch(88% 0.04 125)', opacity: 0.85,
+      }} />
+      {/* mid paper */}
+      <div style={{
+        position: 'absolute', bottom: 4, left: '50%',
+        transform: 'translateX(-50%) rotate(-2deg)',
+        width: 36, height: 42, borderRadius: 3,
+        background: 'oklch(92% 0.03 125)', opacity: 0.9,
+      }} />
+      {/* folder body */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: '50%',
+        transform: 'translateX(-50%)',
+        width: 50, height: 36, borderRadius: '0 4px 6px 6px',
+        background: 'var(--accent)',
+      }} />
+      {/* folder tab */}
+      <div style={{
+        position: 'absolute', bottom: 34, left: '50%',
+        marginLeft: -20, width: 20, height: 8,
+        borderRadius: '4px 4px 0 0',
+        background: 'var(--accent)',
+        filter: 'brightness(1.15)',
+      }} />
+    </div>
+  )
+}
+
 // ── SidebarNode ───────────────────────────────────────────────────────────────
 
 interface SidebarNodeProps {
@@ -64,7 +103,6 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
           transition: 'background 80ms',
         }}
       >
-        {/* expand chevron */}
         <span
           onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
           style={{
@@ -112,9 +150,8 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
 
 // ── FolderCard ────────────────────────────────────────────────────────────────
 
-function FolderCard({ folder, subCount, onOpen, onDelete }: {
+function FolderCard({ folder, onOpen, onDelete }: {
   folder: FolderType
-  subCount: number
   onOpen: () => void
   onDelete: () => void
 }) {
@@ -126,82 +163,91 @@ function FolderCard({ folder, subCount, onOpen, onDelete }: {
       onMouseLeave={() => setHov(false)}
       onClick={onOpen}
       style={{
-        position: 'relative', cursor: 'pointer', borderRadius: 14,
-        border: `1px solid ${hov ? 'var(--border-strong)' : 'var(--border)'}`,
-        background: hov ? 'var(--surface-2)' : 'var(--surface)',
-        transition: 'border-color 100ms, background 100ms',
-        overflow: 'hidden', userSelect: 'none',
+        position: 'relative', cursor: 'pointer',
+        borderRadius: 10,
+        background: hov ? 'var(--surface-2)' : 'transparent',
+        transition: 'background 100ms',
+        padding: '12px 8px 10px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+        userSelect: 'none',
       }}
     >
-      {/* Illustration */}
-      <div style={{
-        height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--surface-2)', borderBottom: '1px solid var(--border)',
-        position: 'relative',
+      <FolderIllustration />
+
+      <span style={{
+        fontSize: 12, fontWeight: 500, color: 'var(--fg)',
+        textAlign: 'center', width: '100%',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        padding: '0 4px',
       }}>
-        <div style={{ position: 'relative', width: 60, height: 60 }}>
-          {/* back paper */}
-          <div style={{
-            position: 'absolute', bottom: 2, left: '50%',
-            transform: 'translateX(-50%) rotate(-7deg)',
-            width: 38, height: 46, borderRadius: 4,
-            background: 'oklch(25% 0.015 250)',
-            border: '1px solid oklch(36% 0.02 250)',
-          }} />
-          {/* mid paper */}
-          <div style={{
-            position: 'absolute', bottom: 2, left: '50%',
-            transform: 'translateX(-50%) rotate(-2deg)',
-            width: 38, height: 46, borderRadius: 4,
-            background: 'oklch(29% 0.015 250)',
-            border: '1px solid oklch(40% 0.02 250)',
-          }} />
-          {/* folder body */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: '50%',
-            transform: 'translateX(-50%)',
-            width: 46, height: 36, borderRadius: '0 0 6px 6px',
-            background: 'oklch(35% 0.03 250)',
-            border: '1px solid oklch(46% 0.03 250)',
-          }} />
-          {/* folder tab */}
-          <div style={{
-            position: 'absolute', bottom: 34, left: '50%',
-            marginLeft: -18,
-            width: 18, height: 7, borderRadius: '4px 4px 0 0',
-            background: 'oklch(35% 0.03 250)',
-            border: '1px solid oklch(46% 0.03 250)',
-            borderBottom: 'none',
-          }} />
-        </div>
-      </div>
+        {folder.name}
+      </span>
 
-      {/* Label */}
-      <div style={{ padding: '10px 12px 11px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
-          {folder.name}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--fg-muted)' }}>
-          {subCount > 0 ? `${subCount} Unterordner` : 'Ordner'}
-        </div>
-      </div>
-
-      {/* Delete */}
       {hov && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
           title="Ordner löschen"
           style={{
-            position: 'absolute', top: 8, right: 8,
-            width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+            position: 'absolute', top: 6, right: 6,
+            width: 22, height: 22, borderRadius: 6, border: 'none', cursor: 'pointer',
             background: 'oklch(72% 0.18 25 / 0.15)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--danger)', zIndex: 1,
           }}
         >
-          <Trash2 size={12} />
+          <Trash2 size={11} />
         </button>
       )}
+    </div>
+  )
+}
+
+// ── NewFolderCard — appears inline in the grid, like desktop ──────────────────
+
+function NewFolderCard({ onSubmit, onCancel }: {
+  onSubmit: (name: string) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState('Neuer Ordner')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.select()
+  }, [])
+
+  const commit = () => {
+    const n = name.trim()
+    if (n) onSubmit(n)
+    else   onCancel()
+  }
+
+  return (
+    <div style={{
+      borderRadius: 10,
+      border: '1.5px solid var(--accent)',
+      background: 'var(--surface-2)',
+      padding: '12px 8px 10px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+      userSelect: 'none',
+    }}>
+      <FolderIllustration />
+
+      <input
+        ref={inputRef}
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter')  commit()
+          if (e.key === 'Escape') onCancel()
+        }}
+        onBlur={commit}
+        style={{
+          fontSize: 12, fontWeight: 500, textAlign: 'center',
+          width: '100%', padding: '3px 6px', borderRadius: 5,
+          background: 'var(--surface)', border: '1px solid var(--accent)',
+          color: 'var(--fg)', outline: 'none',
+        }}
+      />
     </div>
   )
 }
@@ -310,16 +356,14 @@ export function DateienPane({ customerId }: Props) {
 
   const [sidebarTab, setSidebarTab] = useState<'ordner' | 'tags'>('ordner')
   const [search,     setSearch]     = useState('')
-  const [creating,   setCreating]   = useState(false)
-  const [newName,    setNewName]    = useState('')
-  const [delTarget,  setDelTarget]  = useState<{ type: 'folder'; item: FolderType } | null>(null)
+  const [creating,   setCreating]   = useState(false)  // shows NewFolderCard in grid
+  const [delTarget,  setDelTarget]  = useState<FolderType | null>(null)
 
   // ── navigation ─────────────────────────────────────────────────────────────
   const navigate = async (id: string | null) => {
     setActiveFolder(id)
     await loadFiles(customerId, id)
     setCreating(false)
-    setNewName('')
   }
 
   // ── derived ─────────────────────────────────────────────────────────────────
@@ -330,7 +374,6 @@ export function DateienPane({ customerId }: Props) {
     [folders, activeFolderId],
   )
 
-  // ── sidebar search ───────────────────────────────────────────────────────────
   const sidebarFolders = useMemo(() => {
     if (!search.trim()) return rootFolders
     const q = search.toLowerCase()
@@ -338,20 +381,18 @@ export function DateienPane({ customerId }: Props) {
   }, [folders, rootFolders, search])
 
   // ── folder creation ─────────────────────────────────────────────────────────
-  const submitCreate = async () => {
-    const name = newName.trim()
-    if (!name) { setCreating(false); setNewName(''); return }
+  const handleCreate = async (name: string) => {
+    setCreating(false)
     try { await createFolder({ customerId, name, parentId: activeFolderId }) } catch {}
-    setCreating(false); setNewName('')
   }
 
   // ── folder delete ───────────────────────────────────────────────────────────
   const confirmDelete = async () => {
     if (!delTarget) return
     try {
-      await removeFolder(delTarget.item.id)
-      if (activeFolderId === delTarget.item.id) {
-        await navigate(delTarget.item.parentId ?? null)
+      await removeFolder(delTarget.id)
+      if (activeFolderId === delTarget.id) {
+        await navigate(delTarget.parentId ?? null)
       }
     } catch {}
     setDelTarget(null)
@@ -366,6 +407,9 @@ export function DateienPane({ customerId }: Props) {
     await importFile({ customerId, folderId: activeFolderId, name: file.name, data, mimeType: file.type || null })
     e.target.value = ''
   }
+
+  const showFolders = shownSubfolders.length > 0 || creating
+  const showFiles   = files.length > 0 || isLoading
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -390,23 +434,15 @@ export function DateienPane({ customerId }: Props) {
           </span>
           <div style={{ display: 'flex', gap: 2 }}>
             {[
-              { icon: <Plus size={14} />, title: 'Neuer Ordner', onClick: () => { setCreating(true); setNewName('') } },
-              { icon: <Upload size={13} />, title: 'Hochladen', onClick: () => fileRef.current?.click() },
-            ].map((btn, i) => (
-              <button
-                key={i}
-                onClick={btn.onClick}
-                title={btn.title}
+              { icon: <Plus size={14} />, title: 'Neuer Ordner', fn: () => setCreating(true) },
+              { icon: <Upload size={13} />, title: 'Hochladen',    fn: () => fileRef.current?.click() },
+            ].map((b, i) => (
+              <button key={i} onClick={b.fn} title={b.title}
                 onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--fg)' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
-                style={{
-                  width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
-                  background: 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--fg-muted)', transition: 'background 80ms, color 80ms',
-                }}
+                style={{ width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-muted)', transition: 'background 80ms, color 80ms' }}
               >
-                {btn.icon}
+                {b.icon}
               </button>
             ))}
           </div>
@@ -414,42 +450,24 @@ export function DateienPane({ customerId }: Props) {
 
         {/* search */}
         <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '5px 10px', borderRadius: 8,
-            background: 'var(--surface-2)', border: '1px solid var(--border)',
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 10px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
             <Search size={12} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Suchen…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suchen…"
               style={{ flex: 1, border: 'none', outline: 'none', background: 'none', fontSize: 12, color: 'var(--fg)' }}
             />
             {search && (
-              <button
-                onClick={() => setSearch('')}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--fg-dim)' }}
-              >
+              <button onClick={() => setSearch('')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--fg-dim)' }}>
                 <X size={11} />
               </button>
             )}
           </div>
         </div>
 
-        {/* Ordner / Tags tabs */}
+        {/* Ordner / Tags toggle */}
         <div style={{ display: 'flex', padding: '6px 10px', gap: 4, borderBottom: '1px solid var(--border)' }}>
           {(['ordner', 'tags'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setSidebarTab(t)}
-              style={{
-                flex: 1, padding: '5px 0', borderRadius: 7, border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400,
-                background: sidebarTab === t ? 'var(--surface-2)' : 'transparent',
-                color: sidebarTab === t ? 'var(--fg)' : 'var(--fg-muted)',
-                transition: 'background 80ms, color 80ms',
-              }}
+            <button key={t} onClick={() => setSidebarTab(t)}
+              style={{ flex: 1, padding: '5px 0', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, background: sidebarTab === t ? 'var(--surface-2)' : 'transparent', color: sidebarTab === t ? 'var(--fg)' : 'var(--fg-muted)', transition: 'background 80ms, color 80ms' }}
             >
               {t === 'ordner' ? 'Ordner' : 'Tags'}
             </button>
@@ -460,36 +478,21 @@ export function DateienPane({ customerId }: Props) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
           {sidebarTab === 'ordner' ? (
             <>
-              {/* Root */}
               <div
                 onClick={() => navigate(null)}
                 onMouseEnter={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'var(--surface-2)' }}
                 onMouseLeave={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'transparent' }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1,
-                  background: activeFolderId === null ? 'var(--accent)' : 'transparent',
-                  transition: 'background 80ms',
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1, background: activeFolderId === null ? 'var(--accent)' : 'transparent', transition: 'background 80ms' }}
               >
                 <span style={{ width: 16, flexShrink: 0 }} />
                 <span style={{ display: 'flex', color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg-muted)', flexShrink: 0 }}>
                   {activeFolderId === null ? <FolderOpen size={13} /> : <Folder size={13} />}
                 </span>
-                <span style={{
-                  flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400,
-                  color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg)',
-                }}>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400, color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg)' }}>
                   Alle Dateien
                 </span>
                 {rootFolders.length > 0 && (
-                  <span style={{
-                    fontSize: 11, fontWeight: 500, minWidth: 18, height: 18,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 5, padding: '0 4px',
-                    background: activeFolderId === null ? 'oklch(100% 0 0 / 0.2)' : 'var(--surface-2)',
-                    color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg-muted)',
-                  }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, padding: '0 4px', background: activeFolderId === null ? 'oklch(100% 0 0 / 0.2)' : 'var(--surface-2)', color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg-muted)' }}>
                     {rootFolders.length}
                   </span>
                 )}
@@ -499,7 +502,7 @@ export function DateienPane({ customerId }: Props) {
                 <SidebarNode key={f.id} folder={f} all={folders} depth={0} activeId={activeFolderId} onSelect={navigate} />
               ))}
 
-              {rootFolders.length === 0 && (
+              {rootFolders.length === 0 && !creating && (
                 <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
                   Noch keine Ordner.<br />Klicke <strong>+</strong> um einen zu erstellen.
                 </div>
@@ -523,7 +526,7 @@ export function DateienPane({ customerId }: Props) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           flexShrink: 0, background: 'var(--surface)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--fg)' }}>
               {activeName ?? 'Alle Dateien'}
             </h2>
@@ -531,18 +534,10 @@ export function DateienPane({ customerId }: Props) {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleUpload} />
-            <button
-              className="btn-ghost"
-              onClick={() => { setCreating(true); setNewName('') }}
-              style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}
-            >
+            <button className="btn-ghost" onClick={() => setCreating(true)} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
               <FolderPlus size={13} /> Neuer Ordner
             </button>
-            <button
-              className="btn-ghost"
-              onClick={() => fileRef.current?.click()}
-              style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}
-            >
+            <button className="btn-ghost" onClick={() => fileRef.current?.click()} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
               <Upload size={13} /> Hochladen
             </button>
           </div>
@@ -558,75 +553,45 @@ export function DateienPane({ customerId }: Props) {
         {/* Scrollable body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px' }}>
 
-          {/* Inline folder creation */}
-          {creating && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '8px 12px', borderRadius: 10,
-                border: '2px solid var(--accent)', background: 'var(--surface)',
-              }}>
-                <FolderOpen size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                <input
-                  autoFocus value={newName} onChange={e => setNewName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter')  submitCreate()
-                    if (e.key === 'Escape') { setCreating(false); setNewName('') }
-                  }}
-                  placeholder="Ordnername…"
-                  style={{ fontSize: 13, fontWeight: 500, background: 'none', border: 'none', outline: 'none', color: 'var(--fg)', width: 160 }}
-                />
-                <button onClick={submitCreate} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: 'var(--accent-ink)', fontWeight: 600 }}>OK</button>
-                <button onClick={() => { setCreating(false); setNewName('') }} style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--surface-2)', color: 'var(--fg-muted)' }}>✕</button>
-              </div>
-            </div>
-          )}
-
           {/* ── Folders grid ── */}
-          {shownSubfolders.length > 0 && (
+          {showFolders && (
             <div style={{ marginBottom: 30 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 10 }}>
                 Ordner
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(162px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 4 }}>
                 {shownSubfolders.map(f => (
                   <FolderCard
                     key={f.id}
                     folder={f}
-                    subCount={folders.filter(c => c.parentId === f.id).length}
                     onOpen={() => navigate(f.id)}
-                    onDelete={() => setDelTarget({ type: 'folder', item: f })}
+                    onDelete={() => setDelTarget(f)}
                   />
                 ))}
+                {/* Inline new folder card */}
+                {creating && (
+                  <NewFolderCard
+                    onSubmit={handleCreate}
+                    onCancel={() => setCreating(false)}
+                  />
+                )}
               </div>
             </div>
           )}
 
           {/* ── Files table ── */}
-          {(files.length > 0 || isLoading) && (
+          {showFiles && (
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 8 }}>
                 Dateien
               </div>
-
-              {/* Table header */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 120px 72px 32px',
-                alignItems: 'center', gap: 8,
-                padding: '6px 12px', marginBottom: 2,
-                borderBottom: '1px solid var(--border)',
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 72px 32px', alignItems: 'center', gap: 8, padding: '6px 12px', marginBottom: 2, borderBottom: '1px solid var(--border)' }}>
                 {['Name', 'Datum', 'Größe', ''].map((h, i) => (
-                  <span key={i} style={{
-                    fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)',
-                    textTransform: 'uppercase', letterSpacing: '0.06em',
-                    textAlign: i === 2 ? 'right' : 'left',
-                  }}>
+                  <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i === 2 ? 'right' : 'left' }}>
                     {h}
                   </span>
                 ))}
               </div>
-
               {isLoading ? (
                 <div style={{ fontSize: 13, color: 'var(--fg-muted)', padding: '14px 12px' }}>Lädt…</div>
               ) : (
@@ -636,11 +601,8 @@ export function DateienPane({ customerId }: Props) {
           )}
 
           {/* Empty state */}
-          {!isLoading && shownSubfolders.length === 0 && files.length === 0 && !creating && (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              height: 260, gap: 12,
-            }}>
+          {!isLoading && !showFolders && !showFiles && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 260, gap: 12 }}>
               <FolderOpen size={42} style={{ opacity: 0.15, color: 'var(--fg)' }} />
               <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>
                 {activeName ? `„${activeName}" ist leer` : 'Noch keine Dateien oder Ordner'}
@@ -663,7 +625,7 @@ export function DateienPane({ customerId }: Props) {
 
       {/* Delete confirm */}
       {delTarget && (
-        <ConfirmModal name={delTarget.item.name} onConfirm={confirmDelete} onCancel={() => setDelTarget(null)} />
+        <ConfirmModal name={delTarget.name} onConfirm={confirmDelete} onCancel={() => setDelTarget(null)} />
       )}
     </div>
   )
