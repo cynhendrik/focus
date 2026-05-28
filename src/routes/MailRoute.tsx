@@ -5,6 +5,10 @@ import { useMailStore } from '@/store/mail.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { ComposeModal } from '@/components/mail/ComposeModal'
 import { FolderTree } from '@/components/mail/FolderTree'
+import { CampaignsTab }        from '@/components/mail/CampaignsTab'
+import { CampaignDetail }      from '@/components/mail/CampaignDetail'
+import { CreateCampaignModal } from '@/components/mail/CreateCampaignModal'
+import { useCampaignStore }    from '@/store/campaign.store'
 import type { SyncProgress, MailFolder } from '@/types/mail.types'
 
 export function MailRoute() {
@@ -22,6 +26,10 @@ export function MailRoute() {
   const [showSetup, setShowSetup] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
   const [composeMode, setComposeMode] = useState<'new' | 'reply' | 'forward'>('new')
+  const [mailTab,         setMailTab]         = useState<'inbox' | 'campaigns'>('inbox')
+  const [showNewCampaign, setShowNewCampaign] = useState(false)
+  const setActiveCampaign = useCampaignStore(s => s.setActive)
+  const activeCampaignId  = useCampaignStore(s => s.activeCampaignId)
 
   useEffect(() => {
     loadAccounts()
@@ -75,6 +83,31 @@ export function MailRoute() {
       <div style={{ display: 'flex', minHeight: 0, flex: 1 }}>
       {/* Left panel: accounts + folders */}
       <div className="card" style={{ width: 192, flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '8px', gap: 4, marginRight: 0, borderRadius: '12px 0 0 12px' }}>
+        {/* Tab Toggle — Inbox / Kampagnen */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+          <button
+            onClick={() => { setMailTab('inbox'); setActiveCampaign(null) }}
+            style={{
+              flex: 1, padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              background: mailTab === 'inbox' ? 'rgba(255,255,255,0.10)' : 'transparent',
+              color: mailTab === 'inbox' ? 'var(--fg)' : 'var(--fg-dim)',
+              border: 'none',
+            }}
+          >
+            Inbox
+          </button>
+          <button
+            onClick={() => { setMailTab('campaigns'); setActiveCampaign(null) }}
+            style={{
+              flex: 1, padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              background: mailTab === 'campaigns' ? 'rgba(45,212,191,0.12)' : 'transparent',
+              color: mailTab === 'campaigns' ? '#2dd4bf' : 'var(--fg-dim)',
+              border: 'none',
+            }}
+          >
+            Kampagnen
+          </button>
+        </div>
         <p className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider px-2 py-1">Konten</p>
         {accounts.map(a => (
           <button
@@ -141,6 +174,8 @@ export function MailRoute() {
         </div>
       </div>
 
+      {mailTab === 'inbox' ? (
+      <>
       {/* Middle panel: email list */}
       <div className="card" style={{ width: 288, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0, borderRadius: 0 }}>
         <div style={{ padding: '8px 8px 0', display: 'flex', justifyContent: 'flex-end' }}>
@@ -299,6 +334,18 @@ export function MailRoute() {
           </div>
         )}
       </div>
+      </>
+      ) : activeCampaignId ? (
+        <CampaignDetail
+          campaignId={activeCampaignId}
+          onBack={() => setActiveCampaign(null)}
+        />
+      ) : (
+        <CampaignsTab
+          onNew={() => setShowNewCampaign(true)}
+          onSelect={(id) => setActiveCampaign(id)}
+        />
+      )}
 
       {showSetup && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -316,6 +363,14 @@ export function MailRoute() {
           accountId={selectedAccountId}
           onClose={() => setShowCompose(false)}
           onSent={() => {}}
+        />
+      )}
+      {showNewCampaign && (
+        <CreateCampaignModal
+          onClose={() => setShowNewCampaign(false)}
+          onCreated={(_id) => {
+            setShowNewCampaign(false)
+          }}
         />
       )}
       </div>
