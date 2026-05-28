@@ -36,39 +36,24 @@ function relDate(iso: string): string {
 }
 
 // ── FolderIllustration ────────────────────────────────────────────────────────
-// Reusable — used in both FolderCard and NewFolderCard
+// Apple-style: clean body + tab, no paper clutter
+// Color adapts via CSS vars: near-white in dark mode, dark gray in light mode
 
 function FolderIllustration() {
   return (
-    <div style={{ position: 'relative', width: 62, height: 56, flexShrink: 0 }}>
-      {/* back paper */}
+    <div style={{ position: 'relative', width: 58, height: 46, flexShrink: 0 }}>
+      {/* tab — top-left, connects flush to body */}
       <div style={{
-        position: 'absolute', bottom: 4, left: '50%',
-        transform: 'translateX(-50%) rotate(-7deg)',
-        width: 36, height: 42, borderRadius: 3,
-        background: 'oklch(88% 0.04 125)', opacity: 0.85,
+        position: 'absolute', top: 0, left: 0,
+        width: 22, height: 11,
+        borderRadius: '5px 5px 0 0',
+        background: 'var(--folder-tab)',
       }} />
-      {/* mid paper */}
+      {/* body */}
       <div style={{
-        position: 'absolute', bottom: 4, left: '50%',
-        transform: 'translateX(-50%) rotate(-2deg)',
-        width: 36, height: 42, borderRadius: 3,
-        background: 'oklch(92% 0.03 125)', opacity: 0.9,
-      }} />
-      {/* folder body */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: '50%',
-        transform: 'translateX(-50%)',
-        width: 50, height: 36, borderRadius: '0 4px 6px 6px',
-        background: 'var(--accent)',
-      }} />
-      {/* folder tab */}
-      <div style={{
-        position: 'absolute', bottom: 34, left: '50%',
-        marginLeft: -20, width: 20, height: 8,
-        borderRadius: '4px 4px 0 0',
-        background: 'var(--accent)',
-        filter: 'brightness(1.15)',
+        position: 'absolute', top: 9, left: 0, right: 0, bottom: 0,
+        borderRadius: '0 6px 6px 6px',
+        background: 'var(--folder-body)',
       }} />
     </div>
   )

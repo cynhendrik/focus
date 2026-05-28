@@ -87,6 +87,17 @@
   --green: var(--ok);
   --red: var(--danger);
   --amber: var(--warn);
+
+  /* Folder icon — adapts to color scheme */
+  --folder-body: oklch(91% 0.004 240);
+  --folder-tab:  oklch(84% 0.006 240);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --folder-body: oklch(30% 0.012 240);
+    --folder-tab:  oklch(24% 0.012 240);
+  }
 }
 
 [data-density="compact"] {
