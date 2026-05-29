@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useLeadsStore } from './leads.store'
 import { usePipelineStore } from './pipeline.store'
 import { useDealsStore } from './deals.store'
+import { useCustomersStore } from './customers.store'
 import { LeadsService } from '@/services/leads.service'
 import { DealsService } from '@/services/deals.service'
 import type { Lead } from '@/types/lead.types'
@@ -34,6 +35,12 @@ vi.mock('@/services/pipeline.service', () => ({
     upsert: vi.fn(),
     delete: vi.fn(),
     reorder: vi.fn(),
+  },
+}))
+
+vi.mock('./customers.store', () => ({
+  useCustomersStore: {
+    getState: vi.fn(() => ({ init: vi.fn().mockResolvedValue(undefined) })),
   },
 }))
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { LeadsService } from '@/services/leads.service'
 import { usePipelineStore } from './pipeline.store'
 import { useDealsStore } from './deals.store'
+import { useCustomersStore } from './customers.store'
 import { DealsService } from '@/services/deals.service'
 import { log } from '@/lib/logger'
 import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
@@ -115,7 +116,10 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       value: 0,
     })
 
-    // 3) Update local state — remove lead, add deal
+    // 3) Refresh customers — the converted lead is now a customer in DB
+    await useCustomersStore.getState().init()
+
+    // 4) Update local state — remove lead, add deal
     useLeadsStore.setState(s => ({ leads: s.leads.filter(l => l.id !== id) }))
     useDealsStore.setState(s => ({ deals: [...s.deals, deal] }))
   },
