@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import { LeadsService } from '@/services/leads.service'
+import { usePipelineStore } from './pipeline.store'
+import { useDealsStore } from './deals.store'
+import { DealsService } from '@/services/deals.service'
 import { log } from '@/lib/logger'
 import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
@@ -13,6 +16,7 @@ interface LeadsState {
   upsert: (payload: UpsertLeadPayload) => Promise<void>
   bulkUpdate: (payload: BulkUpdateLeadsPayload, workspaceId: string) => Promise<void>
   convertToClient: (id: string) => Promise<void>
+  convertToDeal: (id: string, workspaceId: string, userId: string) => Promise<void>
   deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
   updateStage: (id: string, stage: PipelineStage) => Promise<void>
@@ -84,6 +88,36 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       log.error('Failed to convert lead to client', { error })
       throw err
     }
+  },
+
+  convertToDeal: async (id, workspaceId, userId) => {
+    const lead = get().leads.find(l => l.id === id)
+    if (!lead) throw new Error('Lead nicht gefunden')
+
+    const stages = usePipelineStore.getState().activeStages()
+    if (stages.length === 0) {
+      throw new Error('Keine Pipeline-Stage konfiguriert')
+    }
+    const firstStage = stages[0]
+
+    // 1) Convert lead → customer (changes account_type in DB)
+    await LeadsService.convertToClient(id)
+
+    // 2) Create deal pointing to the now-customer (same ID)
+    const userIdSafe = userId || lead.workspaceId  // never empty, but createdBy is required
+    const deal = await DealsService.upsert({
+      workspaceId,
+      createdBy: userIdSafe,
+      accountId: id,
+      customerId: id,
+      title: lead.name,
+      stage: firstStage.name,
+      value: 0,
+    })
+
+    // 3) Update local state — remove lead, add deal
+    useLeadsStore.setState(s => ({ leads: s.leads.filter(l => l.id !== id) }))
+    useDealsStore.setState(s => ({ deals: [...s.deals, deal] }))
   },
 
   deleteLead: async (id, workspaceId) => {
