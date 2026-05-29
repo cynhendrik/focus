@@ -168,6 +168,27 @@ export function SmartListModal({ initial, onClose }: {
           />
         </div>
 
+        {/* Tags */}
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 6 }}>
+            Tags (kommagetrennt)
+          </label>
+          <input
+            type="text"
+            value={(filter.tags ?? []).join(', ')}
+            onChange={e => {
+              const raw = e.target.value
+              const tags = raw.split(',').map(t => t.trim()).filter(Boolean)
+              setFilter(f => ({ ...f, tags: tags.length ? tags : undefined }))
+            }}
+            placeholder="z.B. vip, webinar-2025"
+            style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--bg)', fontSize: 13, boxSizing: 'border-box' }}
+          />
+          <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 4 }}>
+            Kunde muss ALLE genannten Tags haben (AND-Logik).
+          </div>
+        </div>
+
         {/* Aktionen */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button onClick={onClose} className="btn-ghost" style={{ fontSize: 13 }}>Abbrechen</button>
