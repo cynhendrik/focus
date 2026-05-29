@@ -63,7 +63,7 @@ export function ArbeitenPane({ customerId }: Props) {
   const renderPane = () => {
     switch (sub) {
       case 'tasks':   return <WorkflowPane customerId={customerId} />
-      case 'notizen': return <NotizenSection customerId={customerId} />
+      case 'notizen': return <NotizPane customerId={customerId} />
       case 'dateien': return <DateienPane customerId={customerId} />
     }
   }
@@ -125,6 +125,3 @@ export function ArbeitenPane({ customerId }: Props) {
   )
 }
 
-function NotizenSection({ customerId }: { customerId: string }) {
-  return <NotizPane customerId={customerId} />
-}

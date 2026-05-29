@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { NotizPane } from './NotizPane'
 import { useTodosStore } from '@/store/todos.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -665,7 +664,6 @@ export function WorkflowPane({ customerId }: Props) {
   const customer       = useCustomersStore(s => s.customers.find(c => c.id === customerId))
   const customerName   = customer?.name ?? ''
 
-  const [subTab, setSubTab]             = useState<'tasks' | 'notizen'>('tasks')
   const [showNewTask, setShowNewTask]   = useState(false)
   const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null)
   const [laterOpen, setLaterOpen]       = useState(true)
@@ -706,27 +704,7 @@ export function WorkflowPane({ customerId }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Sub-tab bar */}
-      <div className="flex items-center gap-1 px-6 py-2 border-b border-[var(--border)] flex-shrink-0">
-        {(['tasks', 'notizen'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setSubTab(t)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
-              ${subTab === t
-                ? 'bg-primary text-black'
-                : 'text-[var(--text2)] hover:text-[var(--text)] hover:bg-white/5'
-              }`}
-          >
-            {t === 'tasks' ? 'Tasks' : 'Notizen'}
-          </button>
-        ))}
-      </div>
-
-      {subTab === 'notizen' ? (
-        <NotizPane customerId={customerId} />
-      ) : (
-        <div className="p-6 flex flex-col gap-8 overflow-y-auto flex-1">
+      <div className="p-6 flex flex-col gap-8 overflow-y-auto flex-1">
 
           {/* Header */}
           <div className="flex items-center justify-between flex-shrink-0">
@@ -805,7 +783,6 @@ export function WorkflowPane({ customerId }: Props) {
             </div>
           )}
         </div>
-      )}
 
       <NewTaskModal
         open={showNewTask}
