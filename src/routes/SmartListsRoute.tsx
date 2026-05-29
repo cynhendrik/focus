@@ -8,7 +8,9 @@ import { applySmartListFilter } from '@/lib/smart-list-filter'
 import { SmartListItem } from '@/components/smart-lists/SmartListItem'
 import { SmartListModal } from '@/components/smart-lists/SmartListModal'
 import { CustomerTableFiltered } from '@/components/smart-lists/CustomerTableFiltered'
-import type { SmartList } from '@/types/smart-list.types'
+import { FilterChipBar } from '@/components/smart-lists/FilterChipBar'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import type { SmartList, SmartListFilter } from '@/types/smart-list.types'
 
 const ACTIVE_STORAGE_KEY = 'cynera:smartlists:active-v1'
 
@@ -17,10 +19,14 @@ export function SmartListsRoute() {
   const activeListId = useSmartListsStore(s => s.activeListId)
   const setActive    = useSmartListsStore(s => s.setActive)
   const remove       = useSmartListsStore(s => s.remove)
+  const upsert       = useSmartListsStore(s => s.upsert)
 
   const customers    = useCustomersStore(s => s.customers)
   const lastActivity = useCrmStore(s => s.lastActivity)
   const [editing, setEditing] = useState<SmartList | 'new' | null>(null)
+
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const [working, setWorking] = useState<SmartListFilter | null>(null)
 
   // Persist activeListId across reloads
   useEffect(() => {
@@ -42,6 +48,10 @@ export function SmartListsRoute() {
     }
   }, [lists, activeListId, setActive])
 
+  useEffect(() => {
+    setWorking(null)
+  }, [activeListId])
+
   const activityMap = useMemo(
     () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
     [lastActivity],
@@ -52,11 +62,15 @@ export function SmartListsRoute() {
     [lists, activeListId],
   )
 
+  const effectiveFilter = working ?? activeList?.filter ?? null
+  const isDirty = activeList != null && working != null
+    && JSON.stringify(working) !== JSON.stringify(activeList.filter)
+
   const filtered = useMemo(
-    () => activeList
-      ? applySmartListFilter(customers, activeList.filter, activityMap)
+    () => effectiveFilter && activeList
+      ? applySmartListFilter(customers, effectiveFilter, activityMap)
       : customers,
-    [customers, activeList, activityMap],
+    [customers, effectiveFilter, activeList, activityMap],
   )
 
   const systemLists = lists.filter(l => l.isSystem)
@@ -166,15 +180,45 @@ export function SmartListsRoute() {
           )}
 
           {activeList && !activeList.isSystem && (
-            <button
-              onClick={() => setEditing(activeList)}
-              className="btn-ghost"
-              style={{ fontSize: 12, padding: '5px 12px' }}
-            >
-              Filter bearbeiten
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {isDirty && (
+                <button
+                  onClick={async () => {
+                    if (!working || !activeList) return
+                    await upsert({
+                      id:         activeList.id,
+                      workspaceId,
+                      name:       activeList.name,
+                      icon:       activeList.icon,
+                      filter:     working,
+                      orderIndex: activeList.orderIndex,
+                      isSystem:   activeList.isSystem,
+                    })
+                    setWorking(null)
+                  }}
+                  className="btn-primary"
+                  style={{ fontSize: 12, padding: '5px 14px' }}
+                >
+                  Speichern
+                </button>
+              )}
+              <button
+                onClick={() => setEditing(activeList)}
+                className="btn-ghost"
+                style={{ fontSize: 12, padding: '5px 12px' }}
+              >
+                Filter bearbeiten
+              </button>
+            </div>
           )}
         </div>
+
+        {activeList && effectiveFilter && (
+          <FilterChipBar
+            filter={effectiveFilter}
+            onChange={(next) => setWorking(next)}
+          />
+        )}
 
         {/* Table */}
         <CustomerTableFiltered
