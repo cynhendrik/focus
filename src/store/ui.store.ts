@@ -35,7 +35,7 @@ export type AppView =
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'
   | 'pipeline'  | 'tasks'      | 'calendar'  | 'mail' | 'crm' | 'followups' | 'leads'
-  | 'smartlists' | 'chat' | 'workstation'
+  | 'smartlists' | 'chat'
 
 interface UiState {
   theme: Theme

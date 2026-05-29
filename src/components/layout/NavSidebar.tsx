@@ -8,7 +8,7 @@ import { useActivitiesStore } from '@/store/activities.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
 import {
-  Monitor, Home, CheckSquare, Users, CreditCard,
+  Home, CheckSquare, Users, CreditCard,
   TrendingUp, ListFilter, Bell, Target,
   Calendar, Mail, MessageCircle, Settings,
   ChevronRight,
@@ -129,7 +129,6 @@ export function NavSidebar() {
       <SidebarSection label="Workspace" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
       {expanded.workspace && (
         <>
-          <SidebarNavItem icon={Monitor}     label="Workstation" active={appView === 'workstation'} onClick={() => setAppView('workstation')} kbd="W" />
           <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
           <SidebarNavItem icon={CheckSquare} label="Tasks"       active={appView === 'tasks'}       onClick={() => setAppView('tasks')}       kbd="T" badge={openTaskCount || undefined} />
           <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />

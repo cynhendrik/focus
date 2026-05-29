@@ -38,7 +38,6 @@ import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
 import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
 import { ChatRoute }             from '@/routes/ChatRoute'
-import { WorkstationRoute }      from '@/routes/WorkstationRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
@@ -148,7 +147,6 @@ export default function App() {
       case 'dashboard':    return <DashboardRoute />
       case 'profile':      return <ProfileRoute />
       case 'clients':      return <ClientsRoute />
-      case 'workstation':  return <WorkstationRoute />
       case 'tasks':        return <TasksRoute />
       case 'invoices':     return <FinanceRoute />
       case 'leads':        return <LeadsRoute />
