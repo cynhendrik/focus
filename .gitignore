@@ -6,3 +6,13 @@ src-tauri/target/
 src-tauri/.cargo/config.toml
 .env
 .env.local
+
+# Claude / Superpowers session scratch
+.claude/worktrees/
+.superpowers/brainstorm/
+
+# Test/build logs
+*.log
+test-output.log
+tsc-output.log
+tsc-check.log
