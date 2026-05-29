@@ -1,5 +1,11 @@
-import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { useEditor, EditorContent, type Editor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import { useNotebookStore, type NoteBook, type NoteEntry } from '@/store/notebook.store'
+import { SlashCommands } from '@/components/customer/arbeitsraum/slashExtension'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -17,65 +23,51 @@ function stripHtml(html: string): string {
 
 // ── Formatting toolbar ────────────────────────────────────────────────────────
 
-type FmtBtn = { cmd: string; label: string; title: string; style?: React.CSSProperties }
+function FormatBar({ editor }: { editor: Editor | null }) {
+  if (!editor) return null
 
-const FORMAT_BTNS: FmtBtn[] = [
-  { cmd: 'bold',          label: 'B', title: 'Fett (⌘B)',          style: { fontWeight: 700 } },
-  { cmd: 'italic',        label: 'I', title: 'Kursiv (⌘I)',        style: { fontStyle: 'italic' } },
-  { cmd: 'underline',     label: 'U', title: 'Unterstrichen (⌘U)', style: { textDecoration: 'underline' } },
-  { cmd: 'strikeThrough', label: 'S', title: 'Durchgestrichen',    style: { textDecoration: 'line-through' } },
-]
-
-function FormatBar({ onFormat, active }: {
-  onFormat: (cmd: string, value?: string) => void
-  active: Set<string>
-}) {
-  const handleHighlight = (e: React.MouseEvent) => {
-    e.preventDefault()
-    const val = document.queryCommandValue('hiliteColor')
-    const isOn = val && val !== 'rgba(0, 0, 0, 0)' && val !== 'transparent' && val !== ''
-    onFormat('hiliteColor', isOn ? 'transparent' : 'rgba(194, 240, 48, 0.35)')
-  }
+  const btn = (
+    isActive: boolean,
+    onClick: () => void,
+    title: string,
+    label: React.ReactNode,
+    style?: React.CSSProperties,
+  ) => (
+    <button
+      key={title}
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      title={title}
+      className={`w-7 h-6 rounded text-xs flex items-center justify-center transition-colors
+        ${isActive
+          ? 'text-[var(--accent)] bg-[var(--accent-soft)]'
+          : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-black/5'
+        }`}
+      style={style}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div className="flex items-center gap-0.5">
-      {FORMAT_BTNS.map(f => (
-        <button
-          key={f.cmd}
-          onMouseDown={e => { e.preventDefault(); onFormat(f.cmd) }}
-          title={f.title}
-          className={`w-7 h-6 rounded text-xs flex items-center justify-center transition-colors
-            ${active.has(f.cmd)
-              ? 'text-[var(--accent)] bg-[var(--accent-soft)]'
-              : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-black/5'
-            }`}
-          style={f.style}
-        >
-          {f.label}
-        </button>
-      ))}
-
+      {btn(editor.isActive('bold'),          () => editor.chain().focus().toggleBold().run(),          'Fett (⌘B)',          'B', { fontWeight: 700 })}
+      {btn(editor.isActive('italic'),        () => editor.chain().focus().toggleItalic().run(),        'Kursiv (⌘I)',        'I', { fontStyle: 'italic' })}
+      {btn(editor.isActive('strike'),        () => editor.chain().focus().toggleStrike().run(),        'Durchgestrichen',    'S', { textDecoration: 'line-through' })}
       <div className="w-px h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
-
-      {/* Highlight */}
-      <button
-        onMouseDown={handleHighlight}
-        title="Markieren"
-        className="w-7 h-6 rounded flex items-center justify-center transition-colors text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-black/5"
-      >
-        <span className="text-xs font-bold relative">
-          A
-          <span
-            className="absolute bottom-0 left-0 right-0 h-1 rounded-sm"
-            style={{ background: 'oklch(92% 0.2 125 / 0.7)' }}
-          />
-        </span>
-      </button>
+      {btn(editor.isActive('heading', { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), 'Überschrift 1', 'H1', { fontWeight: 700 })}
+      {btn(editor.isActive('heading', { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), 'Überschrift 2', 'H2', { fontWeight: 700 })}
+      <div className="w-px h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
+      {btn(editor.isActive('bulletList'),    () => editor.chain().focus().toggleBulletList().run(),    'Bullet-Liste',       '•')}
+      {btn(editor.isActive('orderedList'),   () => editor.chain().focus().toggleOrderedList().run(),   'Nummerierte Liste',  '1.')}
+      {btn(editor.isActive('taskList'),      () => editor.chain().focus().toggleTaskList().run(),      'Aufgaben',           '☐')}
+      <div className="w-px h-4 bg-[var(--border)] mx-1 flex-shrink-0" />
+      {btn(editor.isActive('code'),          () => editor.chain().focus().toggleCode().run(),          'Inline-Code',        '<>')}
+      {btn(editor.isActive('blockquote'),    () => editor.chain().focus().toggleBlockquote().run(),    'Zitat',              '"')}
     </div>
   )
 }
 
-// ── Note editor ───────────────────────────────────────────────────────────────
+// ── Note editor (TipTap-based) ───────────────────────────────────────────────
 
 function NoteEditor({ entry, onUpdate, onRemove }: {
   entry: NoteEntry
@@ -83,48 +75,65 @@ function NoteEditor({ entry, onUpdate, onRemove }: {
   onRemove: () => void
 }) {
   const [title, setTitle] = useState(entry.title)
-  const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set())
-  const editorRef = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedRef = useRef<string>(entry.content)
 
-  // Load stored HTML on mount / when switching entries
-  useLayoutEffect(() => {
-    if (editorRef.current) {
-      editorRef.current.innerHTML = entry.content
-    }
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+      }),
+      Placeholder.configure({
+        placeholder: ({ node }) => {
+          if (node.type.name === 'heading') return 'Überschrift…'
+          return 'Schreibe etwas — oder „/" für Block-Auswahl.'
+        },
+      }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      SlashCommands,
+    ],
+    editorProps: {
+      attributes: { class: 'tt-editor', spellcheck: 'true' },
+    },
+    content: entry.content || '',
+    onUpdate({ editor }) {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        const html = editor.getHTML()
+        if (html !== lastSavedRef.current) {
+          lastSavedRef.current = html
+          onUpdate({ content: html })
+        }
+      }, 500)
+    },
   }, [entry.id])
 
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
+  // When entry switches, sync editor content + title
+  useEffect(() => {
+    if (!editor) return
+    if (entry.content !== lastSavedRef.current) {
+      editor.commands.setContent(entry.content || '', { emitUpdate: false })
+      lastSavedRef.current = entry.content
+    }
+    setTitle(entry.title)
+  }, [entry.id, entry.content, entry.title, editor])
 
-  const scheduleSave = useCallback(() => {
+  // Cleanup
+  useEffect(() => () => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      onUpdate({ content: editorRef.current?.innerHTML ?? '' })
-    }, 500)
-  }, [onUpdate])
+  }, [])
 
   const saveTitle = useCallback((val: string) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => onUpdate({ title: val }), 500)
   }, [onUpdate])
 
-  const refreshFormats = () => {
-    const cmds = ['bold', 'italic', 'underline', 'strikeThrough']
-    setActiveFormats(new Set(cmds.filter(c => document.queryCommandState(c))))
-  }
-
-  const handleFormat = (cmd: string, value?: string) => {
-    editorRef.current?.focus()
-    document.execCommand(cmd, false, value ?? undefined)
-    refreshFormats()
-    scheduleSave()
-  }
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="px-6 py-2.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
-        <FormatBar onFormat={handleFormat} active={activeFormats} />
+        <FormatBar editor={editor} />
         <div className="flex items-center gap-4">
           <span className="text-xs text-[var(--fg-dim)]">
             {formatDate(entry.updatedAt)}
@@ -144,22 +153,15 @@ function NoteEditor({ entry, onUpdate, onRemove }: {
         onChange={e => { setTitle(e.target.value); saveTitle(e.target.value) }}
         placeholder="Titel…"
         className="mx-8 mt-8 mb-3 text-2xl font-bold text-[var(--fg)] bg-transparent border-none focus:outline-none placeholder:text-[var(--fg-dim)]/30 flex-shrink-0"
+        style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.025em' }}
       />
 
       <div className="mx-8 mb-4 h-px bg-[var(--border)] flex-shrink-0" />
 
-      {/* Rich text content */}
-      <div
-        ref={editorRef}
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder="Beginne zu schreiben…"
-        onInput={scheduleSave}
-        onKeyUp={refreshFormats}
-        onMouseUp={refreshFormats}
-        className="flex-1 mx-8 mb-8 text-sm text-[var(--fg)] bg-transparent focus:outline-none leading-loose overflow-y-auto"
-        style={{ minHeight: 0 }}
-      />
+      {/* TipTap content */}
+      <div className="flex-1 mx-8 mb-8 overflow-y-auto" style={{ minHeight: 0 }}>
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }

@@ -7,9 +7,11 @@ import { isAppError, formatError } from '@/types/error.types'
 
 interface TodosState {
   todos: Todo[]
+  allTodos: Todo[]
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
+  loadAll: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertTodoPayload) => Promise<void>
   remove: (id: string) => Promise<void>
 }
@@ -22,8 +24,18 @@ function upsertById(list: Todo[], updated: Todo): Todo[] {
 
 export const useTodosStore = create<TodosState>()((set) => ({
   todos: [],
+  allTodos: [],
   isLoading: false,
   error: null,
+
+  loadAll: async (workspaceId) => {
+    try {
+      const allTodos = await TodoService.getAll(workspaceId)
+      set({ allTodos })
+    } catch (err) {
+      log.error('Failed to load all todos', { err })
+    }
+  },
 
   loadForCustomer: async (customerId) => {
     set({ isLoading: true, error: null })
@@ -40,7 +52,10 @@ export const useTodosStore = create<TodosState>()((set) => ({
   upsert: async (payload) => {
     try {
       const updated = await TodoService.upsert(payload)
-      set(s => ({ todos: upsertById(s.todos, updated) }))
+      set(s => ({
+        todos: upsertById(s.todos, updated),
+        allTodos: upsertById(s.allTodos, updated),
+      }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err
@@ -50,7 +65,10 @@ export const useTodosStore = create<TodosState>()((set) => ({
   remove: async (id) => {
     try {
       await TodoService.delete(id)
-      set(s => ({ todos: s.todos.filter(t => t.id !== id) }))
+      set(s => ({
+        todos: s.todos.filter(t => t.id !== id),
+        allTodos: s.allTodos.filter(t => t.id !== id),
+      }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err

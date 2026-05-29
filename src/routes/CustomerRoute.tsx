@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ChevronLeft, Mail as MailIcon, Phone, Plus } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronLeft, ChevronDown, Mail as MailIcon, Phone, Clock, X, DollarSign, CalendarClock, Trash2, User } from 'lucide-react'
+import type { CreateActivityPayload } from '@/types/pipeline.types'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore, type CustomerTab } from '@/store/ui.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -8,16 +10,13 @@ import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useFilesStore } from '@/store/files.store'
 import { useActivitiesStore } from '@/store/activities.store'
-import { CustomerModal } from '@/components/customer/CustomerModal'
-import { DashboardPane } from '@/components/customer/tabs/DashboardPane'
-import { WorkflowPane } from '@/components/customer/tabs/WorkflowPane'
-import { KommunikationPane } from '@/components/customer/tabs/KommunikationPane'
-import { DateienPane } from '@/components/customer/tabs/DateienPane'
-import { HistoriePane } from '@/components/customer/tabs/HistoriePane'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
+import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
-import { SalesPane } from '@/components/customer/tabs/SalesPane'
-import { AktivitaetenPane } from '@/components/customer/tabs/AktivitaetenPane'
-import { InformationenPane } from '@/components/customer/tabs/InformationenPane'
+import { UeberblickPane } from '@/components/customer/tabs/UeberblickPane'
+import { ArbeitenPane } from '@/components/customer/tabs/ArbeitenPane'
+import { HistorieWrapperPane } from '@/components/customer/tabs/HistorieWrapperPane'
 
 function avatarBg(name: string): string {
   const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
@@ -36,14 +35,9 @@ function relativeTime(iso: string): string {
 
 function TabIcon({ id }: { id: CustomerTab }) {
   const paths: Record<CustomerTab, string[]> = {
-    dashboard:     ['M18 20V10', 'M12 20V4', 'M6 20v-6'],
-    kommunikation: ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'],
-    aktivitaeten:  ['M22 12h-4l-3 9L9 3l-3 9H2'],
-    informationen: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 16v-4', 'M12 8h.01'],
-    sales:         ['M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'],
-    workflow:      ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
-    dateien:       ['M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'],
-    historie:      ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
+    ueberblick: ['M3 12h18', 'M3 6h18', 'M3 18h18'],
+    arbeiten:   ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+    historie:   ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
   }
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,14 +47,9 @@ function TabIcon({ id }: { id: CustomerTab }) {
 }
 
 const TABS: { id: CustomerTab; label: string }[] = [
-  { id: 'dashboard',     label: 'Dashboard' },
-  { id: 'kommunikation', label: 'Kommunikation' },
-  { id: 'aktivitaeten',  label: 'Aktivitäten' },
-  { id: 'informationen', label: 'Informationen' },
-  { id: 'sales',         label: 'Deals' },
-  { id: 'workflow',      label: 'Workflow' },
-  { id: 'dateien',       label: 'Dateien' },
-  { id: 'historie',      label: 'Historie' },
+  { id: 'ueberblick', label: 'Überblick' },
+  { id: 'arbeiten',   label: 'Arbeiten'  },
+  { id: 'historie',   label: 'Historie'  },
 ]
 
 interface Props { customerId: string }
@@ -70,8 +59,32 @@ export function CustomerRoute({ customerId }: Props) {
   const activeTab   = useUiStore(s => s.activeCustomerTab)
   const setTab      = useUiStore(s => s.setActiveCustomerTab)
   const setSelected = useUiStore(s => s.setSelectedCustomer)
-  const [showEdit, setShowEdit] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
+  const [showDetails,     setShowDetails]     = useState(false)
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
+  const [showTimeLog,     setShowTimeLog]     = useState(false)
+  const [aktionenOpen,    setAktionenOpen]    = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+
+  const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user           = useAuthStore(s => s.user)
+  const createActivity = useActivitiesStore(s => s.create)
+  const removeCustomer = useCustomersStore(s => s.remove)
+  const aktionenRef    = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!aktionenOpen) return
+    const handler = (e: MouseEvent) => {
+      if (aktionenRef.current && !aktionenRef.current.contains(e.target as Node))
+        setAktionenOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [aktionenOpen])
+
+  const handleDelete = async () => {
+    await removeCustomer(customerId)
+    setSelected(null)
+  }
 
   const loadTodos     = useTodosStore(s => s.loadForCustomer)
   const loadNotes     = useNotesStore(s => s.loadForCustomer)
@@ -106,14 +119,9 @@ export function CustomerRoute({ customerId }: Props) {
 
   const renderPane = () => {
     switch (activeTab) {
-      case 'dashboard':     return <DashboardPane customerId={customerId} />
-      case 'kommunikation': return <KommunikationPane customerId={customerId} />
-      case 'aktivitaeten':  return <AktivitaetenPane customerId={customerId} />
-      case 'informationen': return <InformationenPane customerId={customerId} />
-      case 'sales':         return <SalesPane customerId={customerId} />
-      case 'workflow':      return <WorkflowPane customerId={customerId} />
-      case 'dateien':       return <DateienPane customerId={customerId} />
-      case 'historie':      return <HistoriePane customerId={customerId} />
+      case 'ueberblick': return <UeberblickPane customerId={customerId} />
+      case 'arbeiten':   return <ArbeitenPane customerId={customerId} />
+      case 'historie':   return <HistorieWrapperPane customerId={customerId} />
     }
   }
 
@@ -130,22 +138,74 @@ export function CustomerRoute({ customerId }: Props) {
         <div style={{ flex: 1 }}>
           <h1>{customer.name}</h1>
           <div className="sub">
-            Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status}
+            <span>Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status}</span>
           </div>
         </div>
         <button className="btn-ghost"><Phone size={13} /> Anrufen</button>
         <button className="btn-ghost"><MailIcon size={13} /> Mail</button>
-        <button className="btn-primary" onClick={() => setShowEdit(true)}>
-          <Plus size={13} /> Neue Aktion
-        </button>
+
+        {/* Aktionen-Menü */}
+        <div ref={aktionenRef} style={{ position: 'relative' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setAktionenOpen(v => !v)}
+            style={{ background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none' }}
+          >
+            Aktionen
+            <ChevronDown size={12} style={{
+              transition: 'transform 200ms',
+              transform: aktionenOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            }} />
+          </button>
+
+          <AnimatePresence>
+            {aktionenOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0,  scale: 1     }}
+                exit   ={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.16, ease: [0.2, 0.7, 0.1, 1] }}
+                style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 14, padding: 6, minWidth: 210,
+                  boxShadow: 'var(--shadow-2)', zIndex: 100,
+                  display: 'flex', flexDirection: 'column', gap: 2,
+                  transformOrigin: 'top right',
+                }}
+              >
+                <AktionItem icon={<User size={14} />}         label="Stammdaten"           onClick={() => { setShowDetails(true); setAktionenOpen(false) }} />
+                <AktionItem icon={<DollarSign size={14} />} label="Rechnung schreiben"   onClick={() => { setShowInvoiceForm(true); setAktionenOpen(false) }} />
+                <AktionItem icon={<Clock size={14} />}       label="Zeiterfassung"         onClick={() => { setShowTimeLog(true); setAktionenOpen(false) }} />
+                <AktionItem icon={<CalendarClock size={14} />} label="Follow-Up erstellen" onClick={() => {
+                  createActivity({ workspaceId, createdBy: user?.id ?? '', accountId: customerId, type: 'followup', title: 'Follow-Up', status: 'open' })
+                  setAktionenOpen(false)
+                }} />
+
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
+
+                <AktionItem
+                  icon={<Trash2 size={14} />} label="Löschen"
+                  danger onClick={() => { setShowDeleteModal(true); setAktionenOpen(false) }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Tab bar */}
       <div style={{ marginBottom: 22 }}>
         <div className="tabs glass" ref={tabsRef}>
-          <div
+          <motion.div
             className="tab-indicator"
-            style={{ left: indicator.left, width: indicator.width, opacity: indicator.opacity }}
+            initial={false}
+            animate={{
+              left: indicator.left,
+              width: indicator.width,
+              opacity: indicator.opacity,
+            }}
+            transition={{ type: 'spring', stiffness: 480, damping: 38, mass: 0.7 }}
           />
           {TABS.map(t => (
             <div
@@ -161,13 +221,50 @@ export function CustomerRoute({ customerId }: Props) {
         </div>
       </div>
 
-      {/* Active pane */}
+      {/* Active pane
+          ⚠️ Pane wrapper deliberately animates ONLY opacity — no transform,
+          no y, no will-change. Any of those would create a containing block
+          for `position: fixed` descendants, trapping every modal/sheet/
+          confirm-dialog inside the tab area instead of the viewport. */}
       <div className="flex-1 overflow-auto">
-        {renderPane()}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.2, 0.7, 0.1, 1] }}
+          >
+            {renderPane()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {showEdit && (
-        <CustomerModal customer={customer} onClose={() => setShowEdit(false)} />
+      {showInvoiceForm && (
+        <InvoiceForm
+          initialAccountId={customerId}
+          onClose={() => setShowInvoiceForm(false)}
+          onSaved={() => setShowInvoiceForm(false)}
+        />
+      )}
+
+      {showTimeLog && (
+        <TimeLogModal
+          customerId={customerId}
+          customerName={customer.name}
+          workspaceId={workspaceId}
+          userId={user?.id ?? ''}
+          onCreate={createActivity}
+          onClose={() => setShowTimeLog(false)}
+        />
+      )}
+
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          customerName={customer.name}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
       )}
 
       {showDetails && (
@@ -191,6 +288,199 @@ export function CustomerRoute({ customerId }: Props) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface TimeLogModalProps {
+  customerId: string
+  customerName: string
+  workspaceId: string
+  userId: string
+  onCreate: (payload: CreateActivityPayload) => Promise<void>
+  onClose: () => void
+}
+
+function TimeLogModal({ customerId, customerName, workspaceId, userId, onCreate, onClose }: TimeLogModalProps) {
+  const [hours,   setHours]   = useState('1')
+  const [minutes, setMinutes] = useState('0')
+  const [desc,    setDesc]    = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+
+  const totalMin = (parseInt(hours) || 0) * 60 + (parseInt(minutes) || 0)
+
+  const handleSave = async () => {
+    if (totalMin <= 0) { setError('Bitte eine gültige Dauer eingeben'); return }
+    setSaving(true); setError(null)
+    try {
+      const h = Math.floor(totalMin / 60)
+      const m = totalMin % 60
+      const durationStr = h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`
+      await onCreate({
+        workspaceId, createdBy: userId, accountId: customerId,
+        type: 'note',
+        title: `Zeiterfassung: ${durationStr}`,
+        body: desc.trim() || undefined,
+        status: 'done',
+      })
+      onClose()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'oklch(0% 0 0 / 0.55)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div className="card" style={{
+        width: 420, maxWidth: '94vw',
+        padding: 0, overflow: 'hidden',
+        boxShadow: 'var(--shadow-2)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Clock size={15} style={{ color: 'var(--fg-muted)' }} />
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>Zeiterfassung</h2>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--fg-dim)', marginTop: 3 }}>{customerName}</div>
+          </div>
+          <button className="icon-btn" onClick={onClose}><X size={15} /></button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Duration */}
+          <div>
+            <label className="card-label" style={{ display: 'block', marginBottom: 8 }}>Dauer</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number" min="0" max="23" value={hours}
+                  onChange={e => setHours(e.target.value)}
+                  className="mock-input"
+                  style={{ width: 64, textAlign: 'center' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>h</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="number" min="0" max="59" step="5" value={minutes}
+                  onChange={e => setMinutes(e.target.value)}
+                  className="mock-input"
+                  style={{ width: 64, textAlign: 'center' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>min</span>
+              </div>
+              {totalMin > 0 && (
+                <span className="chip" data-tone="accent">
+                  {Math.floor(totalMin / 60) > 0 ? `${Math.floor(totalMin / 60)}h ` : ''}
+                  {totalMin % 60 > 0 ? `${totalMin % 60}min` : ''}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="card-label" style={{ display: 'block', marginBottom: 6 }}>Beschreibung (optional)</label>
+            <textarea
+              value={desc}
+              onChange={e => setDesc(e.target.value)}
+              className="mock-input"
+              rows={3}
+              placeholder="Was wurde gemacht?"
+            />
+          </div>
+
+          {error && (
+            <div style={{ color: 'var(--danger)', fontSize: 13, padding: '8px 12px', background: 'oklch(72% 0.18 25 / 0.1)', borderRadius: 8 }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '14px 22px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn-ghost" onClick={onClose}>Abbrechen</button>
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Speichern…' : 'Zeit erfassen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AktionItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 10px', borderRadius: 8, width: '100%', textAlign: 'left',
+        background: hover ? (danger ? 'oklch(72% 0.18 25 / 0.1)' : 'var(--surface-2)') : 'none',
+        border: 'none', cursor: 'pointer', fontSize: 13,
+        color: danger ? 'var(--danger)' : 'var(--fg-2)',
+        transition: 'background 120ms ease',
+      }}
+    >
+      <span style={{ color: danger ? 'var(--danger)' : 'var(--fg-muted)', display: 'flex', opacity: hover ? 1 : 0.8 }}>{icon}</span>
+      {label}
+    </button>
+  )
+}
+
+function DeleteConfirmModal({ customerName, onConfirm, onCancel }: { customerName: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'oklch(0% 0 0 / 0.55)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div className="card" style={{ width: 360, maxWidth: '92vw', padding: 0, overflow: 'hidden', boxShadow: 'var(--shadow-2)' }}>
+        <div style={{ padding: '24px 24px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: 'oklch(72% 0.18 25 / 0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Trash2 size={16} style={{ color: 'var(--danger)' }} />
+            </div>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: '-0.02em' }}>Kunde löschen?</h2>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.5 }}>
+            <strong style={{ color: 'var(--fg)' }}>{customerName}</strong> wird unwiderruflich gelöscht. Alle Daten, Aktivitäten und Deals gehen verloren.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', padding: '14px 24px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn-ghost" onClick={onCancel}>Abbrechen</button>
+          <button
+            onClick={onConfirm}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 99, border: 'none', cursor: 'pointer',
+              background: 'var(--danger)', color: '#fff',
+              fontSize: 13, fontWeight: 600,
+            }}
+          >
+            <Trash2 size={13} /> Löschen
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

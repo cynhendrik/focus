@@ -21,13 +21,17 @@ interface Props {
 }
 
 export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Props) {
-  const createInvoice = useFinanceStore(s => s.createInvoice)
-  const updateInvoice = useFinanceStore(s => s.updateInvoice)
-  const accounts      = useAccountsStore(s => s.accounts)
-  const profile       = useCompanyStore(s => s.profile)
-  const isAdmin       = useCompanyStore(s => s.isAdmin)
-  const workspaceId   = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-  const user          = useAuthStore(s => s.user)
+  const createInvoice  = useFinanceStore(s => s.createInvoice)
+  const updateInvoice  = useFinanceStore(s => s.updateInvoice)
+  const accounts       = useAccountsStore(s => s.accounts)
+  const loadAccounts   = useAccountsStore(s => s.init)
+  const profile        = useCompanyStore(s => s.profile)
+  const isAdmin        = useCompanyStore(s => s.isAdmin)
+  const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user           = useAuthStore(s => s.user)
+
+  // Accounts beim Öffnen frisch laden — damit neu erstellte Kunden sofort verfügbar sind
+  useEffect(() => { loadAccounts() }, [])
 
   const kleinunternehmer = profile.kleinunternehmer ?? false
   const zahlungszielTage = profile.zahlungszielTage ?? 14

@@ -2,12 +2,40 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-export type CustomerTab = 'dashboard' | 'kommunikation' | 'aktivitaeten' | 'informationen' | 'sales' | 'workflow' | 'dateien' | 'historie' | 'finanzen'
+/** Canonical customer tabs — 3 instead of 9. */
+export type CustomerTab = 'ueberblick' | 'arbeiten' | 'historie'
+
+/** Legacy CustomerTab values, kept for backwards-compat with deep-link callers. */
+export type LegacyCustomerTab = 'dashboard' | 'kommunikation' | 'aktivitaeten' | 'informationen' | 'sales' | 'workflow' | 'arbeitsraum' | 'dateien' | 'finanzen'
+
+/** Map legacy tab IDs onto the new three-tab model. */
+export function mapLegacyCustomerTab(tab: string): CustomerTab {
+  switch (tab) {
+    case 'ueberblick':
+    case 'arbeiten':
+    case 'historie':
+      return tab as CustomerTab
+    case 'dashboard':
+    case 'informationen':
+    case 'sales':
+    case 'finanzen':
+      return 'ueberblick'
+    case 'workflow':
+    case 'arbeitsraum':
+    case 'dateien':
+      return 'arbeiten'
+    case 'kommunikation':
+    case 'aktivitaeten':
+    default:
+      return 'historie'
+  }
+}
 export type AppView =
-  | 'dashboard' | 'profile'   | 'workstation'
-  | 'clients'   | 'pipeline'  | 'invoices'  | 'tasks'    | 'kpis' | 'insights'
-  | 'calendar'  | 'mail'      | 'crm'       | 'settings' | 'followups'
-  | 'smartlists'| 'chat'      | 'leads'
+  | 'dashboard' | 'profile'
+  | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
+  | 'settings'
+  | 'pipeline'  | 'tasks'      | 'calendar'  | 'mail' | 'crm' | 'followups' | 'leads'
+  | 'smartlists' | 'chat' | 'workstation'
 
 interface UiState {
   theme: Theme
@@ -20,7 +48,7 @@ interface UiState {
   activeCustomerTab: CustomerTab
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
-  openCustomerAt: (id: string, tab?: CustomerTab) => void
+  openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
   setAppView: (view: AppView) => void
   toggleFocusMode: () => void
   markIntroSeen: () => void
@@ -39,7 +67,7 @@ export const useUiStore = create<UiState>()(
       hasSeenIntro: false,
       migrationDone: false,
       cmdPaletteOpen: false,
-      activeCustomerTab: 'dashboard',
+      activeCustomerTab: 'ueberblick',
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -47,8 +75,8 @@ export const useUiStore = create<UiState>()(
       setSelectedCustomer: (id) =>
         set({ selectedCustomerId: id, appView: 'clients' }),
 
-      openCustomerAt: (id, tab = 'dashboard') =>
-        set({ selectedCustomerId: id, appView: 'clients', activeCustomerTab: tab }),
+      openCustomerAt: (id, tab = 'ueberblick') =>
+        set({ selectedCustomerId: id, appView: 'clients', activeCustomerTab: mapLegacyCustomerTab(tab) }),
 
       setAppView: (view) =>
         set({ appView: view }),
@@ -66,7 +94,7 @@ export const useUiStore = create<UiState>()(
         set({ cmdPaletteOpen: open }),
 
       setActiveCustomerTab: (tab) =>
-        set({ activeCustomerTab: tab }),
+        set({ activeCustomerTab: mapLegacyCustomerTab(tab) }),
     }),
     {
       name: 'focus-ui-v2',

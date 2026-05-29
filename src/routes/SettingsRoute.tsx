@@ -3,8 +3,10 @@ import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useCompanyStore } from '@/store/company.store'
 import type { CompanyProfile, CompanyModules } from '@/types/company.types'
-import { Check, Copy, TrendingUp, Users, Mail, Share2, Sparkles, Clock } from 'lucide-react'
+import { Check, Copy, TrendingUp, Users, Mail, Share2, Sparkles, Clock, Zap, Bot, Eye, EyeOff } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { Switch } from '@/components/ui/Switch'
+import { getApiKey, setApiKey, clearApiKey, getModel, setModel } from '@/lib/ai/briefing'
 
 const SUPABASE_URL    = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const WEBHOOK_SECRET  = import.meta.env.VITE_LEAD_WEBHOOK_SECRET as string | undefined
@@ -94,27 +96,6 @@ function CopyField({ label, url }: { label: string; url: string }) {
   )
 }
 
-function ModuleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={e => { e.preventDefault(); onToggle() }}
-      style={{
-        width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
-        background: on ? 'oklch(55% 0.25 270)' : 'var(--border)',
-        position: 'relative', transition: 'background 200ms', flexShrink: 0,
-        padding: 0,
-      }}
-    >
-      <div style={{
-        width: 20, height: 20, borderRadius: '50%', background: '#fff',
-        position: 'absolute', top: 3, left: on ? 21 : 3,
-        transition: 'left 200ms',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
-      }} />
-    </button>
-  )
-}
-
 function ModuleCard({ def, on, onToggle }: { def: ModuleDef; on: boolean; onToggle: () => void }) {
   const Icon = def.icon
   return (
@@ -122,18 +103,25 @@ function ModuleCard({ def, on, onToggle }: { def: ModuleDef; on: boolean; onTogg
       background: 'var(--surface-2)', border: '1px solid var(--border)',
       borderRadius: 16, padding: '18px 20px',
       display: 'flex', flexDirection: 'column', gap: 14,
-    }}>
+      transition: 'border-color 180ms ease, background 180ms ease',
+    }}
+    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+    >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-          background: 'oklch(92% 0.08 270)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: on ? 'var(--accent-soft)' : 'oklch(50% 0 0 / 0.06)',
+          border: `1px solid ${on ? 'var(--accent-soft)' : 'var(--border)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 220ms ease, border-color 220ms ease',
         }}>
-          <Icon size={18} color="oklch(50% 0.2 270)" />
+          <Icon size={18} style={{ color: on ? 'var(--accent)' : 'var(--fg-muted)', transition: 'color 220ms ease' }} />
         </div>
-        <ModuleToggle on={on} onToggle={onToggle} />
+        <Switch on={on} onToggle={onToggle} size="sm" />
       </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', marginBottom: 4 }}>{def.label}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg)', marginBottom: 4, letterSpacing: '-0.005em' }}>{def.label}</div>
         <div style={{ fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.5 }}>{def.description}</div>
       </div>
     </div>
@@ -168,6 +156,345 @@ function ModuleGrid({ modules, onToggle }: {
           />
         ))}
       </div>
+    </div>
+  )
+}
+
+function ProSection({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        borderRadius: 20,
+        padding: '24px 26px',
+        background: on
+          ? 'linear-gradient(135deg, var(--accent-soft), oklch(60% 0.18 235 / 0.08))'
+          : 'var(--surface-2)',
+        border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+        boxShadow: on
+          ? '0 12px 36px -18px var(--accent-glow)'
+          : 'none',
+        overflow: 'hidden',
+        transition: 'background 280ms ease, border-color 280ms ease, box-shadow 280ms ease',
+      }}
+    >
+      {/* Glow Akzent rechts oben — nur sichtbar wenn aktiv */}
+      <div
+        style={{
+          position: 'absolute', top: -40, right: -40,
+          width: 180, height: 180, borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--accent-glow), transparent 70%)',
+          opacity: on ? 0.4 : 0,
+          transition: 'opacity 320ms ease',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', minWidth: 0 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            background: on ? 'var(--accent)' : 'oklch(50% 0 0 / 0.06)',
+            border: `1px solid ${on ? 'transparent' : 'var(--border)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: on ? '0 6px 18px -8px var(--accent-glow)' : 'none',
+            transition: 'all 240ms ease',
+          }}>
+            <Zap size={20} style={{ color: on ? 'var(--accent-ink)' : 'var(--fg-muted)', transition: 'color 220ms ease' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.015em' }}>
+                Pro-Modus
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                padding: '2px 7px', borderRadius: 99,
+                background: on ? 'var(--accent)' : 'oklch(50% 0 0 / 0.1)',
+                color: on ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                transition: 'all 220ms ease',
+              }}>
+                {on ? 'aktiv' : 'optional'}
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.55 }}>
+              Schaltet erweiterte Workspace-Features frei: <strong style={{ color: 'var(--fg-2)' }}>Kampagnen</strong> für Team-Outreach und <strong style={{ color: 'var(--fg-2)' }}>Automationen</strong> für wiederkehrende Workflows.
+            </div>
+          </div>
+        </div>
+        <Switch on={on} onToggle={onToggle} size="md" />
+      </div>
+
+      {on && (
+        <div
+          style={{
+            marginTop: 18,
+            padding: '14px 16px',
+            borderRadius: 12,
+            background: 'oklch(50% 0 0 / 0.04)',
+            border: '1px solid oklch(50% 0 0 / 0.06)',
+            display: 'flex', flexDirection: 'column', gap: 10,
+          }}
+        >
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10,
+            letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: 'var(--fg-dim)', fontWeight: 600,
+          }}>
+            Enthalten
+          </div>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+            <ProFeatureItem icon="📣" label="Kampagnen" hint="Outreach im Team" />
+            <ProFeatureItem icon="⚡" label="Automationen" hint="Trigger & Workflows" />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProFeatureItem({ icon, label, hint }: { icon: string; label: string; hint: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      <span style={{ fontSize: 18 }}>{icon}</span>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg)' }}>{label}</span>
+        <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{hint}</span>
+      </div>
+    </div>
+  )
+}
+
+const AI_MODELS: { id: string; label: string; hint: string }[] = [
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', hint: 'Schnell + günstig — empfohlen' },
+  { id: 'claude-opus-4-7',   label: 'Opus 4.7',   hint: 'Maximale Qualität — etwas langsamer + teurer' },
+  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5',  hint: 'Sehr günstig — für einfache Zusammenfassungen' },
+]
+
+function AiSection() {
+  const [keyInput, setKeyInput]     = useState('')
+  const [hasKey, setHasKey]         = useState<boolean>(() => !!getApiKey())
+  const [showInput, setShowInput]   = useState<boolean>(() => !getApiKey())
+  const [reveal, setReveal]         = useState(false)
+  const [saved, setSaved]           = useState(false)
+  const [model, setModelState]      = useState<string>(() => getModel())
+
+  useEffect(() => {
+    if (hasKey) setKeyInput(getApiKey() ?? '')
+    else        setKeyInput('')
+  }, [hasKey])
+
+  const handleSave = () => {
+    const trimmed = keyInput.trim()
+    if (!trimmed) return
+    setApiKey(trimmed)
+    setHasKey(true)
+    setShowInput(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1800)
+  }
+
+  const handleRemove = () => {
+    clearApiKey()
+    setHasKey(false)
+    setKeyInput('')
+    setShowInput(true)
+  }
+
+  const handleModel = (id: string) => {
+    setModel(id)
+    setModelState(id)
+  }
+
+  const masked = (key: string) => key ? `${key.slice(0, 8)}…${key.slice(-4)}` : ''
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        borderRadius: 20,
+        padding: '24px 26px',
+        background: hasKey
+          ? 'linear-gradient(135deg, oklch(60% 0.18 280 / 0.10), oklch(60% 0.16 235 / 0.06))'
+          : 'var(--surface-2)',
+        border: `1px solid ${hasKey ? 'oklch(60% 0.18 280 / 0.45)' : 'var(--border)'}`,
+        boxShadow: hasKey
+          ? '0 12px 36px -18px oklch(60% 0.18 280 / 0.5)'
+          : 'none',
+        overflow: 'hidden',
+        transition: 'all 280ms ease',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: -40, right: -40,
+        width: 180, height: 180, borderRadius: '50%',
+        background: 'radial-gradient(circle, oklch(60% 0.18 280 / 0.35), transparent 70%)',
+        opacity: hasKey ? 0.5 : 0,
+        transition: 'opacity 320ms ease',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', minWidth: 0 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            background: hasKey ? 'oklch(60% 0.18 280)' : 'oklch(50% 0 0 / 0.06)',
+            border: `1px solid ${hasKey ? 'transparent' : 'var(--border)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: hasKey ? '0 6px 18px -8px oklch(60% 0.18 280 / 0.6)' : 'none',
+            transition: 'all 240ms ease',
+          }}>
+            <Bot size={20} style={{ color: hasKey ? '#fff' : 'var(--fg-muted)', transition: 'color 220ms ease' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.015em' }}>
+                KI-Briefings
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                padding: '2px 7px', borderRadius: 99,
+                background: hasKey ? 'oklch(60% 0.18 280)' : 'oklch(50% 0 0 / 0.1)',
+                color: hasKey ? '#fff' : 'var(--fg-muted)',
+                fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                transition: 'all 220ms ease',
+              }}>
+                {hasKey ? 'aktiv' : 'nicht konfiguriert'}
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.55 }}>
+              Claude erstellt aus den Kundendaten ein <strong style={{ color: 'var(--fg-2)' }}>30-Sekunden-Briefing</strong> vor jedem Call. Eigener API-Key erforderlich — Daten gehen direkt an Anthropic, nicht über Cynera-Server.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* API Key Section */}
+      <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <span className="card-label">API-Key</span>
+
+        {hasKey && !showInput ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 14px', borderRadius: 12,
+            background: 'oklch(50% 0 0 / 0.06)',
+            border: '1px solid var(--border)',
+          }}>
+            <Check size={14} style={{ color: 'var(--ok)', flexShrink: 0 }} />
+            <span style={{
+              flex: 1, fontFamily: 'var(--font-mono)', fontSize: 12,
+              color: 'var(--fg-muted)', letterSpacing: '0.02em',
+            }}>
+              {reveal ? (getApiKey() ?? '') : masked(getApiKey() ?? '')}
+            </span>
+            <button onClick={() => setReveal(v => !v)} className="btn-ghost" style={{ fontSize: 11, padding: '5px 10px' }}>
+              {reveal ? <EyeOff size={12} /> : <Eye size={12} />}
+            </button>
+            <button onClick={() => setShowInput(true)} className="btn-ghost" style={{ fontSize: 11, padding: '5px 10px' }}>
+              Ändern
+            </button>
+            <button
+              onClick={handleRemove}
+              style={{
+                fontSize: 11, padding: '5px 10px', borderRadius: 99,
+                background: 'transparent', color: 'var(--danger)',
+                border: '1px solid var(--border)', cursor: 'pointer',
+              }}
+            >
+              Entfernen
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type={reveal ? 'text' : 'password'}
+              value={keyInput}
+              onChange={e => setKeyInput(e.target.value)}
+              placeholder="sk-ant-api03-..."
+              onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+              style={{
+                flex: 1, padding: '10px 14px', fontSize: 12.5,
+                borderRadius: 12, border: '1px solid var(--border)',
+                background: 'var(--surface)', color: 'var(--fg)',
+                outline: 'none', fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.01em',
+                transition: 'border-color 150ms',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = 'oklch(60% 0.18 280)' }}
+              onBlur ={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            />
+            <button onClick={() => setReveal(v => !v)} className="btn-ghost" style={{ padding: '0 12px' }}>
+              {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!keyInput.trim()}
+              style={{
+                padding: '10px 18px', borderRadius: 12,
+                background: keyInput.trim() ? 'oklch(60% 0.18 280)' : 'oklch(50% 0 0 / 0.1)',
+                color: keyInput.trim() ? '#fff' : 'var(--fg-dim)',
+                fontSize: 13, fontWeight: 600,
+                cursor: keyInput.trim() ? 'pointer' : 'not-allowed',
+                border: 'none',
+                transition: 'background 150ms',
+              }}
+            >
+              Speichern
+            </button>
+          </div>
+        )}
+
+        {saved && (
+          <span style={{ fontSize: 11.5, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Check size={12} /> Gespeichert
+          </span>
+        )}
+
+        <span style={{ fontSize: 11.5, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+          Hol dir einen Key auf <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' }}>console.anthropic.com</span> → API Keys. Wird nur lokal auf deinem Gerät gespeichert.
+        </span>
+      </div>
+
+      {/* Model Selection */}
+      {hasKey && (
+        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <span className="card-label">Modell</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {AI_MODELS.map(m => {
+              const active = model === m.id
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => handleModel(m.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: active ? 'oklch(60% 0.18 280 / 0.12)' : 'oklch(50% 0 0 / 0.04)',
+                    border: `1px solid ${active ? 'oklch(60% 0.18 280 / 0.45)' : 'var(--border)'}`,
+                    cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 180ms ease',
+                  }}
+                >
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: active ? 'oklch(60% 0.18 280)' : 'transparent',
+                    border: `2px solid ${active ? 'oklch(60% 0.18 280)' : 'var(--border-strong)'}`,
+                    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{m.label}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--fg-dim)', marginTop: 1 }}>{m.hint}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -417,6 +744,12 @@ export function SettingsRoute() {
 
       {/* ── Module ──────────────────────────────────────────────────────────── */}
       <ModuleGrid modules={modules} onToggle={toggleModule} />
+
+      {/* ── Pro-Modus ───────────────────────────────────────────────────────── */}
+      <ProSection on={!!modules.pro} onToggle={() => toggleModule('pro')} />
+
+      {/* ── KI-Briefings (Claude API) ──────────────────────────────────────── */}
+      <AiSection />
 
       {/* ── Leads & Integrationen ────────────────────────────────────────────── */}
       <div className="card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>

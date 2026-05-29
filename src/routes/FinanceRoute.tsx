@@ -10,7 +10,6 @@ import { OfferForm } from '@/components/finance/OfferForm'
 import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import { downloadInvoicePDF, batchExportInvoicesPDF, getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
-import { WorkspaceAblageService } from '@/services/workspace-ablage.service'
 import { downloadOfferPDF } from '@/components/finance/OfferPDF'
 import { FinanceService } from '@/services/finance.service'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
@@ -379,24 +378,6 @@ export function FinanceRoute() {
   const handleReleaseInvoice = async (inv: Invoice) => {
     await updateInvoiceStatus(inv.id, 'open')
     await loadAll(workspaceId)
-    // Auto-Ablage: PDF generieren und in Workspace-Ablage speichern
-    try {
-      const full = await FinanceService.getInvoice(inv.id)
-      const acc  = accounts.find(a => a.id === inv.accountId)
-      if (acc && full.invoice.number && profile) {
-        const bytes = await getInvoicePdfBytes(full, profile, acc)
-        await WorkspaceAblageService.saveInvoiceToAblage({
-          workspaceId,
-          invoiceId:     inv.id,
-          invoiceNumber: full.invoice.number,
-          accountName:   acc.name,
-          invoiceDate:   full.invoice.date,
-          pdfData:       Array.from(bytes),
-        })
-      }
-    } catch {
-      // Silent fallback — Rechnung ist bereits freigegeben, Ablage-Fehler blockiert nicht
-    }
   }
 
   // KPIs

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff } from 'lucide-react'
+import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff, Sparkles, ArrowRight } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -7,6 +7,8 @@ import { useCrmStore } from '@/store/crm.store'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
+import { StaggerList } from '@/components/ui/StaggerList'
+import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
 import type { Customer, CustomerStatus } from '@/types/customer.types'
 import type { Todo } from '@/types/todo.types'
 import type { CustomerTab } from '@/store/ui.store'
@@ -284,12 +286,31 @@ function ClientRow({ customer, lastAct, tab, onClick }: {
 
 function ClientBoard() {
   const customers      = useCustomersStore(s => s.customers)
+  const upsertCustomer = useCustomersStore(s => s.upsert)
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
   const allTodos       = useTodosStore(s => s.allTodos)
   const lastActivity   = useCrmStore(s => s.lastActivity)
   const pinnedIds      = useClientPickerStore(s => s.pinnedIds)
   const togglePin      = useClientPickerStore(s => s.togglePin)
   const [showModal, setShowModal] = useState(false)
+  const [loadingSample, setLoadingSample] = useState(false)
+
+  const loadSampleData = async (ind: IndustryProfile) => {
+    setLoadingSample(true)
+    try {
+      for (const c of ind.sampleCustomers) {
+        await upsertCustomer({
+          name: c.name, company: c.company, email: c.email, phone: c.phone,
+          city: c.city, status: c.status, priority: c.priority,
+          industry: c.industry, goals: c.goals, tags: [],
+        })
+      }
+    } catch (e) {
+      console.error('Failed to load sample customers', e)
+    } finally {
+      setLoadingSample(false)
+    }
+  }
 
   const activityMap = useMemo(
     () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
@@ -352,23 +373,31 @@ function ClientBoard() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em' }}>
-            Client Board
+            Kunden
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>
             Prioritäten, Risiken und letzte Aktivitäten auf einen Blick
           </p>
         </div>
         <button className="btn-ghost" onClick={() => setShowModal(true)}>
-          <UserPlus size={14} /> Neuer Client
+          <UserPlus size={14} /> Neuer Kunde
         </button>
       </div>
+
+      {customers.length === 0 ? (
+        <EmptyClientBoard
+          loading={loadingSample}
+          onLoadSample={loadSampleData}
+          onAddManual={() => setShowModal(true)}
+        />
+      ) : (<>
 
       {/* Quick Strip */}
       <QuickStrip
         customers={customers}
         pinnedIds={pinnedIds}
         recentClients={recentClients}
-        onOpen={id => openCustomerAt(id, 'dashboard')}
+        onOpen={id => openCustomerAt(id, 'ueberblick')}
         onTogglePin={togglePin}
       />
 
@@ -398,19 +427,23 @@ function ClientBoard() {
           empty="Keine fälligen To-Dos — alles im grünen Bereich."
         >
           {deadlineItems.length > 0
-            ? deadlineItems.map(({ todo, tone, label }) => {
-                const c = customerMap.get(todo.customerId)
-                return (
-                  <DeadlineRow
-                    key={todo.id}
-                    todo={todo}
-                    name={c?.name ?? '—'}
-                    tone={tone}
-                    label={label}
-                    onClick={() => c && openCustomerAt(c.id, 'aktivitaeten')}
-                  />
-                )
-              })
+            ? (
+              <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {deadlineItems.map(({ todo, tone, label }) => {
+                  const c = customerMap.get(todo.customerId)
+                  return (
+                    <DeadlineRow
+                      key={todo.id}
+                      todo={todo}
+                      name={c?.name ?? '—'}
+                      tone={tone}
+                      label={label}
+                      onClick={() => c && openCustomerAt(c.id, 'historie')}
+                    />
+                  )
+                })}
+              </StaggerList>
+            )
             : undefined}
         </SectionCard>
 
@@ -425,36 +458,165 @@ function ClientBoard() {
             empty="Alle Clients sind up to date."
           >
             {riskClients.length > 0
-              ? riskClients.map(c => (
-                  <ClientRow
-                    key={c.id}
-                    customer={c}
-                    lastAct={activityMap.get(c.id) ?? c.updatedAt}
-                    tab="dashboard"
-                    onClick={() => openCustomerAt(c.id, 'dashboard')}
-                  />
-                ))
+              ? (
+                <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {riskClients.map(c => (
+                    <ClientRow
+                      key={c.id}
+                      customer={c}
+                      lastAct={activityMap.get(c.id) ?? c.updatedAt}
+                      tab="ueberblick"
+                      onClick={() => openCustomerAt(c.id, 'ueberblick')}
+                    />
+                  ))}
+                </StaggerList>
+              )
               : undefined}
           </SectionCard>
 
           {/* Recent — öffnet Dashboard-Tab */}
           <SectionCard title="Letzte Aktivität" icon={<Activity size={14} />} empty="Noch keine Clients.">
             {recentClients.length > 0
-              ? recentClients.map(c => (
-                  <ClientRow
-                    key={c.id}
-                    customer={c}
-                    lastAct={activityMap.get(c.id) ?? c.updatedAt}
-                    tab="dashboard"
-                    onClick={() => openCustomerAt(c.id, 'dashboard')}
-                  />
-                ))
+              ? (
+                <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {recentClients.map(c => (
+                    <ClientRow
+                      key={c.id}
+                      customer={c}
+                      lastAct={activityMap.get(c.id) ?? c.updatedAt}
+                      tab="ueberblick"
+                      onClick={() => openCustomerAt(c.id, 'ueberblick')}
+                    />
+                  ))}
+                </StaggerList>
+              )
               : undefined}
           </SectionCard>
         </div>
       </div>
 
+      </>)}
+
       {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
+    </div>
+  )
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
+  loading: boolean
+  onLoadSample: (ind: IndustryProfile) => void
+  onAddManual: () => void
+}) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 28,
+      padding: '40px 24px',
+      maxWidth: 720, margin: '20px auto 0',
+      textAlign: 'center',
+    }}>
+      <div style={{
+        width: 64, height: 64, borderRadius: 18, margin: '0 auto',
+        background: 'var(--accent-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <UserPlus size={28} style={{ color: 'var(--accent)' }} />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <h2 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 28, fontWeight: 600,
+          letterSpacing: '-0.025em',
+          margin: 0,
+        }}>
+          Noch keine Kunden.
+        </h2>
+        <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.55 }}>
+          Lege deinen ersten Kunden an — oder lade Beispiel-Daten um die App zu testen.
+        </p>
+      </div>
+
+      {/* Primary CTA */}
+      <button
+        onClick={onAddManual}
+        className="btn-primary"
+        style={{ padding: '11px 22px', fontSize: 13.5, alignSelf: 'center' }}
+      >
+        <UserPlus size={14} /> Ersten Kunden anlegen
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '8px 0' }}>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+          color: 'var(--fg-dim)', fontWeight: 600,
+        }}>
+          oder
+        </span>
+        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+      </div>
+
+      {/* Sample data */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{
+          fontSize: 12.5, color: 'var(--fg-muted)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}>
+          <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+          Beispiel-Daten laden
+        </span>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 10,
+          marginTop: 8,
+        }}>
+          {INDUSTRIES.map(ind => (
+            <button
+              key={ind.id}
+              onClick={() => onLoadSample(ind)}
+              disabled={loading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                cursor: loading ? 'wait' : 'pointer',
+                textAlign: 'left',
+                transition: 'all 180ms ease',
+                opacity: loading ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!loading) {
+                  e.currentTarget.style.borderColor = 'var(--accent)'
+                  e.currentTarget.style.background = 'var(--accent-soft)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!loading) {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.background = 'var(--surface-2)'
+                }
+              }}
+            >
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{ind.icon}</span>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
+                  {ind.label}
+                </span>
+                <span style={{ fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1 }}>
+                  {ind.sampleCustomers.length} Beispiel-Kunden
+                </span>
+              </div>
+              <ArrowRight size={12} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

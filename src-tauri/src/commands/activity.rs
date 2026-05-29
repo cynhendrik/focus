@@ -90,3 +90,11 @@ pub fn get_activities_by_customer(
 ) -> Result<Vec<Activity>, AppError> {
     db::activity::get_by_customer(&db.conn(), &customer_id)
 }
+
+#[tauri::command]
+pub fn get_open_followups(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<Vec<Activity>, AppError> {
+    db::activity::get_open_followups(&db.conn(), &workspace_id)
+}

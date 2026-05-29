@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAccountsStore } from '@/store/accounts.store'
@@ -37,11 +37,15 @@ function calcTotals(items: UpsertOfferItemPayload[], taxMode: TaxMode) {
 }
 
 export function OfferForm({ initial, onClose, onSaved }: Props) {
-  const createOffer  = useFinanceStore(s => s.createOffer)
-  const updateOffer  = useFinanceStore(s => s.updateOffer)
-  const accounts     = useAccountsStore(s => s.accounts)
-  const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-  const user         = useAuthStore(s => s.user)
+  const createOffer   = useFinanceStore(s => s.createOffer)
+  const updateOffer   = useFinanceStore(s => s.updateOffer)
+  const accounts      = useAccountsStore(s => s.accounts)
+  const loadAccounts  = useAccountsStore(s => s.init)
+  const workspaceId   = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user          = useAuthStore(s => s.user)
+
+  // Accounts beim Öffnen frisch laden — damit neu erstellte Kunden sofort verfügbar sind
+  useEffect(() => { loadAccounts() }, [])
 
   const [accountId,  setAccountId]  = useState(initial?.offer.accountId ?? '')
   const [title,      setTitle]      = useState(initial?.offer.title ?? '')

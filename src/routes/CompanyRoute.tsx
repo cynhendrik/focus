@@ -9,6 +9,7 @@ const MODULE_LABELS: Record<keyof CompanyModules, string> = {
   instagram: 'Instagram',
   focusAi: 'FOCUS AI',
   zeiterfassung: 'Zeiterfassung',
+  pro: 'Pro-Modus',
 }
 
 export function CompanyRoute() {

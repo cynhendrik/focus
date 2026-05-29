@@ -29,6 +29,8 @@ export interface CompanyModules {
   instagram?: boolean
   focusAi?: boolean
   zeiterfassung?: boolean
+  /** Pro-Bündel: schaltet Kampagnen + Automationen frei. */
+  pro?: boolean
 }
 
 export interface CompanySettings {

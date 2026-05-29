@@ -30,6 +30,11 @@ function activityToTodo(a: Activity): Todo {
 }
 
 export const TodoService = {
+  async getAll(workspaceId: string): Promise<Todo[]> {
+    const activities = await invoke<Activity[]>('get_open_tasks', { workspaceId })
+    return activities.map(activityToTodo)
+  },
+
   async getByCustomer(customerId: string): Promise<Todo[]> {
     const activities = await invoke<Activity[]>('get_activities_by_account', { accountId: customerId })
     return activities.filter(a => a.type === 'task').map(activityToTodo)

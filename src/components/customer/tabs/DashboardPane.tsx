@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useFilesStore } from '@/store/files.store'
 import { useMailStore } from '@/store/mail.store'
+import { BriefingCard } from '@/components/customer/BriefingCard'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,9 @@ export function DashboardPane({ customerId }: Props) {
 
   return (
     <div className="p-5 flex flex-col gap-4 overflow-auto h-full">
+
+      {/* ── KI-Briefing ── */}
+      <BriefingCard customerId={customerId} />
 
       {/* ── Row 1: Beziehung + Letzte Interaktion + Nächste Aktion ── */}
       <div className="grid grid-cols-3 gap-4">
