@@ -1,6 +1,10 @@
 // src/components/smart-lists/CustomerTableFiltered.tsx
+import { useMemo, useState } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import type { Customer } from '@/types/customer.types'
+
+type SortKey = 'name' | 'status' | 'priority' | 'score' | 'industry' | 'lastActivity'
+type SortDir = 'asc' | 'desc'
 
 const STATUS_LABEL: Record<string, string> = {
   aktiv: 'Aktiv', lead: 'Lead', inaktiv: 'Inaktiv', lost: 'Lost',
@@ -11,6 +15,7 @@ const STATUS_TONE: Record<string, string> = {
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Niedrig', normal: 'Normal', high: 'Hoch',
 }
+const PRIORITY_NUM: Record<string, number> = { low: 0, normal: 1, high: 2 }
 
 function relTime(iso: string): string {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
@@ -30,10 +35,50 @@ export function CustomerTableFiltered({
   const setSelected = useUiStore(s => s.setSelectedCustomer)
   const setAppView  = useUiStore(s => s.setAppView)
 
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null)
+
   const openCustomer = (id: string) => {
     setSelected(id)
     setAppView('clients')
   }
+
+  const toggleSort = (key: SortKey) => {
+    setSort(prev => {
+      if (prev?.key === key) {
+        return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+      }
+      return { key, dir: 'asc' }
+    })
+  }
+
+  const sortedCustomers = useMemo(() => {
+    if (sort === null) return customers
+    const { key, dir } = sort
+    return [...customers].sort((a, b) => {
+      let cmp = 0
+      if (key === 'name') {
+        cmp = a.name.localeCompare(b.name)
+      } else if (key === 'status') {
+        cmp = a.status.localeCompare(b.status)
+      } else if (key === 'priority') {
+        cmp = (PRIORITY_NUM[a.priority] ?? 1) - (PRIORITY_NUM[b.priority] ?? 1)
+      } else if (key === 'score') {
+        cmp = a.leadScore - b.leadScore
+      } else if (key === 'industry') {
+        cmp = (a.industry ?? '').localeCompare(b.industry ?? '')
+      } else if (key === 'lastActivity') {
+        const la = lastActivity.get(a.id) ?? ''
+        const lb = lastActivity.get(b.id) ?? ''
+        cmp = la.localeCompare(lb)
+      }
+      return dir === 'asc' ? cmp : -cmp
+    })
+  }, [customers, sort, lastActivity])
+
+  const arrow = (key: SortKey) =>
+    sort?.key === key
+      ? <span style={{ fontSize: 9, marginLeft: 3 }}>{sort.dir === 'asc' ? '▲' : '▼'}</span>
+      : null
 
   if (customers.length === 0) {
     return (
@@ -51,16 +96,28 @@ export function CustomerTableFiltered({
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr style={{ borderBottom: '1px solid var(--border)' }}>
-            <th style={th}>Name</th>
-            <th style={th}>Status</th>
-            <th style={th}>Priorität</th>
-            <th style={{ ...th, textAlign: 'right' }}>Score</th>
-            <th style={th}>Branche</th>
-            <th style={th}>Letzte Aktivität</th>
+            <th style={{ ...th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('name')}>
+              Name {arrow('name')}
+            </th>
+            <th style={{ ...th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('status')}>
+              Status {arrow('status')}
+            </th>
+            <th style={{ ...th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>
+              Priorität {arrow('priority')}
+            </th>
+            <th style={{ ...th, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('score')}>
+              Score {arrow('score')}
+            </th>
+            <th style={{ ...th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('industry')}>
+              Branche {arrow('industry')}
+            </th>
+            <th style={{ ...th, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('lastActivity')}>
+              Letzte Aktivität {arrow('lastActivity')}
+            </th>
           </tr>
         </thead>
         <tbody>
-          {customers.map(c => {
+          {sortedCustomers.map(c => {
             const last = lastActivity.get(c.id)
             return (
               <tr
