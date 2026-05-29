@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSmartListsStore } from '@/store/smart-lists.store'
 import { useWorkspaceStore }  from '@/store/workspace.store'
+import { useCustomersStore }  from '@/store/customers.store'
 import type { SmartList, SmartListFilter } from '@/types/smart-list.types'
 import type { CustomerStatus, Priority } from '@/types/customer.types'
 
@@ -36,6 +37,15 @@ export function SmartListModal({ initial, onClose }: {
   const [icon,   setIcon]   = useState(initial?.icon ?? '📋')
   const [filter, setFilter] = useState<SmartListFilter>(initial?.filter ?? {})
   const [saving, setSaving] = useState(false)
+
+  const customers = useCustomersStore(s => s.customers)
+  const availableIndustries = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of customers) {
+      if (c.industry && c.industry.trim()) set.add(c.industry.trim())
+    }
+    return [...set].sort()
+  }, [customers])
 
   const handleSave = async () => {
     if (!name.trim()) return
@@ -188,6 +198,33 @@ export function SmartListModal({ initial, onClose }: {
             Kunde muss ALLE genannten Tags haben (AND-Logik).
           </div>
         </div>
+
+        {/* Industry */}
+        {availableIndustries.length > 0 && (
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 6 }}>Branche</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {availableIndustries.map(ind => {
+                const active = filter.industry?.includes(ind) ?? false
+                return (
+                  <button
+                    key={ind}
+                    onClick={() => setFilter(f => ({ ...f, industry: toggle(f.industry, ind) }))}
+                    style={{
+                      padding: '4px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 500,
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color:      active ? 'var(--accent)' : 'var(--fg-muted)',
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {ind}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Aktionen */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
