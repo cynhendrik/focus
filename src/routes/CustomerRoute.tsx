@@ -10,28 +10,19 @@ import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useFilesStore } from '@/store/files.store'
 import { useActivitiesStore } from '@/store/activities.store'
+import { useDealsStore } from '@/store/deals.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { useMailStore } from '@/store/mail.store'
+import { useContactsStore } from '@/store/contacts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
 import { UeberblickPane } from '@/components/customer/tabs/UeberblickPane'
 import { ArbeitenPane } from '@/components/customer/tabs/ArbeitenPane'
-import { HistorieWrapperPane } from '@/components/customer/tabs/HistorieWrapperPane'
-
-function avatarBg(name: string): string {
-  const palette = ['bg-blue-600', 'bg-violet-600', 'bg-emerald-700', 'bg-orange-600', 'bg-pink-600', 'bg-teal-600']
-  let h = 0
-  for (const c of name) h += c.charCodeAt(0)
-  return palette[h % palette.length]
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diff / 86400000)
-  if (days === 0) return 'Today'
-  if (days === 1) return '1 day ago'
-  return `${days} days ago`
-}
+import { TimelinePane } from '@/components/customer/tabs/TimelinePane'
+import { PulseBar } from '@/components/customer/PulseBar'
+import { PrimaryContact } from '@/components/customer/PrimaryContact'
 
 function TabIcon({ id }: { id: CustomerTab }) {
   const paths: Record<CustomerTab, string[]> = {
@@ -47,9 +38,9 @@ function TabIcon({ id }: { id: CustomerTab }) {
 }
 
 const TABS: { id: CustomerTab; label: string }[] = [
-  { id: 'ueberblick', label: 'Überblick' },
-  { id: 'arbeiten',   label: 'Arbeiten'  },
-  { id: 'historie',   label: 'Historie'  },
+  { id: 'ueberblick', label: 'Überblick'  },
+  { id: 'arbeiten',   label: 'Arbeiten'   },
+  { id: 'historie',   label: 'Activities' },
 ]
 
 interface Props { customerId: string }
@@ -86,12 +77,16 @@ export function CustomerRoute({ customerId }: Props) {
     setSelected(null)
   }
 
-  const loadTodos     = useTodosStore(s => s.loadForCustomer)
-  const loadNotes     = useNotesStore(s => s.loadForCustomer)
-  const loadDeadlines = useDeadlinesStore(s => s.loadForCustomer)
+  const loadTodos      = useTodosStore(s => s.loadForCustomer)
+  const loadNotes      = useNotesStore(s => s.loadForCustomer)
+  const loadDeadlines  = useDeadlinesStore(s => s.loadForCustomer)
   const loadFollowUps  = useCrmStore(s => s.loadForCustomer)
   const loadFolders    = useFilesStore(s => s.loadForCustomer)
   const loadActivities = useActivitiesStore(s => s.loadForCustomer)
+  const loadDeals      = useDealsStore(s => s.loadForCustomer)
+  const loadStages     = usePipelineStore(s => s.load)
+  const loadEmails     = useMailStore(s => s.loadEmails)
+  const loadContacts   = useContactsStore(s => s.loadByAccount)
 
   useEffect(() => {
     loadTodos(customerId)
@@ -100,7 +95,11 @@ export function CustomerRoute({ customerId }: Props) {
     loadFollowUps(customerId)
     loadFolders(customerId)
     loadActivities(customerId)
-  }, [customerId])
+    loadDeals(customerId)
+    loadEmails()
+    loadContacts(customerId)
+    if (workspaceId) loadStages(workspaceId)
+  }, [customerId, workspaceId])
 
   const tabsRef = useRef<HTMLDivElement>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 })
@@ -121,7 +120,7 @@ export function CustomerRoute({ customerId }: Props) {
     switch (activeTab) {
       case 'ueberblick': return <UeberblickPane customerId={customerId} />
       case 'arbeiten':   return <ArbeitenPane customerId={customerId} />
-      case 'historie':   return <HistorieWrapperPane customerId={customerId} />
+      case 'historie':   return <TimelinePane customerId={customerId} />
     }
   }
 
@@ -135,11 +134,10 @@ export function CustomerRoute({ customerId }: Props) {
         <div className="avatar" style={{ width: 56, height: 56, borderRadius: 16, fontSize: 18 }}>
           {customer.name.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h1>{customer.name}</h1>
-          <div className="sub">
-            <span>Letzte Aktivität: {relativeTime(customer.updatedAt)} · {customer.status}</span>
-          </div>
+          <PrimaryContact customerId={customerId} />
+          <PulseBar customerId={customerId} />
         </div>
         <button className="btn-ghost"><Phone size={13} /> Anrufen</button>
         <button className="btn-ghost"><MailIcon size={13} /> Mail</button>
