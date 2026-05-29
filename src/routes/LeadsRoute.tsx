@@ -7,6 +7,8 @@ import {
 import { useLeadsStore } from '@/store/leads.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useUiStore } from '@/store/ui.store'
+import { useToastStore } from '@/store/toast.store'
 import { ActivitiesService } from '@/services/activities.service'
 import type { Lead, LeadSource, LeadStatus, UpsertLeadPayload } from '@/types/lead.types'
 
@@ -61,10 +63,13 @@ function dotColor(iso: string): string {
 
 // ── Board columns ─────────────────────────────────────────────────────────────
 
-const COLUMNS: { id: LeadStatus; label: string; hoverBg: string; dot: string }[] = [
-  { id: 'new',       label: 'New In',    hoverBg: 'rgba(59,130,246,0.10)',  dot: '#60a5fa' },
-  { id: 'attempted', label: 'Attempted', hoverBg: 'rgba(251,191,36,0.10)',  dot: '#fbbf24' },
-  { id: 'warm',      label: 'Warm Lead', hoverBg: 'rgba(74,222,128,0.10)',  dot: '#4ade80' },
+type ColumnId = LeadStatus | 'call_booked'
+
+const COLUMNS: { id: ColumnId; label: string; hoverBg: string; dot: string }[] = [
+  { id: 'new',         label: 'New In',          hoverBg: 'rgba(59,130,246,0.10)',  dot: '#60a5fa' },
+  { id: 'attempted',   label: 'Attempted',       hoverBg: 'rgba(251,191,36,0.10)',  dot: '#fbbf24' },
+  { id: 'warm',        label: 'Warm Lead',       hoverBg: 'rgba(74,222,128,0.10)',  dot: '#4ade80' },
+  { id: 'call_booked', label: 'Termin gebucht',  hoverBg: 'rgba(208,252,105,0.12)', dot: '#D0FC69' },
 ]
 
 const SIDEBAR_LIMIT = 8
@@ -344,10 +349,10 @@ function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
         <button
           onClick={e => { e.stopPropagation(); onWarm() }}
           style={{
-            marginTop: 8, width: '100%', padding: '4px 0',
-            borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-            background: 'var(--accent-soft)', border: '1px solid var(--accent)',
-            color: 'var(--accent)', display: 'flex', alignItems: 'center',
+            marginTop: 8, width: '100%', padding: '5px 0',
+            borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer',
+            background: 'var(--accent)', border: 'none',
+            color: 'var(--accent-ink)', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: 4,
           }}
         >
@@ -548,6 +553,10 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   const allLeads = useLeadsStore(s => s.leads)
   const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
   const deleteLead = useLeadsStore(s => s.deleteLead)
+  const convertToDeal = useLeadsStore(s => s.convertToDeal)
+  const userId        = useAuthStore(s => s.user?.id ?? '')
+  const setAppView    = useUiStore(s => s.setAppView)
+  const showToast     = useToastStore(s => s.show)
   const [activeLead, setActiveLead] = useState<Lead | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
@@ -565,7 +574,10 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
     [allLeads],
   )
 
-  const leadsForCol = (status: LeadStatus) => boardLeads.filter(l => l.leadStatus === status)
+  const leadsForCol = (status: ColumnId) =>
+    status === 'call_booked'
+      ? []   // Drop-only column — converted leads disappear from board
+      : boardLeads.filter(l => l.leadStatus === status)
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -585,10 +597,17 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   const handleDragEnd = (e: DragEndEvent) => {
     setActiveLead(null)
     if (!e.over) return
-    const newStatus = e.over.id as LeadStatus
+    const targetId = e.over.id as ColumnId
     const lead = boardLeads.find(l => l.id === e.active.id)
-    if (lead && lead.leadStatus !== newStatus) {
-      bulkUpdate({ ids: [lead.id], status: newStatus }, workspaceId)
+    if (!lead) return
+
+    if (targetId === 'call_booked') {
+      handleConvertToDeal(lead)
+      return
+    }
+
+    if (lead.leadStatus !== targetId) {
+      bulkUpdate({ ids: [lead.id], status: targetId as LeadStatus }, workspaceId)
     }
   }
 
@@ -598,6 +617,21 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
 
   const handleWarm = (id: string) => {
     bulkUpdate({ ids: [id], status: 'warm' }, workspaceId)
+  }
+
+  const handleConvertToDeal = async (lead: Lead) => {
+    try {
+      await convertToDeal(lead.id, workspaceId, userId)
+      showToast({
+        message: `Deal angelegt — ${lead.name}`,
+        action: { label: '→ Pipeline öffnen', onClick: () => setAppView('pipeline') },
+      })
+    } catch (err) {
+      showToast({
+        message: err instanceof Error ? err.message : 'Konvertierung fehlgeschlagen',
+        variant: 'error',
+      })
+    }
   }
 
   const selectedLeads = boardLeads.filter(l => selected.has(l.id))
