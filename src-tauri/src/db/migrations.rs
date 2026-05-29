@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 16;
+const CURRENT_VERSION: u32 = 17;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -526,6 +526,25 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 CREATE INDEX IF NOT EXISTS idx_campaign_recipients_email
                     ON campaign_recipients(email);
             "#)?;
+            Ok(())
+        }
+        17 => {
+            // Enrich contacts with B2B-grade fields: LinkedIn, decision power,
+            // preferred channel, free notes, birthday. All nullable — no migration
+            // of existing data needed.
+            for (col, def) in [
+                ("linkedin_url",      "TEXT"),
+                ("decision_power",    "TEXT"),  // 'high' | 'medium' | 'low' | NULL
+                ("preferred_channel", "TEXT"),  // 'email' | 'phone' | 'whatsapp' | 'in_person' | NULL
+                ("notes",             "TEXT"),
+                ("birthday",          "TEXT"),  // ISO date string
+            ] {
+                if !column_exists(conn, "contacts", col) {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE contacts ADD COLUMN {col} {def};"
+                    ))?;
+                }
+            }
             Ok(())
         }
         _ => Ok(()),

@@ -37,20 +37,25 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         );
 
         CREATE TABLE IF NOT EXISTS contacts (
-            id              TEXT PRIMARY KEY,
-            workspace_id    TEXT NOT NULL DEFAULT '',
-            created_by      TEXT NOT NULL DEFAULT '',
-            account_id      TEXT REFERENCES accounts(id) ON DELETE SET NULL,
-            first_name      TEXT NOT NULL,
-            last_name       TEXT,
-            email           TEXT,
-            phone           TEXT,
-            role            TEXT,
-            is_primary      INTEGER NOT NULL DEFAULT 0,
-            avatar_url      TEXT,
-            pending_sync    INTEGER NOT NULL DEFAULT 0,
-            created_at      TEXT NOT NULL,
-            updated_at      TEXT NOT NULL
+            id                TEXT PRIMARY KEY,
+            workspace_id      TEXT NOT NULL DEFAULT '',
+            created_by        TEXT NOT NULL DEFAULT '',
+            account_id        TEXT REFERENCES accounts(id) ON DELETE SET NULL,
+            first_name        TEXT NOT NULL,
+            last_name         TEXT,
+            email             TEXT,
+            phone             TEXT,
+            role              TEXT,
+            is_primary        INTEGER NOT NULL DEFAULT 0,
+            avatar_url        TEXT,
+            linkedin_url      TEXT,
+            decision_power    TEXT,
+            preferred_channel TEXT,
+            notes             TEXT,
+            birthday          TEXT,
+            pending_sync      INTEGER NOT NULL DEFAULT 0,
+            created_at        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS deals (
