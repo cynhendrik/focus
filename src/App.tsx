@@ -28,23 +28,24 @@ import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
 import { FinanceRoute }    from '@/routes/FinanceRoute'
 import { TasksRoute }      from '@/routes/TasksRoute'
-import { KpisRoute }       from '@/routes/KpisRoute'
-import { InsightsRoute }   from '@/routes/InsightsRoute'
-import { CalendarRoute }   from '@/routes/CalendarRoute'
-import { MailRoute }       from '@/routes/MailRoute'
 import { CrmRoute }        from '@/routes/CrmRoute'
 import { SettingsRoute }   from '@/routes/SettingsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
+import { LeadsRoute }            from '@/routes/LeadsRoute'
 import { PipelineRoute }         from '@/routes/PipelineRoute'
+import { SmartListsRoute }       from '@/routes/SmartListsRoute'
 import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
-import { WorkstationRoute }     from '@/routes/WorkstationRoute'
-import { SmartListsRoute }      from '@/routes/SmartListsRoute'
-import { ChatRoute }            from '@/routes/ChatRoute'
-import { LeadsRoute }           from '@/routes/LeadsRoute'
+import { CalendarRoute }         from '@/routes/CalendarRoute'
+import { MailRoute }             from '@/routes/MailRoute'
+import { ChatRoute }             from '@/routes/ChatRoute'
+import { WorkstationRoute }      from '@/routes/WorkstationRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
+import { ToastViewport }       from '@/components/ui/Toast'
 import { SplashScreen }        from '@/components/ui/SplashScreen'
+import { RouteSwitch }         from '@/components/layout/RouteSwitch'
+import { OnboardingWizard, hasCompletedOnboarding } from '@/components/onboarding/OnboardingWizard'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -68,6 +69,10 @@ export default function App() {
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
   const openPicker        = useClientPickerStore(s => s.open)
+  // Onboarding signal — must be called BEFORE any early return below to satisfy
+  // the Rules of Hooks. Hook order must be stable across renders.
+  const customersCount    = useCustomersStore(s => s.customers.length)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
 
   // ── Splash ────────────────────────────────────────────────────────────────
   const [minTimeDone,  setMinTimeDone]  = useState(false)
@@ -140,26 +145,41 @@ export default function App() {
 
   const renderMain = () => {
     switch (appView) {
-      case 'dashboard':  return <DashboardRoute />
-      case 'profile':    return <ProfileRoute />
-      case 'clients':    return <ClientsRoute />
-      case 'pipeline':     return <PipelineRoute />
-      case 'followups':    return <FollowupsDashboardRoute />
+      case 'dashboard':    return <DashboardRoute />
+      case 'profile':      return <ProfileRoute />
+      case 'clients':      return <ClientsRoute />
       case 'workstation':  return <WorkstationRoute />
-      case 'smartlists':   return <SmartListsRoute />
-      case 'chat':         return <ChatRoute />
+      case 'tasks':        return <TasksRoute />
+      case 'invoices':     return <FinanceRoute />
       case 'leads':        return <LeadsRoute />
-      case 'invoices':   return <FinanceRoute />
-      case 'tasks':      return <TasksRoute />
-      case 'kpis':       return <KpisRoute />
-      case 'insights':   return <InsightsRoute />
-      case 'calendar':   return <CalendarRoute />
-      case 'mail':       return <MailRoute />
-      case 'crm':        return <CrmRoute />
-      case 'settings':   return <SettingsRoute />
-      default:           return <DashboardRoute />
+      case 'pipeline':     return <PipelineRoute />
+      case 'smartlists':   return <SmartListsRoute />
+      case 'followups':    return <FollowupsDashboardRoute />
+      case 'calendar':     return <CalendarRoute />
+      case 'mail':         return <MailRoute />
+      case 'chat':         return <ChatRoute />
+      case 'crm':          return <CrmRoute />
+      case 'settings':     return <SettingsRoute />
+      // Legacy fallbacks (consolidated wrappers removed)
+      case 'sales':        return <LeadsRoute />
+      case 'inbox':        return <MailRoute />
+      default:             return <DashboardRoute />
     }
   }
+
+  // Use selected customer ID as part of the key so opening different customers
+  // also triggers the transition (CustomerRoute is rendered via appView='clients').
+  const routeKey = appView === 'clients' && selectedCustomerId
+    ? `clients:${selectedCustomerId}`
+    : appView
+
+  // First-run onboarding: shown if user has never completed it AND there are
+  // no customers yet. Once they finish (or skip) it stays gone.
+  // (Hooks declared at top of component to satisfy Rules of Hooks.)
+  const showOnboarding = !onboardingDismissed
+    && !hasCompletedOnboarding()
+    && customersCount === 0
+    && !!activeWorkspaceId
 
   return (
     <AppShell>
@@ -168,13 +188,19 @@ export default function App() {
         <main className="main">
           <Topbar />
           <ErrorBoundary>
-            {renderMain()}
+            <RouteSwitch viewKey={routeKey}>
+              {renderMain()}
+            </RouteSwitch>
           </ErrorBoundary>
         </main>
       </div>
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
       {pickerOpen && <ClientPicker />}
       <DownloadToast />
+      <ToastViewport />
+      {showOnboarding && (
+        <OnboardingWizard onComplete={() => setOnboardingDismissed(true)} />
+      )}
     </AppShell>
   )
 }
