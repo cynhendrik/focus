@@ -177,7 +177,11 @@ export function SmartListsRoute() {
         </div>
 
         {/* Table */}
-        <CustomerTableFiltered customers={filtered} lastActivity={activityMap} />
+        <CustomerTableFiltered
+          customers={filtered}
+          lastActivity={activityMap}
+          onReset={activeList ? () => setActive(null) : undefined}
+        />
       </main>
 
       {editing && (

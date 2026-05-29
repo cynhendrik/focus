@@ -27,10 +27,11 @@ function relTime(iso: string): string {
 }
 
 export function CustomerTableFiltered({
-  customers, lastActivity,
+  customers, lastActivity, onReset,
 }: {
   customers:    Customer[]
   lastActivity: Map<string, string | null>
+  onReset?:     () => void
 }) {
   const setSelected = useUiStore(s => s.setSelectedCustomer)
   const setAppView  = useUiStore(s => s.setAppView)
@@ -85,8 +86,18 @@ export function CustomerTableFiltered({
       <div style={{
         padding: '60px 20px', textAlign: 'center',
         color: 'var(--fg-dim)', fontSize: 13,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
       }}>
-        Keine Kunden matchen diesen Filter.
+        <span>Keine Kunden matchen diesen Filter.</span>
+        {onReset && (
+          <button
+            onClick={onReset}
+            className="btn-ghost"
+            style={{ fontSize: 12, padding: '5px 14px' }}
+          >
+            Filter zurücksetzen
+          </button>
+        )}
       </div>
     )
   }
