@@ -1,6 +1,6 @@
-import type { Priority } from './customer.types'
-
-export type TodoStatus = 'open' | 'in_progress' | 'done'
+export type TodoPriority = 'p1' | 'p2' | 'p3' | 'p4'
+export type TodoBucket   = 'backlog' | 'today' | 'in_progress' | 'done'
+export type TodoStatus   = 'open' | 'in_progress' | 'done'
 
 export interface ChecklistItem {
   id: string
@@ -10,11 +10,16 @@ export interface ChecklistItem {
 
 export interface Todo {
   id: string
-  customerId: string
+  customerId?: string
   title: string
   status: TodoStatus
-  priority: Priority
+  priority: TodoPriority
+  bucket: TodoBucket
+  scheduledAt?: string
+  plannedMinutes?: number
   dueDate?: string
+  notes?: string
+  aiSummary?: string
   checklist: ChecklistItem[]
   tags: string[]
   assignee?: string
@@ -24,11 +29,16 @@ export interface Todo {
 
 export interface UpsertTodoPayload {
   id?: string
-  customerId: string
+  customerId?: string
   title: string
   status?: TodoStatus
-  priority?: Priority
+  priority?: TodoPriority
+  bucket?: TodoBucket
+  scheduledAt?: string
+  plannedMinutes?: number
   dueDate?: string
+  notes?: string
+  aiSummary?: string
   checklist?: ChecklistItem[]
   tags?: string[]
   assignee?: string
