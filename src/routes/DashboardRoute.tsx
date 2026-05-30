@@ -14,6 +14,7 @@ import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
 
 import { DayTimeline } from '@/components/dashboard/DayTimeline'
+import { AccountSignals } from '@/components/dashboard/AccountSignals'
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
 import { Skeleton } from '@/components/ui/Skeleton'
 
@@ -530,6 +531,9 @@ export function DashboardRoute() {
           })}
         </SectionCard>
       </div>
+
+      {/* BEZIEHUNGEN BRAUCHEN PFLEGE */}
+      <AccountSignals />
 
       {/* TAGESPLAN */}
       <div style={{ marginTop: 24 }}>

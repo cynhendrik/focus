@@ -12,6 +12,8 @@ import type { Todo } from '@/types/todo.types'
 import type { Note } from '@/types/note.types'
 import type { EmailHeader } from '@/types/mail.types'
 import type { Contact } from '@/types/contact.types'
+import type { Customer } from '@/types/customer.types'
+import type { FollowUp, AccountActivityDate } from '@/types/crm.types'
 
 export type InsightSeverity = 'positive' | 'neutral' | 'caution' | 'urgent'
 
@@ -308,3 +310,109 @@ export function computeInsights(input: ComputeInput): Insight[] {
     .filter((i): i is Insight => i !== null)
     .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cross-customer signals — surface relationship-level alerts across the whole
+// workspace, for the Dashboard "Beziehungen brauchen Pflege" section.
+//
+// Scope intentionally narrow: dormancy + stage-stalls. Overdue follow-ups
+// are already covered by the existing "Wer wartet auf dich" surface, so we
+// don't double-surface them here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AccountSignal {
+  customerId:   string
+  customerName: string
+  insight:      Insight
+}
+
+interface AccountSignalsInput {
+  customers:     Customer[]
+  lastActivity:  AccountActivityDate[]
+  followups:     FollowUp[]
+  deals:         Deal[]
+  stages:        PipelineStage[]
+}
+
+export function computeAccountSignals(input: AccountSignalsInput): AccountSignal[] {
+  const lastByAcc = new Map<string, string>()
+  for (const la of input.lastActivity) {
+    if (la.lastActivityAt) lastByAcc.set(la.accountId, la.lastActivityAt)
+  }
+
+  const stageByName = new Map<string, PipelineStage>()
+  for (const s of input.stages) stageByName.set(s.name, s)
+
+  const dealsByCust = new Map<string, Deal[]>()
+  for (const d of input.deals) {
+    // Deal.accountId is the customer/account id in this codebase
+    const key = d.accountId
+    const list = dealsByCust.get(key) ?? []
+    list.push(d)
+    dealsByCust.set(key, list)
+  }
+
+  const out: AccountSignal[] = []
+
+  for (const c of input.customers) {
+    if (c.isPrivate) continue
+    if (c.id === '__cynera_privat__') continue
+
+    // ── Dormancy ────────────────────────────────────────────────────────
+    const last = lastByAcc.get(c.id) ?? c.updatedAt
+    const lastMs = last ? new Date(last).getTime() : null
+    if (lastMs !== null && !Number.isNaN(lastMs)) {
+      const days = Math.floor((Date.now() - lastMs) / DAY)
+      if (days >= 30) {
+        out.push({
+          customerId:   c.id,
+          customerName: c.name,
+          insight: {
+            id:       `dormancy-${c.id}`,
+            kind:     'dormancy',
+            severity: days >= 60 ? 'urgent' : 'caution',
+            text:     `Letzter Touch vor ${pluralDays(days)}.`,
+          },
+        })
+      }
+    }
+
+    // ── Stage stall ────────────────────────────────────────────────────
+    const customerDeals = dealsByCust.get(c.id) ?? []
+    let worstStall: { deal: Deal; stage: PipelineStage; days: number } | null = null
+    for (const d of customerDeals) {
+      const stage = stageByName.get(d.stage)
+      if (!stage || stage.isWon || stage.isLost) continue
+      const ts = toMs(d.updatedAt)
+      if (ts === null) continue
+      const days = Math.floor((Date.now() - ts) / DAY)
+      if (days < 21) continue   // higher bar for dashboard than per-customer (14d)
+      if (!worstStall || days > worstStall.days) worstStall = { deal: d, stage, days }
+    }
+    if (worstStall) {
+      out.push({
+        customerId:   c.id,
+        customerName: c.name,
+        insight: {
+          id:       `stall-${c.id}-${worstStall.deal.id}`,
+          kind:     'stage_stall',
+          severity: worstStall.days >= 45 ? 'urgent' : 'caution',
+          text:     `Deal "${worstStall.deal.title}" steckt in ${worstStall.stage.label} seit ${pluralDays(worstStall.days)}.`,
+        },
+      })
+    }
+  }
+
+  out.sort((a, b) => {
+    const s = SEVERITY_ORDER[a.insight.severity] - SEVERITY_ORDER[b.insight.severity]
+    if (s !== 0) return s
+    return a.customerName.localeCompare(b.customerName)
+  })
+
+  // Silence the "unused" warning for the followups param so a future expansion
+  // (e.g. include overdue follow-up signals here) doesn't trip the linter today.
+  void input.followups
+
+  return out
+}
+
