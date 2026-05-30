@@ -7,7 +7,8 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
-import { parseTaskText } from './prefix-parser'
+import { parseTaskText, type TaskDraft } from './prefix-parser'
+import { CalendarEventConfirmCard, type PendingEventDraft } from './CalendarEventConfirmCard'
 import { Plus, Send, Calendar } from 'lucide-react'
 
 const PRIO_LABEL: Record<string, string> = {
@@ -36,6 +37,8 @@ export function TaskComposer({ customerId }: Props = {}) {
   const accounts     = useAccountsStore(s => s.accounts)
   const upsertEvent  = useCalendarStore(s => s.upsert)
   const [text, setText] = useState('')
+  const [pendingEvent, setPendingEvent] = useState<PendingEventDraft | null>(null)
+  const [pendingDraft, setPendingDraft] = useState<TaskDraft | null>(null)
 
   const placeholder = customerId
     ? 'Neue Task… "!! ~45m @10:00 #call Logo finalisieren"'
@@ -72,49 +75,91 @@ export function TaskComposer({ customerId }: Props = {}) {
 
   const canSubmit = !!(draft.title.trim() || draft.tags.length || draft.customerHint)
 
-  const submit = async () => {
-    if (!editor || !canSubmit) return
+  /** Persist a task (and optionally a linked calendar event), then reset composer. */
+  const persistTaskAndOptionalEvent = async (
+    sourceDraft: TaskDraft,
+    eventOverride: PendingEventDraft | null,
+  ) => {
+    if (!editor) return
     const todayStr = new Date().toISOString().slice(0, 10)
-    const title = draft.title.trim() || '(ohne Titel)'
-    const wantsCalendar = draft.hasExplicitTime && !!draft.scheduledAt
+    const title = sourceDraft.title.trim() || '(ohne Titel)'
 
-    // 1. Create calendar event first if applicable, so we can link it on the task
     let calendarEventId: string | undefined
-    if (wantsCalendar) {
+    if (eventOverride) {
       const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
       const createdBy   = useAuthStore.getState().user?.id ?? ''
       if (workspaceId) {
-        const startAt = isoLocal(draft.scheduledAt!)
-        const minutes = draft.plannedMinutes ?? 30
-        const endAt   = isoLocal(addMinutes(draft.scheduledAt!, minutes))
+        const startAt = isoLocal(eventOverride.scheduledAt)
+        const endAt   = isoLocal(addMinutes(eventOverride.scheduledAt, eventOverride.plannedMinutes))
         try {
           const ev = await upsertEvent({
             workspaceId, createdBy,
-            accountId: resolvedCustomerId,
-            title, startAt, endAt, allDay: false,
+            accountId:   eventOverride.customerId,
+            title:       eventOverride.title,
+            description: eventOverride.description,
+            location:    eventOverride.location,
+            startAt, endAt, allDay: false,
             color: 'accent',
           })
           calendarEventId = ev.id
         } catch (e) {
-          // Silent: task still created, calendar event failed
           console.error('Calendar event creation failed', e)
         }
       }
     }
 
     await upsert({
-      title,
-      priority:       draft.priority ?? 'p3',
-      scheduledAt:    draft.scheduledAt,
-      plannedMinutes: draft.plannedMinutes,
-      tags:           draft.tags,
-      customerId:     resolvedCustomerId,
+      title: eventOverride?.title ?? title,
+      priority:       sourceDraft.priority ?? 'p3',
+      scheduledAt:    sourceDraft.scheduledAt,
+      plannedMinutes: eventOverride?.plannedMinutes ?? sourceDraft.plannedMinutes,
+      tags:           sourceDraft.tags,
+      customerId:     eventOverride?.customerId ?? resolvedCustomerId,
       calendarEventId,
-      bucket:         draft.scheduledAt && draft.scheduledAt.slice(0, 10) === todayStr
+      bucket:         sourceDraft.scheduledAt && sourceDraft.scheduledAt.slice(0, 10) === todayStr
                       ? 'today' : 'backlog',
     })
+
     editor.commands.clearContent()
     setText('')
+    setPendingEvent(null)
+    setPendingDraft(null)
+  }
+
+  const submit = async () => {
+    if (!editor || !canSubmit) return
+    const title = draft.title.trim() || '(ohne Titel)'
+    const wantsCalendar = draft.hasExplicitTime && !!draft.scheduledAt
+
+    // Termin erkannt → erst Bestätigung anzeigen, nicht direkt anlegen
+    if (wantsCalendar) {
+      setPendingDraft(draft)
+      setPendingEvent({
+        title,
+        scheduledAt:    draft.scheduledAt!,
+        plannedMinutes: draft.plannedMinutes ?? 30,
+        customerId:     resolvedCustomerId,
+      })
+      return
+    }
+
+    // Reine Task ohne Uhrzeit → direkt anlegen
+    await persistTaskAndOptionalEvent(draft, null)
+  }
+
+  const confirmPending = async (finalDraft: PendingEventDraft) => {
+    if (!pendingDraft) return
+    await persistTaskAndOptionalEvent(pendingDraft, finalDraft)
+  }
+
+  const skipEventForPending = async () => {
+    if (!pendingDraft) return
+    await persistTaskAndOptionalEvent(pendingDraft, null)
+  }
+
+  const cancelPending = () => {
+    setPendingEvent(null)
+    setPendingDraft(null)
   }
 
   useEffect(() => {
@@ -133,6 +178,7 @@ export function TaskComposer({ customerId }: Props = {}) {
   }, [editor, draft, resolvedCustomerId])
 
   return (
+    <>
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 8,
       padding: '12px 14px',
@@ -206,6 +252,15 @@ export function TaskComposer({ customerId }: Props = {}) {
         )}
       </div>
     </div>
+
+    <CalendarEventConfirmCard
+      open={!!pendingEvent}
+      draft={pendingEvent}
+      onConfirm={confirmPending}
+      onTaskOnly={skipEventForPending}
+      onCancel={cancelPending}
+    />
+    </>
   )
 }
 
