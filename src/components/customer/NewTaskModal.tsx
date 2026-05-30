@@ -22,17 +22,18 @@ interface Props {
   context?: string
 }
 
-const PRIORITIES: { value: 'low' | 'normal' | 'high'; label: string }[] = [
-  { value: 'low',    label: 'Niedrig' },
-  { value: 'normal', label: 'Mittel'  },
-  { value: 'high',   label: 'Hoch'    },
+const PRIORITIES: { value: 'p1' | 'p2' | 'p3' | 'p4'; label: string }[] = [
+  { value: 'p1', label: 'Dringend' },
+  { value: 'p2', label: 'Hoch'     },
+  { value: 'p3', label: 'Normal'   },
+  { value: 'p4', label: 'Niedrig'  },
 ]
 
 export function NewTaskModal({ open, customerId, onClose, context = 'Workflow' }: Props) {
   const upsert = useTodosStore(s => s.upsert)
   const [title, setTitle]         = useState('')
   const [dueDate, setDueDate]     = useState('')
-  const [priority, setPriority]   = useState<'low' | 'normal' | 'high'>('normal')
+  const [priority, setPriority]   = useState<'p1' | 'p2' | 'p3' | 'p4'>('p3')
   const [tag, setTag]             = useState('')
   const [checklist, setChecklist] = useState<ChecklistItem[]>([])
   const [newStep, setNewStep]     = useState('')
@@ -40,7 +41,7 @@ export function NewTaskModal({ open, customerId, onClose, context = 'Workflow' }
   const reset = () => {
     setTitle('')
     setDueDate('')
-    setPriority('normal')
+    setPriority('p3')
     setTag('')
     setChecklist([])
     setNewStep('')
