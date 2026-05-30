@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ArrowUpRight, ArrowDownRight, ArrowRight, Flame } from 'lucide-react'
+import { ArrowUpRight, ArrowDownRight, ArrowRight, Flame, CheckSquare } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useNotesStore } from '@/store/notes.store'
@@ -110,6 +110,16 @@ export function PulseBar({ customerId }: Props) {
   }), [customerDeals, stageById])
   const openValue = openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
 
+  // ── Tasks ─────────────────────────────────────────────────────────────
+  const openTodos = useMemo(
+    () => todos.filter(t => t.status !== 'done' && t.customerId === customerId),
+    [todos, customerId],
+  )
+  const overdueTodos = useMemo(
+    () => openTodos.filter(t => t.dueDate && new Date(t.dueDate).getTime() < Date.now()),
+    [openTodos],
+  )
+
   // ── Trend (touches this 30d vs prior 30d) ─────────────────────────────
   const trend = useMemo(() => {
     if (touchesPrev === 0 && touchesNow === 0) {
@@ -164,6 +174,34 @@ export function PulseBar({ customerId }: Props) {
           <>
             <CellValue>{openDeals.length} {openDeals.length === 1 ? 'Deal' : 'Deals'}</CellValue>
             <CellLabel>· {formatCurrency(openValue)} offen</CellLabel>
+          </>
+        )}
+      </Cell>
+
+      <Sep />
+
+      {/* TASKS */}
+      <Cell>
+        <CheckSquare size={11} strokeWidth={2.4} style={{
+          color: overdueTodos.length > 0 ? 'var(--danger)' : openTodos.length > 0 ? 'var(--accent)' : 'var(--fg-dim)',
+        }} />
+        {openTodos.length === 0 ? (
+          <>
+            <CellValue tone="dim">—</CellValue>
+            <CellLabel>keine Tasks</CellLabel>
+          </>
+        ) : (
+          <>
+            <CellValue>{openTodos.length} {openTodos.length === 1 ? 'Task' : 'Tasks'}</CellValue>
+            <CellLabel>
+              {overdueTodos.length > 0 ? (
+                <span style={{ color: 'var(--danger)' }}>
+                  · {overdueTodos.length} überfällig
+                </span>
+              ) : (
+                'offen'
+              )}
+            </CellLabel>
           </>
         )}
       </Cell>

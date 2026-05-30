@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Phone, Users, Mail, FileText, Bell, AlarmClock,
   Paperclip, CheckCircle2, Trash2, ChevronDown, Calendar as CalIcon,
+  Search, X, Inbox, CheckSquare, Plus, Check,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Note } from '@/types/note.types'
+import type { Todo } from '@/types/todo.types'
 
 import { useActivitiesStore } from '@/store/activities.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -25,6 +27,7 @@ import { ContactCard } from '@/components/customer/ContactCard'
 import { ContactModal } from '@/components/customer/ContactModal'
 import { InfosFeed, readInfos, matchContact } from '@/components/customer/InfosFeed'
 import { InsightsStrip } from '@/components/customer/InsightsStrip'
+import { NewTaskModal } from '@/components/customer/NewTaskModal'
 import { UserPlus } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,9 +263,36 @@ export function TimelinePane({ customerId }: Props) {
     return out
   }, [activities, todos, notes, files, followUps, deadlines, allEmails, customerId, nowMs, removeActivity])
 
-  const groups       = useMemo(() => buildGroups(events), [events])
+  // ── Stream filters — Close-style tab + search ──────────────────────────
+  type StreamFilter = 'all' | 'calls' | 'notes' | 'mails' | 'tasks'
+  const [streamFilter, setStreamFilter] = useState<StreamFilter>('all')
+  const [streamQuery,  setStreamQuery]  = useState('')
+
+  const STREAM_FILTER_KINDS: Record<StreamFilter, ReadonlySet<EventKind> | null> = {
+    all:    null,
+    calls:  new Set<EventKind>(['call', 'meeting']),
+    notes:  new Set<EventKind>(['note', 'note_text']),
+    mails:  new Set<EventKind>(['email', 'mail_in']),
+    tasks:  new Set<EventKind>(['todo', 'followup', 'deadline', 'file']),
+  }
+
+  const filteredEvents = useMemo(() => {
+    const allowed = STREAM_FILTER_KINDS[streamFilter]
+    const q = streamQuery.trim().toLowerCase()
+    return events.filter(ev => {
+      if (allowed && !allowed.has(ev.kind)) return false
+      if (q) {
+        const hay = `${ev.title} ${ev.body ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [events, streamFilter, streamQuery])
+
+  const groups       = useMemo(() => buildGroups(filteredEvents), [filteredEvents])
   const futureGroups = groups.filter(g => g.isFuture)
   const pastGroups   = groups.filter(g => !g.isFuture)
+  const isFiltered   = streamFilter !== 'all' || streamQuery.trim() !== ''
 
   // ── Composer ─────────────────────────────────────────────────────────────
   type ComposerKind = 'call' | 'meeting' | 'email' | 'note' | 'followup'
@@ -328,6 +358,7 @@ export function TimelinePane({ customerId }: Props) {
         gap: 18,
       }}>
         <InfosFeed customerId={customerId} notes={notes} />
+        <TasksList customerId={customerId} />
         <ContactsList customerId={customerId} notes={notes} />
       </aside>
 
@@ -347,7 +378,16 @@ export function TimelinePane({ customerId }: Props) {
           onSubmit={handleSubmit}
         />
 
-        <div style={{ position: 'relative', marginTop: 32 }}>
+        <StreamFilterBar
+          filter={streamFilter}
+          onFilterChange={setStreamFilter}
+          query={streamQuery}
+          onQueryChange={setStreamQuery}
+          totalCount={events.length}
+          visibleCount={filteredEvents.length}
+        />
+
+        <div style={{ position: 'relative', marginTop: 16 }}>
           {/* The Spine — one vertical line spanning the entire stream */}
           <div
             aria-hidden
@@ -391,14 +431,34 @@ export function TimelinePane({ customerId }: Props) {
             />
           ))}
 
-          {events.length === 0 && (
+          {filteredEvents.length === 0 && (
             <div style={{ padding: '64px 0 24px', textAlign: 'center' }}>
-              <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, letterSpacing: '-0.01em' }}>
-                Hier ist noch nichts passiert.
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '6px 0 0' }}>
-                Erfasse oben den ersten Eintrag — oder plane ein Follow-up.
-              </p>
+              {isFiltered ? (
+                <>
+                  <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, letterSpacing: '-0.01em' }}>
+                    Keine Treffer für diesen Filter.
+                  </p>
+                  <button
+                    onClick={() => { setStreamFilter('all'); setStreamQuery('') }}
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12, color: 'var(--accent)',
+                      background: 'transparent', cursor: 'pointer',
+                    }}
+                  >
+                    Filter zurücksetzen
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, letterSpacing: '-0.01em' }}>
+                    Hier ist noch nichts passiert.
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '6px 0 0' }}>
+                    Erfasse oben den ersten Eintrag — oder plane ein Follow-up.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1069,6 +1129,526 @@ function NowLine({ nowMs, hasFuture, hasPast }: NowLineProps) {
           background: 'linear-gradient(90deg, var(--accent) 0%, var(--accent) 10%, transparent 100%)',
         }} />
       </div>
+    </motion.div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StreamFilterBar — Close-style tab strip + in-customer search above the spine.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type StreamFilterId = 'all' | 'calls' | 'notes' | 'mails' | 'tasks'
+
+interface StreamFilterBarProps {
+  filter:        StreamFilterId
+  onFilterChange:(f: StreamFilterId) => void
+  query:         string
+  onQueryChange: (q: string) => void
+  totalCount:    number
+  visibleCount:  number
+}
+
+const STREAM_TABS: { id: StreamFilterId; label: string; icon: typeof Phone }[] = [
+  { id: 'all',   label: 'Alle',           icon: Inbox       },
+  { id: 'calls', label: 'Anrufe & Mtgs',  icon: Phone       },
+  { id: 'notes', label: 'Notizen',        icon: FileText    },
+  { id: 'mails', label: 'Mails',          icon: Mail        },
+  { id: 'tasks', label: 'Tasks & FUs',    icon: CheckSquare },
+]
+
+function StreamFilterBar({
+  filter, onFilterChange, query, onQueryChange, totalCount, visibleCount,
+}: StreamFilterBarProps) {
+  const [searchOpen, setSearchOpen] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (searchOpen) inputRef.current?.focus()
+  }, [searchOpen])
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center',
+      gap: 8, marginTop: 18,
+      paddingBottom: 4,
+      borderBottom: '1px solid var(--border)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0, overflow: 'auto' }}>
+        {STREAM_TABS.map(t => {
+          const Icon = t.icon
+          const active = filter === t.id
+          return (
+            <button
+              key={t.id}
+              onClick={() => onFilterChange(t.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 10px', borderRadius: 999,
+                background: active ? 'var(--accent-soft)' : 'transparent',
+                color: active ? 'var(--accent)' : 'var(--fg-muted)',
+                fontSize: 11.5, fontWeight: active ? 600 : 500,
+                letterSpacing: '-0.005em',
+                cursor: 'pointer',
+                transition: 'background 180ms ease, color 180ms ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Icon size={11} strokeWidth={2.4} />
+              {t.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Count */}
+      {filter !== 'all' || query.trim() !== '' ? (
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          color: 'var(--fg-dim)', letterSpacing: '0.02em',
+          opacity: 0.8, flexShrink: 0,
+        }}>
+          {visibleCount}/{totalCount}
+        </span>
+      ) : null}
+
+      {/* Search */}
+      {searchOpen || query ? (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 8px',
+          borderRadius: 8,
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          flexShrink: 0,
+        }}>
+          <Search size={11} strokeWidth={2.4} style={{ color: 'var(--fg-dim)' }} />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => onQueryChange(e.target.value)}
+            onBlur={() => { if (!query) setSearchOpen(false) }}
+            placeholder="Stream durchsuchen…"
+            style={{
+              width: 140,
+              background: 'transparent', border: 'none',
+              color: 'var(--fg)', fontSize: 11.5,
+              letterSpacing: '-0.005em',
+            }}
+          />
+          {query && (
+            <button
+              onClick={() => { onQueryChange(''); inputRef.current?.focus() }}
+              style={{
+                width: 16, height: 16,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--fg-dim)', background: 'transparent',
+              }}
+            >
+              <X size={9} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => setSearchOpen(true)}
+          aria-label="Stream durchsuchen"
+          style={{
+            width: 26, height: 26, borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--fg-muted)', background: 'transparent',
+            flexShrink: 0,
+            transition: 'color 180ms ease, background 180ms ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.color = 'var(--fg)'
+            e.currentTarget.style.background = 'oklch(100% 0 0 / 0.04)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.color = 'var(--fg-muted)'
+            e.currentTarget.style.background = 'transparent'
+          }}
+        >
+          <Search size={12} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TasksList — compact todo list for the Activities left rail.
+//
+// Same data source as Arbeiten > Tasks (useTodosStore). Click checkbox to
+// toggle done. Inline composer for quick-add during a call. Done section
+// collapses by default to keep the rail tight.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TasksListProps { customerId: string }
+
+function TasksList({ customerId }: TasksListProps) {
+  const todos          = useTodosStore(s => s.todos)
+  const upsertTodo     = useTodosStore(s => s.upsert)
+  const removeTodo     = useTodosStore(s => s.remove)
+
+  const scoped = useMemo(
+    () => todos.filter(t => t.customerId === customerId),
+    [todos, customerId],
+  )
+
+  const PRIO_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
+  const openTodos = useMemo(
+    () => scoped
+      .filter(t => t.status !== 'done')
+      .sort((a, b) => {
+        // Priority first (high → normal → low)
+        const pa = PRIO_ORDER[a.priority] ?? 1
+        const pb = PRIO_ORDER[b.priority] ?? 1
+        if (pa !== pb) return pa - pb
+        // Then by due date ascending (undated last)
+        const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity
+        const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity
+        return ad - bd
+      }),
+    [scoped],
+  )
+  const doneTodos = useMemo(() => scoped.filter(t => t.status === 'done'), [scoped])
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [showDone, setShowDone]   = useState(false)
+
+  const toggleDone = async (t: Todo) => {
+    await upsertTodo({
+      id: t.id,
+      customerId: t.customerId,
+      title: t.title,
+      status: t.status === 'done' ? 'open' : 'done',
+      priority: t.priority,
+      dueDate: t.dueDate,
+      checklist: t.checklist,
+      tags: t.tags,
+      assignee: t.assignee,
+    })
+  }
+
+  const cyclePriority = async (t: Todo) => {
+    // normal → high → low → normal
+    const next: 'high' | 'low' | 'normal' =
+      t.priority === 'normal' ? 'high'
+      : t.priority === 'high' ? 'low'
+      : 'normal'
+    await upsertTodo({
+      id: t.id,
+      customerId: t.customerId,
+      title: t.title,
+      status: t.status,
+      priority: next,
+      dueDate: t.dueDate,
+      checklist: t.checklist,
+      tags: t.tags,
+      assignee: t.assignee,
+    })
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        marginBottom: 8, paddingLeft: 2,
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'var(--fg-dim)', fontWeight: 500,
+        }}>
+          Tasks
+        </span>
+        {openTodos.length > 0 && (
+          <span style={{
+            fontSize: 10, color: 'var(--fg-dim)',
+            fontFamily: 'var(--font-mono)', opacity: 0.7,
+          }}>
+            · {openTodos.length}
+          </span>
+        )}
+        <div style={{
+          flex: 1, height: 1,
+          background: 'linear-gradient(90deg, var(--border) 0%, transparent 100%)',
+        }} />
+        <button
+          onClick={() => setModalOpen(true)}
+          aria-label="Task hinzufügen"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px 3px 6px', borderRadius: 999,
+            background: 'oklch(100% 0 0 / 0.04)',
+            border: '1px solid var(--border)',
+            color: 'var(--fg-muted)',
+            fontSize: 11, cursor: 'pointer',
+            transition: 'background 180ms ease, color 180ms ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'oklch(100% 0 0 / 0.08)'
+            e.currentTarget.style.color = 'var(--fg)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'oklch(100% 0 0 / 0.04)'
+            e.currentTarget.style.color = 'var(--fg-muted)'
+          }}
+        >
+          <Plus size={11} strokeWidth={2.4} />
+          Task
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {openTodos.length === 0 && (
+        <button
+          onClick={() => setModalOpen(true)}
+          style={{
+            display: 'block', width: '100%',
+            padding: '12px 12px',
+            borderRadius: 10,
+            background: 'transparent',
+            border: '1px dashed var(--border)',
+            color: 'var(--fg-dim)',
+            fontSize: 12, fontStyle: 'italic',
+            textAlign: 'left',
+            cursor: 'pointer',
+            transition: 'border-color 180ms ease, color 180ms ease',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = 'var(--accent)'
+            e.currentTarget.style.color = 'var(--accent)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'var(--border)'
+            e.currentTarget.style.color = 'var(--fg-dim)'
+          }}
+        >
+          + Was ist als Nächstes zu tun?
+        </button>
+      )}
+
+      {/* Open tasks */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <AnimatePresence initial={false}>
+          {openTodos.map(t => (
+            <TaskRow
+              key={t.id}
+              todo={t}
+              onToggle={() => toggleDone(t)}
+              onDelete={() => removeTodo(t.id)}
+              onCyclePriority={() => cyclePriority(t)}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Done — collapsed by default */}
+      {doneTodos.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <button
+            onClick={() => setShowDone(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '4px 6px',
+              fontSize: 10.5,
+              fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
+              color: 'var(--fg-dim)', background: 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronDown
+              size={10}
+              style={{
+                transform: showDone ? 'rotate(0deg)' : 'rotate(-90deg)',
+                transition: 'transform 180ms ease',
+              }}
+            />
+            Erledigt · {doneTodos.length}
+          </button>
+
+          <AnimatePresence initial={false}>
+            {showDone && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit   ={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.16 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4, opacity: 0.6 }}>
+                  {doneTodos.map(t => (
+                    <TaskRow
+                      key={t.id}
+                      todo={t}
+                      onToggle={() => toggleDone(t)}
+                      onDelete={() => removeTodo(t.id)}
+                      onCyclePriority={() => cyclePriority(t)}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      <NewTaskModal
+        open={modalOpen}
+        customerId={customerId}
+        context="Activities"
+        onClose={() => setModalOpen(false)}
+      />
+    </div>
+  )
+}
+
+// ─── TaskRow ────────────────────────────────────────────────────────────────
+
+function formatTaskDue(iso: string): { label: string; tone: 'overdue' | 'today' | 'soon' | 'later' } {
+  const d = new Date(iso)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  d.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86_400_000)
+  if (diffDays < 0)   return { label: `vor ${-diffDays}T`, tone: 'overdue' }
+  if (diffDays === 0) return { label: 'heute',  tone: 'today' }
+  if (diffDays === 1) return { label: 'morgen', tone: 'today' }
+  if (diffDays < 7)   return { label: `${diffDays}T`, tone: 'soon' }
+  return { label: new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }), tone: 'later' }
+}
+
+const DUE_TONE: Record<'overdue' | 'today' | 'soon' | 'later', string> = {
+  overdue: 'var(--danger)',
+  today:   'var(--accent)',
+  soon:    'var(--warn)',
+  later:   'var(--fg-dim)',
+}
+
+const PRIORITY_META: Record<'high' | 'normal' | 'low', {
+  label: string; color: string; fill: boolean; ring: boolean
+}> = {
+  high:   { label: 'Hoch',    color: 'var(--danger)',  fill: true,  ring: true  },
+  normal: { label: 'Normal',  color: 'var(--fg-muted)', fill: true,  ring: false },
+  low:    { label: 'Niedrig', color: 'var(--fg-dim)',   fill: false, ring: false },
+}
+
+function TaskRow({
+  todo, onToggle, onDelete, onCyclePriority,
+}: {
+  todo: Todo
+  onToggle: () => void
+  onDelete: () => void
+  onCyclePriority: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const isDone = todo.status === 'done'
+  const due = todo.dueDate ? formatTaskDue(todo.dueDate) : null
+  const prio = PRIORITY_META[(todo.priority as 'high' | 'normal' | 'low') ?? 'normal']
+  const isHigh = todo.priority === 'high'
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 2 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit   ={{ opacity: 0, x: 6 }}
+      transition={{ duration: 0.16 }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '10px 14px 1fr auto auto',
+        alignItems: 'center',
+        gap: 8,
+        padding: '5px 8px 5px 4px',
+        borderRadius: 7,
+        background: hover
+          ? 'oklch(100% 0 0 / 0.035)'
+          : (isHigh && !isDone ? `${prio.color}0d` : 'transparent'),
+        borderLeft: isHigh && !isDone ? `2px solid ${prio.color}` : '2px solid transparent',
+        transition: 'background 150ms ease',
+      }}
+    >
+      {/* Priority dot — click to cycle */}
+      <button
+        onClick={e => { e.stopPropagation(); onCyclePriority() }}
+        title={`Priorität: ${prio.label} (Klick zum Wechseln)`}
+        style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: prio.fill ? prio.color : 'transparent',
+          border: prio.fill ? 'none' : `1.5px solid ${prio.color}`,
+          boxShadow: prio.ring ? `0 0 0 3px ${prio.color}24` : 'none',
+          cursor: 'pointer',
+          padding: 0,
+          flexShrink: 0,
+          transition: 'transform 180ms ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.4)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+      />
+
+      {/* Checkbox */}
+      <button
+        onClick={e => { e.stopPropagation(); onToggle() }}
+        aria-label={isDone ? 'Als offen markieren' : 'Als erledigt markieren'}
+        style={{
+          width: 14, height: 14, borderRadius: 4,
+          background: isDone ? 'var(--accent)' : 'transparent',
+          border: isDone ? '1px solid var(--accent)' : '1.5px solid var(--border-strong)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'background 180ms ease, border-color 180ms ease',
+        }}
+        onMouseEnter={e => {
+          if (!isDone) e.currentTarget.style.borderColor = 'var(--accent)'
+        }}
+        onMouseLeave={e => {
+          if (!isDone) e.currentTarget.style.borderColor = 'var(--border-strong)'
+        }}
+      >
+        {isDone && <Check size={9} strokeWidth={3} style={{ color: 'var(--accent-ink)' }} />}
+      </button>
+
+      <span style={{
+        fontSize: 12.5,
+        color: isDone ? 'var(--fg-dim)' : 'var(--fg)',
+        textDecoration: isDone ? 'line-through' : 'none',
+        letterSpacing: '-0.005em',
+        fontWeight: isHigh && !isDone ? 600 : 500,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {todo.title}
+      </span>
+
+      {due && !isDone ? (
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          letterSpacing: '0.04em',
+          color: DUE_TONE[due.tone],
+          opacity: due.tone === 'later' ? 0.7 : 1,
+          whiteSpace: 'nowrap',
+        }}>
+          {due.label}
+        </span>
+      ) : <span />}
+
+      <button
+        onClick={e => { e.stopPropagation(); onDelete() }}
+        aria-label="Task entfernen"
+        style={{
+          width: 18, height: 18, borderRadius: 4,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', color: 'var(--fg-dim)',
+          opacity: hover ? 1 : 0,
+          transition: 'opacity 180ms ease, color 180ms ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)' }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-dim)' }}
+      >
+        <Trash2 size={10} />
+      </button>
     </motion.div>
   )
 }

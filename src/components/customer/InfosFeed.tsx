@@ -36,29 +36,81 @@ export function readInfos(content: string | undefined, fallbackTitle: string): s
   return content
 }
 
-// ── Token parser for inline @ and # ─────────────────────────────────────────
-type Token =
+// ── Markdown-Light parser ───────────────────────────────────────────────────
+//
+// Block-level: # heading, ## subheading, - bullet, paragraph (default), empty.
+// Inline:      **bold**, *italic*, [label](url), @mention, #tag, plain text.
+// Edit mode keeps raw markdown visible (Notion/Linear style). Display mode
+// renders. The @/# autocomplete is unaffected — the detector walks back to
+// the last @ or # and ignores other markdown characters.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type InlineToken =
   | { kind: 'text';    value: string }
+  | { kind: 'bold';    inner: InlineToken[] }
+  | { kind: 'italic';  inner: InlineToken[] }
+  | { kind: 'link';    label: string; href: string }
   | { kind: 'mention'; name:  string }
   | { kind: 'tag';     name:  string }
 
-const TOKEN_RE = /(@[\wäöüÄÖÜß-]+|#[\wäöüÄÖÜß-]+)/g
+type Block =
+  | { kind: 'heading';   level: 1 | 2; inline: InlineToken[] }
+  | { kind: 'bullet';    inline: InlineToken[] }
+  | { kind: 'paragraph'; inline: InlineToken[] }
+  | { kind: 'blank' }
 
-function tokenize(text: string): Token[] {
-  const out: Token[] = []
+const INLINE_RE = new RegExp(
+  [
+    '\\*\\*[^*\\n][^*\\n]*\\*\\*',     // **bold**
+    '\\*[^*\\n][^*\\n]*\\*',           // *italic*
+    '\\[[^\\]\\n]+\\]\\([^)\\s]+\\)',  // [label](url)
+    '@[\\wäöüÄÖÜß-]+',                 // @mention
+    '#[\\wäöüÄÖÜß-]+',                 // #tag
+  ].join('|'),
+  'g',
+)
+
+function tokenizeInline(text: string): InlineToken[] {
+  const out: InlineToken[] = []
   let lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = TOKEN_RE.exec(text)) !== null) {
+  const re = new RegExp(INLINE_RE.source, 'g')
+  while ((m = re.exec(text)) !== null) {
     if (m.index > lastIndex) {
       out.push({ kind: 'text', value: text.slice(lastIndex, m.index) })
     }
     const tok = m[0]
-    if (tok.startsWith('@')) out.push({ kind: 'mention', name: tok.slice(1) })
-    else                     out.push({ kind: 'tag',     name: tok.slice(1) })
+    if (tok.startsWith('**')) {
+      out.push({ kind: 'bold', inner: tokenizeInline(tok.slice(2, -2)) })
+    } else if (tok.startsWith('*')) {
+      out.push({ kind: 'italic', inner: tokenizeInline(tok.slice(1, -1)) })
+    } else if (tok.startsWith('[')) {
+      const labelEnd = tok.indexOf(']')
+      const label = tok.slice(1, labelEnd)
+      const href  = tok.slice(labelEnd + 2, -1)
+      out.push({ kind: 'link', label, href })
+    } else if (tok.startsWith('@')) {
+      out.push({ kind: 'mention', name: tok.slice(1) })
+    } else {
+      out.push({ kind: 'tag', name: tok.slice(1) })
+    }
     lastIndex = m.index + tok.length
   }
-  if (lastIndex < text.length) out.push({ kind: 'text', value: text.slice(lastIndex) })
+  if (lastIndex < text.length) {
+    out.push({ kind: 'text', value: text.slice(lastIndex) })
+  }
   return out
+}
+
+function parseBlocks(text: string): Block[] {
+  const lines = text.split('\n')
+  return lines.map<Block>(line => {
+    if (line.trim() === '')      return { kind: 'blank' }
+    if (line.startsWith('## '))  return { kind: 'heading',   level: 2, inline: tokenizeInline(line.slice(3)) }
+    if (line.startsWith('# '))   return { kind: 'heading',   level: 1, inline: tokenizeInline(line.slice(2)) }
+    if (line.startsWith('- '))   return { kind: 'bullet',    inline: tokenizeInline(line.slice(2)) }
+    return { kind: 'paragraph', inline: tokenizeInline(line) }
+  })
 }
 
 export function matchContact(name: string, contacts: Contact[]): Contact | null {
@@ -799,7 +851,6 @@ function NoteItem({
         fontSize: 13, lineHeight: 1.55,
         color: 'var(--fg-2)',
         letterSpacing: '-0.005em',
-        whiteSpace: 'pre-wrap',
         wordWrap: 'break-word',
       }}>
         <ParsedText text={displayText} contacts={contacts} />
@@ -840,20 +891,107 @@ function NoteItem({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ParsedText — renders @mentions and #tags inline as colored pills
+// ParsedText — block + inline markdown renderer.
+// Headings, bullets, paragraphs at the block level. Bold, italic, link,
+// @mention, #tag at the inline level.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ParsedText({ text, contacts }: { text: string; contacts: Contact[] }) {
-  const tokens = useMemo(() => tokenize(text), [text])
+  const blocks = useMemo(() => parseBlocks(text), [text])
+
+  // Group consecutive bullets so they render as a tight cluster, not as
+  // separate rows with extra spacing.
+  const elements: React.ReactNode[] = []
+  let bulletBuf: Block[] = []
+  const flushBullets = () => {
+    if (bulletBuf.length === 0) return
+    elements.push(
+      <ul key={`ul-${elements.length}`} style={{
+        margin: '4px 0 4px 14px',
+        paddingLeft: 0,
+        listStyleType: 'disc',
+        listStylePosition: 'outside',
+      }}>
+        {bulletBuf.map((b, i) => (
+          <li key={i} style={{
+            paddingLeft: 4,
+            color: 'var(--fg-2)',
+            letterSpacing: '-0.005em',
+          }}>
+            <RenderInline tokens={(b as Extract<Block, { kind: 'bullet' }>).inline} contacts={contacts} />
+          </li>
+        ))}
+      </ul>,
+    )
+    bulletBuf = []
+  }
+
+  blocks.forEach((b, i) => {
+    if (b.kind === 'bullet') {
+      bulletBuf.push(b)
+      return
+    }
+    flushBullets()
+    if (b.kind === 'blank') {
+      elements.push(<div key={i} style={{ height: 6 }} />)
+      return
+    }
+    if (b.kind === 'heading') {
+      const Tag = (b.level === 1 ? 'h3' : 'h4') as 'h3' | 'h4'
+      const styles: React.CSSProperties = b.level === 1
+        ? { fontSize: 14.5, fontWeight: 700, margin: '6px 0 2px', letterSpacing: '-0.015em', color: 'var(--fg)' }
+        : { fontSize: 13,   fontWeight: 600, margin: '4px 0 1px', letterSpacing: '-0.01em', color: 'var(--fg)' }
+      elements.push(
+        <Tag key={i} style={styles}>
+          <RenderInline tokens={b.inline} contacts={contacts} />
+        </Tag>,
+      )
+      return
+    }
+    // paragraph — render inline; preserve linebreaks via separate paragraphs
+    elements.push(
+      <span key={i} style={{ display: 'block', letterSpacing: '-0.005em' }}>
+        <RenderInline tokens={b.inline} contacts={contacts} />
+      </span>,
+    )
+  })
+  flushBullets()
+
+  return <>{elements}</>
+}
+
+function RenderInline({ tokens, contacts }: { tokens: InlineToken[]; contacts: Contact[] }) {
   return (
     <>
       {tokens.map((t, i) => {
-        if (t.kind === 'text') return <span key={i}>{t.value}</span>
-        if (t.kind === 'tag')  return <TagInline key={i} name={t.name} />
+        if (t.kind === 'text')    return <span key={i}>{t.value}</span>
+        if (t.kind === 'bold')    return <strong key={i} style={{ fontWeight: 700, color: 'var(--fg)' }}><RenderInline tokens={t.inner} contacts={contacts} /></strong>
+        if (t.kind === 'italic')  return <em key={i} style={{ fontStyle: 'italic' }}><RenderInline tokens={t.inner} contacts={contacts} /></em>
+        if (t.kind === 'link')    return <LinkInline key={i} label={t.label} href={t.href} />
+        if (t.kind === 'tag')     return <TagInline key={i} name={t.name} />
         const c = matchContact(t.name, contacts)
         return <MentionInline key={i} name={t.name} contact={c} />
       })}
     </>
+  )
+}
+
+function LinkInline({ label, href }: { label: string; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      style={{
+        color: 'var(--accent)',
+        textDecoration: 'underline',
+        textDecorationColor: 'var(--accent-soft)',
+        textUnderlineOffset: 2,
+      }}
+    >
+      {label}
+    </a>
   )
 }
 
