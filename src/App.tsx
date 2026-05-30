@@ -42,6 +42,7 @@ import { ToastViewport }       from '@/components/ui/Toast'
 import { SplashScreen }        from '@/components/ui/SplashScreen'
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
 import { OnboardingWizard, hasCompletedOnboarding } from '@/components/onboarding/OnboardingWizard'
+import { seedSampleAiSummaries } from '@/lib/seed-ai-summaries'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -134,7 +135,7 @@ export default function App() {
         loadPipelineStages(activeWorkspaceId)
       )
       loadAllDeals(activeWorkspaceId)
-      loadAllTodos(activeWorkspaceId)
+      loadAllTodos(activeWorkspaceId).then(() => seedSampleAiSummaries())
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
       loadCalendar(activeWorkspaceId)
