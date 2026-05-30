@@ -14,7 +14,7 @@ function activityToTimeEntry(a: Activity): TimeEntry {
   } catch {}
   return {
     id: a.id,
-    customerId: a.accountId,
+    customerId: a.accountId ?? '',
     description: a.title ?? '',
     minutes,
     date,

@@ -7,7 +7,7 @@ import type { Activity } from '@/types/activity.types'
 function activityToDeadline(a: Activity): Deadline {
   return {
     id: a.id,
-    customerId: a.accountId,
+    customerId: a.accountId ?? '',
     title: a.title ?? '',
     dueDate: a.dueAt ?? '',
     done: a.status === 'done',

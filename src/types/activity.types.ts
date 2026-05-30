@@ -17,7 +17,7 @@ export interface Activity extends TimestampedEntity {
   id: string
   workspaceId: string
   createdBy: string
-  accountId: string
+  accountId?: string
   contactId?: string
   dealId?: string
   type: ActivityType
@@ -35,7 +35,7 @@ export interface Activity extends TimestampedEntity {
 export interface CreateActivityPayload {
   workspaceId: string
   createdBy: string
-  accountId: string
+  accountId?: string
   contactId?: string
   dealId?: string
   type: ActivityType

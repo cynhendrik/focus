@@ -12,7 +12,7 @@ function activityToFollowUp(a: Activity): FollowUp {
   } catch {}
   return {
     id: a.id,
-    customerId: a.accountId,
+    customerId: a.accountId ?? '',
     title: a.title ?? '',
     dueDate: a.dueAt ?? '',
     status: a.status === 'done' ? 'erledigt' : 'offen',

@@ -16,7 +16,7 @@ function activityToTodo(a: Activity): Todo {
   } catch {}
   return {
     id: a.id,
-    customerId: a.accountId,
+    customerId: a.accountId ?? '',
     title: a.title ?? '',
     status: a.status === 'done' ? 'done' : 'open',
     priority,

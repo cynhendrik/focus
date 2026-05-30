@@ -16,7 +16,7 @@ function activityToNote(a: Activity): Note {
   } catch {}
   return {
     id: a.id,
-    customerId: a.accountId,
+    customerId: a.accountId ?? '',
     title: a.title ?? '',
     content: a.body ?? '',
     pinned,
