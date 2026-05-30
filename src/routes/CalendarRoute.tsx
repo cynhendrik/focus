@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/store/calendar.store'
 import { TagesplanCard } from '@/components/calendar/TagesplanCard'
@@ -539,6 +539,197 @@ const COLOR_OPTIONS: { value: EventColor | ''; label: string; bg: string }[] = [
   { value: 'danger', label: 'Rot',      bg: 'var(--danger)' },
 ]
 
+// ── AccountCombobox ───────────────────────────────────────────────────────────
+
+interface Account { id: string; name: string; company?: string }
+
+interface AccountComboboxProps {
+  accounts: Account[]
+  value: string                 // selected accountId, "" for none
+  onChange: (id: string) => void
+  placeholder?: string
+}
+
+function AccountCombobox({ accounts, value, onChange, placeholder = 'Kunde tippen…' }: AccountComboboxProps) {
+  const selected = accounts.find(a => a.id === value)
+  const [query, setQuery]       = useState(selected?.name ?? '')
+  const [open, setOpen]         = useState(false)
+  const [activeIdx, setActiveIdx] = useState(0)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inputRef   = useRef<HTMLInputElement>(null)
+
+  // Keep query in sync when value changes externally
+  useEffect(() => {
+    setQuery(selected?.name ?? '')
+  }, [selected?.id])
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return accounts.slice(0, 20)
+    return accounts.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      (a.company ?? '').toLowerCase().includes(q)
+    ).slice(0, 20)
+  }, [accounts, query])
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (!wrapperRef.current?.contains(e.target as Node)) {
+        setOpen(false)
+        // Restore display of selected name if user typed but didn't pick
+        setQuery(selected?.name ?? '')
+      }
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open, selected?.name])
+
+  // Reset active index when matches change
+  useEffect(() => { setActiveIdx(0) }, [matches.length])
+
+  const pick = (account: Account | null) => {
+    if (account) {
+      onChange(account.id)
+      setQuery(account.name)
+    } else {
+      onChange('')
+      setQuery('')
+    }
+    setOpen(false)
+    inputRef.current?.blur()
+  }
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setOpen(true)
+      setActiveIdx(i => Math.min(i + 1, matches.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIdx(i => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (matches[activeIdx]) pick(matches[activeIdx])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+      setQuery(selected?.name ?? '')
+    }
+  }
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '7px 10px',
+        background: 'var(--surface-2)',
+        border: `1px solid ${open ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 9,
+        boxShadow: open ? '0 0 0 3px var(--accent-soft)' : 'none',
+        transition: 'border-color 160ms, box-shadow 160ms',
+      }}>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKey}
+          placeholder={placeholder}
+          style={{
+            flex: 1, minWidth: 0,
+            background: 'transparent', border: 'none', outline: 'none',
+            fontSize: 13, color: 'var(--fg)',
+            padding: 0,
+          }}
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => pick(null)}
+            style={{
+              fontSize: 11, color: 'var(--fg-dim)',
+              padding: '2px 6px', borderRadius: 6,
+              background: 'transparent',
+              cursor: 'pointer',
+            }}
+            title="Auswahl entfernen"
+          >×</button>
+        )}
+      </div>
+
+      {open && matches.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          boxShadow: 'var(--shadow-2)',
+          maxHeight: 260, overflowY: 'auto',
+          zIndex: 50,
+          padding: 4,
+        }}>
+          {matches.map((acc, i) => {
+            const active = i === activeIdx
+            return (
+              <div
+                key={acc.id}
+                onMouseDown={e => { e.preventDefault(); pick(acc) }}
+                onMouseEnter={() => setActiveIdx(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '7px 10px', borderRadius: 7,
+                  cursor: 'pointer',
+                  background: active ? 'var(--accent-soft)' : 'transparent',
+                  color: active ? 'var(--accent-ink)' : 'var(--fg)',
+                  transition: 'background 80ms',
+                }}
+              >
+                <div style={{
+                  width: 24, height: 24, borderRadius: 7,
+                  background: active ? 'var(--accent)' : 'oklch(50% 0 0 / 0.08)',
+                  color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontWeight: 700, flexShrink: 0,
+                  transition: 'background 80ms, color 80ms',
+                }}>
+                  {acc.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {acc.name}
+                  </div>
+                  {acc.company && (
+                    <div style={{ fontSize: 10.5, color: 'var(--fg-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {acc.company}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {open && matches.length === 0 && query.trim() && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 10,
+          padding: '12px 14px',
+          fontSize: 12, color: 'var(--fg-dim)',
+          zIndex: 50,
+        }}>
+          Kein Kunde für „{query}" gefunden.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── EventForm ─────────────────────────────────────────────────────────────────
+
 interface EventFormProps {
   initial?: CalendarEvent
   defaultDate?: Date
@@ -633,7 +824,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
       >
         <div style={{ padding: '22px 24px 18px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
-            {initial ? 'Event bearbeiten' : 'Neues Event'}
+            {initial ? 'Termin bearbeiten' : 'Neuer Termin'}
           </div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em' }}>
             {title || <span style={{ color: 'var(--fg-dim)', fontWeight: 400, fontStyle: 'italic' }}>Titel…</span>}
@@ -684,15 +875,13 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
 
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
-              Client (optional)
+              Kunde (optional)
             </label>
-            <select value={accountId} onChange={e => setAccountId(e.target.value)}
-              style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }}>
-              <option value="">Kein Client</option>
-              {accounts.filter(a => !a.isPrivate).map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            <AccountCombobox
+              accounts={accounts.filter(a => !a.isPrivate)}
+              value={accountId}
+              onChange={setAccountId}
+            />
           </div>
 
           <div>
@@ -844,7 +1033,7 @@ export function CalendarRoute() {
         <h1 className="greeting-title">Kalender<em>.</em></h1>
         <div className="greeting-sub">
           <span>{headingLabel()}</span>
-          <span>{events.length} Events</span>
+          <span>{events.length} Termin{events.length === 1 ? '' : 'e'}</span>
         </div>
       </div>
 
@@ -887,7 +1076,7 @@ export function CalendarRoute() {
             ))}
           </div>
           <button className="btn-primary" onClick={() => openNew()} title="N">
-            <Plus size={13} /> Event
+            <Plus size={13} /> Termin
           </button>
         </div>
       </div>
@@ -933,7 +1122,7 @@ export function CalendarRoute() {
 
         {!isLoading && events.length === 0 && (
           <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--fg-dim)', fontStyle: 'italic', borderBottom: view !== 'month' ? '1px solid var(--border)' : 'none' }}>
-            Keine Events in diesem Zeitraum — klicke auf einen Slot oder drücke N.
+            Keine Termine in diesem Zeitraum — klicke auf einen Slot oder drücke N.
           </div>
         )}
 
