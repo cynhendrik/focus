@@ -81,7 +81,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             id              TEXT PRIMARY KEY,
             workspace_id    TEXT NOT NULL DEFAULT '',
             created_by      TEXT NOT NULL DEFAULT '',
-            account_id      TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            account_id      TEXT REFERENCES accounts(id) ON DELETE CASCADE,
             contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
             deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
             customer_id     TEXT,

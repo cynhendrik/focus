@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 17;
+const CURRENT_VERSION: u32 = 18;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -545,6 +545,44 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     ))?;
                 }
             }
+            Ok(())
+        }
+        18 => {
+            // activities.account_id: NOT NULL → nullable (Table-Rebuild — SQLite kann das nicht via ALTER)
+            if !table_exists(conn, "activities") { return Ok(()); }
+            conn.execute_batch(r#"
+                CREATE TABLE activities_new (
+                    id              TEXT PRIMARY KEY,
+                    workspace_id    TEXT NOT NULL DEFAULT '',
+                    created_by      TEXT NOT NULL DEFAULT '',
+                    account_id      TEXT REFERENCES accounts(id) ON DELETE CASCADE,
+                    contact_id      TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+                    deal_id         TEXT REFERENCES deals(id) ON DELETE SET NULL,
+                    customer_id     TEXT,
+                    type            TEXT NOT NULL,
+                    title           TEXT,
+                    body            TEXT,
+                    payload         TEXT NOT NULL DEFAULT '{}',
+                    status          TEXT NOT NULL DEFAULT 'open',
+                    due_at          TEXT,
+                    assignee        TEXT,
+                    outcome         TEXT,
+                    direction       TEXT,
+                    email_id        TEXT,
+                    pending_sync    INTEGER NOT NULL DEFAULT 0,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );
+                INSERT INTO activities_new SELECT * FROM activities;
+                DROP TABLE activities;
+                ALTER TABLE activities_new RENAME TO activities;
+                CREATE INDEX IF NOT EXISTS idx_activities_account
+                    ON activities(account_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_activities_deal
+                    ON activities(deal_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_activities_contact
+                    ON activities(contact_id, created_at DESC);
+            "#)?;
             Ok(())
         }
         _ => Ok(()),
@@ -1224,6 +1262,20 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(count_after, 0, "recipient should be cascade-deleted");
+    }
+
+    #[test]
+    fn migration_v18_makes_activities_account_id_nullable() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        crate::db::schema::create_tables(&conn).unwrap();
+        // Inserting a task with NULL account_id must succeed
+        let result = conn.execute(
+            "INSERT INTO activities (id, workspace_id, created_by, account_id, type, payload, status, created_at, updated_at)
+             VALUES ('t1', 'ws-1', 'u-1', NULL, 'task', '{}', 'open', '2026-01-01', '2026-01-01')",
+            [],
+        );
+        assert!(result.is_ok(), "Should accept NULL account_id: {:?}", result);
     }
 
     #[test]
