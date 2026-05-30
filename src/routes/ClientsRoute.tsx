@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff, Sparkles, ArrowRight } from 'lucide-react'
+import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff, Sparkles, ArrowRight, LayoutGrid, ListFilter } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -7,11 +7,43 @@ import { useCrmStore } from '@/store/crm.store'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
+import { SmartListsRoute } from './SmartListsRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
 import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
 import type { Customer, CustomerStatus } from '@/types/customer.types'
 import type { Todo } from '@/types/todo.types'
 import type { CustomerTab } from '@/store/ui.store'
+
+// ── shared view toggle (Board ↔ Liste) ────────────────────────────────────────
+
+export function ClientsViewToggle() {
+  const view    = useUiStore(s => s.clientsView)
+  const setView = useUiStore(s => s.setClientsView)
+  const segBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '5px 12px',
+    border: 'none', background: active ? 'var(--surface)' : 'transparent',
+    color: active ? 'var(--fg)' : 'var(--fg-muted)',
+    fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 7, cursor: 'pointer',
+    transition: 'background 140ms, color 140ms',
+    boxShadow: active ? 'var(--shadow-1)' : 'none',
+  })
+  return (
+    <div style={{
+      display: 'inline-flex', padding: 3,
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 10,
+    }}>
+      <button style={segBtn(view === 'board')} onClick={() => setView('board')} title="Board-Ansicht">
+        <LayoutGrid size={12} /> Board
+      </button>
+      <button style={segBtn(view === 'list')} onClick={() => setView('list')} title="Listen-Ansicht mit Smart Lists">
+        <ListFilter size={12} /> Liste
+      </button>
+    </div>
+  )
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -379,9 +411,12 @@ function ClientBoard() {
             Prioritäten, Risiken und letzte Aktivitäten auf einen Blick
           </p>
         </div>
-        <button className="btn-ghost" onClick={() => setShowModal(true)}>
-          <UserPlus size={14} /> Neuer Kunde
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ClientsViewToggle />
+          <button className="btn-ghost" onClick={() => setShowModal(true)}>
+            <UserPlus size={14} /> Neuer Kunde
+          </button>
+        </div>
       </div>
 
       {customers.length === 0 ? (
@@ -430,7 +465,7 @@ function ClientBoard() {
             ? (
               <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {deadlineItems.map(({ todo, tone, label }) => {
-                  const c = customerMap.get(todo.customerId)
+                  const c = todo.customerId ? customerMap.get(todo.customerId) : undefined
                   return (
                     <DeadlineRow
                       key={todo.id}
@@ -625,9 +660,14 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
 
 export function ClientsRoute() {
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
+  const clientsView        = useUiStore(s => s.clientsView)
 
   if (selectedCustomerId) {
     return <CustomerRoute customerId={selectedCustomerId} />
+  }
+
+  if (clientsView === 'list') {
+    return <SmartListsRoute />
   }
 
   return <ClientBoard />

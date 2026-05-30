@@ -114,7 +114,7 @@ export function DayTimeline({ limit }: Props) {
     for (const t of allTodos) {
       if (t.status === 'done' || !t.dueDate) continue
       if (!t.dueDate.startsWith(todayIso)) continue
-      const cust = customerById.get(t.customerId)
+      const cust = t.customerId ? customerById.get(t.customerId) : undefined
       // If dueDate contains a time, use it; otherwise default to 09:00.
       const hasTime = t.dueDate.length >= 16 && t.dueDate.includes('T')
       const startMin = hasTime ? minutesOfDay(t.dueDate) : 9 * 60

@@ -116,7 +116,7 @@ export function computePriorities(input: {
     const overdue = daysOverdue(t.dueDate)
     if (overdue <= 0) continue
     const cust = customerById(input.customers, t.customerId)
-    const priorityBoost = t.priority === 'high' ? 20 : t.priority === 'low' ? -5 : 5
+    const priorityBoost = t.priority === 'p1' ? 20 : t.priority === 'p4' ? -5 : 5
     items.push({
       id: `task:${t.id}`,
       kind: 'overdue_task',
@@ -134,7 +134,7 @@ export function computePriorities(input: {
     if (t.status === 'done' || !t.dueDate) continue
     if (!t.dueDate.startsWith(todayIso)) continue
     const cust = customerById(input.customers, t.customerId)
-    const priorityBoost = t.priority === 'high' ? 25 : t.priority === 'low' ? -5 : 8
+    const priorityBoost = t.priority === 'p1' ? 25 : t.priority === 'p4' ? -5 : 8
     items.push({
       id: `task:${t.id}`,
       kind: 'today_task',
@@ -167,7 +167,7 @@ export function computePriorities(input: {
 
   // ── Tomorrow's high-priority tasks ───────────────────────────────────────
   for (const t of input.todos) {
-    if (t.status === 'done' || !t.dueDate || t.priority !== 'high') continue
+    if (t.status === 'done' || !t.dueDate || t.priority !== 'p1') continue
     if (!t.dueDate.startsWith(tomorrowIso)) continue
     const cust = customerById(input.customers, t.customerId)
     items.push({
@@ -176,7 +176,7 @@ export function computePriorities(input: {
       score: 35,
       title: t.title,
       meta: cust?.name,
-      hint: 'morgen fällig · high',
+      hint: 'morgen fällig · p1',
       customerId: t.customerId,
       whenIso: t.dueDate,
     })

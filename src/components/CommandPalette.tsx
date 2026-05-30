@@ -185,7 +185,7 @@ export function CommandPalette({ open, onClose }: Props) {
       .filter(t => includesCI(t.title, q))
       .slice(0, MAX_PER_GROUP)
       .map<Hit>(t => {
-        const cust = customerById.get(t.customerId)
+        const cust = t.customerId ? customerById.get(t.customerId) : undefined
         return {
           kind: 'task',
           id: t.id,

@@ -108,7 +108,7 @@ export function DashboardPane({ customerId }: Props) {
 
   // Hohe Prio
   const highPrio = todos
-    .filter(t => t.status !== 'done' && t.priority === 'high')
+    .filter(t => t.status !== 'done' && t.priority === 'p1')
     .slice(0, 6)
 
   // Timeline

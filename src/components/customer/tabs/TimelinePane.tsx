@@ -1331,11 +1331,11 @@ function TasksList({ customerId }: TasksListProps) {
   }
 
   const cyclePriority = async (t: Todo) => {
-    // normal → high → low → normal
-    const next: 'high' | 'low' | 'normal' =
-      t.priority === 'normal' ? 'high'
-      : t.priority === 'high' ? 'low'
-      : 'normal'
+    // p3 → p1 → p4 → p3
+    const next: 'p1' | 'p3' | 'p4' =
+      t.priority === 'p3' ? 'p1'
+      : t.priority === 'p1' ? 'p4'
+      : 'p3'
     await upsertTodo({
       id: t.id,
       customerId: t.customerId,
@@ -1546,7 +1546,7 @@ function TaskRow({
   const isDone = todo.status === 'done'
   const due = todo.dueDate ? formatTaskDue(todo.dueDate) : null
   const prio = PRIORITY_META[(todo.priority as 'high' | 'normal' | 'low') ?? 'normal']
-  const isHigh = todo.priority === 'high'
+  const isHigh = todo.priority === 'p1' || todo.priority === 'p2'
 
   return (
     <motion.div
