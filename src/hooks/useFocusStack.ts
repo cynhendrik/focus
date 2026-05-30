@@ -35,18 +35,23 @@ export interface FocusStackApi {
   postpone: () => Promise<void>
 }
 
-export function useFocusStack(): FocusStackApi {
+export function useFocusStack(customerId?: string): FocusStackApi {
   const allTodos = useTodosStore(s => s.allTodos)
   const complete = useTodosStore(s => s.complete)
   const postpone = useTodosStore(s => s.postpone)
 
+  const scoped = useMemo(
+    () => customerId ? allTodos.filter(t => t.customerId === customerId) : allTodos,
+    [allTodos, customerId],
+  )
+
   const stack = useMemo(
-    () => allTodos.filter(t => isToday(t) && t.status !== 'done').sort(sortFocus),
-    [allTodos],
+    () => scoped.filter(t => isToday(t) && t.status !== 'done').sort(sortFocus),
+    [scoped],
   )
   const completedToday = useMemo(
-    () => allTodos.filter(t => t.status === 'done' && t.updatedAt.slice(0, 10) === todayDateString()).length,
-    [allTodos],
+    () => scoped.filter(t => t.status === 'done' && t.updatedAt.slice(0, 10) === todayDateString()).length,
+    [scoped],
   )
 
   const [currentIndex, setCurrentIndex] = useState(0)

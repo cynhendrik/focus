@@ -3,8 +3,10 @@ import { useFocusStack } from '@/hooks/useFocusStack'
 import { TaskFocusCard } from './TaskFocusCard'
 import { ChevronLeft, ChevronRight, Check, Clock } from 'lucide-react'
 
-export function TasksFocusView() {
-  const stack = useFocusStack()
+interface Props { customerId?: string }
+
+export function TasksFocusView({ customerId }: Props = {}) {
+  const stack = useFocusStack(customerId)
   const { current, currentIndex, total, prev, skip, complete, postpone } = stack
 
   useEffect(() => {

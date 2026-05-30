@@ -41,7 +41,7 @@ interface Hit {
   primary:   string         // main label (e.g. customer name)
   secondary: string         // sub label (e.g. company / status)
   meta?:     string         // right-side hint (e.g. stage, date)
-  openWhere: { customerId?: string; appView?: 'mail' | 'tasks' | 'invoices' | 'pipeline' }
+  openWhere: { customerId?: string; appView?: 'mail' | 'invoices' | 'pipeline' }
 }
 
 interface Group {

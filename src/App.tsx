@@ -27,7 +27,6 @@ import { useSyncBridge } from '@/core/sync/useSyncBridge'
 import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
 import { FinanceRoute }    from '@/routes/FinanceRoute'
-import { TasksRoute }      from '@/routes/TasksRoute'
 import { SettingsRoute }   from '@/routes/SettingsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
 import { LeadsRoute }            from '@/routes/LeadsRoute'
@@ -155,7 +154,6 @@ export default function App() {
       case 'dashboard':    return <DashboardRoute />
       case 'profile':      return <ProfileRoute />
       case 'clients':      return <ClientsRoute />
-      case 'tasks':        return <TasksRoute />
       case 'invoices':     return <FinanceRoute />
       case 'leads':        return <LeadsRoute />
       case 'pipeline':     return <PipelineRoute />

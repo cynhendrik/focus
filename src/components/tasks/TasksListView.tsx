@@ -40,8 +40,14 @@ const PRIORITY_SECTIONS = [
   { id: 'p4', label: 'P4 — Niedrig'  },
 ]
 
-export function TasksListView() {
-  const todos = useTodosStore(s => s.allTodos)
+interface Props { customerId?: string }
+
+export function TasksListView({ customerId }: Props = {}) {
+  const allTodos = useTodosStore(s => s.allTodos)
+  const todos = useMemo(
+    () => customerId ? allTodos.filter(t => t.customerId === customerId) : allTodos,
+    [allTodos, customerId],
+  )
   const [groupBy, setGroupBy] = useState<GroupBy>('time')
 
   const grouped = useMemo(() => {
@@ -68,7 +74,7 @@ export function TasksListView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <TaskComposer />
+      <TaskComposer customerId={customerId} />
 
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',

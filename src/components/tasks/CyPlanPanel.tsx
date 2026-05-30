@@ -14,20 +14,21 @@ const REASON_BY_PRIO: Record<TodoPriority, string> = {
   p4: 'Wenn-Zeit-Slot — niedrige Priorität, kein Stress.',
 }
 
-interface Props { open: boolean; onClose: () => void }
+interface Props { open: boolean; onClose: () => void; customerId?: string }
 
-export function CyPlanPanel({ open, onClose }: Props) {
-  const todos = useTodosStore(s => s.allTodos)
+export function CyPlanPanel({ open, onClose, customerId }: Props) {
+  const allTodos = useTodosStore(s => s.allTodos)
   const todayPlan = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10)
-    return todos
+    const scoped = customerId ? allTodos.filter(t => t.customerId === customerId) : allTodos
+    return scoped
       .filter(t => t.status !== 'done' && (t.bucket === 'today' || t.scheduledAt?.slice(0, 10) === today))
       .sort((a, b) => {
         const p = PRIO_ORDER[a.priority] - PRIO_ORDER[b.priority]
         if (p !== 0) return p
         return (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? '')
       })
-  }, [todos])
+  }, [allTodos, customerId])
 
   return (
     <AnimatePresence>

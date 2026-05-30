@@ -69,7 +69,12 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const todos = await TodoService.getByCustomer(customerId)
-      set({ todos, isLoading: false })
+      // Merge into allTodos so global views (filtered by customerId) see ALL of this
+      // customer's tasks — including done/in_progress — not just the open ones from loadAll.
+      set(s => {
+        const otherCustomers = s.allTodos.filter(t => t.customerId !== customerId)
+        return { todos, allTodos: [...otherCustomers, ...todos], isLoading: false }
+      })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ isLoading: false, error })

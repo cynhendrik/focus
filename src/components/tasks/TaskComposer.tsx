@@ -11,10 +11,16 @@ const PRIO_LABEL: Record<string, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
-export function TaskComposer() {
+interface Props { customerId?: string }
+
+export function TaskComposer({ customerId }: Props = {}) {
   const upsert   = useTodosStore(s => s.upsert)
   const accounts = useAccountsStore(s => s.accounts)
   const [text, setText] = useState('')
+
+  const placeholder = customerId
+    ? 'Neue Task… "!! ~45m @10:00 #call Logo finalisieren"'
+    : 'Was muss erledigt werden? "!! ~45m @10:00 #call +TechCorp …"'
 
   const editor = useEditor({
     extensions: [
@@ -23,9 +29,7 @@ export function TaskComposer() {
         listItem: false, blockquote: false, codeBlock: false,
         horizontalRule: false,
       }),
-      Placeholder.configure({
-        placeholder: 'Was muss erledigt werden? "!! ~45m @10:00 #call +TechCorp …"',
-      }),
+      Placeholder.configure({ placeholder }),
     ],
     content: '',
     onUpdate: ({ editor }) => setText(editor.getText()),
@@ -40,11 +44,12 @@ export function TaskComposer() {
   const draft = useMemo(() => parseTaskText(text), [text])
 
   const resolvedCustomerId = useMemo(() => {
+    if (customerId) return customerId
     if (!draft.customerHint) return undefined
     const lower = draft.customerHint.toLowerCase()
     const match = accounts.find(c => c.name.toLowerCase().includes(lower))
     return match?.id
-  }, [draft.customerHint, accounts])
+  }, [customerId, draft.customerHint, accounts])
 
   const canSubmit = !!(draft.title.trim() || draft.tags.length || draft.customerHint)
 
@@ -129,7 +134,7 @@ export function TaskComposer() {
         {draft.priority && <Chip color="warn">● {PRIO_LABEL[draft.priority]}</Chip>}
         {draft.plannedMinutes && <Chip color="muted">⏱ {draft.plannedMinutes}m</Chip>}
         {draft.tags.map(t => <Chip key={t} color="muted">#{t}</Chip>)}
-        {draft.customerHint && (
+        {!customerId && draft.customerHint && (
           <Chip color={resolvedCustomerId ? 'accent' : 'danger'}>
             +{draft.customerHint}
             {!resolvedCustomerId && ' (nicht gefunden)'}
@@ -137,7 +142,9 @@ export function TaskComposer() {
         )}
         {!draft.scheduledAt && !draft.priority && !draft.plannedMinutes && !draft.tags.length && !draft.customerHint && (
           <span style={{ color: 'var(--fg-dim)', fontSize: 11 }}>
-            ! Priorität · ~Zeit · @ wann · # Tag · + Kunde
+            {customerId
+              ? '! Priorität · ~Zeit · @ wann · # Tag'
+              : '! Priorität · ~Zeit · @ wann · # Tag · + Kunde'}
           </span>
         )}
       </div>

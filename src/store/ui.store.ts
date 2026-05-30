@@ -40,7 +40,7 @@ export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'
-  | 'pipeline'  | 'tasks'      | 'calendar'  | 'mail' | 'followups' | 'leads'
+  | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
 
 interface UiState {
   theme: Theme

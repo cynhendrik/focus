@@ -2,22 +2,20 @@ import { useState, useEffect } from 'react'
 import { useUiStore, type AppView } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useCustomersStore } from '@/store/customers.store'
-import { useTodosStore } from '@/store/todos.store'
 import { useDealsStore } from '@/store/deals.store'
-import { useActivitiesStore } from '@/store/activities.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
 import {
   Home, CheckSquare, Users, CreditCard,
-  TrendingUp, ListFilter, Bell, Target,
-  Calendar, Mail, MessageCircle, Settings,
+  TrendingUp, Target,
+  Calendar, Mail, Settings,
   ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 type SectionKey = 'workspace' | 'sales' | 'inbox'
 
-const SALES_VIEWS = new Set<string>(['leads', 'pipeline', 'smartlists', 'followups'])
+const SALES_VIEWS = new Set<string>(['leads', 'pipeline'])
 
 function readExpanded(): Record<SectionKey, boolean> {
   try {
@@ -82,11 +80,9 @@ export function NavSidebar() {
   const user       = useAuthStore(s => s.user)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
-  const openTaskCount = useTodosStore(s => s.allTodos.length)
   const openDealCount = useDealsStore(s =>
     s.deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
   )
-  const followupCount = useActivitiesStore(s => s.followups.length)
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const isAdmin = useCompanyStore(s => s.isAdmin)
   const modules = useCompanyStore(s => s.modules)
@@ -130,7 +126,6 @@ export function NavSidebar() {
       {expanded.workspace && (
         <>
           <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
-          <SidebarNavItem icon={CheckSquare} label="Tasks"       active={appView === 'tasks'}       onClick={() => setAppView('tasks')}       kbd="T" badge={openTaskCount || undefined} />
           <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
           {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
         </>
@@ -143,8 +138,6 @@ export function NavSidebar() {
             <>
               <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
               <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
-              <SidebarNavItem icon={ListFilter}  label="Smart Lists" active={appView === 'smartlists'}  onClick={() => setAppView('smartlists')}  kbd="L" />
-              <SidebarNavItem icon={Bell}        label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" badge={followupCount || undefined} />
             </>
           )}
         </>
@@ -155,7 +148,6 @@ export function NavSidebar() {
         <>
           <SidebarNavItem icon={Calendar}      label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />
           <SidebarNavItem icon={Mail}          label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />
-          <SidebarNavItem icon={MessageCircle} label="Chat"     active={appView === 'chat'}     onClick={() => setAppView('chat')} />
         </>
       )}
 

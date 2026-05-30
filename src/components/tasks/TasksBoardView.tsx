@@ -52,9 +52,16 @@ function DropColumn({
   )
 }
 
-export function TasksBoardView() {
-  const todos     = useTodosStore(s => s.allTodos)
+interface Props { customerId?: string }
+
+export function TasksBoardView({ customerId }: Props = {}) {
+  const allTodos  = useTodosStore(s => s.allTodos)
   const setBucket = useTodosStore(s => s.setBucket)
+
+  const todos = useMemo(
+    () => customerId ? allTodos.filter(t => t.customerId === customerId) : allTodos,
+    [allTodos, customerId],
+  )
 
   const byBucket = useMemo(() => {
     const map: Record<TodoBucket, Todo[]> = {
@@ -72,7 +79,7 @@ export function TasksBoardView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <TaskComposer />
+      <TaskComposer customerId={customerId} />
       <DndContext onDragEnd={onDragEnd}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
           {COLUMNS.map(col => (

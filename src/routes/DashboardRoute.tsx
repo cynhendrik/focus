@@ -489,7 +489,7 @@ export function DashboardRoute() {
               due={todo.dueDate}
               onClick={() => {
                 if (todo.customerId) setSelected(todo.customerId)
-                else setAppView('tasks')
+                else setAppView('clients')
               }}
             />
           ))}
