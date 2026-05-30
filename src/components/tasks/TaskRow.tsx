@@ -53,13 +53,15 @@ export function TaskRow({ todo }: Props) {
       style={{
         position: 'relative',
         display: 'flex', flexDirection: 'column',
-        padding: '12px 14px',
+        padding: '12px 14px 12px 18px',
         background: 'var(--surface-2)',
         border: '1px solid var(--border)', borderRadius: 12,
         cursor: 'pointer',
-        marginBottom: 8,
         opacity: todo.status === 'done' ? 0.6 : 1,
+        transition: 'border-color 180ms',
       }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
     >
       <div style={{
         position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,

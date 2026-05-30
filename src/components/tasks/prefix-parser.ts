@@ -20,6 +20,11 @@ const WEEKDAY_MAP: Record<string, number> = {
   mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 0,
 }
 
+const WEEKDAY_FULL: Record<string, number> = {
+  montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4,
+  freitag: 5, samstag: 6, sonntag: 0,
+}
+
 function todayAt(hour: number, minute: number): string {
   const d = new Date()
   d.setHours(hour, minute, 0, 0)
@@ -30,6 +35,13 @@ function tomorrowAt(hour = 9, minute = 0): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
   d.setHours(hour, minute, 0, 0)
+  return d.toISOString()
+}
+
+function dayAfterTomorrowAt(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 2)
+  d.setHours(9, 0, 0, 0)
   return d.toISOString()
 }
 
@@ -46,6 +58,39 @@ function parseAtKeyword(value: string): string | undefined {
   if (lower === 'heute')  return todayAt(new Date().getHours() + 1, 0)
   if (lower === 'morgen') return tomorrowAt()
   if (lower in WEEKDAY_MAP) return nextWeekday(WEEKDAY_MAP[lower])
+  return undefined
+}
+
+// Soft date detection — words in free-text without `@` prefix.
+// Returns ISO date if the token (case-insensitive, trailing punctuation
+// stripped) is recognized as a date keyword or German date format.
+function parseSoftDateToken(rawToken: string): string | undefined {
+  // Tolerant: strip trailing punctuation like "heute," or "heute."
+  // but keep trailing dot for date formats (handled by their own regex).
+  const cleanWord = rawToken.replace(/[,;:!?]+$/, '')
+  const lower = cleanWord.toLowerCase()
+
+  if (lower === 'heute')      return todayAt(new Date().getHours() + 1, 0)
+  if (lower === 'morgen')     return tomorrowAt()
+  if (lower === 'übermorgen') return dayAfterTomorrowAt()
+  if (lower in WEEKDAY_FULL)  return nextWeekday(WEEKDAY_FULL[lower])
+
+  // DD.MM.YYYY
+  const ymd = rawToken.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
+  if (ymd) {
+    const d = new Date(parseInt(ymd[3], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[1], 10), 9, 0, 0)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+
+  // DD.MM. or DD.MM (current year, roll forward if already past)
+  const dm = rawToken.match(/^(\d{1,2})\.(\d{1,2})\.?$/)
+  if (dm) {
+    const now = new Date()
+    const d = new Date(now.getFullYear(), parseInt(dm[2], 10) - 1, parseInt(dm[1], 10), 9, 0, 0)
+    if (d.getTime() < now.setHours(0, 0, 0, 0)) d.setFullYear(d.getFullYear() + 1)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+
   return undefined
 }
 
@@ -94,6 +139,20 @@ export function parseTaskText(input: string): TaskDraft {
       continue
     }
     titleParts.push(token)
+  }
+
+  // Soft date detection on the leftover title parts — only if no
+  // explicit @-token already set a date. Match the FIRST hit only,
+  // remove that token from the title.
+  if (!draft.scheduledAt) {
+    for (let i = 0; i < titleParts.length; i++) {
+      const soft = parseSoftDateToken(titleParts[i])
+      if (soft) {
+        draft.scheduledAt = soft
+        titleParts.splice(i, 1)
+        break
+      }
+    }
   }
 
   draft.title = titleParts.join(' ')

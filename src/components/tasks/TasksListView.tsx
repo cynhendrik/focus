@@ -73,33 +73,35 @@ export function TasksListView({ customerId }: Props = {}) {
   const sections = groupBy === 'time' ? TIME_SECTIONS : PRIORITY_SECTIONS
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       <TaskComposer customerId={customerId} />
 
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         fontSize: 11.5,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="card-label">Gruppieren</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="card-label" style={{ marginRight: 4 }}>Gruppieren</span>
           <button
             onClick={() => setGroupBy('time')}
             style={{
-              padding: '4px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600,
+              padding: '4px 11px', borderRadius: 99, fontSize: 11.5, fontWeight: 600,
               background: groupBy === 'time' ? 'var(--accent)' : 'transparent',
               color:      groupBy === 'time' ? 'var(--accent-ink)' : 'var(--fg-muted)',
+              transition: 'background 160ms, color 160ms',
             }}
           >Zeit</button>
           <button
             onClick={() => setGroupBy('priority')}
             style={{
-              padding: '4px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600,
+              padding: '4px 11px', borderRadius: 99, fontSize: 11.5, fontWeight: 600,
               background: groupBy === 'priority' ? 'var(--accent)' : 'transparent',
               color:      groupBy === 'priority' ? 'var(--accent-ink)' : 'var(--fg-muted)',
+              transition: 'background 160ms, color 160ms',
             }}
           >Priorität</button>
         </div>
-        <span style={{ color: 'var(--fg-muted)' }}>
+        <span style={{ color: 'var(--fg-muted)', fontSize: 11.5 }}>
           {openCount} offen · {doneCount} erledigt
         </span>
       </div>
@@ -107,29 +109,44 @@ export function TasksListView({ customerId }: Props = {}) {
       {sections.map(sec => {
         const items = grouped[sec.id] ?? []
         if (items.length === 0) return null
+        const isErledigt = sec.id === 'erledigt'
         return (
-          <div key={sec.id}>
+          <section key={sec.id} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              marginBottom: 8,
+              display: 'flex', alignItems: 'baseline', gap: 10,
+              paddingBottom: 6,
+              borderBottom: '1px solid var(--border)',
             }}>
               <h3 style={{
-                fontSize: 13.5, fontWeight: 700,
-                color: sec.id === 'erledigt' ? 'var(--fg-muted)' : 'var(--fg)',
+                fontSize: 12, fontWeight: 700,
+                color: isErledigt ? 'var(--fg-muted)' : 'var(--fg)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
                 margin: 0,
               }}>
                 {sec.label}
               </h3>
-              <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{items.length}</span>
+              <span style={{
+                fontSize: 10.5, color: 'var(--fg-dim)',
+                fontFamily: 'var(--font-mono)',
+              }}>{items.length}</span>
             </div>
-            {items.map(t => <TaskRow key={t.id} todo={t} />)}
-          </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {items.map(t => <TaskRow key={t.id} todo={t} />)}
+            </div>
+          </section>
         )
       })}
 
       {todos.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)', fontSize: 13 }}>
-          Noch keine Tasks. Tippe oben deinen ersten ein.
+        <div style={{
+          textAlign: 'center', padding: '64px 0',
+          color: 'var(--fg-dim)', fontSize: 13,
+        }}>
+          Noch keine Tasks. Tippe oben deinen ersten ein —<br/>
+          <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
+            „!! morgen 10:00 Brand finalisieren" reicht.
+          </span>
         </div>
       )}
     </div>

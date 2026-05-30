@@ -39,8 +39,15 @@ export function WorkflowPane({ customerId }: Props) {
   }, [customerTodos])
 
   return (
-    <div style={{ padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div style={{
+      maxWidth: 760,
+      margin: '0 auto',
+      padding: '8px 24px 80px',
+      display: 'flex', flexDirection: 'column',
+      gap: 24,
+    }}>
       <TasksHeader
+        compact
         total={total}
         completedToday={completedToday}
         plannedHours={plannedHours}

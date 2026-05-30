@@ -93,4 +93,74 @@ describe('parseTaskText', () => {
     expect(r.priority).toBe('p2')
     expect(r.title).toBe('Test')
   })
+
+  describe('soft date detection (free text, no @-prefix)', () => {
+    const todayStr = () => new Date().toISOString().slice(0, 10)
+    const dayPlus = (n: number) => {
+      const d = new Date(); d.setDate(d.getDate() + n)
+      return d.toISOString().slice(0, 10)
+    }
+
+    it('detects "morgen" anywhere in title', () => {
+      const r = parseTaskText('Morgen Kunde anrufen')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(dayPlus(1))
+      expect(r.title).toBe('Kunde anrufen')
+    })
+
+    it('detects "heute" case-insensitive', () => {
+      const r = parseTaskText('Brand Update heute fertig')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(todayStr())
+      expect(r.title).toBe('Brand Update fertig')
+    })
+
+    it('detects "übermorgen"', () => {
+      const r = parseTaskText('Statuscall übermorgen')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(dayPlus(2))
+      expect(r.title).toBe('Statuscall')
+    })
+
+    it('detects full weekday name', () => {
+      const r = parseTaskText('Review Montag')
+      expect(r.scheduledAt).toBeDefined()
+      expect(r.title).toBe('Review')
+    })
+
+    it('detects DD.MM. format (current year)', () => {
+      const r = parseTaskText('Termin 15.6. mit Kunde')
+      expect(r.scheduledAt).toBeDefined()
+      const d = new Date(r.scheduledAt!)
+      expect(d.getDate()).toBe(15)
+      expect(d.getMonth()).toBe(5)  // June = month 5 (0-indexed)
+      expect(r.title).toBe('Termin mit Kunde')
+    })
+
+    it('detects DD.MM.YYYY format', () => {
+      const r = parseTaskText('Audit 15.10.2026 fertigstellen')
+      expect(r.scheduledAt).toBeDefined()
+      const d = new Date(r.scheduledAt!)
+      expect(d.getDate()).toBe(15)
+      expect(d.getMonth()).toBe(9)  // October
+      expect(d.getFullYear()).toBe(2026)
+      expect(r.title).toBe('Audit fertigstellen')
+    })
+
+    it('handles trailing comma after keyword', () => {
+      const r = parseTaskText('Morgen, Brand Refresh')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(dayPlus(1))
+      expect(r.title).toBe('Brand Refresh')
+    })
+
+    it('explicit @-token wins over soft token', () => {
+      const r = parseTaskText('@heute morgen')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(todayStr())
+      // 'morgen' should remain in title since @heute already set scheduledAt
+      expect(r.title).toBe('morgen')
+    })
+
+    it('only first soft date matched', () => {
+      const r = parseTaskText('morgen heute Brand')
+      expect(r.scheduledAt?.slice(0, 10)).toBe(dayPlus(1))
+      expect(r.title).toBe('heute Brand')
+    })
+  })
 })

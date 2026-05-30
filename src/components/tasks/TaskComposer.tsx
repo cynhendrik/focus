@@ -87,20 +87,23 @@ export function TaskComposer({ customerId }: Props = {}) {
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      padding: '14px 16px',
-      background: 'var(--surface-2)', borderRadius: 14,
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '12px 14px',
+      background: 'var(--surface-2)',
+      borderRadius: 14,
       border: '1px solid var(--border)',
+      transition: 'border-color 200ms, box-shadow 200ms',
+    }}
+    onFocusCapture={e => {
+      e.currentTarget.style.borderColor = 'var(--accent)'
+      e.currentTarget.style.boxShadow = '0 0 0 4px var(--accent-soft)'
+    }}
+    onBlurCapture={e => {
+      e.currentTarget.style.borderColor = 'var(--border)'
+      e.currentTarget.style.boxShadow = 'none'
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'oklch(50% 0 0 / 0.06)', color: 'var(--fg-muted)',
-          flexShrink: 0, marginTop: 4,
-        }}>
-          <Plus size={14} />
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Plus size={15} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <EditorContent editor={editor} />
         </div>
@@ -108,17 +111,18 @@ export function TaskComposer({ customerId }: Props = {}) {
           onClick={submit}
           disabled={!canSubmit}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: 99,
-            background: 'var(--accent)', color: 'var(--accent-ink)',
-            fontSize: 12.5, fontWeight: 600,
-            opacity: canSubmit ? 1 : 0.4,
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '6px 12px', borderRadius: 99,
+            background: canSubmit ? 'var(--accent)' : 'oklch(50% 0 0 / 0.08)',
+            color: canSubmit ? 'var(--accent-ink)' : 'var(--fg-dim)',
+            fontSize: 11.5, fontWeight: 600,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
             flexShrink: 0,
+            transition: 'background 160ms, color 160ms',
           }}
         >
-          Hinzufügen
-          <Send size={12} />
+          Enter
+          <Send size={11} />
         </button>
       </div>
 
