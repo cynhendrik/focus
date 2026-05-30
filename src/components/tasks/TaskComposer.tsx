@@ -9,14 +9,16 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { parseTaskText, type TaskDraft } from './prefix-parser'
 import { CalendarEventConfirmCard, type PendingEventDraft } from './CalendarEventConfirmCard'
+import {
+  MentionPopover, extractMentionQuery, useMentionPopoverState,
+  type MentionCandidate,
+} from './MentionPopover'
 import { Plus, Send, Calendar } from 'lucide-react'
 
 const PRIO_LABEL: Record<string, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
-// Calendar events store local-iso (no timezone offset), so we strip the Z and
-// align the wall-clock time to what the user typed (e.g. "12:30").
 function isoLocal(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -37,15 +39,23 @@ export function TaskComposer({ customerId }: Props = {}) {
   const accounts     = useAccountsStore(s => s.accounts)
   const upsertEvent  = useCalendarStore(s => s.upsert)
   const [text, setText] = useState('')
+  /** Resolved mentions: marker (e.g. "@Klara") → customerId */
+  const [mentions, setMentions] = useState<Array<{ marker: string; customerId: string }>>([])
   const [pendingEvent, setPendingEvent] = useState<PendingEventDraft | null>(null)
   const [pendingDraft, setPendingDraft] = useState<TaskDraft | null>(null)
-  // submit is stateful (depends on draft + resolvedCustomerId); we keep a ref
-  // so TipTap's keyboard hook (set ONCE at editor init) can call the latest one.
   const submitRef = useRef<() => void>(() => {})
+  const mention = useMentionPopoverState()
+  const mentionStateRef = useRef(mention)
+  mentionStateRef.current = mention
 
   const placeholder = customerId
-    ? 'Neue Task… "!! ~45m @10:00 #call Logo finalisieren"'
-    : 'Was muss erledigt werden? "!! ~45m @10:00 #call +TechCorp …"'
+    ? 'Was muss erledigt werden? "!! morgen 10:00 #call Logo finalisieren"'
+    : 'Was muss erledigt werden? "!! morgen 10:00 #call Termin mit @Klara"'
+
+  const candidates: MentionCandidate[] = useMemo(
+    () => accounts.filter(a => !a.isPrivate).map(a => ({ id: a.id, name: a.name, company: a.industry })),
+    [accounts],
+  )
 
   const editor = useEditor({
     extensions: [
@@ -57,16 +67,43 @@ export function TaskComposer({ customerId }: Props = {}) {
       Placeholder.configure({ placeholder }),
     ],
     content: '',
-    onUpdate: ({ editor }) => setText(editor.getText()),
+    onUpdate: ({ editor }) => {
+      const txt = editor.getText()
+      setText(txt)
+      // Detect mention context: text up to current cursor
+      const pos = editor.state.selection.from
+      const before = txt.slice(0, posToTextOffset(editor, pos))
+      const q = extractMentionQuery(before)
+      if (q) {
+        const coords = editor.view.coordsAtPos(pos)
+        mentionStateRef.current.setCtx({
+          open: true,
+          query: q.query,
+          startOffset: q.startOffset,
+          anchor: { top: coords.bottom + 6, left: coords.left },
+        })
+      } else if (mentionStateRef.current.ctx.open) {
+        mentionStateRef.current.close()
+      }
+    },
     editorProps: {
       attributes: {
         class: 'tasks-composer-editor',
         style: 'outline:none; min-height:24px; padding:8px 4px; font-size:14px; color:var(--fg);',
       },
-      // Intercept Enter at ProseMirror level — beats both the StarterKit
-      // Enter mapping (which would insert a paragraph) and our DOM listener.
-      // Return true = "we handled it" so PM stops processing.
+      // Capture Enter / ArrowUp / ArrowDown before ProseMirror processes them.
       handleKeyDown: (_view, event) => {
+        const m = mentionStateRef.current
+        if (m.ctx.open) {
+          if (event.key === 'ArrowDown') { event.preventDefault(); m.setActiveIdx(m.activeIdx + 1); return true }
+          if (event.key === 'ArrowUp')   { event.preventDefault(); m.setActiveIdx(Math.max(0, m.activeIdx - 1)); return true }
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            ;(window as unknown as { __cyneraPickMention?: () => void }).__cyneraPickMention?.()
+            return true
+          }
+          if (event.key === 'Escape') { event.preventDefault(); m.close(); return true }
+        }
         if (event.key === 'Enter') {
           event.preventDefault()
           submitRef.current()
@@ -77,19 +114,63 @@ export function TaskComposer({ customerId }: Props = {}) {
     },
   })
 
-  const draft = useMemo(() => parseTaskText(text), [text])
+  // Parse the text with currently resolved mentions
+  const draft = useMemo(
+    () => parseTaskText(text, { mentions }),
+    [text, mentions],
+  )
 
-  const resolvedCustomerId = useMemo(() => {
-    if (customerId) return customerId
-    if (!draft.customerHint) return undefined
-    const lower = draft.customerHint.toLowerCase()
-    const match = accounts.find(c => c.name.toLowerCase().includes(lower))
-    return match?.id
-  }, [customerId, draft.customerHint, accounts])
+  const effectiveCustomerId = useMemo(
+    () => customerId ?? draft.customerId,
+    [customerId, draft.customerId],
+  )
 
-  const canSubmit = !!(draft.title.trim() || draft.tags.length || draft.customerHint)
+  const canSubmit = !!(draft.title.trim() || draft.tags.length || effectiveCustomerId)
 
-  /** Persist a task (and optionally a linked calendar event), then reset composer. */
+  /** Insert the mention marker (display = @Name) and record it in `mentions`. */
+  const pickMention = (cand: MentionCandidate) => {
+    if (!editor) return
+    const m = mentionStateRef.current
+    if (!m.ctx.open) return
+    const marker = `@${cand.name.split(' ')[0]}`   // first word, keeps it short
+    // Replace from startOffset to current cursor with `marker + space`
+    // We use text-level replacement via editor commands.
+    const fullText = editor.getText()
+    const pos = editor.state.selection.from
+    const textOffset = posToTextOffset(editor, pos)
+    const before = fullText.slice(0, m.ctx.startOffset)
+    const after  = fullText.slice(textOffset)
+    const next = `${before}${marker} ${after}`
+    editor.commands.setContent(next)
+    // Place cursor at end of marker+space
+    const newCursor = (before + marker + ' ').length
+    editor.commands.setTextSelection(textOffsetToPos(editor, newCursor))
+    // Record the mention
+    setMentions(prev => {
+      // dedupe by marker
+      const without = prev.filter(p => p.marker.toLowerCase() !== marker.toLowerCase())
+      return [...without, { marker, customerId: cand.id }]
+    })
+    m.close()
+  }
+
+  // Expose pickMention to the handleKeyDown closure via a stable window-bound function.
+  useEffect(() => {
+    const picker = () => {
+      const m = mentionStateRef.current
+      if (!m.ctx.open) return
+      const q = m.ctx.query.toLowerCase().trim()
+      const filtered = q
+        ? candidates.filter(c =>
+            c.name.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q))
+        : candidates
+      const cand = filtered[m.activeIdx]
+      if (cand) pickMention(cand)
+    }
+    ;(window as unknown as { __cyneraPickMention?: () => void }).__cyneraPickMention = picker
+    return () => { delete (window as unknown as { __cyneraPickMention?: () => void }).__cyneraPickMention }
+  })
+
   const persistTaskAndOptionalEvent = async (
     sourceDraft: TaskDraft,
     eventOverride: PendingEventDraft | null,
@@ -128,7 +209,7 @@ export function TaskComposer({ customerId }: Props = {}) {
       scheduledAt:    sourceDraft.scheduledAt,
       plannedMinutes: eventOverride?.plannedMinutes ?? sourceDraft.plannedMinutes,
       tags:           sourceDraft.tags,
-      customerId:     eventOverride?.customerId ?? resolvedCustomerId,
+      customerId:     eventOverride?.customerId ?? effectiveCustomerId,
       calendarEventId,
       bucket:         sourceDraft.scheduledAt && sourceDraft.scheduledAt.slice(0, 10) === todayStr
                       ? 'today' : 'backlog',
@@ -136,6 +217,7 @@ export function TaskComposer({ customerId }: Props = {}) {
 
     editor.commands.clearContent()
     setText('')
+    setMentions([])
     setPendingEvent(null)
     setPendingDraft(null)
   }
@@ -145,19 +227,17 @@ export function TaskComposer({ customerId }: Props = {}) {
     const title = draft.title.trim() || '(ohne Titel)'
     const wantsCalendar = draft.hasExplicitTime && !!draft.scheduledAt
 
-    // Termin erkannt → erst Bestätigung anzeigen, nicht direkt anlegen
     if (wantsCalendar) {
       setPendingDraft(draft)
       setPendingEvent({
         title,
         scheduledAt:    draft.scheduledAt!,
         plannedMinutes: draft.plannedMinutes ?? 30,
-        customerId:     resolvedCustomerId,
+        customerId:     effectiveCustomerId,
       })
       return
     }
 
-    // Reine Task ohne Uhrzeit → direkt anlegen
     await persistTaskAndOptionalEvent(draft, null)
   }
 
@@ -165,22 +245,16 @@ export function TaskComposer({ customerId }: Props = {}) {
     if (!pendingDraft) return
     await persistTaskAndOptionalEvent(pendingDraft, finalDraft)
   }
-
   const skipEventForPending = async () => {
     if (!pendingDraft) return
     await persistTaskAndOptionalEvent(pendingDraft, null)
   }
-
   const cancelPending = () => {
     setPendingEvent(null)
     setPendingDraft(null)
   }
 
-  // Keep the ref pointing at the latest `submit` closure so the PM handler
-  // (which is bound once at editor init) always sees current draft/customer state.
-  useEffect(() => {
-    submitRef.current = submit
-  })
+  useEffect(() => { submitRef.current = submit })
 
   return (
     <>
@@ -242,21 +316,30 @@ export function TaskComposer({ customerId }: Props = {}) {
           </Chip>
         )}
         {draft.tags.map(t => <Chip key={t} color="muted">#{t}</Chip>)}
-        {!customerId && draft.customerHint && (
-          <Chip color={resolvedCustomerId ? 'accent' : 'danger'}>
-            +{draft.customerHint}
-            {!resolvedCustomerId && ' (nicht gefunden)'}
-          </Chip>
-        )}
-        {!draft.scheduledAt && !draft.priority && !draft.plannedMinutes && !draft.tags.length && !draft.customerHint && (
+        {!customerId && effectiveCustomerId && (() => {
+          const acc = accounts.find(a => a.id === effectiveCustomerId)
+          return acc ? <Chip color="accent">@ {acc.name}</Chip> : null
+        })()}
+        {!draft.scheduledAt && !draft.priority && !draft.plannedMinutes && !draft.tags.length && !effectiveCustomerId && (
           <span style={{ color: 'var(--fg-dim)', fontSize: 11 }}>
             {customerId
-              ? '! Priorität · ~Zeit · @ wann · # Tag'
-              : '! Priorität · ~Zeit · @ wann · # Tag · + Kunde'}
+              ? '! Priorität · Zeit · Datum · # Tag'
+              : '! Priorität · Zeit · Datum · # Tag · @ Kunde'}
           </span>
         )}
       </div>
     </div>
+
+    <MentionPopover
+      open={mention.ctx.open}
+      query={mention.ctx.query}
+      candidates={candidates}
+      anchor={mention.ctx.anchor}
+      activeIdx={mention.activeIdx}
+      setActiveIdx={mention.setActiveIdx}
+      onSelect={pickMention}
+      onClose={mention.close}
+    />
 
     <CalendarEventConfirmCard
       open={!!pendingEvent}
@@ -267,6 +350,20 @@ export function TaskComposer({ customerId }: Props = {}) {
     />
     </>
   )
+}
+
+/** Map a ProseMirror position to the equivalent offset in `editor.getText()`. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function posToTextOffset(editor: any, pos: number): number {
+  // Simple: count text characters from start of doc to pos, treating each non-text node as a single \n.
+  // For our single-line composer this is essentially: pos - 1 (PM uses 1-indexed pos with doc-start=0+1).
+  // Heuristic that works for the StarterKit single-paragraph case:
+  return Math.max(0, pos - 1)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function textOffsetToPos(_editor: any, offset: number): number {
+  return offset + 1
 }
 
 function Chip({ children, color }: { children: React.ReactNode; color: 'accent' | 'warn' | 'muted' | 'danger' }) {

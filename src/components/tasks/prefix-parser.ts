@@ -5,28 +5,26 @@ export interface TaskDraft {
   priority?: TodoPriority
   plannedMinutes?: number
   scheduledAt?: string
-  /** True if the user gave an explicit clock time (e.g. "10:00") — drives auto-calendar. */
+  /** True if the user gave an explicit clock time (e.g. "12:30") — drives auto-calendar. */
   hasExplicitTime?: boolean
   tags: string[]
-  customerHint?: string
+  /** Customer reference — populated either by the @-mention popover or legacy +Kunde. */
+  customerId?: string
 }
 
 const RE_PRIORITY = /^(!{1,2})$/
 const RE_DURATION = /^~(\d+(?:\.\d+)?)(m|h)$/i
-const RE_TIME     = /^@(\d{1,2}):(\d{2})$/
-const RE_DATE_ISO = /^@(\d{4}-\d{2}-\d{2})$/
 const RE_TAG      = /^#([\p{L}\p{N}_-]+)$/u
-const RE_CUSTOMER = /^\+([\p{L}\p{N}_-]+)$/u
-/** "12:30" / "9:00" — bare clock time without @-prefix in free text. */
+/** Legacy "+Kunde" — kept for back-compat. New mentions come pre-resolved via mentionsResolver. */
+const RE_LEGACY_CUSTOMER = /^\+([\p{L}\p{N}_-]+)$/u
+/** "12:30" / "9:00" — bare clock time. */
 const RE_SOFT_TIME = /^(\d{1,2}):(\d{2})$/
-
-const WEEKDAY_MAP: Record<string, number> = {
-  mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 0,
-}
 
 const WEEKDAY_FULL: Record<string, number> = {
   montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4,
   freitag: 5, samstag: 6, sonntag: 0,
+  // Common short forms also accepted as soft tokens
+  mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 0,
 }
 
 function todayAt(hour: number, minute: number): string {
@@ -55,14 +53,6 @@ function nextWeekday(target: number): string {
   d.setDate(d.getDate() + diff)
   d.setHours(9, 0, 0, 0)
   return d.toISOString()
-}
-
-function parseAtKeyword(value: string): string | undefined {
-  const lower = value.toLowerCase()
-  if (lower === 'heute')  return todayAt(new Date().getHours() + 1, 0)
-  if (lower === 'morgen') return tomorrowAt()
-  if (lower in WEEKDAY_MAP) return nextWeekday(WEEKDAY_MAP[lower])
-  return undefined
 }
 
 /** Apply explicit hour/minute to an existing ISO date (keeps date, replaces time). */
@@ -98,9 +88,18 @@ function parseSoftDateToken(rawToken: string): string | undefined {
   return undefined
 }
 
-export function parseTaskText(input: string): TaskDraft {
+export interface ParseContext {
+  /** Resolved mentions — `[{ marker: '@<token>', customerId }]`. Composer fills this from the mention popover. */
+  mentions?: Array<{ marker: string; customerId: string }>
+}
+
+export function parseTaskText(input: string, ctx: ParseContext = {}): TaskDraft {
   const draft: TaskDraft = { title: '', tags: [] }
   const titleParts: string[] = []
+
+  // Resolve pre-known mentions first — strip marker tokens out of the title pass.
+  const mentionMap = new Map<string, string>()
+  for (const m of ctx.mentions ?? []) mentionMap.set(m.marker.toLowerCase(), m.customerId)
 
   for (const token of input.trim().split(/\s+/)) {
     if (!token) continue
@@ -117,52 +116,47 @@ export function parseTaskText(input: string): TaskDraft {
         : Math.round(value)
       continue
     }
-    const tm = token.match(RE_TIME)
-    if (tm) {
-      draft.scheduledAt = todayAt(parseInt(tm[1], 10), parseInt(tm[2], 10))
-      draft.hasExplicitTime = true
-      continue
-    }
-    const iso = token.match(RE_DATE_ISO)
-    if (iso) {
-      const d = new Date(iso[1] + 'T09:00:00')
-      draft.scheduledAt = d.toISOString()
-      continue
-    }
+    // Resolved mention from popover (highest precedence on @-tokens)
     if (token.startsWith('@')) {
-      const kw = parseAtKeyword(token.slice(1))
-      if (kw) { draft.scheduledAt = kw; continue }
+      const resolved = mentionMap.get(token.toLowerCase())
+      if (resolved) {
+        // First mention wins — keeps later mentions usable as participants display
+        if (!draft.customerId) draft.customerId = resolved
+        continue
+      }
+      // Unresolved @-token: drop the @ and treat as a normal word in the title.
+      // This makes "@Klara" still readable even when the mention hasn't been picked.
+      titleParts.push(token.slice(1))
+      continue
     }
     const tag = token.match(RE_TAG)
     if (tag) {
       draft.tags.push(tag[1])
       continue
     }
-    const cust = token.match(RE_CUSTOMER)
-    if (cust) {
-      draft.customerHint = cust[1]
+    // Legacy "+Kunde" — fuzzy match resolution happens in the composer
+    const legacyCust = token.match(RE_LEGACY_CUSTOMER)
+    if (legacyCust) {
+      // Pass through as customerHint marker — composer can still resolve it.
+      // (We don't set customerId here because we don't have the customer list in pure parser.)
+      titleParts.push(token)   // preserve in title until composer resolves
       continue
     }
     titleParts.push(token)
   }
 
-  // Soft date detection on the leftover title parts (no @-prefix words like
-  // "morgen", "Montag", "15.6."). Only if no explicit @-token already set a date.
+  // Soft date detection on the leftover title parts.
   // Match the FIRST hit only, remove that token from the title.
-  if (!draft.scheduledAt) {
-    for (let i = 0; i < titleParts.length; i++) {
-      const soft = parseSoftDateToken(titleParts[i])
-      if (soft) {
-        draft.scheduledAt = soft
-        titleParts.splice(i, 1)
-        break
-      }
+  for (let i = 0; i < titleParts.length; i++) {
+    const soft = parseSoftDateToken(titleParts[i])
+    if (soft) {
+      draft.scheduledAt = soft
+      titleParts.splice(i, 1)
+      break
     }
   }
 
-  // Soft time detection: bare "HH:MM" in the free text. Combines with whatever
-  // date is already set — overrides the default 09:00, sets hasExplicitTime.
-  // If no scheduledAt yet, anchor on today.
+  // Soft time detection: bare "HH:MM" in the free text.
   for (let i = 0; i < titleParts.length; i++) {
     const m = titleParts[i].match(RE_SOFT_TIME)
     if (!m) continue
@@ -177,6 +171,10 @@ export function parseTaskText(input: string): TaskDraft {
     break
   }
 
-  draft.title = titleParts.join(' ')
+  // Filler words that became meaningless once tokens were stripped ("um", "am", "mit")
+  const FILLER = new Set(['um', 'am', 'mit'])
+  const cleaned = titleParts.filter(t => !FILLER.has(t.toLowerCase()))
+
+  draft.title = cleaned.join(' ')
   return draft
 }

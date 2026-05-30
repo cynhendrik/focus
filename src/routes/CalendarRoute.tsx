@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/store/calendar.store'
 import { TagesplanCard } from '@/components/calendar/TagesplanCard'
+import { QuickEventComposer } from '@/components/calendar/QuickEventComposer'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -1149,6 +1150,16 @@ export function CalendarRoute() {
         <TagesplanCard events={todayEvents} isLoading={isTodayLoading} />
       </div>
     </div>{/* end flex row */}
+
+      {/* Quick Termin Composer — natural language entry at the bottom */}
+      <div style={{
+        position: 'sticky',
+        bottom: 16,
+        marginTop: 12,
+        zIndex: 20,
+      }}>
+        <QuickEventComposer onCreated={() => load(workspaceId)} />
+      </div>
 
       {formOpen && (
         <EventForm

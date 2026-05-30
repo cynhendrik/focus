@@ -43,40 +43,6 @@ describe('parseTaskText', () => {
     expect(r.title).toBe('Onboarding-Call')
   })
 
-  it('parses @10:00 as today at given time', () => {
-    const r = parseTaskText('@10:00 Brand Guidelines')
-    expect(r.scheduledAt).toBeDefined()
-    const d = new Date(r.scheduledAt!)
-    expect(d.getHours()).toBe(10)
-    expect(d.getMinutes()).toBe(0)
-    const today = new Date().toISOString().slice(0, 10)
-    expect(r.scheduledAt!.slice(0, 10)).toBe(today)
-  })
-
-  it('parses @morgen as tomorrow 09:00', () => {
-    const r = parseTaskText('@morgen Statuscall')
-    expect(r.scheduledAt).toBeDefined()
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    expect(r.scheduledAt!.slice(0, 10)).toBe(tomorrow.toISOString().slice(0, 10))
-  })
-
-  it('parses +Kunde as customerHint', () => {
-    const r = parseTaskText('+TechCorp Statusupdate')
-    expect(r.customerHint).toBe('TechCorp')
-    expect(r.title).toBe('Statusupdate')
-  })
-
-  it('parses combined tokens', () => {
-    const r = parseTaskText('!! ~45m @10:00 #call +TechCorp Brand Guidelines')
-    expect(r.priority).toBe('p1')
-    expect(r.plannedMinutes).toBe(45)
-    expect(r.scheduledAt).toBeDefined()
-    expect(r.tags).toEqual(['call'])
-    expect(r.customerHint).toBe('TechCorp')
-    expect(r.title).toBe('Brand Guidelines')
-  })
-
   it('does not parse ! inside word', () => {
     const r = parseTaskText('Test! Wichtig')
     expect(r.priority).toBeUndefined()
@@ -94,7 +60,7 @@ describe('parseTaskText', () => {
     expect(r.title).toBe('Test')
   })
 
-  describe('soft date detection (free text, no @-prefix)', () => {
+  describe('soft date detection (free text)', () => {
     const todayStr = () => new Date().toISOString().slice(0, 10)
     const dayPlus = (n: number) => {
       const d = new Date(); d.setDate(d.getDate() + n)
@@ -130,8 +96,9 @@ describe('parseTaskText', () => {
       expect(r.scheduledAt).toBeDefined()
       const d = new Date(r.scheduledAt!)
       expect(d.getDate()).toBe(15)
-      expect(d.getMonth()).toBe(5)  // June = month 5 (0-indexed)
-      expect(r.title).toBe('Termin mit Kunde')
+      expect(d.getMonth()).toBe(5)
+      // "mit" is a filler word and gets dropped
+      expect(r.title).toBe('Termin Kunde')
     })
 
     it('detects DD.MM.YYYY format', () => {
@@ -139,7 +106,7 @@ describe('parseTaskText', () => {
       expect(r.scheduledAt).toBeDefined()
       const d = new Date(r.scheduledAt!)
       expect(d.getDate()).toBe(15)
-      expect(d.getMonth()).toBe(9)  // October
+      expect(d.getMonth()).toBe(9)
       expect(d.getFullYear()).toBe(2026)
       expect(r.title).toBe('Audit fertigstellen')
     })
@@ -150,13 +117,6 @@ describe('parseTaskText', () => {
       expect(r.title).toBe('Brand Refresh')
     })
 
-    it('explicit @-token wins over soft token', () => {
-      const r = parseTaskText('@heute morgen')
-      expect(r.scheduledAt?.slice(0, 10)).toBe(todayStr())
-      // 'morgen' should remain in title since @heute already set scheduledAt
-      expect(r.title).toBe('morgen')
-    })
-
     it('only first soft date matched', () => {
       const r = parseTaskText('morgen heute Brand')
       expect(r.scheduledAt?.slice(0, 10)).toBe(dayPlus(1))
@@ -164,25 +124,7 @@ describe('parseTaskText', () => {
     })
   })
 
-  describe('hasExplicitTime + soft-time detection', () => {
-    it('@10:00 sets hasExplicitTime', () => {
-      const r = parseTaskText('@10:00 Brand')
-      expect(r.hasExplicitTime).toBe(true)
-      const d = new Date(r.scheduledAt!)
-      expect(d.getHours()).toBe(10)
-    })
-
-    it('@morgen alone does NOT set hasExplicitTime', () => {
-      const r = parseTaskText('@morgen Brand')
-      expect(r.hasExplicitTime).toBeUndefined()
-      expect(r.scheduledAt).toBeDefined()
-    })
-
-    it('"morgen" soft-date alone does NOT set hasExplicitTime', () => {
-      const r = parseTaskText('Morgen Brand')
-      expect(r.hasExplicitTime).toBeUndefined()
-    })
-
+  describe('soft-time + hasExplicitTime', () => {
     it('bare "12:30" sets time + hasExplicitTime, anchored today', () => {
       const r = parseTaskText('Brand 12:30')
       expect(r.hasExplicitTime).toBe(true)
@@ -216,11 +158,64 @@ describe('parseTaskText', () => {
       expect(r.title).toBe('Termin')
     })
 
+    it('plain "morgen" without time does NOT set hasExplicitTime', () => {
+      const r = parseTaskText('Morgen Brand')
+      expect(r.hasExplicitTime).toBeUndefined()
+      expect(r.scheduledAt).toBeDefined()
+    })
+
     it('invalid time "25:99" stays in title', () => {
       const r = parseTaskText('Test 25:99')
       expect(r.hasExplicitTime).toBeUndefined()
       expect(r.scheduledAt).toBeUndefined()
       expect(r.title).toBe('Test 25:99')
+    })
+  })
+
+  describe('@-mention resolution via ParseContext', () => {
+    it('resolved @-mention sets customerId, marker removed from title', () => {
+      const r = parseTaskText('Call mit @Klara', {
+        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+      })
+      expect(r.customerId).toBe('cust-1')
+      // "mit" is a filler, gets stripped
+      expect(r.title).toBe('Call')
+    })
+
+    it('case-insensitive marker match', () => {
+      const r = parseTaskText('Treffen mit @KLARA', {
+        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+      })
+      expect(r.customerId).toBe('cust-1')
+    })
+
+    it('unresolved @-token: drops the @ and keeps the word in title', () => {
+      const r = parseTaskText('Call mit @Klara')
+      expect(r.customerId).toBeUndefined()
+      expect(r.title).toBe('Call Klara')
+    })
+
+    it('multiple resolved mentions: first wins', () => {
+      const r = parseTaskText('Treffen @Klara @Tobi', {
+        mentions: [
+          { marker: '@Klara', customerId: 'cust-1' },
+          { marker: '@Tobi',  customerId: 'cust-2' },
+        ],
+      })
+      expect(r.customerId).toBe('cust-1')
+    })
+
+    it('combined: priority + date + time + mention', () => {
+      const r = parseTaskText('!! Morgen 12:30 Termin mit @Klara', {
+        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+      })
+      expect(r.priority).toBe('p1')
+      expect(r.hasExplicitTime).toBe(true)
+      expect(r.customerId).toBe('cust-1')
+      const d = new Date(r.scheduledAt!)
+      expect(d.getHours()).toBe(12)
+      expect(d.getMinutes()).toBe(30)
+      expect(r.title).toBe('Termin')
     })
   })
 })
