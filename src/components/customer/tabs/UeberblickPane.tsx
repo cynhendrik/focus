@@ -1,19 +1,17 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, LayoutDashboard, DollarSign, FileText, User } from 'lucide-react'
+import { ChevronDown, DollarSign, FileText, User } from 'lucide-react'
 
-import { DashboardPane } from './DashboardPane'
 import { SalesPane } from './SalesPane'
 import { InformationenPane } from './InformationenPane'
 import { FinanzPane } from './FinanzPane'
 
-type Section = 'dashboard' | 'finanzen' | 'sales' | 'informationen'
+type Section = 'finanzen' | 'sales' | 'informationen'
 
-const SECTIONS: { id: Section; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'dashboard',     label: 'Übersicht',        icon: LayoutDashboard },
-  { id: 'finanzen',      label: 'Finanzen',         icon: DollarSign      },
-  { id: 'sales',         label: 'Deals & Pipeline', icon: FileText        },
-  { id: 'informationen', label: 'Stammdaten',       icon: User            },
+const SECTIONS: { id: Section; label: string; icon: typeof DollarSign }[] = [
+  { id: 'sales',         label: 'Deals & Pipeline', icon: FileText  },
+  { id: 'finanzen',      label: 'Finanzen',         icon: DollarSign },
+  { id: 'informationen', label: 'Stammdaten',       icon: User      },
 ]
 
 interface Props { customerId: string }
@@ -27,9 +25,8 @@ interface Props { customerId: string }
  */
 export function UeberblickPane({ customerId }: Props) {
   const [open, setOpen] = useState<Record<Section, boolean>>({
-    dashboard:     true,
+    sales:         true,
     finanzen:      false,
-    sales:         false,
     informationen: false,
   })
 
@@ -54,7 +51,6 @@ export function UeberblickPane({ customerId }: Props) {
 
 function renderSection(section: Section, customerId: string): React.ReactNode {
   switch (section) {
-    case 'dashboard':     return <DashboardPane     customerId={customerId} />
     case 'finanzen':      return <FinanzPane        customerId={customerId} />
     case 'sales':         return <SalesPane         customerId={customerId} />
     case 'informationen': return <InformationenPane customerId={customerId} />
@@ -65,7 +61,7 @@ function SectionShell({
   label, icon: Icon, open, onToggle, children,
 }: {
   label: string
-  icon: typeof LayoutDashboard
+  icon: typeof DollarSign
   open: boolean
   onToggle: () => void
   children: React.ReactNode
