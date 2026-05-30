@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -39,6 +39,9 @@ export function TaskComposer({ customerId }: Props = {}) {
   const [text, setText] = useState('')
   const [pendingEvent, setPendingEvent] = useState<PendingEventDraft | null>(null)
   const [pendingDraft, setPendingDraft] = useState<TaskDraft | null>(null)
+  // submit is stateful (depends on draft + resolvedCustomerId); we keep a ref
+  // so TipTap's keyboard hook (set ONCE at editor init) can call the latest one.
+  const submitRef = useRef<() => void>(() => {})
 
   const placeholder = customerId
     ? 'Neue Task… "!! ~45m @10:00 #call Logo finalisieren"'
@@ -59,6 +62,17 @@ export function TaskComposer({ customerId }: Props = {}) {
       attributes: {
         class: 'tasks-composer-editor',
         style: 'outline:none; min-height:24px; padding:8px 4px; font-size:14px; color:var(--fg);',
+      },
+      // Intercept Enter at ProseMirror level — beats both the StarterKit
+      // Enter mapping (which would insert a paragraph) and our DOM listener.
+      // Return true = "we handled it" so PM stops processing.
+      handleKeyDown: (_view, event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          submitRef.current()
+          return true
+        }
+        return false
       },
     },
   })
@@ -162,20 +176,11 @@ export function TaskComposer({ customerId }: Props = {}) {
     setPendingDraft(null)
   }
 
+  // Keep the ref pointing at the latest `submit` closure so the PM handler
+  // (which is bound once at editor init) always sees current draft/customer state.
   useEffect(() => {
-    if (!editor) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey && editor.isFocused) {
-        e.preventDefault()
-        submit()
-      }
-    }
-    const dom = editor.view.dom as HTMLElement
-    dom.addEventListener('keydown', handler)
-    return () => dom.removeEventListener('keydown', handler)
-    // submit captures `draft` and `resolvedCustomerId` via closure
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, draft, resolvedCustomerId])
+    submitRef.current = submit
+  })
 
   return (
     <>
