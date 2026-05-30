@@ -5,6 +5,12 @@ type Theme = 'light' | 'dark'
 /** Canonical customer tabs — 3 instead of 9. */
 export type CustomerTab = 'ueberblick' | 'arbeiten' | 'historie'
 
+/** Clients page view mode: card board vs. filtered list (Smart Lists). */
+export type ClientsView = 'board' | 'list'
+
+/** Tasks page tab. */
+export type TasksTab = 'list' | 'board' | 'focus'
+
 /** Legacy CustomerTab values, kept for backwards-compat with deep-link callers. */
 export type LegacyCustomerTab = 'dashboard' | 'kommunikation' | 'aktivitaeten' | 'informationen' | 'sales' | 'workflow' | 'arbeitsraum' | 'dateien' | 'finanzen'
 
@@ -34,8 +40,7 @@ export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'
-  | 'pipeline'  | 'tasks'      | 'calendar'  | 'mail' | 'crm' | 'followups' | 'leads'
-  | 'smartlists' | 'chat'
+  | 'pipeline'  | 'tasks'      | 'calendar'  | 'mail' | 'followups' | 'leads'
 
 interface UiState {
   theme: Theme
@@ -46,6 +51,8 @@ interface UiState {
   migrationDone: boolean
   cmdPaletteOpen: boolean
   activeCustomerTab: CustomerTab
+  clientsView: ClientsView
+  tasksTab: TasksTab
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
@@ -55,6 +62,8 @@ interface UiState {
   markMigrationDone: () => void
   setCmdPaletteOpen: (open: boolean) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
+  setClientsView: (view: ClientsView) => void
+  setTasksTab: (tab: TasksTab) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -68,6 +77,8 @@ export const useUiStore = create<UiState>()(
       migrationDone: false,
       cmdPaletteOpen: false,
       activeCustomerTab: 'ueberblick',
+      clientsView: 'board',
+      tasksTab: 'list',
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -95,6 +106,12 @@ export const useUiStore = create<UiState>()(
 
       setActiveCustomerTab: (tab) =>
         set({ activeCustomerTab: mapLegacyCustomerTab(tab) }),
+
+      setClientsView: (view) =>
+        set({ clientsView: view }),
+
+      setTasksTab: (tab) =>
+        set({ tasksTab: tab }),
     }),
     {
       name: 'focus-ui-v2',
@@ -103,6 +120,8 @@ export const useUiStore = create<UiState>()(
         selectedCustomerId: s.selectedCustomerId,
         hasSeenIntro: s.hasSeenIntro,
         migrationDone: s.migrationDone,
+        clientsView: s.clientsView,
+        tasksTab: s.tasksTab,
       }),
     }
   )
