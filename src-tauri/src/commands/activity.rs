@@ -13,9 +13,9 @@ pub fn create_activity(
 ) -> Result<Activity, AppError> {
     let conn = db.conn();
     let activity = activity_engine::create(&*conn, &app, payload)?;
-    if let Some(outcome) = &activity.outcome {
+    if let (Some(outcome), Some(account_id)) = (&activity.outcome, &activity.account_id) {
         engine::evaluate(&*conn, engine::CrmEvent::ActivityOutcome {
-            account_id:   activity.account_id.clone(),
+            account_id:   account_id.clone(),
             workspace_id: activity.workspace_id.clone(),
             outcome:      outcome.clone(),
         })?;
@@ -32,9 +32,9 @@ pub fn update_activity(
 ) -> Result<Activity, AppError> {
     let conn = db.conn();
     let activity = activity_engine::update(&*conn, &app, &id, payload)?;
-    if let Some(outcome) = &activity.outcome {
+    if let (Some(outcome), Some(account_id)) = (&activity.outcome, &activity.account_id) {
         engine::evaluate(&*conn, engine::CrmEvent::ActivityOutcome {
-            account_id:   activity.account_id.clone(),
+            account_id:   account_id.clone(),
             workspace_id: activity.workspace_id.clone(),
             outcome:      outcome.clone(),
         })?;

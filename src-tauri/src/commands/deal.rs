@@ -31,7 +31,7 @@ pub fn update_deal_stage(
     let _ = crate::activity_engine::create(&*conn, &app, crate::db::activity::CreateActivityPayload {
         workspace_id: updated.workspace_id.clone(),
         created_by: updated.created_by.clone(),
-        account_id: updated.account_id.clone(),
+        account_id: Some(updated.account_id.clone()),
         contact_id: updated.contact_id.clone(),
         deal_id: Some(id.clone()),
         customer_id: None,

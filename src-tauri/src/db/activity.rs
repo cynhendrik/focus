@@ -8,7 +8,7 @@ pub struct Activity {
     pub id: String,
     pub workspace_id: String,
     pub created_by: String,
-    pub account_id: String,
+    pub account_id: Option<String>,
     pub contact_id: Option<String>,
     pub deal_id: Option<String>,
     #[serde(rename = "type")]
@@ -31,7 +31,7 @@ pub struct Activity {
 pub struct CreateActivityPayload {
     pub workspace_id: String,
     pub created_by: String,
-    pub account_id: String,
+    pub account_id: Option<String>,
     pub contact_id: Option<String>,
     pub deal_id: Option<String>,
     pub customer_id: Option<String>,
@@ -241,7 +241,7 @@ mod tests {
     fn make_payload(account_id: &str, activity_type: &str) -> CreateActivityPayload {
         CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: account_id.into(), contact_id: None, deal_id: None,
+            account_id: Some(account_id.into()), contact_id: None, deal_id: None,
             customer_id: None,
             activity_type: activity_type.into(), title: Some("Test".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -275,7 +275,7 @@ mod tests {
         // open task
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
             activity_type: "task".into(), title: Some("Open Task".into()),
             body: None, payload: None, status: Some("open".into()),
             due_at: Some("2026-06-01".into()), assignee: None, outcome: None,
@@ -316,7 +316,7 @@ mod tests {
         seed_account(&conn, "a1");
         let a = insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
             activity_type: "call".into(), title: Some("Call".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: Some("strong_interest".into()), direction: None, email_id: None,
@@ -340,7 +340,7 @@ mod tests {
         // Insert one activity with customer_id "cust-1"
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None,
             customer_id: Some("cust-1".into()),
             activity_type: "note".into(), title: Some("Notiz Kunde 1".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -349,7 +349,7 @@ mod tests {
         // Insert one activity with customer_id "cust-2"
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a2".into(), contact_id: None, deal_id: None,
+            account_id: Some("a2".into()), contact_id: None, deal_id: None,
             customer_id: Some("cust-2".into()),
             activity_type: "task".into(), title: Some("Task Kunde 2".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -378,7 +378,7 @@ mod tests {
         seed_account(&conn, "a1");
         let a = insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: "a1".into(), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
             activity_type: "email".into(), title: Some("Email".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: None,
