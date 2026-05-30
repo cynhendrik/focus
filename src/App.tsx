@@ -28,16 +28,13 @@ import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
 import { FinanceRoute }    from '@/routes/FinanceRoute'
 import { TasksRoute }      from '@/routes/TasksRoute'
-import { CrmRoute }        from '@/routes/CrmRoute'
 import { SettingsRoute }   from '@/routes/SettingsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
 import { LeadsRoute }            from '@/routes/LeadsRoute'
 import { PipelineRoute }         from '@/routes/PipelineRoute'
-import { SmartListsRoute }       from '@/routes/SmartListsRoute'
 import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
 import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
-import { ChatRoute }             from '@/routes/ChatRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
@@ -55,6 +52,7 @@ export default function App() {
   const init            = useAccountsStore(s => s.init)
   const initCustomers   = useCustomersStore(s => s.init)
   const loadLastActivity = useCrmStore(s => s.loadLastActivity)
+  const loadCrmAll       = useCrmStore(s => s.loadAll)
   const loadSmartLists  = useSmartListsStore(s => s.load)
   const loadPipelineStages = usePipelineStore(s => s.load)
   const loadAllDeals    = useDealsStore(s => s.loadAll)
@@ -96,14 +94,22 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+K → Client picker (jump to a specific customer)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         openPicker()
+        return
+      }
+      // Cmd/Ctrl+J → Global Spotlight search (across everything)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+        e.preventDefault()
+        setCmdPaletteOpen(true)
+        return
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [openPicker])
+  }, [openPicker, setCmdPaletteOpen])
 
   useEffect(() => {
     if (DEV_BYPASS && !activeWorkspaceId) {
@@ -120,6 +126,7 @@ export default function App() {
       init()
       initCustomers()
       loadLastActivity(activeWorkspaceId)
+      loadCrmAll(activeWorkspaceId)
       SmartListService.seedSystemLists(activeWorkspaceId)
         .catch(() => {})
         .then(() => loadSmartLists(activeWorkspaceId))
@@ -132,7 +139,7 @@ export default function App() {
       loadLeads(activeWorkspaceId)
       loadCalendar(activeWorkspaceId)
     }
-  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
+  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
   useSyncBridge()
 
@@ -151,12 +158,9 @@ export default function App() {
       case 'invoices':     return <FinanceRoute />
       case 'leads':        return <LeadsRoute />
       case 'pipeline':     return <PipelineRoute />
-      case 'smartlists':   return <SmartListsRoute />
       case 'followups':    return <FollowupsDashboardRoute />
       case 'calendar':     return <CalendarRoute />
       case 'mail':         return <MailRoute />
-      case 'chat':         return <ChatRoute />
-      case 'crm':          return <CrmRoute />
       case 'settings':     return <SettingsRoute />
       // Legacy fallbacks (consolidated wrappers removed)
       case 'sales':        return <LeadsRoute />
