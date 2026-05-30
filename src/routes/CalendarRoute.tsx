@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCalendarStore } from '@/store/calendar.store'
 import { TagesplanCard } from '@/components/calendar/TagesplanCard'
-import { QuickEventComposer } from '@/components/calendar/QuickEventComposer'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -64,14 +63,25 @@ function kwOf(d: Date) {
   return 1 + Math.round(((tmp.getTime() - jan4.getTime()) / 86400000 - 3 + ((jan4.getDay()+6)%7)) / 7)
 }
 
+// ── Time helpers ─────────────────────────────────────────────────────────────
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
+function fmtRange(start: string, end: string): string {
+  return `${fmtTime(start)}–${fmtTime(end)}`
+}
+
 // ── EventChip ─────────────────────────────────────────────────────────────────
 
 interface EventChipProps {
   event: CalendarEvent
   onClick: () => void
+  customerName?: string
   compact?: boolean
 }
-function EventChip({ event, onClick, compact }: EventChipProps) {
+function EventChip({ event, onClick, customerName, compact }: EventChipProps) {
+  const time = !event.allDay ? fmtTime(event.startAt) : null
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick() }}
@@ -85,12 +95,20 @@ function EventChip({ event, onClick, compact }: EventChipProps) {
         transition: 'transform 140ms ease',
         fontWeight: 500,
         boxSizing: 'border-box' as const,
+        display: 'flex', alignItems: 'center', gap: 4,
       }}
       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = '')}
-      title={event.title}
+      title={`${event.title}${customerName ? ` · ${customerName}` : ''}${time ? ` · ${time}` : ''}`}
     >
-      {event.title}
+      {time && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, opacity: 0.75, flexShrink: 0 }}>
+          {time}
+        </span>
+      )}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+        {event.title}
+      </span>
     </div>
   )
 }
@@ -130,6 +148,9 @@ function WeekView({
   onSlotClick: (date: Date, hour: number) => void
   onEventClick: (event: CalendarEvent) => void
 }) {
+  const accounts = useAccountsStore(s => s.accounts)
+  const accountName = (id?: string) =>
+    id ? accounts.find(a => a.id === id)?.name : undefined
   const nowRef = useRef<HTMLDivElement>(null)
   const [nowPct,  setNowPct]  = useState(0)
   const [nowTime, setNowTime] = useState('')
@@ -264,34 +285,46 @@ function WeekView({
             )}
 
             {/* Events */}
-            {computeLanes(dayEvents).map(({ event: ev, lane, totalLanes }, ei) => (
-              <div
-                key={ei}
-                style={{
-                  position: 'absolute',
-                  left: `calc(${lane / totalLanes * 100}% + 2px)`,
-                  width: `calc(${100 / totalLanes}% - 4px)`,
-                  top: eventTop(ev) + 2, height: eventHeight(ev),
-                  background: evtBg(ev.color), color: evtFg(ev.color),
-                  border: `1px solid ${evtBorder(ev.color)}`,
-                  borderRadius: 8, padding: '5px 9px',
-                  fontSize: 11.5, lineHeight: 1.3,
-                  overflow: 'hidden', cursor: 'pointer',
-                  transition: 'transform 140ms ease',
-                  zIndex: 5,
-                }}
-                onClick={e => { e.stopPropagation(); onEventClick(ev) }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = '')}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {ev.title}
+            {computeLanes(dayEvents).map(({ event: ev, lane, totalLanes }, ei) => {
+              const cust = accountName(ev.accountId)
+              const h = eventHeight(ev)
+              const compact = h < 48
+              return (
+                <div
+                  key={ei}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${lane / totalLanes * 100}% + 2px)`,
+                    width: `calc(${100 / totalLanes}% - 4px)`,
+                    top: eventTop(ev) + 2, height: h,
+                    background: evtBg(ev.color), color: evtFg(ev.color),
+                    border: `1px solid ${evtBorder(ev.color)}`,
+                    borderRadius: 8, padding: '5px 9px',
+                    fontSize: 11.5, lineHeight: 1.3,
+                    overflow: 'hidden', cursor: 'pointer',
+                    transition: 'transform 140ms ease',
+                    zIndex: 5,
+                    display: 'flex', flexDirection: 'column', gap: 1,
+                  }}
+                  onClick={e => { e.stopPropagation(); onEventClick(ev) }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                  onMouseLeave={e => (e.currentTarget.style.transform = '')}
+                  title={`${ev.title}${cust ? ` · ${cust}` : ''} · ${fmtRange(ev.startAt, ev.endAt)}`}
+                >
+                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {ev.title}
+                  </div>
+                  <div style={{ opacity: 0.75, fontSize: 10.5, fontFamily: 'var(--font-mono)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span>{compact ? fmtTime(ev.startAt) : fmtRange(ev.startAt, ev.endAt)}</span>
+                  </div>
+                  {cust && !compact && (
+                    <div style={{ fontSize: 10.5, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      · {cust}
+                    </div>
+                  )}
                 </div>
-                <div style={{ opacity: 0.7, fontSize: 10.5, fontFamily: 'var(--font-mono)' }}>
-                  {new Date(ev.startAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )
       })}
@@ -309,6 +342,8 @@ function MonthView({
   onDayClick: (date: Date) => void
   onEventClick: (event: CalendarEvent) => void
 }) {
+  const accounts = useAccountsStore(s => s.accounts)
+  const accountName = (id?: string) => id ? accounts.find(a => a.id === id)?.name : undefined
   const firstOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
   const gridStart    = mondayOf(firstOfMonth)
 
@@ -371,7 +406,13 @@ function MonthView({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {dayEvts.slice(0, 3).map((ev, ei) => (
-                <EventChip key={ei} event={ev} onClick={() => onEventClick(ev)} compact />
+                <EventChip
+                  key={ei}
+                  event={ev}
+                  customerName={accountName(ev.accountId)}
+                  onClick={() => onEventClick(ev)}
+                  compact
+                />
               ))}
               {overflow > 0 && (
                 <div
@@ -399,6 +440,8 @@ function DayView({
   onSlotClick: (date: Date, hour: number) => void
   onEventClick: (event: CalendarEvent) => void
 }) {
+  const accounts = useAccountsStore(s => s.accounts)
+  const accountName = (id?: string) => id ? accounts.find(a => a.id === id)?.name : undefined
   const [nowPct,  setNowPct]  = useState(0)
   const [nowTime, setNowTime] = useState('')
 
@@ -501,7 +544,9 @@ function DayView({
           </div>
         )}
 
-        {dayEvents.map((ev, ei) => (
+        {dayEvents.map((ev, ei) => {
+          const cust = accountName(ev.accountId)
+          return (
           <div
             key={ei}
             style={{
@@ -509,22 +554,40 @@ function DayView({
               top: eventTop(ev) + 2, height: eventHeight(ev),
               background: evtBg(ev.color), color: evtFg(ev.color),
               border: `1px solid ${evtBorder(ev.color)}`,
-              borderRadius: 8, padding: '6px 12px',
+              borderRadius: 8, padding: '8px 14px',
               fontSize: 12, cursor: 'pointer',
               transition: 'transform 140ms ease', zIndex: 5,
+              display: 'flex', flexDirection: 'column', gap: 3,
+              overflow: 'hidden',
             }}
             onClick={e => { e.stopPropagation(); onEventClick(ev) }}
             onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-1px)')}
             onMouseLeave={e => (e.currentTarget.style.transform = '')}
+            title={`${ev.title}${cust ? ` · ${cust}` : ''} · ${fmtRange(ev.startAt, ev.endAt)}`}
           >
-            <div style={{ fontWeight: 600 }}>{ev.title}</div>
-            <div style={{ fontSize: 11, opacity: 0.7, fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-              {new Date(ev.startAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} –{' '}
-              {new Date(ev.endAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 11, opacity: 0.8, fontFamily: 'var(--font-mono)',
+            }}>
+              <span style={{ fontWeight: 700 }}>{fmtRange(ev.startAt, ev.endAt)}</span>
+              {cust && (
+                <>
+                  <span style={{ opacity: 0.5 }}>·</span>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600 }}>{cust}</span>
+                </>
+              )}
             </div>
-            {ev.location && <div style={{ fontSize: 10.5, opacity: 0.6, marginTop: 2 }}>📍 {ev.location}</div>}
+            <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {ev.title}
+            </div>
+            {ev.location && (
+              <div style={{ fontSize: 10.5, opacity: 0.65, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                📍 {ev.location}
+              </div>
+            )}
           </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -1150,16 +1213,6 @@ export function CalendarRoute() {
         <TagesplanCard events={todayEvents} isLoading={isTodayLoading} />
       </div>
     </div>{/* end flex row */}
-
-      {/* Quick Termin Composer — natural language entry at the bottom */}
-      <div style={{
-        position: 'sticky',
-        bottom: 16,
-        marginTop: 12,
-        zIndex: 20,
-      }}>
-        <QuickEventComposer onCreated={() => load(workspaceId)} />
-      </div>
 
       {formOpen && (
         <EventForm

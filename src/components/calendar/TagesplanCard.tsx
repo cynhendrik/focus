@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/types/calendar.types'
+import { useAccountsStore } from '@/store/accounts.store'
 
 interface TagesplanCardProps {
   events: CalendarEvent[]
@@ -29,6 +30,8 @@ function isPast(event: CalendarEvent): boolean {
 }
 
 export function TagesplanCard({ events, isLoading }: TagesplanCardProps) {
+  const accounts = useAccountsStore(s => s.accounts)
+  const accountName = (id?: string) => id ? accounts.find(a => a.id === id)?.name : undefined
   return (
     <div style={{ padding: '4px 0' }}>
       {/* Header */}
@@ -118,9 +121,20 @@ export function TagesplanCard({ events, isLoading }: TagesplanCardProps) {
                   }}>
                     {event.title}
                   </div>
-                  {event.location && (
-                    <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>
-                      {event.location}
+                  {(accountName(event.accountId) || event.location) && (
+                    <div style={{
+                      fontSize: 11, color: 'var(--fg-dim)', marginTop: 2,
+                      display: 'flex', gap: 6, alignItems: 'center',
+                    }}>
+                      {accountName(event.accountId) && (
+                        <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>
+                          {accountName(event.accountId)}
+                        </span>
+                      )}
+                      {accountName(event.accountId) && event.location && (
+                        <span style={{ opacity: 0.4 }}>·</span>
+                      )}
+                      {event.location && <span>{event.location}</span>}
                     </div>
                   )}
                 </div>
