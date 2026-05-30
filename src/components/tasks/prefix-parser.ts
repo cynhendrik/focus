@@ -5,6 +5,8 @@ export interface TaskDraft {
   priority?: TodoPriority
   plannedMinutes?: number
   scheduledAt?: string
+  /** True if the user gave an explicit clock time (e.g. "10:00") — drives auto-calendar. */
+  hasExplicitTime?: boolean
   tags: string[]
   customerHint?: string
 }
@@ -15,6 +17,8 @@ const RE_TIME     = /^@(\d{1,2}):(\d{2})$/
 const RE_DATE_ISO = /^@(\d{4}-\d{2}-\d{2})$/
 const RE_TAG      = /^#([\p{L}\p{N}_-]+)$/u
 const RE_CUSTOMER = /^\+([\p{L}\p{N}_-]+)$/u
+/** "12:30" / "9:00" — bare clock time without @-prefix in free text. */
+const RE_SOFT_TIME = /^(\d{1,2}):(\d{2})$/
 
 const WEEKDAY_MAP: Record<string, number> = {
   mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 0,
@@ -61,12 +65,14 @@ function parseAtKeyword(value: string): string | undefined {
   return undefined
 }
 
-// Soft date detection — words in free-text without `@` prefix.
-// Returns ISO date if the token (case-insensitive, trailing punctuation
-// stripped) is recognized as a date keyword or German date format.
+/** Apply explicit hour/minute to an existing ISO date (keeps date, replaces time). */
+function withTime(iso: string, hour: number, minute: number): string {
+  const d = new Date(iso)
+  d.setHours(hour, minute, 0, 0)
+  return d.toISOString()
+}
+
 function parseSoftDateToken(rawToken: string): string | undefined {
-  // Tolerant: strip trailing punctuation like "heute," or "heute."
-  // but keep trailing dot for date formats (handled by their own regex).
   const cleanWord = rawToken.replace(/[,;:!?]+$/, '')
   const lower = cleanWord.toLowerCase()
 
@@ -75,14 +81,12 @@ function parseSoftDateToken(rawToken: string): string | undefined {
   if (lower === 'übermorgen') return dayAfterTomorrowAt()
   if (lower in WEEKDAY_FULL)  return nextWeekday(WEEKDAY_FULL[lower])
 
-  // DD.MM.YYYY
   const ymd = rawToken.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/)
   if (ymd) {
     const d = new Date(parseInt(ymd[3], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[1], 10), 9, 0, 0)
     if (!isNaN(d.getTime())) return d.toISOString()
   }
 
-  // DD.MM. or DD.MM (current year, roll forward if already past)
   const dm = rawToken.match(/^(\d{1,2})\.(\d{1,2})\.?$/)
   if (dm) {
     const now = new Date()
@@ -116,6 +120,7 @@ export function parseTaskText(input: string): TaskDraft {
     const tm = token.match(RE_TIME)
     if (tm) {
       draft.scheduledAt = todayAt(parseInt(tm[1], 10), parseInt(tm[2], 10))
+      draft.hasExplicitTime = true
       continue
     }
     const iso = token.match(RE_DATE_ISO)
@@ -141,9 +146,9 @@ export function parseTaskText(input: string): TaskDraft {
     titleParts.push(token)
   }
 
-  // Soft date detection on the leftover title parts — only if no
-  // explicit @-token already set a date. Match the FIRST hit only,
-  // remove that token from the title.
+  // Soft date detection on the leftover title parts (no @-prefix words like
+  // "morgen", "Montag", "15.6."). Only if no explicit @-token already set a date.
+  // Match the FIRST hit only, remove that token from the title.
   if (!draft.scheduledAt) {
     for (let i = 0; i < titleParts.length; i++) {
       const soft = parseSoftDateToken(titleParts[i])
@@ -153,6 +158,23 @@ export function parseTaskText(input: string): TaskDraft {
         break
       }
     }
+  }
+
+  // Soft time detection: bare "HH:MM" in the free text. Combines with whatever
+  // date is already set — overrides the default 09:00, sets hasExplicitTime.
+  // If no scheduledAt yet, anchor on today.
+  for (let i = 0; i < titleParts.length; i++) {
+    const m = titleParts[i].match(RE_SOFT_TIME)
+    if (!m) continue
+    const hour = parseInt(m[1], 10)
+    const minute = parseInt(m[2], 10)
+    if (hour > 23 || minute > 59) continue
+    draft.scheduledAt = draft.scheduledAt
+      ? withTime(draft.scheduledAt, hour, minute)
+      : todayAt(hour, minute)
+    draft.hasExplicitTime = true
+    titleParts.splice(i, 1)
+    break
   }
 
   draft.title = titleParts.join(' ')

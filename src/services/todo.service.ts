@@ -35,17 +35,19 @@ function activityToTodo(a: Activity): Todo {
   let plannedMinutes: number | undefined
   let notes: string | undefined
   let aiSummary: string | undefined
+  let calendarEventId: string | undefined
 
   try {
     const p = JSON.parse(a.payload)
-    checklist      = Array.isArray(p.checklist) ? p.checklist : []
-    tags           = Array.isArray(p.tags) ? p.tags : []
-    rawPriority    = p.priority
-    bucket         = p.bucket
-    scheduledAt    = p.scheduledAt
-    plannedMinutes = typeof p.plannedMinutes === 'number' ? p.plannedMinutes : undefined
-    notes          = typeof p.notes === 'string' ? p.notes : undefined
-    aiSummary      = typeof p.aiSummary === 'string' ? p.aiSummary : undefined
+    checklist       = Array.isArray(p.checklist) ? p.checklist : []
+    tags            = Array.isArray(p.tags) ? p.tags : []
+    rawPriority     = p.priority
+    bucket          = p.bucket
+    scheduledAt     = p.scheduledAt
+    plannedMinutes  = typeof p.plannedMinutes === 'number' ? p.plannedMinutes : undefined
+    notes           = typeof p.notes === 'string' ? p.notes : undefined
+    aiSummary       = typeof p.aiSummary === 'string' ? p.aiSummary : undefined
+    calendarEventId = typeof p.calendarEventId === 'string' ? p.calendarEventId : undefined
   } catch {}
 
   const status: Todo['status'] = a.status === 'done'
@@ -65,6 +67,7 @@ function activityToTodo(a: Activity): Todo {
     dueDate: a.dueAt,
     notes,
     aiSummary,
+    calendarEventId,
     checklist,
     tags,
     assignee: a.assignee,
@@ -90,15 +93,16 @@ export const TodoService = {
     const bucket = payload.bucket ?? deriveBucket(status, scheduledAt)
 
     const activityPayload = JSON.stringify({
-      checklist:      payload.checklist ?? [],
-      tags:           payload.tags ?? [],
-      priority:       payload.priority ?? 'p3',
+      checklist:       payload.checklist ?? [],
+      tags:            payload.tags ?? [],
+      priority:        payload.priority ?? 'p3',
       bucket,
-      scheduledAt:    scheduledAt ?? null,
-      plannedMinutes: payload.plannedMinutes ?? null,
-      notes:          payload.notes ?? null,
-      aiSummary:      payload.aiSummary ?? null,
-      is_follow_up:   false,
+      scheduledAt:     scheduledAt ?? null,
+      plannedMinutes:  payload.plannedMinutes ?? null,
+      notes:           payload.notes ?? null,
+      aiSummary:       payload.aiSummary ?? null,
+      calendarEventId: payload.calendarEventId ?? null,
+      is_follow_up:    false,
     })
 
     if (payload.id) {

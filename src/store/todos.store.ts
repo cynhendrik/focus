@@ -1,9 +1,68 @@
 import { create } from 'zustand'
 import { TodoService } from '@/services/todo.service'
+import { CalendarService } from '@/services/calendar.service'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { log } from '@/lib/logger'
 import type { Todo, UpsertTodoPayload, TodoBucket, TodoPriority } from '@/types/todo.types'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
+
+// Format ISO date as local-iso (no timezone Z) — matches calendar store's format
+function calendarIso(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function addMinutesIso(iso: string, minutes: number): string {
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() + minutes)
+  return d.toISOString()
+}
+
+/** Update the linked calendar event when a task's schedule changes. */
+async function syncLinkedEvent(todo: Todo, newScheduledAt: string | undefined): Promise<void> {
+  if (!todo.calendarEventId) return
+  if (!newScheduledAt) return
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+  const createdBy   = useAuthStore.getState().user?.id ?? ''
+  if (!workspaceId) return
+  try {
+    const minutes = todo.plannedMinutes ?? 30
+    await useCalendarStore.getState().upsert({
+      id: todo.calendarEventId,
+      workspaceId, createdBy,
+      accountId: todo.customerId,
+      title: todo.title,
+      startAt: calendarIso(newScheduledAt),
+      endAt: calendarIso(addMinutesIso(newScheduledAt, minutes)),
+      allDay: false,
+      color: 'accent',
+    })
+  } catch (e) {
+    log.error('failed to sync linked calendar event', { e })
+  }
+}
+
+/** Delete the linked calendar event when its task is removed. */
+async function deleteLinkedEvent(todo: Todo): Promise<void> {
+  if (!todo.calendarEventId) return
+  const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+  if (!workspaceId) return
+  try {
+    await CalendarService.delete(todo.calendarEventId, workspaceId)
+    // Also remove from local store cache
+    useCalendarStore.setState(s => ({
+      events:      s.events.filter(e => e.id !== todo.calendarEventId),
+      todayEvents: s.todayEvents.filter(e => e.id !== todo.calendarEventId),
+    }))
+  } catch (e) {
+    log.error('failed to delete linked calendar event', { e })
+  }
+}
 
 interface TodosState {
   todos: Todo[]
@@ -42,11 +101,12 @@ function todoToPayload(t: Todo): UpsertTodoPayload {
     scheduledAt:    t.scheduledAt,
     plannedMinutes: t.plannedMinutes,
     dueDate:        t.dueDate,
-    notes:          t.notes,
-    aiSummary:      t.aiSummary,
-    checklist:      t.checklist,
-    tags:           t.tags,
-    assignee:       t.assignee,
+    notes:           t.notes,
+    aiSummary:       t.aiSummary,
+    calendarEventId: t.calendarEventId,
+    checklist:       t.checklist,
+    tags:            t.tags,
+    assignee:        t.assignee,
   }
 }
 
@@ -98,6 +158,8 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
 
   remove: async (id) => {
     try {
+      const existing = get().allTodos.find(t => t.id === id)
+      if (existing) await deleteLinkedEvent(existing)
       await TodoService.delete(id)
       set(s => ({
         todos:    s.todos.filter(t => t.id !== id),
@@ -118,12 +180,23 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
   postpone: async (id) => {
     const current = get().allTodos.find(t => t.id === id)
     if (!current) return
-    const nextDate = new Date()
-    nextDate.setDate(nextDate.getDate() + 1)
-    nextDate.setHours(9, 0, 0, 0)
+    // Shift the existing scheduledAt by 1 day if present (preserves clock time),
+    // otherwise tomorrow 09:00.
+    let nextIso: string
+    if (current.scheduledAt) {
+      const d = new Date(current.scheduledAt)
+      d.setDate(d.getDate() + 1)
+      nextIso = d.toISOString()
+    } else {
+      const d = new Date()
+      d.setDate(d.getDate() + 1)
+      d.setHours(9, 0, 0, 0)
+      nextIso = d.toISOString()
+    }
+    await syncLinkedEvent(current, nextIso)
     await get().upsert({
       ...todoToPayload(current),
-      scheduledAt: nextDate.toISOString(),
+      scheduledAt: nextIso,
       bucket: 'backlog',
     })
   },
@@ -147,6 +220,7 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
   setScheduledAt: async (id, iso) => {
     const current = get().allTodos.find(t => t.id === id)
     if (!current) return
+    if (iso) await syncLinkedEvent(current, iso)
     await get().upsert({ ...todoToPayload(current), scheduledAt: iso })
   },
 

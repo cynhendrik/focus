@@ -163,4 +163,64 @@ describe('parseTaskText', () => {
       expect(r.title).toBe('heute Brand')
     })
   })
+
+  describe('hasExplicitTime + soft-time detection', () => {
+    it('@10:00 sets hasExplicitTime', () => {
+      const r = parseTaskText('@10:00 Brand')
+      expect(r.hasExplicitTime).toBe(true)
+      const d = new Date(r.scheduledAt!)
+      expect(d.getHours()).toBe(10)
+    })
+
+    it('@morgen alone does NOT set hasExplicitTime', () => {
+      const r = parseTaskText('@morgen Brand')
+      expect(r.hasExplicitTime).toBeUndefined()
+      expect(r.scheduledAt).toBeDefined()
+    })
+
+    it('"morgen" soft-date alone does NOT set hasExplicitTime', () => {
+      const r = parseTaskText('Morgen Brand')
+      expect(r.hasExplicitTime).toBeUndefined()
+    })
+
+    it('bare "12:30" sets time + hasExplicitTime, anchored today', () => {
+      const r = parseTaskText('Brand 12:30')
+      expect(r.hasExplicitTime).toBe(true)
+      const d = new Date(r.scheduledAt!)
+      expect(d.getHours()).toBe(12)
+      expect(d.getMinutes()).toBe(30)
+      const today = new Date().toISOString().slice(0, 10)
+      expect(r.scheduledAt!.slice(0, 10)).toBe(today)
+      expect(r.title).toBe('Brand')
+    })
+
+    it('"morgen 12:30" combines date + time, hasExplicitTime=true', () => {
+      const r = parseTaskText('!! Telefonmeeting Morgen 12:30')
+      expect(r.priority).toBe('p1')
+      expect(r.hasExplicitTime).toBe(true)
+      const d = new Date(r.scheduledAt!)
+      expect(d.getHours()).toBe(12)
+      expect(d.getMinutes()).toBe(30)
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1)
+      expect(r.scheduledAt!.slice(0, 10)).toBe(tomorrow.toISOString().slice(0, 10))
+      expect(r.title).toBe('Telefonmeeting')
+    })
+
+    it('"15.6. 14:00" combines date + time', () => {
+      const r = parseTaskText('Termin 15.6. 14:00')
+      expect(r.hasExplicitTime).toBe(true)
+      const d = new Date(r.scheduledAt!)
+      expect(d.getHours()).toBe(14)
+      expect(d.getDate()).toBe(15)
+      expect(d.getMonth()).toBe(5)
+      expect(r.title).toBe('Termin')
+    })
+
+    it('invalid time "25:99" stays in title', () => {
+      const r = parseTaskText('Test 25:99')
+      expect(r.hasExplicitTime).toBeUndefined()
+      expect(r.scheduledAt).toBeUndefined()
+      expect(r.title).toBe('Test 25:99')
+    })
+  })
 })

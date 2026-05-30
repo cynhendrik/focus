@@ -4,18 +4,37 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { parseTaskText } from './prefix-parser'
-import { Plus, Send } from 'lucide-react'
+import { Plus, Send, Calendar } from 'lucide-react'
 
 const PRIO_LABEL: Record<string, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
+// Calendar events store local-iso (no timezone offset), so we strip the Z and
+// align the wall-clock time to what the user typed (e.g. "12:30").
+function isoLocal(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function addMinutes(iso: string, minutes: number): string {
+  const d = new Date(iso)
+  d.setMinutes(d.getMinutes() + minutes)
+  return d.toISOString()
+}
+
 interface Props { customerId?: string }
 
 export function TaskComposer({ customerId }: Props = {}) {
-  const upsert   = useTodosStore(s => s.upsert)
-  const accounts = useAccountsStore(s => s.accounts)
+  const upsert       = useTodosStore(s => s.upsert)
+  const accounts     = useAccountsStore(s => s.accounts)
+  const upsertEvent  = useCalendarStore(s => s.upsert)
   const [text, setText] = useState('')
 
   const placeholder = customerId
@@ -56,13 +75,41 @@ export function TaskComposer({ customerId }: Props = {}) {
   const submit = async () => {
     if (!editor || !canSubmit) return
     const todayStr = new Date().toISOString().slice(0, 10)
+    const title = draft.title.trim() || '(ohne Titel)'
+    const wantsCalendar = draft.hasExplicitTime && !!draft.scheduledAt
+
+    // 1. Create calendar event first if applicable, so we can link it on the task
+    let calendarEventId: string | undefined
+    if (wantsCalendar) {
+      const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+      const createdBy   = useAuthStore.getState().user?.id ?? ''
+      if (workspaceId) {
+        const startAt = isoLocal(draft.scheduledAt!)
+        const minutes = draft.plannedMinutes ?? 30
+        const endAt   = isoLocal(addMinutes(draft.scheduledAt!, minutes))
+        try {
+          const ev = await upsertEvent({
+            workspaceId, createdBy,
+            accountId: resolvedCustomerId,
+            title, startAt, endAt, allDay: false,
+            color: 'accent',
+          })
+          calendarEventId = ev.id
+        } catch (e) {
+          // Silent: task still created, calendar event failed
+          console.error('Calendar event creation failed', e)
+        }
+      }
+    }
+
     await upsert({
-      title:          draft.title.trim() || '(ohne Titel)',
+      title,
       priority:       draft.priority ?? 'p3',
       scheduledAt:    draft.scheduledAt,
       plannedMinutes: draft.plannedMinutes,
       tags:           draft.tags,
       customerId:     resolvedCustomerId,
+      calendarEventId,
       bucket:         draft.scheduledAt && draft.scheduledAt.slice(0, 10) === todayStr
                       ? 'today' : 'backlog',
     })
@@ -137,6 +184,12 @@ export function TaskComposer({ customerId }: Props = {}) {
         )}
         {draft.priority && <Chip color="warn">● {PRIO_LABEL[draft.priority]}</Chip>}
         {draft.plannedMinutes && <Chip color="muted">⏱ {draft.plannedMinutes}m</Chip>}
+        {draft.hasExplicitTime && draft.scheduledAt && (
+          <Chip color="accent">
+            <Calendar size={10} style={{ marginRight: 4, display: 'inline', verticalAlign: '-1px' }} />
+            Kalender · {draft.plannedMinutes ?? 30}m
+          </Chip>
+        )}
         {draft.tags.map(t => <Chip key={t} color="muted">#{t}</Chip>)}
         {!customerId && draft.customerHint && (
           <Chip color={resolvedCustomerId ? 'accent' : 'danger'}>
