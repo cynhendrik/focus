@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { TodoService } from '@/services/todo.service'
-import { CalendarService } from '@/services/calendar.service'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -23,7 +22,7 @@ function addMinutesIso(iso: string, minutes: number): string {
   return d.toISOString()
 }
 
-/** Update the linked calendar event when a task's schedule changes. */
+/** Task → Calendar: update the linked event when a task's schedule changes. */
 async function syncLinkedEvent(todo: Todo, newScheduledAt: string | undefined): Promise<void> {
   if (!todo.calendarEventId) return
   if (!newScheduledAt) return
@@ -41,26 +40,77 @@ async function syncLinkedEvent(todo: Todo, newScheduledAt: string | undefined): 
       endAt: calendarIso(addMinutesIso(newScheduledAt, minutes)),
       allDay: false,
       color: 'accent',
-    })
+    }, { fromTodoSync: true })   // skip reverse-sync — we're the originator
   } catch (e) {
     log.error('failed to sync linked calendar event', { e })
   }
 }
 
-/** Delete the linked calendar event when its task is removed. */
+/** Task → Calendar: delete the linked event when its task is removed. */
 async function deleteLinkedEvent(todo: Todo): Promise<void> {
   if (!todo.calendarEventId) return
   const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
   if (!workspaceId) return
   try {
-    await CalendarService.delete(todo.calendarEventId, workspaceId)
-    // Also remove from local store cache
-    useCalendarStore.setState(s => ({
-      events:      s.events.filter(e => e.id !== todo.calendarEventId),
-      todayEvents: s.todayEvents.filter(e => e.id !== todo.calendarEventId),
-    }))
+    await useCalendarStore.getState().remove(todo.calendarEventId, workspaceId, { fromTodoSync: true })
   } catch (e) {
     log.error('failed to delete linked calendar event', { e })
+  }
+}
+
+// ─── Calendar → Task: reverse sync entrypoints used by calendar.store ────────
+
+/** Called by calendar.store.upsert when an existing event's startAt changes. */
+export async function syncTodoFromCalendar(eventId: string, newStartAt: string): Promise<void> {
+  const state = useTodosStore.getState()
+  const todo = state.allTodos.find(t => t.calendarEventId === eventId)
+  if (!todo) return
+
+  // Parse "YYYY-MM-DDTHH:mm:ss" (no timezone) as local time, then back to ISO.
+  // Keeps the user-intended wall-clock time intact.
+  const localDate = new Date(newStartAt)
+  const newScheduledIso = localDate.toISOString()
+
+  if (todo.scheduledAt === newScheduledIso) return   // already in sync
+
+  // Derive new bucket from new date
+  const today = new Date().toISOString().slice(0, 10)
+  const newBucket = newScheduledIso.slice(0, 10) === today
+    ? (todo.bucket === 'in_progress' ? 'in_progress' : 'today')
+    : 'backlog'
+
+  await state.upsert({
+    id:             todo.id,
+    customerId:     todo.customerId,
+    title:          todo.title,
+    status:         todo.status,
+    priority:       todo.priority,
+    bucket:         newBucket,
+    scheduledAt:    newScheduledIso,
+    plannedMinutes: todo.plannedMinutes,
+    dueDate:        todo.dueDate,
+    notes:          todo.notes,
+    aiSummary:      todo.aiSummary,
+    calendarEventId: todo.calendarEventId,
+    checklist:      todo.checklist,
+    tags:           todo.tags,
+    assignee:       todo.assignee,
+  })
+}
+
+/** Called by calendar.store.remove when an event with a linked todo gets deleted. */
+export async function deleteTodoLinkedToEvent(eventId: string): Promise<void> {
+  const state = useTodosStore.getState()
+  const todo = state.allTodos.find(t => t.calendarEventId === eventId)
+  if (!todo) return
+  try {
+    await TodoService.delete(todo.id)
+    useTodosStore.setState(s => ({
+      todos:    s.todos.filter(t => t.id !== todo.id),
+      allTodos: s.allTodos.filter(t => t.id !== todo.id),
+    }))
+  } catch (e) {
+    log.error('failed to delete todo linked to removed calendar event', { e })
   }
 }
 

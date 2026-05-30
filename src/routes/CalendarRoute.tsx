@@ -956,7 +956,7 @@ export function CalendarRoute() {
       </div>{/* end left column */}
 
       {/* Tagesplan sidebar */}
-      <div style={{ width: 280, flexShrink: 0 }}>
+      <div style={{ width: 240, flexShrink: 0, paddingLeft: 4 }}>
         <TagesplanCard events={todayEvents} isLoading={isTodayLoading} />
       </div>
     </div>{/* end flex row */}

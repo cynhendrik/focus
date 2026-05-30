@@ -5,6 +5,11 @@ import type { CalendarEvent, UpsertCalendarEventPayload } from '@/types/calendar
 
 export type CalendarView = 'day' | 'week' | 'month'
 
+interface CalendarSyncOpts {
+  /** True when the upsert was triggered by a linked Todo update — skips reverse-sync to avoid loops. */
+  fromTodoSync?: boolean
+}
+
 interface CalendarState {
   events: CalendarEvent[]
   view: CalendarView
@@ -16,8 +21,8 @@ interface CalendarState {
   loadToday: (workspaceId: string) => Promise<void>
 
   load: (workspaceId: string) => Promise<void>
-  upsert: (payload: UpsertCalendarEventPayload) => Promise<CalendarEvent>
-  remove: (id: string, workspaceId: string) => Promise<void>
+  upsert: (payload: UpsertCalendarEventPayload, opts?: CalendarSyncOpts) => Promise<CalendarEvent>
+  remove: (id: string, workspaceId: string, opts?: CalendarSyncOpts) => Promise<void>
   setView: (view: CalendarView) => void
   navigate: (dir: 'prev' | 'next' | 'today', workspaceId: string) => void
 }
@@ -85,7 +90,11 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
     }
   },
 
-  upsert: async (payload) => {
+  upsert: async (payload, opts) => {
+    const previousStart = payload.id
+      ? (get().events.find(e => e.id === payload.id)?.startAt)
+      : undefined
+
     const event = await CalendarService.upsert(payload)
     set(s => {
       const filtered      = s.events.filter(e => e.id !== event.id)
@@ -99,15 +108,29 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
           : filteredToday,
       }
     })
+
+    // Reverse-sync: if this is an existing event with a linked Todo and the
+    // start time actually changed, mirror that on the Todo's scheduledAt.
+    if (!opts?.fromTodoSync && payload.id && previousStart && previousStart !== event.startAt) {
+      const { syncTodoFromCalendar } = await import('@/store/todos.store')
+      syncTodoFromCalendar(event.id, event.startAt).catch(() => { /* logged downstream */ })
+    }
+
     return event
   },
 
-  remove: async (id, workspaceId) => {
+  remove: async (id, workspaceId, opts) => {
     await CalendarService.delete(id, workspaceId)
     set(s => ({
       events:      s.events.filter(e => e.id !== id),
       todayEvents: s.todayEvents.filter(e => e.id !== id),
     }))
+
+    // Reverse-sync: drop the linked Todo too.
+    if (!opts?.fromTodoSync) {
+      const { deleteTodoLinkedToEvent } = await import('@/store/todos.store')
+      deleteTodoLinkedToEvent(id).catch(() => { /* logged downstream */ })
+    }
   },
 
   setView: (view) => set({ view }),
