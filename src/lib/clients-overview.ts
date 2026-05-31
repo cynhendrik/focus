@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Customer } from '@/types/customer.types'
+import { isPrivateCustomer } from '@/types/customer.types'
 import type { Deal, PipelineStage } from '@/types/pipeline.types'
 import type { Invoice, Offer } from '@/types/finance.types'
 import type { AccountActivityDate } from '@/types/crm.types'
@@ -82,8 +83,16 @@ export function clientHue(customer: Pick<Customer, 'id' | 'name'>): number {
   return hashHue(customer.id || customer.name)
 }
 
+// Deals werden primaer ueber accountId zugeordnet; customerId ist ein
+// Legacy-Fallback fuer Datensaetze ohne gesetztes accountId. Niemals beide
+// matchen — sonst kann derselbe Deal bei zwei Kunden auftauchen, wenn die
+// Felder unterschiedliche IDs enthalten.
 function customerDealsOf(customerId: string, deals: Deal[]): Deal[] {
-  return deals.filter(d => d.accountId === customerId || d.customerId === customerId)
+  return deals.filter(d =>
+    d.accountId
+      ? d.accountId === customerId
+      : d.customerId === customerId,
+  )
 }
 
 function isStageOpen(stageName: string, stageByName: Map<string, PipelineStage>): boolean {
@@ -92,18 +101,24 @@ function isStageOpen(stageName: string, stageByName: Map<string, PipelineStage>)
   return !stage.isWon && !stage.isLost
 }
 
+// "sv" liefert YYYY-MM-DD im LOKALEN Kalendertag — wichtig, damit z.B.
+// abends um 23:00 (DE) nicht schon UTC-morgens als "heute" gilt und
+// Rechnungen einen Tag zu frueh als faellig erscheinen.
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('sv')
 }
 
 // ─── Per-customer signal computation ───────────────────────────────────────
 
 function hasOverdueInvoice(customerId: string, invoices: Invoice[]): boolean {
   const today = todayIso()
-  return invoices.some(i =>
-    i.accountId === customerId &&
-    (i.status === 'overdue' || (i.status === 'open' && i.dueDate < today)),
-  )
+  return invoices.some(i => {
+    if (i.accountId !== customerId) return false
+    if (i.status === 'overdue') return true
+    // Leerer dueDate-String wuerde lexikographisch unter heute liegen
+    // ('' < '2026-05-31') und Rechnungen faelschlich als faellig markieren.
+    return i.status === 'open' && !!i.dueDate && i.dueDate < today
+  })
 }
 
 function hasStuckDeal(customerId: string, deals: Deal[], stageByName: Map<string, PipelineStage>): boolean {
@@ -190,7 +205,7 @@ export function computeClientRows(input: ComputeInput): ClientRow[] {
   }
 
   return input.customers
-    .filter(c => !c.isPrivate && c.id !== '__cynera_privat__')
+    .filter(c => !isPrivateCustomer(c))
     .map<ClientRow>(c => {
       const lastContactAt = lastByAcc.get(c.id) ?? c.updatedAt ?? null
       const lastContactMs = toMs(lastContactAt)
