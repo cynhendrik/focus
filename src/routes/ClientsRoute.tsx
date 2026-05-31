@@ -21,6 +21,7 @@ import {
   customerInitials, formatEuroShort, relContactLabel, clientHue,
   type ClientRow, type ClientSortKey, type ClientSignalTone,
 } from '@/lib/clients-overview'
+import { scoreColor } from '@/lib/lead-score'
 
 // ── shared view toggle (Board ↔ Liste) ────────────────────────────────────────
 
@@ -69,6 +70,31 @@ function signalColors(tone: ClientSignalTone) {
     case 'warn': return { ink: 'oklch(82% 0.17 80)',  bg: 'oklch(82% 0.17 80 / 0.10)', stroke: 'oklch(82% 0.17 80 / 0.32)' }
     case 'ok':   return { ink: 'oklch(82% 0.18 145)', bg: 'oklch(82% 0.18 145 / 0.08)', stroke: 'oklch(82% 0.18 145 / 0.28)' }
   }
+}
+
+// ── ScorePill — Lead Score in Bucket-Farbe, wird bei Score=0 ausgeblendet ───
+
+function ScorePill({ score, size = 'sm' }: { score: number; size?: 'xs' | 'sm' }) {
+  if (!score) return null
+  const c = scoreColor(score)
+  const pad = size === 'xs' ? '1px 6px' : '2px 8px'
+  const fs  = size === 'xs' ? 10        : 10.5
+  return (
+    <span
+      title={`Lead Score ${score}`}
+      style={{
+        display: 'inline-flex', alignItems: 'center',
+        padding: pad, borderRadius: 999,
+        background: `color-mix(in oklch, ${c} 14%, transparent)`,
+        color: c, border: `1px solid color-mix(in oklch, ${c} 32%, transparent)`,
+        fontFamily: 'var(--font-mono)', fontSize: fs, fontWeight: 700,
+        letterSpacing: '0.04em', fontVariantNumeric: 'tabular-nums',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {score}
+    </span>
+  )
 }
 
 // ── ClientAvatar — colored squircle with initials ────────────────────────────
@@ -126,6 +152,7 @@ function ZuletztStrip({ recent, onOpen }: { recent: Customer[]; onOpen: (id: str
         >
           <ClientAvatar name={c.name} hue={clientHue(c)} size={26} />
           <span style={{ whiteSpace: 'nowrap' }}>{c.name}</span>
+          <ScorePill score={c.leadScore} size="xs" />
         </button>
       ))}
     </div>
@@ -182,10 +209,16 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
         <ClientAvatar name={row.customer.name} hue={row.hue} />
         <div style={{ minWidth: 0 }}>
           <div style={{
-            fontSize: 14.5, fontWeight: 600, color: 'var(--fg)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: 'flex', alignItems: 'center', gap: 8,
+            overflow: 'hidden',
           }}>
-            {row.customer.name}
+            <span style={{
+              fontSize: 14.5, fontWeight: 600, color: 'var(--fg)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {row.customer.name}
+            </span>
+            <ScorePill score={row.customer.leadScore} />
           </div>
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 10.5,
