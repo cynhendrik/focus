@@ -55,24 +55,15 @@ export function ClientsViewToggle() {
 }
 
 // ── color helpers (avatar squircle) ──────────────────────────────────────────
-// Alle Avatare liegen auf der Lime-Skala (hue=125). variation 0..1 bestimmt,
-// wie gesaettigt ein einzelner Kunde aussieht: nahe 0 → fast grau,
-// nahe 1 → voller Lime-Akzent. Lightness bleibt konstant.
-//
-// Effekt: die Liste wirkt einheitlich gruen-getoent, jeder Avatar ist aber
-// trotzdem wiedererkennbar.
-
-const AVATAR_HUE    = 125
-const AVATAR_LIGHT  = 78
-const CHROMA_MIN    = 0.015
-const CHROMA_MAX    = 0.18
-
-function avatarColors(variation: number) {
-  const c = CHROMA_MIN + variation * (CHROMA_MAX - CHROMA_MIN)
+// Alle Avatare einheitlich in dunklem Grau — kein Hash-basierter Farbtupfer,
+// kein Lime-Fade. Ruhiges, neutrales Listen-Bild. (variation-Parameter bleibt
+// in der Signatur, wird aktuell aber bewusst nicht ausgewertet — falls wir
+// spaeter doch eine subtile Variation reinmischen wollen.)
+function avatarColors(_variation: number) {
   return {
-    stroke: `oklch(${AVATAR_LIGHT}% ${c.toFixed(3)} ${AVATAR_HUE})`,
-    ink:    `oklch(${AVATAR_LIGHT + 8}% ${(c * 0.85).toFixed(3)} ${AVATAR_HUE})`,
-    bg:     `oklch(${AVATAR_LIGHT}% ${c.toFixed(3)} ${AVATAR_HUE} / 0.08)`,
+    stroke: 'oklch(38% 0 0)',
+    ink:    'oklch(70% 0 0)',
+    bg:     'oklch(28% 0 0 / 0.45)',
   }
 }
 
