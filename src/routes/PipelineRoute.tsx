@@ -3,28 +3,49 @@ import { Settings2, Bell } from 'lucide-react'
 import { useDealsStore } from '@/store/deals.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useCrmStore } from '@/store/crm.store'
+import { usePipelineStore } from '@/store/pipeline.store'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoard'
 import { DealModal } from '@/components/pipeline/DealModal'
 import { StagesManager } from '@/components/pipeline/StagesManager'
-import type { Deal } from '@/types/pipeline.types'
+import type { Deal, PipelineStage } from '@/types/pipeline.types'
+
+// Open = nicht gewonnen UND nicht verloren. Stages werden vom User umbenannt,
+// also nie auf Namen wie 'won'/'lost' vergleichen — immer die Flags der
+// Stage-Definition befragen.
+function makeIsOpenStage(stages: PipelineStage[]) {
+  const byName = new Map(stages.map(s => [s.name, s]))
+  return (stageName: string) => {
+    const stage = byName.get(stageName)
+    if (!stage) return true // unbekannte Stage → als offen behandeln
+    return !stage.isWon && !stage.isLost
+  }
+}
 
 export function PipelineRoute() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const deals = useDealsStore(s => s.deals)
+  const stages = usePipelineStore(s => s.stages)
   const allFollowUps = useCrmStore(s => s.allFollowUps)
   const [editDeal, setEditDeal] = useState<Deal | null | 'new'>(null)
   const [showStages, setShowStages] = useState(false)
   const [onlyWithFollowUps, setOnlyWithFollowUps] = useState(false)
 
-  const openDealsValue = deals
-    .filter(d => d.stage !== 'won' && d.stage !== 'lost')
-    .reduce((s, d) => s + (d.value ?? 0), 0)
+  const isOpenStage = useMemo(() => makeIsOpenStage(stages), [stages])
 
-  const openDealsCount = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
+  const openDealsValue = useMemo(
+    () => deals.filter(d => isOpenStage(d.stage)).reduce((s, d) => s + (d.value ?? 0), 0),
+    [deals, isOpenStage],
+  )
+
+  const openDealsCount = useMemo(
+    () => deals.filter(d => isOpenStage(d.stage)).length,
+    [deals, isOpenStage],
+  )
 
   // Customer-IDs with an open follow-up due today or earlier.
+  // Lokale Zeit, nicht UTC — sonst flippt der Vergleich nachts.
   const dueFollowUpCustomerIds = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = new Date().toLocaleDateString('sv')
     return new Set(
       allFollowUps
         .filter(f => f.status === 'offen' && f.dueDate <= today)
@@ -35,9 +56,9 @@ export function PipelineRoute() {
   const filteredCount = useMemo(() => {
     if (!onlyWithFollowUps) return openDealsCount
     return deals.filter(d =>
-      d.stage !== 'won' && d.stage !== 'lost' && dueFollowUpCustomerIds.has(d.accountId)
+      isOpenStage(d.stage) && dueFollowUpCustomerIds.has(d.accountId)
     ).length
-  }, [deals, openDealsCount, onlyWithFollowUps, dueFollowUpCustomerIds])
+  }, [deals, openDealsCount, onlyWithFollowUps, dueFollowUpCustomerIds, isOpenStage])
 
   const dealFilter = onlyWithFollowUps
     ? (d: Deal) => dueFollowUpCustomerIds.has(d.accountId)
