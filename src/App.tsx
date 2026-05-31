@@ -36,6 +36,7 @@ import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
 import { SalesCockpitRoute }     from '@/routes/SalesCockpitRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
+import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
@@ -68,6 +69,7 @@ export default function App() {
   const cmdOpen           = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
   const sidebarCollapsed  = useUiStore(s => s.sidebarCollapsed)
+  const appMode           = useUiStore(s => s.appMode)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
   const openPicker        = useClientPickerStore(s => s.open)
   // Onboarding signal — must be called BEFORE any early return below to satisfy
@@ -214,6 +216,19 @@ export default function App() {
     && !hasCompletedOnboarding()
     && customersCount === 0
     && !!activeWorkspaceId
+
+  // Privater Raum: komplett anderes Layout, kein NavSidebar/Topbar.
+  // Modals/Toasts laufen weiter parallel — bewusst, damit z.B. Toasts
+  // beim Loeschen einer Notiz auch hier sichtbar werden.
+  if (appMode === 'private') {
+    return (
+      <AppShell>
+        <PrivateShell />
+        <DownloadToast />
+        <ToastViewport />
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell>

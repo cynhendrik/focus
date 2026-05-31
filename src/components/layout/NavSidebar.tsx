@@ -82,6 +82,7 @@ export function NavSidebar() {
   const setAppView       = useUiStore(s => s.setAppView)
   const collapsed        = useUiStore(s => s.sidebarCollapsed)
   const toggleSidebar    = useUiStore(s => s.toggleSidebar)
+  const enterPrivate     = useUiStore(s => s.enterPrivate)
   const user             = useAuthStore(s => s.user)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
@@ -110,7 +111,6 @@ export function NavSidebar() {
 
   const initials    = user?.email ? user.email.slice(0, 2).toUpperCase() : 'CY'
   const displayName = user?.email?.split('@')[0] ?? 'User'
-  const inPersonal  = appView === 'journal'
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
@@ -171,33 +171,18 @@ export function NavSidebar() {
 
       <SidebarNavItem icon={Settings} label="Settings" active={appView === 'settings'} onClick={() => setAppView('settings')} />
 
-      {/* Eingang zu "Mein Raum" (Journal). Bewusst nicht in der normalen
-          Sidebar-Liste — soll sich wie ein eigener Ort anfuehlen, den man
-          ueber das Profil-Element betritt. Aktiv-State zeigt blauen Akzent. */}
+      {/* Eingang zum "Privaten Raum". Klick wechselt den ganzen App-Modus
+          und ersetzt das Layout — siehe PrivateShell in App.tsx. */}
       <div
         className="sidebar-user"
-        onClick={() => setAppView('journal')}
-        title="Mein Raum oeffnen"
-        style={{
-          cursor: 'pointer',
-          background: inPersonal ? 'oklch(70% 0.13 250 / 0.14)' : undefined,
-          borderTop: inPersonal ? '1px solid oklch(70% 0.13 250 / 0.32)' : undefined,
-        }}
+        onClick={() => enterPrivate()}
+        title="Privater Raum oeffnen"
+        style={{ cursor: 'pointer' }}
       >
-        <div
-          className="sidebar-user-avatar"
-          style={inPersonal ? {
-            background: 'oklch(70% 0.13 250 / 0.22)',
-            color: 'oklch(86% 0.13 250)',
-          } : undefined}
-        >
-          {initials}
-        </div>
+        <div className="sidebar-user-avatar">{initials}</div>
         <div className="sidebar-user-text">
-          <strong style={inPersonal ? { color: 'oklch(88% 0.13 250)' } : undefined}>
-            {displayName}
-          </strong>
-          <span>{inPersonal ? 'Mein Raum' : 'Mein Raum öffnen'}</span>
+          <strong>{displayName}</strong>
+          <span>Privater Raum</span>
         </div>
       </div>
     </aside>

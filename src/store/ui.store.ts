@@ -22,6 +22,20 @@ export type ClientsView = 'board' | 'list'
 /** Tasks page tab. */
 export type TasksTab = 'list' | 'board' | 'focus'
 
+/** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
+ *  mit eigener Sidebar und eigenem Theme. */
+export type AppMode = 'business' | 'private'
+
+/** Sub-Routes innerhalb des Privaten Raums. */
+export type PrivateView =
+  | 'capture'  // Quick Capture (Inbox)
+  | 'todos'    // Persoenliche To-Dos
+  | 'notes'    // Persoenliche Notizen
+  | 'journal'  // Tagebuch mit Stimmung
+  | 'goals'    // Persoenliche Ziele mit Progress
+  | 'review'   // Wochen-Review-Ritual
+  | 'docs'     // Persoenliche Dokumente
+
 /** Legacy CustomerTab values, kept for backwards-compat with deep-link callers. */
 export type LegacyCustomerTab =
   | 'ueberblick' | 'arbeiten' | 'historie'         // 3-Tab-Aera
@@ -85,6 +99,10 @@ interface UiState {
   tasksTab: TasksTab
   /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
   sidebarCollapsed: boolean
+  /** Aktiver App-Modus — Business-Plattform oder Privater Raum. */
+  appMode: AppMode
+  /** Aktive Sub-Route innerhalb des Privaten Raums. */
+  privateView: PrivateView
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
@@ -97,6 +115,9 @@ interface UiState {
   setClientsView: (view: ClientsView) => void
   setTasksTab: (tab: TasksTab) => void
   toggleSidebar: () => void
+  enterPrivate: (view?: PrivateView) => void
+  leavePrivate: () => void
+  setPrivateView: (view: PrivateView) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -113,6 +134,8 @@ export const useUiStore = create<UiState>()(
       clientsView: 'board',
       tasksTab: 'list',
       sidebarCollapsed: false,
+      appMode: 'business',
+      privateView: 'capture',
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -149,6 +172,15 @@ export const useUiStore = create<UiState>()(
 
       toggleSidebar: () =>
         set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+      enterPrivate: (view) =>
+        set(s => ({ appMode: 'private', privateView: view ?? s.privateView })),
+
+      leavePrivate: () =>
+        set({ appMode: 'business' }),
+
+      setPrivateView: (view) =>
+        set({ privateView: view }),
     }),
     {
       name: 'focus-ui-v2',
@@ -160,6 +192,8 @@ export const useUiStore = create<UiState>()(
         clientsView: s.clientsView,
         tasksTab: s.tasksTab,
         sidebarCollapsed: s.sidebarCollapsed,
+        appMode: s.appMode,
+        privateView: s.privateView,
       }),
     }
   )

@@ -12,6 +12,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+export type JournalMood = 'energiegeladen' | 'ruhig' | 'fokussiert' | 'muede' | 'genervt'
+
+export const MOOD_LABEL: Record<JournalMood, string> = {
+  energiegeladen: 'Energiegeladen',
+  ruhig:          'Ruhig',
+  fokussiert:     'Fokussiert',
+  muede:          'Müde',
+  genervt:        'Genervt',
+}
+
+/** OKLCH-Farben fuer die Stimmungs-Chips — warm-paletted fuer den Privaten Raum. */
+export const MOOD_COLOR: Record<JournalMood, string> = {
+  energiegeladen: 'oklch(78% 0.16 60)',   // amber-orange
+  ruhig:          'oklch(75% 0.10 230)',  // soft blue
+  fokussiert:     'oklch(78% 0.14 145)',  // green
+  muede:          'oklch(65% 0.06 280)',  // muted lavender
+  genervt:        'oklch(72% 0.16 25)',   // rust
+}
+
 export interface JournalEntry {
   id:        string
   /** Lokaler Kalendertag im YYYY-MM-DD Format. Sortier- und Gruppierschluessel. */
@@ -19,6 +38,7 @@ export interface JournalEntry {
   title:     string
   /** HTML aus dem TipTap-Editor (oder Plain-Text als Fallback). */
   body:      string
+  mood?:     JournalMood  // optional, falls der User keine Stimmung waehlt
   createdAt: string  // ISO
   updatedAt: string  // ISO
 }
@@ -29,7 +49,7 @@ interface JournalState {
   selectedId: string | null
 
   create:        (date?: string) => string  // gibt neue ID zurueck
-  update:        (id: string, patch: { title?: string; body?: string }) => void
+  update:        (id: string, patch: { title?: string; body?: string; mood?: JournalMood | undefined }) => void
   remove:        (id: string) => void
   setSelected:   (id: string | null) => void
 }

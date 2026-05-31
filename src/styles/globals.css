@@ -261,6 +261,118 @@ input:focus, textarea:focus, button:focus { outline: none; }
   margin: 2px 0 10px;
 }
 
+/* ========== Privater Raum ===================================================
+   Eigenes Layout, warm-getoenter Hintergrund, eigene Farbpalette.
+   ============================================================================ */
+
+.private-shell {
+  /* Warm-anthrazit statt kuehl-anthrazit — markiert den anderen Kontext. */
+  --priv-bg:        oklch(13% 0.012 50);
+  --priv-bg-2:      oklch(15% 0.014 50);
+  --priv-surface:   oklch(17% 0.014 50);
+  --priv-surface-2: oklch(20% 0.016 50);
+  --priv-border:    oklch(28% 0.018 50);
+  --priv-fg:        oklch(96% 0.005 60);
+  --priv-fg-muted:  oklch(74% 0.012 50);
+  --priv-fg-dim:    oklch(56% 0.014 50);
+  --priv-accent:    oklch(78% 0.16 60);     /* warm amber */
+  --priv-accent-2:  oklch(72% 0.18 50);
+  --priv-accent-soft: oklch(78% 0.16 60 / 0.14);
+
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100vh;
+  background:
+    radial-gradient(900px 500px at 80% -10%, oklch(78% 0.16 60 / 0.05), transparent 60%),
+    radial-gradient(800px 400px at -10% 100%, oklch(70% 0.13 30 / 0.05), transparent 60%),
+    var(--priv-bg);
+  color: var(--priv-fg);
+}
+
+.private-sidebar {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--priv-border);
+  background: linear-gradient(180deg, oklch(100% 0 0 / 0.012), transparent 30%);
+  overflow: hidden;
+}
+
+.private-main {
+  overflow: auto;
+  padding: 36px 56px 64px;
+}
+
+/* Grosse, duenne Header-Titel wie auf den Screenshots ("Wie war heute?") */
+.priv-title {
+  font-size: 44px; font-weight: 700; letter-spacing: -0.025em;
+  line-height: 1.05; color: var(--priv-fg); margin: 0 0 10px;
+}
+.priv-title .accent { color: var(--priv-accent); }
+.priv-title .muted  { color: var(--priv-fg-dim); }
+
+.priv-subtitle {
+  font-size: 13.5px; color: var(--priv-fg-muted); line-height: 1.55;
+  max-width: 720px; margin: 0 0 28px;
+}
+
+/* Section-Header mit Mono-Label + Icon (z.B. "QUICK CAPTURE", "PRIVATE NOTIZEN") */
+.priv-section-label {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.20em; text-transform: uppercase;
+  color: var(--priv-fg-dim); font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.priv-card {
+  background: var(--priv-surface);
+  border: 1px solid var(--priv-border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: border-color 140ms;
+}
+.priv-card:hover { border-color: oklch(100% 0 0 / 0.14); }
+
+.priv-input {
+  width: 100%;
+  background: var(--priv-surface-2);
+  border: 1px solid var(--priv-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--priv-fg);
+  font-family: inherit; font-size: 13.5px;
+  outline: none;
+  transition: border-color 140ms;
+}
+.priv-input:focus { border-color: var(--priv-accent); }
+
+.priv-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--priv-accent);
+  color: oklch(20% 0.04 60);
+  border: none; border-radius: 10px;
+  padding: 9px 16px;
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms;
+}
+.priv-btn:hover { background: var(--priv-accent-2); }
+
+.priv-btn-ghost {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: transparent;
+  color: var(--priv-fg-muted);
+  border: 1px solid var(--priv-border); border-radius: 10px;
+  padding: 7px 12px;
+  font-family: inherit; font-size: 12px;
+  cursor: pointer;
+  transition: color 140ms, border-color 140ms, background 140ms;
+}
+.priv-btn-ghost:hover {
+  color: var(--priv-fg);
+  border-color: oklch(100% 0 0 / 0.16);
+  background: oklch(100% 0 0 / 0.03);
+}
+
 .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 8px 8px 18px; }
 .sidebar-brand-logo {
   width: 28px; height: 28px; border-radius: 8px;
