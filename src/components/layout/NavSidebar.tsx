@@ -9,7 +9,7 @@ import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply, Flame,
   Calendar, Mail, Settings,
-  ChevronRight, ChevronsLeft, ChevronsRight,
+  ChevronRight, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -166,7 +166,7 @@ export function NavSidebar() {
         onClick={toggleSidebar}
         title={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
       >
-        {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+        {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
       <SidebarNavItem icon={Settings} label="Settings" active={appView === 'settings'} onClick={() => setAppView('settings')} />
