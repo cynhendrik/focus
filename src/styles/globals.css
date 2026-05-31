@@ -178,7 +178,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
 
 .app {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 230px 1fr;
   height: 100vh;
   /* Drei-Schichten-Glow:
      - oben-rechts: weicher gruener Halo (Hauptakzent)
@@ -286,7 +286,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
   --priv-accent-soft: oklch(78% 0.16 60 / 0.14);
 
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 230px 1fr;
   height: 100vh;
   /* Gleiches 3-Schichten-Prinzip wie .app, in der warmen Amber-Palette. */
   background:
