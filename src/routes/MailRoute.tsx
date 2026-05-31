@@ -40,14 +40,36 @@ export function MailRoute() {
     try { localStorage.setItem('cynera:mail:focus-v1', mailFocus ? 'focus' : 'all') } catch {}
   }, [mailFocus])
 
-  const customerEmailDomains = useMemo(() => {
-    const set = new Set<string>()
+  // Free-Mail-Provider: bei diesen Domains identifiziert die Adresse einen
+  // einzelnen Privatkunden, nicht ein Unternehmen — also auf exakte
+  // E-Mail-Adresse matchen statt auf Domain (sonst wuerde z.B. info@gmail.com
+  // als Kundenadresse die gesamte Gmail-Welt in die Fokus-Inbox spuelen).
+  const PUBLIC_MAIL_DOMAINS = new Set([
+    'gmail.com', 'googlemail.com',
+    'gmx.de', 'gmx.net', 'gmx.at', 'gmx.ch', 'gmx.com',
+    'web.de', 't-online.de', 'freenet.de', 'arcor.de', 'mailbox.org', 'posteo.de',
+    'yahoo.com', 'yahoo.de', 'ymail.com',
+    'hotmail.com', 'hotmail.de', 'outlook.com', 'outlook.de', 'live.com', 'live.de', 'msn.com',
+    'icloud.com', 'me.com', 'mac.com',
+    'aol.com', 'protonmail.com', 'proton.me', 'pm.me',
+  ])
+
+  const { customerEmailAddresses, customerEmailDomains } = useMemo(() => {
+    const addresses = new Set<string>()
+    const domains   = new Set<string>()
     for (const c of customers) {
       if (!c.email) continue
-      const at = c.email.lastIndexOf('@')
-      if (at !== -1) set.add(c.email.slice(at + 1).toLowerCase())
+      const email = c.email.trim().toLowerCase()
+      if (!email) continue
+      addresses.add(email)
+      const at = email.lastIndexOf('@')
+      if (at === -1) continue
+      const domain = email.slice(at + 1)
+      if (domain && !PUBLIC_MAIL_DOMAINS.has(domain)) {
+        domains.add(domain)
+      }
     }
-    return set
+    return { customerEmailAddresses: addresses, customerEmailDomains: domains }
   }, [customers])
 
   const visibleEmails = useMemo(() => {
@@ -55,11 +77,14 @@ export function MailRoute() {
     return emails.filter(e => {
       if (e.customerId) return true
       if (!e.fromAddr) return false
-      const at = e.fromAddr.lastIndexOf('@')
+      const addr = e.fromAddr.trim().toLowerCase()
+      if (!addr) return false
+      if (customerEmailAddresses.has(addr)) return true
+      const at = addr.lastIndexOf('@')
       if (at === -1) return false
-      return customerEmailDomains.has(e.fromAddr.slice(at + 1).toLowerCase())
+      return customerEmailDomains.has(addr.slice(at + 1))
     })
-  }, [emails, mailFocus, customerEmailDomains])
+  }, [emails, mailFocus, customerEmailAddresses, customerEmailDomains])
 
   const hiddenCount = mailFocus ? emails.length - visibleEmails.length : 0
 
