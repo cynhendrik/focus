@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { invoke } from '@tauri-apps/api/core'
 import type { Customer } from '@/types/customer.types'
 import type { Todo } from '@/types/todo.types'
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -377,53 +377,54 @@ export class MissingApiKeyError extends Error {
 // ─────────────────────────────────────────────────────────────────────────────
 // The main call
 
+interface AnthropicTextBlock { type: 'text'; text: string }
+interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: string }> }
+
 /**
  * Sends the customer dossier to Claude and returns a structured briefing.
  *
- * Uses prompt caching on the system prompt — repeated briefings for any
- * customer reuse the same cached prefix, slashing cost on the second+ call.
- * The dossier (volatile) goes in the user message after the cache breakpoint.
+ * The actual HTTP call runs in the Rust backend (cmd_anthropic_messages) —
+ * this keeps the Anthropic SDK out of the browser bundle and prevents the
+ * API key from being sent to any third-party origin from the renderer.
  *
- * Structured output via `output_config.format` guarantees the response shape
- * matches CustomerBriefing.
+ * Prompt caching on the system prompt — repeated briefings reuse the cached
+ * prefix. Structured output via `output_config.format` matches CustomerBriefing.
  */
 export async function generateBriefing(input: DossierInput): Promise<CustomerBriefing> {
   const apiKey = getApiKey()
   if (!apiKey) throw new MissingApiKeyError()
 
-  const client = new Anthropic({
-    apiKey,
-    dangerouslyAllowBrowser: true,
-  })
-
   const dossier = buildDossier(input)
 
-  const message = await client.messages.create({
-    model: getModel(),
-    max_tokens: 4096,
-    system: [
-      {
-        type: 'text',
-        text: SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' },
+  const response = await invoke<AnthropicResponse>('cmd_anthropic_messages', {
+    apiKey,
+    body: {
+      model: getModel(),
+      max_tokens: 4096,
+      system: [
+        {
+          type: 'text',
+          text: SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      output_config: {
+        format: {
+          type: 'json_schema',
+          schema: BRIEFING_SCHEMA,
+        },
       },
-    ],
-    output_config: {
-      format: {
-        type: 'json_schema',
-        schema: BRIEFING_SCHEMA as unknown as Record<string, unknown>,
-      },
-    } as any,
-    messages: [
-      {
-        role: 'user',
-        content: `Erstelle das Briefing für diesen Kunden.\n\n---\n\n${dossier}`,
-      },
-    ],
+      messages: [
+        {
+          role: 'user',
+          content: `Erstelle das Briefing für diesen Kunden.\n\n---\n\n${dossier}`,
+        },
+      ],
+    },
   })
 
-  const block = message.content.find(b => b.type === 'text')
-  if (!block || block.type !== 'text') {
+  const block = response.content.find((b): b is AnthropicTextBlock => b.type === 'text')
+  if (!block) {
     throw new Error('Claude hat keinen Text-Output geliefert.')
   }
 
@@ -434,7 +435,6 @@ export async function generateBriefing(input: DossierInput): Promise<CustomerBri
     throw new Error(`Antwort konnte nicht als JSON gelesen werden: ${String(e)}`)
   }
 
-  // Defensive defaults — schema should guarantee these but belt-and-braces
   if (!parsed.headline)   parsed.headline = ''
   if (!parsed.highlights) parsed.highlights = []
   if (!parsed.signals)    parsed.signals = []

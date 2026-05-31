@@ -259,6 +259,7 @@ fn main() {
             commands::campaign::cmd_get_campaign_recipients,
             commands::campaign::cmd_create_campaign,
             commands::campaign::cmd_send_campaign,
+            commands::ai::cmd_anthropic_messages,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
