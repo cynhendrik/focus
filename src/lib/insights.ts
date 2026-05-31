@@ -13,6 +13,7 @@ import type { Note } from '@/types/note.types'
 import type { EmailHeader } from '@/types/mail.types'
 import type { Contact } from '@/types/contact.types'
 import type { Customer } from '@/types/customer.types'
+import { isPrivateCustomer } from '@/types/customer.types'
 import type { FollowUp, AccountActivityDate } from '@/types/crm.types'
 
 export type InsightSeverity = 'positive' | 'neutral' | 'caution' | 'urgent'
@@ -355,8 +356,7 @@ export function computeAccountSignals(input: AccountSignalsInput): AccountSignal
   const out: AccountSignal[] = []
 
   for (const c of input.customers) {
-    if (c.isPrivate) continue
-    if (c.id === '__cynera_privat__') continue
+    if (isPrivateCustomer(c)) continue
 
     // ── Dormancy ────────────────────────────────────────────────────────
     const last = lastByAcc.get(c.id) ?? c.updatedAt

@@ -3,6 +3,14 @@ import type { TimestampedEntity } from './common.types'
 export type CustomerStatus = 'lead' | 'aktiv' | 'inaktiv' | 'lost'
 export type Priority = 'low' | 'normal' | 'high'
 
+// ID-Sentinel fuer den system-seitig erzeugten "Privat"-Kunden,
+// in dem persoenliche/nicht-Business-Eintraege landen.
+export const PRIVATE_CUSTOMER_ID = '__cynera_privat__'
+
+export function isPrivateCustomer(c: { id: string; isPrivate: boolean }): boolean {
+  return c.isPrivate || c.id === PRIVATE_CUSTOMER_ID
+}
+
 export interface SocialLinks {
   instagram?: string
   linkedin?: string
