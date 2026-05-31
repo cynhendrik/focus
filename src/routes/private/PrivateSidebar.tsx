@@ -48,18 +48,18 @@ function NavItem({
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        width: '100%', padding: '8px 12px', borderRadius: 8,
+        width: '100%', padding: '8px 10px', borderRadius: 10,
         background: active ? 'oklch(100% 0 0 / 0.05)' : 'transparent',
         border: 'none', cursor: 'pointer',
         color: active ? 'var(--priv-fg)' : 'var(--priv-fg-dim)',
-        fontFamily: 'inherit', fontSize: 12.5, fontWeight: active ? 600 : 500,
+        fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 500,
         position: 'relative', textAlign: 'left',
         transition: 'color 140ms, background 140ms',
       }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--priv-fg-muted)' }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--priv-fg-dim)' }}
     >
-      <Ic size={14} style={{ flexShrink: 0, opacity: active ? 1 : 0.85 }} />
+      <Ic size={17} style={{ flexShrink: 0, opacity: active ? 1 : 0.85 }} />
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {def.label}
       </span>
@@ -121,7 +121,7 @@ export function PrivateSidebar() {
       {/* ── Top: Avatar + Name ────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: '20px 12px 22px',
+        padding: '18px 14px 20px',
       }}>
         <div style={{
           width: 32, height: 32, borderRadius: 9,
@@ -152,14 +152,14 @@ export function PrivateSidebar() {
 
       {/* ── BEREICHE ─────────────────────────────────────────────────────── */}
       <div style={{
-        fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.18em',
+        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em',
         textTransform: 'uppercase', color: 'var(--priv-fg-dim)', fontWeight: 600,
-        padding: '0 12px 8px',
+        padding: '14px 14px 6px',
       }}>
         Bereiche
       </div>
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 14px' }}>
         {NAV.map(def => {
           const isCapture = def.id === 'capture'
           const isTodos   = def.id === 'todos'
@@ -184,7 +184,7 @@ export function PrivateSidebar() {
         title="Zurueck zur Arbeit (Esc)"
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 12px', margin: '0 8px 12px',
+          padding: '10px 12px', margin: '0 14px 14px',
           background: 'transparent', border: '1px solid oklch(100% 0 0 / 0.06)',
           borderRadius: 8, cursor: 'pointer',
           color: 'var(--priv-fg-dim)', fontFamily: 'inherit', fontSize: 11.5,
