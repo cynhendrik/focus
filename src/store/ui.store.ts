@@ -21,6 +21,12 @@ export type CustomerTab =
 /** Tasks page tab. */
 export type TasksTab = 'list' | 'board' | 'focus'
 
+/** Dashboard "Heute" hat drei View-Modi:
+ *  - workspace: alles auf einen Blick (Umsatz, Kunden, Tagesplan, Inbox)
+ *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul)
+ *  - client: Top-Kunden heute (wo ist der meiste Druck) */
+export type DashboardView = 'workspace' | 'sales' | 'client'
+
 /** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
  *  mit eigener Sidebar und eigenem Theme. */
 export type AppMode = 'business' | 'private'
@@ -95,6 +101,7 @@ interface UiState {
   cmdPaletteOpen: boolean
   activeCustomerTab: CustomerTab
   tasksTab: TasksTab
+  dashboardView: DashboardView
   /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
   sidebarCollapsed: boolean
   /** Aktiver App-Modus — Business-Plattform oder Privater Raum. */
@@ -111,6 +118,7 @@ interface UiState {
   setCmdPaletteOpen: (open: boolean) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
   setTasksTab: (tab: TasksTab) => void
+  setDashboardView: (view: DashboardView) => void
   toggleSidebar: () => void
   enterPrivate: (view?: PrivateView) => void
   leavePrivate: () => void
@@ -129,6 +137,7 @@ export const useUiStore = create<UiState>()(
       cmdPaletteOpen: false,
       activeCustomerTab: 'cockpit',
       tasksTab: 'list',
+      dashboardView: 'workspace',
       sidebarCollapsed: false,
       appMode: 'business',
       privateView: 'capture',
@@ -163,6 +172,9 @@ export const useUiStore = create<UiState>()(
       setTasksTab: (tab) =>
         set({ tasksTab: tab }),
 
+      setDashboardView: (view) =>
+        set({ dashboardView: view }),
+
       toggleSidebar: () =>
         set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
@@ -183,6 +195,7 @@ export const useUiStore = create<UiState>()(
         hasSeenIntro: s.hasSeenIntro,
         migrationDone: s.migrationDone,
         tasksTab: s.tasksTab,
+        dashboardView: s.dashboardView,
         sidebarCollapsed: s.sidebarCollapsed,
         appMode: s.appMode,
         privateView: s.privateView,

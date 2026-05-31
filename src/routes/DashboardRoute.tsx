@@ -1,10 +1,16 @@
-import { useEffect, useMemo } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Calendar as CalIcon, FileText, AlertTriangle, CheckCircle2, ArrowRight, Inbox, Bell } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+// ─────────────────────────────────────────────────────────────────────────────
+// DashboardRoute "Heute" — drei View-Modi: Workspace / Sales / Client.
+// Headerbereich ist gemeinsam (Greeting + Datum + Tab-Switcher),
+// die Inhalte unterscheiden sich pro Tab.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Home, TrendingUp, Users, ArrowRight, Bell, Reply, Target, Mail,
+} from 'lucide-react'
 
 import { useCustomersStore } from '@/store/customers.store'
-import { useUiStore } from '@/store/ui.store'
+import { useUiStore, type DashboardView } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -12,26 +18,21 @@ import { useMailStore } from '@/store/mail.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useDealsStore } from '@/store/deals.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { useLeadsStore } from '@/store/leads.store'
+import { useCompanyStore } from '@/store/company.store'
 
-import { DayTimeline } from '@/components/dashboard/DayTimeline'
-import { AccountSignals } from '@/components/dashboard/AccountSignals'
-import { AnimatedNumber } from '@/components/ui/AnimatedNumber'
-import { Skeleton } from '@/components/ui/Skeleton'
-
-import {
-  computePriorities,
-  upcomingTasks,
-  type PriorityItem,
-  type PriorityKind,
-} from '@/lib/dailyPriorities'
 import type { EmailHeader } from '@/types/mail.types'
+import type { CalendarEvent } from '@/types/calendar.types'
+import type { Todo } from '@/types/todo.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// helpers
+// Helpers
 
-const DAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
+const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
 
-function getGreeting(): string {
+function greeting(): string {
   const h = new Date().getHours()
   if (h >= 5  && h < 11) return 'Guten Morgen'
   if (h >= 11 && h < 14) return 'Guten Mittag'
@@ -40,162 +41,624 @@ function getGreeting(): string {
   return 'Gute Nacht'
 }
 
-function fmtCurrency(n: number): string {
-  return new Intl.NumberFormat('de-DE', {
-    style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
-  }).format(n)
+function todayLocalIso(): string {
+  return new Date().toLocaleDateString('sv')
 }
 
-function formatDue(iso: string): string {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
-  const d = new Date(iso)
-  const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0)
-  if (dayStart < today) return 'überfällig'
-  if (dayStart.getTime() === today.getTime()) return 'heute'
-  if (dayStart.getTime() === tomorrow.getTime()) return 'morgen'
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+function startOfWeek(d: Date): Date {
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const m = new Date(d)
+  m.setHours(0, 0, 0, 0)
+  m.setDate(d.getDate() + diff)
+  return m
+}
+
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
+}
+
+function fmtKEur(n: number): string {
+  if (Math.abs(n) >= 1000) {
+    const k = n / 1000
+    return k >= 10 ? `${Math.round(k)}` : k.toFixed(1).replace('.', ',')
+  }
+  return n.toLocaleString('de-DE')
+}
+
+function pct(delta: number, base: number): string {
+  if (base === 0) return delta > 0 ? '+∞%' : '0%'
+  const v = Math.round((delta / base) * 100)
+  return `${v > 0 ? '+' : ''}${v}%`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PriorityCard — the three big cards at the top
+// Hero + Tab-Switcher
 
-type PriorityMeta = { label: string; icon: LucideIcon; tone: 'accent' | 'warn' | 'bad' | 'info' }
+function DashboardHero({ name }: { name: string }) {
+  const view             = useUiStore(s => s.dashboardView)
+  const setDashboardView = useUiStore(s => s.setDashboardView)
+  const salesEnabled     = useCompanyStore(s => s.modules.sales !== false)
 
-const KIND_META: Record<PriorityKind, PriorityMeta> = {
-  meeting:          { label: 'MEETING',     icon: CalIcon,      tone: 'accent' },
-  overdue_task:     { label: 'TASK',        icon: AlertTriangle, tone: 'bad'    },
-  today_task:       { label: 'TASK',        icon: CheckCircle2, tone: 'accent' },
-  tomorrow_task:    { label: 'TASK MORGEN', icon: CheckCircle2, tone: 'info'   },
-  overdue_invoice:  { label: 'RECHNUNG',    icon: FileText,     tone: 'warn'   },
-  followup_due:     { label: 'FOLLOW-UP',   icon: Bell,         tone: 'info'   },
-}
+  const now = new Date()
+  const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
 
-const FALLBACK_META: PriorityMeta = { label: 'EINTRAG', icon: CheckCircle2, tone: 'info' }
-
-function metaFor(kind: PriorityKind): PriorityMeta {
-  const m = KIND_META[kind]
-  if (!m) console.warn('[DashboardRoute] unknown priority kind:', kind)
-  return m ?? FALLBACK_META
-}
-
-function PriorityCard({ item, index, onClick }: {
-  item: PriorityItem
-  index: number
-  onClick: () => void
-}) {
-  const meta = metaFor(item.kind)
-  const Icon = meta.icon
-  const isHero = index === 0
   return (
-    <div
-      className="prio-card"
-      data-tone={isHero ? 'hero' : ''}
-      onClick={onClick}
-      style={{ animationDelay: `${60 + index * 70}ms` }}
-    >
-      <div className="prio-num">
-        <Icon size={11} />
-        <span style={{ marginLeft: 2 }}>{meta.label}</span>
+    <div style={{
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+      gap: 24, padding: '8px 4px 24px',
+    }}>
+      <div>
+        <h1 style={{
+          fontSize: 42, fontWeight: 700, letterSpacing: '-0.025em',
+          lineHeight: 1.05, color: 'var(--fg)', margin: 0,
+        }}>
+          {greeting()}, <span style={{ color: 'var(--accent)' }}>{name}.</span>
+        </h1>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, marginTop: 10,
+          fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'var(--fg-dim)', fontWeight: 600,
+        }}>
+          <span>{dateLine}</span>
+          <span style={{
+            padding: '4px 9px', borderRadius: 99,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            color: 'var(--fg-muted)',
+          }}>
+            Alles. Jeder Kunde.
+          </span>
+        </div>
       </div>
-      <h3 className="prio-title">{item.title}</h3>
-      {item.meta && <p className="prio-meta">{item.meta}</p>}
-      <div className="prio-foot">
-        {item.hint && <span className="prio-chip">{item.hint}</span>}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          öffnen <ArrowRight size={11} />
-        </span>
-      </div>
+
+      <DashboardTabs view={view} onChange={setDashboardView} salesEnabled={salesEnabled} />
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SectionCard — a labelled card container
-
-function SectionCard({
-  title, count, children, empty, accent,
+function DashboardTabs({
+  view, onChange, salesEnabled,
 }: {
-  title: string
-  count?: number
-  children: React.ReactNode
-  empty?: string
-  accent?: React.ReactNode
+  view: DashboardView
+  onChange: (v: DashboardView) => void
+  salesEnabled: boolean
 }) {
-  const isEmpty = count === 0
+  const tab = (id: DashboardView, label: string, Icon: typeof Home) => {
+    const active = view === id
+    return (
+      <button
+        key={id}
+        onClick={() => onChange(id)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '8px 14px', borderRadius: 999,
+          background: active ? 'var(--accent)' : 'transparent',
+          color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
+          border: 'none', cursor: 'pointer',
+          fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
+          transition: 'background 140ms, color 140ms',
+        }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg)' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
+      >
+        <Icon size={13} />
+        {label}
+      </button>
+    )
+  }
+
   return (
-    <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5, fontWeight: 600, margin: 0, letterSpacing: '-0.005em' }}>
-          {title}
-          {count !== undefined && count > 0 && (
-            <span className="count" style={{
-              fontFamily: 'var(--font-mono)', fontSize: 10.5,
-              color: 'var(--fg-dim)', fontWeight: 500, letterSpacing: '0.06em',
-              background: 'oklch(100% 0 0 / 0.04)', padding: '2px 7px', borderRadius: 99,
-            }}>
-              {String(count).padStart(2, '0')}
-            </span>
-          )}
-        </h2>
-        {accent}
-      </div>
-      {isEmpty
-        ? <p className="empty" style={{ padding: '20px 0', fontSize: 12.5 }}>{empty ?? 'Alles klar.'}</p>
-        : <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{children}</div>}
+    <div style={{
+      display: 'inline-flex', padding: 3, gap: 0,
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 999, flexShrink: 0,
+    }}>
+      {tab('workspace', 'Workspace', Home)}
+      {salesEnabled && tab('sales', 'Sales', TrendingUp)}
+      {tab('client', 'Client', Users)}
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Row components
+// KPI Card (gemeinsam fuer alle Views)
 
-function TaskRow({ title, customerName, due, onClick }: {
-  title: string
-  customerName?: string
-  due?: string
-  onClick: () => void
+function KpiCard({
+  label, value, hint, accentValue, action, children,
+}: {
+  label: string
+  value: React.ReactNode
+  hint?: React.ReactNode
+  accentValue?: boolean   // groesse Zahl in lime statt fg
+  action?: { label?: string; onClick: () => void }
+  children?: React.ReactNode  // Header-Toolbar (z.B. Woche/Monat-Toggle)
 }) {
-  const dueLabel = due ? formatDue(due) : undefined
-  const isOverdue = dueLabel === 'überfällig'
-  const isToday   = dueLabel === 'heute'
   return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: '1fr auto',
-        alignItems: 'center', gap: 12,
-        padding: '9px 6px', borderRadius: 10,
-        cursor: 'pointer',
-        transition: 'background 180ms ease',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'oklch(100% 0 0 / 0.04)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {title}
+    <div style={{
+      borderRadius: 16, border: '1px solid var(--border)',
+      background: 'var(--bg-2)', padding: '18px 20px',
+      display: 'flex', flexDirection: 'column', gap: 12,
+      position: 'relative', minHeight: 152,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'var(--fg-dim)', fontWeight: 600,
+        }}>
+          {label}
         </span>
-        {customerName && (
-          <span style={{ fontSize: 11.5, color: 'var(--fg-dim)', marginTop: 1 }}>{customerName}</span>
+        {children}
+        {action && (
+          <button
+            onClick={action.onClick}
+            title={action.label}
+            style={{
+              width: 26, height: 26, borderRadius: 99,
+              background: 'transparent', border: '1px solid var(--border)',
+              color: 'var(--fg-dim)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'color 140ms, border-color 140ms',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = 'var(--fg)'
+              e.currentTarget.style.borderColor = 'var(--border-strong)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'var(--fg-dim)'
+              e.currentTarget.style.borderColor = 'var(--border)'
+            }}
+          >
+            <ArrowRight size={12} />
+          </button>
         )}
       </div>
-      {dueLabel && (
-        <span
-          className="chip"
-          data-tone={isOverdue ? 'bad' : isToday ? 'accent' : ''}
-          style={{ flexShrink: 0 }}
-        >
-          {dueLabel}
-        </span>
+
+      <div style={{
+        fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.04em',
+        color: accentValue ? 'var(--accent)' : 'var(--fg)',
+        fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+      }}>
+        {value}
+      </div>
+
+      {hint && (
+        <div style={{ fontSize: 12, color: 'var(--fg-muted)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {hint}
+        </div>
       )}
     </div>
   )
 }
 
-function MailRow({ email, customerName, onClick }: {
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkspaceView — KPIs + Tagesplan + Inbox
+
+function WorkspaceView() {
+  const customers = useCustomersStore(s => s.customers)
+  const invoices  = useFinanceStore(s => s.invoices)
+  const todos     = useTodosStore(s => s.allTodos)
+  const followUps = useCrmStore(s => s.allFollowUps)
+  const events    = useCalendarStore(s => s.todayEvents)
+  const setAppView = useUiStore(s => s.setAppView)
+
+  const [revRange, setRevRange] = useState<'week' | 'month'>('week')
+
+  // Umsatz
+  const { paidNow, paidPrev, label, hintPrevLabel } = useMemo(() => {
+    const now = new Date()
+    let rangeStart: Date
+    let prevStart: Date
+    let prevEnd:   Date
+    let label:     string
+    let hintPrevLabel: string
+
+    if (revRange === 'week') {
+      rangeStart = startOfWeek(now)
+      const prevWeek = new Date(rangeStart); prevWeek.setDate(prevWeek.getDate() - 7)
+      prevStart = prevWeek
+      prevEnd   = new Date(rangeStart)
+      label = 'diese Woche'
+      hintPrevLabel = 'vs Vorwoche'
+    } else {
+      rangeStart = startOfMonth(now)
+      const prevMonth = new Date(rangeStart); prevMonth.setMonth(prevMonth.getMonth() - 1)
+      prevStart = prevMonth
+      prevEnd   = new Date(rangeStart)
+      label = 'diesen Monat'
+      hintPrevLabel = 'vs Vormonat'
+    }
+
+    let paidNow = 0
+    let paidPrev = 0
+    for (const inv of invoices) {
+      if (inv.status !== 'paid') continue
+      const ts = new Date(inv.date)
+      if (ts >= rangeStart && ts <= now) paidNow += inv.total
+      else if (ts >= prevStart && ts < prevEnd) paidPrev += inv.total
+    }
+    return { paidNow, paidPrev, label, hintPrevLabel }
+  }, [invoices, revRange])
+
+  // Aktive Kunden — alle nicht-privaten, +Anzahl der diese Woche neu erstellten
+  const activeCount = useMemo(
+    () => customers.filter(c => !c.isPrivate).length,
+    [customers],
+  )
+  const newThisWeek = useMemo(() => {
+    const sow = startOfWeek(new Date()).toISOString()
+    return customers.filter(c => !c.isPrivate && c.createdAt && c.createdAt >= sow).length
+  }, [customers])
+
+  // Heute faellig
+  const todayIso = todayLocalIso()
+  const dueToday = useMemo(() => {
+    const tasks = todos.filter(t => t.status !== 'done' && t.dueDate === todayIso).length
+    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
+    return { tasks, fus, total: tasks + fus + events.length }
+  }, [todos, followUps, events, todayIso])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
+      }}>
+        <KpiCard
+          label="Umsatz"
+          value={
+            <span>
+              {fmtKEur(paidNow)}
+              <span style={{
+                fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2,
+                fontFamily: 'var(--font-mono)', fontWeight: 600,
+              }}>
+                k€
+              </span>
+            </span>
+          }
+          hint={
+            <>
+              <span style={{ color: paidNow >= paidPrev ? 'var(--accent)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>
+                {paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}
+              </span>
+              <span style={{ color: 'var(--fg-dim)' }}>·</span>
+              <span>{hintPrevLabel}</span>
+              <span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span>
+            </>
+          }
+        >
+          <WeekMonthToggle range={revRange} onChange={setRevRange} />
+        </KpiCard>
+
+        <KpiCard
+          label="Aktive Kunden"
+          value={String(activeCount)}
+          hint={
+            <>
+              <span style={{ color: newThisWeek > 0 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>
+                {newThisWeek > 0 ? `+${newThisWeek}` : '0'}
+              </span>
+              <span style={{ color: 'var(--fg-dim)' }}>·</span>
+              <span>diese Woche</span>
+            </>
+          }
+          action={{ label: 'Zu Clients', onClick: () => setAppView('clients') }}
+        />
+
+        <KpiCard
+          label="Heute fällig"
+          value={String(dueToday.total)}
+          accentValue={dueToday.total > 0}
+          hint={
+            <>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span>
+              <span style={{ color: 'var(--fg-dim)' }}>·</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.fus} FU</span>
+              <span style={{ color: 'var(--fg-dim)' }}>·</span>
+              <span>{events.length} Termine</span>
+            </>
+          }
+          action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
+        />
+      </div>
+
+      <TagesplanCard events={events} todos={todos} customers={customers} />
+
+      <InboxCard />
+    </div>
+  )
+}
+
+function WeekMonthToggle({
+  range, onChange,
+}: { range: 'week' | 'month'; onChange: (r: 'week' | 'month') => void }) {
+  const btn = (id: 'week' | 'month', label: string) => {
+    const active = range === id
+    return (
+      <button
+        onClick={() => onChange(id)}
+        style={{
+          padding: '4px 11px', borderRadius: 99,
+          background: active ? 'var(--accent)' : 'transparent',
+          color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
+          border: 'none', cursor: 'pointer',
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700,
+          letterSpacing: '0.10em', textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </button>
+    )
+  }
+  return (
+    <div style={{
+      display: 'inline-flex', padding: 2, gap: 2,
+      background: 'var(--surface-2)', border: '1px solid var(--border)',
+      borderRadius: 99,
+    }}>
+      {btn('week', 'Woche')}
+      {btn('month', 'Monat')}
+    </div>
+  )
+}
+
+// ── Tagesplan ───────────────────────────────────────────────────────────────
+
+interface PlanItem {
+  id:       string
+  time:     string     // HH:MM
+  title:    string
+  subtitle: string
+  status:   { kind: 'now' | 'block' | 'pause' | 'live' | 'fokus' | 'short'; label: string }
+}
+
+function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
+  const now = new Date()
+  const items: PlanItem[] = []
+
+  // Termine heute → mit Zeit
+  for (const ev of events) {
+    const start = new Date(ev.startAt)
+    const end = ev.endAt ? new Date(ev.endAt) : new Date(start.getTime() + 60 * 60_000)
+    const isNow = start <= now && end >= now
+    const minutes = Math.round((end.getTime() - start.getTime()) / 60_000)
+    let status: PlanItem['status']
+    if (isNow) status = { kind: 'now', label: 'Jetzt' }
+    else if (minutes >= 60) status = { kind: 'block', label: `Block · ${Math.round(minutes / 60)}h` }
+    else status = { kind: 'short', label: `${minutes}m` }
+
+    items.push({
+      id: `ev-${ev.id}`,
+      time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      title: ev.title || '(Termin)',
+      subtitle: ev.location || ev.description || '',
+      status,
+    })
+  }
+
+  // Heute fällige Tasks (ohne Uhrzeit → ohne Zeit-Label)
+  const todayIso = todayLocalIso()
+  for (const t of todos) {
+    if (t.status === 'done') continue
+    if (t.dueDate !== todayIso) continue
+    items.push({
+      id: `t-${t.id}`,
+      time: '',
+      title: t.title,
+      subtitle: t.priority === 'p1' || t.priority === 'p2' ? 'Hohe Prio' : '',
+      status: { kind: 'fokus', label: 'Fokus' },
+    })
+  }
+
+  // Sortieren: Termine mit Zeit aufsteigend, Tasks ohne Zeit ans Ende
+  return items.sort((a, b) => {
+    if (!a.time && b.time) return 1
+    if (a.time && !b.time) return -1
+    return a.time.localeCompare(b.time)
+  })
+}
+
+function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties {
+  const base: React.CSSProperties = {
+    padding: '4px 11px', borderRadius: 99,
+    fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700,
+    letterSpacing: '0.12em', textTransform: 'uppercase',
+  }
+  switch (kind) {
+    case 'now':   return { ...base, background: 'var(--accent)',                  color: 'var(--accent-ink)' }
+    case 'block': return { ...base, background: 'oklch(78% 0.13 235 / 0.18)',     color: 'oklch(78% 0.13 235)' }
+    case 'pause': return { ...base, background: 'var(--surface-2)',               color: 'var(--fg-muted)' }
+    case 'live':  return { ...base, background: 'oklch(72% 0.18 25 / 0.15)',      color: 'oklch(72% 0.18 25)' }
+    case 'fokus': return { ...base, background: 'oklch(82% 0.16 70 / 0.15)',      color: 'oklch(82% 0.16 70)' }
+    case 'short': return { ...base, background: 'var(--surface-2)',               color: 'var(--fg-dim)' }
+  }
+}
+
+function TagesplanCard({
+  events, todos, customers: _customers,
+}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[] }) {
+  const items = useMemo(() => buildTagesplan(events, todos), [events, todos])
+
+  return (
+    <div style={{
+      borderRadius: 16, border: '1px solid var(--border)',
+      background: 'var(--bg-2)', padding: '20px 22px',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 16,
+      }}>
+        <h2 style={{
+          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
+          letterSpacing: '-0.01em',
+        }}>
+          Mein Tagesplan
+        </h2>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          color: 'var(--fg-dim)', letterSpacing: '0.04em',
+        }}>
+          {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'} · heute
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{
+          padding: '20px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5,
+        }}>
+          Keine Termine, keine fälligen Tasks. Tag offen.
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          {/* Spine */}
+          <div style={{
+            position: 'absolute', left: 75, top: 6, bottom: 6, width: 1,
+            background: 'var(--border)',
+          }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {items.map(item => <TagesplanRow key={item.id} item={item} />)}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TagesplanRow({ item }: { item: PlanItem }) {
+  const isNow = item.status.kind === 'now'
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
+      alignItems: 'center', gap: 12, padding: '12px 0',
+    }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 11,
+        color: isNow ? 'var(--accent)' : 'var(--fg-dim)',
+        fontWeight: isNow ? 700 : 500, letterSpacing: '0.04em',
+      }}>
+        {item.time || '—'}
+      </span>
+      <div style={{ display: 'flex', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+        <span style={{
+          width: 10, height: 10, borderRadius: 99,
+          background: isNow ? 'var(--accent)' : 'transparent',
+          border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
+          boxShadow: isNow ? '0 0 0 4px oklch(92% 0.2 125 / 0.16)' : 'none',
+        }} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{
+          fontSize: 13.5, fontWeight: 600, color: 'var(--fg)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {item.title}
+        </span>
+        {item.subtitle && (
+          <span style={{
+            fontSize: 11.5, color: 'var(--fg-muted)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {item.subtitle}
+          </span>
+        )}
+      </div>
+      <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
+    </div>
+  )
+}
+
+// ── Inbox-Card ──────────────────────────────────────────────────────────────
+
+function InboxCard() {
+  const emails            = useMailStore(s => s.emails)
+  const loadEmails        = useMailStore(s => s.loadEmails)
+  const selectEmail       = useMailStore(s => s.selectEmail)
+  const selectedAccountId = useMailStore(s => s.selectedAccountId)
+  const setAppView        = useUiStore(s => s.setAppView)
+  const customers         = useCustomersStore(s => s.customers)
+
+  useEffect(() => {
+    if (selectedAccountId && emails.length === 0) loadEmails()
+  }, [selectedAccountId, emails.length, loadEmails])
+
+  const customerByEmail = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of customers) if (c.email) m.set(c.email.toLowerCase(), c.name)
+    return m
+  }, [customers])
+
+  const sorted = useMemo(
+    () => [...emails].sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || '')),
+    [emails],
+  )
+
+  return (
+    <div style={{
+      borderRadius: 16, border: '1px solid var(--border)',
+      background: 'var(--bg-2)',
+      display: 'flex', flexDirection: 'column', minHeight: 0,
+      maxHeight: 480, overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        padding: '20px 22px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+      }}>
+        <h2 style={{
+          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
+          letterSpacing: '-0.01em',
+        }}>
+          Inbox
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10.5,
+            color: 'var(--fg-dim)', letterSpacing: '0.04em',
+          }}>
+            {sorted.length} {sorted.length === 1 ? 'Mail' : 'Mails'}
+          </span>
+          <button
+            onClick={() => setAppView('mail')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 10px', borderRadius: 8,
+              background: 'transparent', border: '1px solid var(--border)',
+              color: 'var(--fg-muted)', cursor: 'pointer',
+              fontFamily: 'inherit', fontSize: 11.5,
+            }}
+          >
+            Alle <ArrowRight size={11} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', padding: '6px 14px 12px' }}>
+        {sorted.length === 0 ? (
+          <div style={{ padding: '28px 12px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
+            {selectedAccountId ? 'Inbox leer' : 'Kein Mail-Konto verbunden'}
+          </div>
+        ) : (
+          sorted.map(e => (
+            <InboxRow
+              key={e.id}
+              email={e}
+              customerName={customerByEmail.get(e.fromAddr?.toLowerCase() ?? '') ?? null}
+              onClick={() => { selectEmail(e); setAppView('mail') }}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function InboxRow({
+  email, customerName, onClick,
+}: {
   email: EmailHeader
-  customerName?: string
+  customerName: string | null
   onClick: () => void
 }) {
   const time = new Date(email.sentAt)
@@ -209,24 +672,31 @@ function MailRow({ email, customerName, onClick }: {
     <div
       onClick={onClick}
       style={{
-        display: 'grid', gridTemplateColumns: '1fr auto',
-        alignItems: 'center', gap: 12,
-        padding: '9px 6px', borderRadius: 10,
-        cursor: 'pointer',
-        transition: 'background 180ms ease',
+        display: 'grid', gridTemplateColumns: '1fr auto', gap: 12,
+        alignItems: 'center', padding: '10px 8px', borderRadius: 10,
+        cursor: 'pointer', transition: 'background 140ms',
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'oklch(100% 0 0 / 0.04)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600, color: 'var(--fg)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
           {customerName ?? email.fromName ?? email.fromAddr}
         </span>
-        <span style={{ fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{
+          fontSize: 11.5, color: 'var(--fg-muted)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
           {email.subject || '(ohne Betreff)'}
         </span>
       </div>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0 }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5,
+        color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
+      }}>
         {timeLabel}
       </span>
     </div>
@@ -234,70 +704,418 @@ function MailRow({ email, customerName, onClick }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Skeleton placeholders — shown during initial data load
+// SalesView — Pipeline, Follow-Ups, Neue Leads
 
-function PrioritySkeleton() {
-  return (
-    <div className="priorities">
-      {[0, 1, 2].map(i => (
-        <div
-          key={i}
-          className="prio-card"
-          style={{ animation: 'none', cursor: 'default', pointerEvents: 'none' }}
-        >
-          <Skeleton width={80} height={11} radius={4} style={{ marginBottom: 16 }} />
-          <Skeleton width="80%" height={22} radius={6} style={{ marginBottom: 8 }} />
-          <Skeleton width="50%" height={13} radius={6} style={{ marginBottom: 16 }} />
-          <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
-            <Skeleton width={70} height={18} radius={99} />
-            <Skeleton width={50} height={11} radius={6} />
-          </div>
-        </div>
-      ))}
-    </div>
+function SalesView() {
+  const deals     = useDealsStore(s => s.deals)
+  const stages    = usePipelineStore(s => s.stages)
+  const followUps = useCrmStore(s => s.allFollowUps)
+  const leads     = useLeadsStore(s => s.leads)
+  const setAppView = useUiStore(s => s.setAppView)
+
+  const openDeals = useMemo(() => {
+    const byName = new Map(stages.map(s => [s.name, s]))
+    return deals.filter(d => {
+      const s = byName.get(d.stage)
+      return !s || (!s.isWon && !s.isLost)
+    })
+  }, [deals, stages])
+  const pipelineValue = openDeals.reduce((s, d) => s + (d.value ?? 0), 0)
+  const wonValue = useMemo(() => {
+    const wonName = stages.find(s => s.isWon)?.name
+    if (!wonName) return 0
+    return deals.filter(d => d.stage === wonName).reduce((s, d) => s + (d.value ?? 0), 0)
+  }, [deals, stages])
+
+  // Stage-Breakdown (nur offene Stages)
+  const stageBreakdown = useMemo(() => {
+    const open = stages.filter(s => !s.isWon && !s.isLost).sort((a, b) => a.orderIndex - b.orderIndex)
+    return open.map(s => ({
+      stage: s,
+      count: deals.filter(d => d.stage === s.name).length,
+      value: deals.filter(d => d.stage === s.name).reduce((sum, d) => sum + (d.value ?? 0), 0),
+    }))
+  }, [stages, deals])
+
+  const todayIso = todayLocalIso()
+  const fuDueOrOverdue = useMemo(
+    () => followUps
+      .filter(f => f.status === 'offen' && f.dueDate <= todayIso)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .slice(0, 8),
+    [followUps, todayIso],
   )
-}
 
-function StatChipSkeleton() {
+  const newLeadsThisWeek = useMemo(() => {
+    const sow = startOfWeek(new Date()).toISOString()
+    return leads
+      .filter(l => l.createdAt >= sow)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 8)
+  }, [leads])
+
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'baseline', gap: 8,
-      padding: '8px 14px', borderRadius: 99,
-      background: 'oklch(100% 0 0 / 0.04)',
-      border: '1px solid var(--border)',
-    }}>
-      <Skeleton width={70} height={10} radius={4} />
-      <Skeleton width={48} height={14} radius={6} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* KPI-Zeile */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
+      }}>
+        <KpiCard
+          label="Pipeline-Wert"
+          value={
+            <span>
+              {fmtKEur(pipelineValue)}
+              <span style={{ fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>k€</span>
+            </span>
+          }
+          hint={<><span style={{ color: 'var(--accent)', fontWeight: 600 }}>{openDeals.length}</span><span>offene Deals</span></>}
+          action={{ label: 'Zur Pipeline', onClick: () => setAppView('pipeline') }}
+        />
+        <KpiCard
+          label="Gewonnen"
+          value={
+            <span>
+              {fmtKEur(wonValue)}
+              <span style={{ fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>k€</span>
+            </span>
+          }
+          hint={<span>kumuliert</span>}
+        />
+        <KpiCard
+          label="Fällige Follow-Ups"
+          value={String(fuDueOrOverdue.length)}
+          accentValue={fuDueOrOverdue.length > 0}
+          hint={<span>heute oder überfällig</span>}
+          action={{ label: 'Zu Follow-Ups', onClick: () => setAppView('followups') }}
+        />
+      </div>
+
+      {/* Pipeline-Stage-Breakdown */}
+      <div style={{
+        borderRadius: 16, border: '1px solid var(--border)',
+        background: 'var(--bg-2)', padding: '20px 22px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
+            Pipeline-Verteilung
+          </h2>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-dim)' }}>
+            {stageBreakdown.length} Stages
+          </span>
+        </div>
+
+        {stageBreakdown.length === 0 ? (
+          <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
+            Noch keine Stages konfiguriert.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stageBreakdown.length}, 1fr)`, gap: 10 }}>
+            {stageBreakdown.map(({ stage, count, value }) => (
+              <div
+                key={stage.id}
+                onClick={() => setAppView('pipeline')}
+                style={{
+                  padding: 14, borderRadius: 12,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                  transition: 'border-color 140ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+              >
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.10em',
+                  textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 700,
+                }}>
+                  {stage.label}
+                </span>
+                <span style={{
+                  fontSize: 28, fontWeight: 700, color: 'var(--fg)',
+                  fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+                }}>
+                  {count}
+                </span>
+                <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
+                  {value > 0 ? `${fmtKEur(value)} k€` : '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Zwei-Spalten: Follow-Ups + Neue Leads */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border)',
+          background: 'var(--bg-2)', padding: '20px 22px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>
+              Fällige Follow-Ups
+            </h2>
+            <Reply size={13} style={{ color: 'var(--fg-dim)' }} />
+          </div>
+          {fuDueOrOverdue.length === 0 ? (
+            <div style={{ padding: '10px 4px', color: 'var(--fg-dim)', fontSize: 12.5 }}>
+              Keine offenen Follow-Ups.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {fuDueOrOverdue.map(f => {
+                const isOverdue = f.dueDate < todayIso
+                return (
+                  <div
+                    key={f.id}
+                    onClick={() => setAppView('followups')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 12px', borderRadius: 10,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{
+                      width: 6, height: 6, borderRadius: 99,
+                      background: isOverdue ? 'oklch(72% 0.18 25)' : 'var(--accent)',
+                      flexShrink: 0,
+                    }} />
+                    <span style={{
+                      flex: 1, fontSize: 13, color: 'var(--fg)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {f.title}
+                    </span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                      color: isOverdue ? 'oklch(72% 0.18 25)' : 'var(--fg-dim)',
+                    }}>
+                      {isOverdue ? 'überfällig' : 'heute'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border)',
+          background: 'var(--bg-2)', padding: '20px 22px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>
+              Neue Leads · diese Woche
+            </h2>
+            <Target size={13} style={{ color: 'var(--fg-dim)' }} />
+          </div>
+          {newLeadsThisWeek.length === 0 ? (
+            <div style={{ padding: '10px 4px', color: 'var(--fg-dim)', fontSize: 12.5 }}>
+              Keine neuen Leads.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {newLeadsThisWeek.map(l => (
+                <div
+                  key={l.id}
+                  onClick={() => setAppView('leads')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', borderRadius: 10,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{
+                    flex: 1, fontSize: 13, color: 'var(--fg)', fontWeight: 600,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {l.name}
+                  </span>
+                  {l.companyName && (
+                    <span style={{
+                      fontSize: 11.5, color: 'var(--fg-muted)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      · {l.companyName}
+                    </span>
+                  )}
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                    color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
+                  }}>
+                    {new Date(l.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick stat chip (footer row)
+// ClientView — Top-Kunden heute
 
-function QuickStat({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
+function ClientView() {
+  const customers   = useCustomersStore(s => s.customers)
+  const todos       = useTodosStore(s => s.allTodos)
+  const followUps   = useCrmStore(s => s.allFollowUps)
+  const events      = useCalendarStore(s => s.todayEvents)
+  const emails      = useMailStore(s => s.emails)
+  const openCustomerAt = useUiStore(s => s.openCustomerAt)
+
+  const todayIso = todayLocalIso()
+
+  // Pro Kunde Druck zaehlen
+  const ranked = useMemo(() => {
+    const pressure = new Map<string, { tasks: number; fus: number; events: number; mails: number }>()
+
+    for (const t of todos) {
+      if (t.status === 'done') continue
+      if (!t.customerId) continue
+      if (t.dueDate && t.dueDate > todayIso) continue
+      const p = pressure.get(t.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
+      p.tasks++
+      pressure.set(t.customerId, p)
+    }
+    for (const f of followUps) {
+      if (f.status !== 'offen') continue
+      if (f.dueDate > todayIso) continue
+      const p = pressure.get(f.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
+      p.fus++
+      pressure.set(f.customerId, p)
+    }
+    for (const ev of events) {
+      if (!ev.accountId) continue
+      const p = pressure.get(ev.accountId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
+      p.events++
+      pressure.set(ev.accountId, p)
+    }
+    // Mails ohne Antwort (letzte 7 Tage)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
+    for (const e of emails) {
+      if (!e.customerId) continue
+      if (!e.sentAt || e.sentAt < sevenDaysAgo) continue
+      const p = pressure.get(e.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
+      p.mails++
+      pressure.set(e.customerId, p)
+    }
+
+    return Array.from(pressure.entries())
+      .map(([customerId, p]) => {
+        const customer = customers.find(c => c.id === customerId)
+        if (!customer) return null
+        const score = p.tasks * 3 + p.fus * 3 + p.events * 4 + p.mails * 1
+        return { customer, ...p, score }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+  }, [todos, followUps, events, emails, customers, todayIso])
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'baseline', gap: 8,
-      padding: '8px 14px', borderRadius: 99,
-      background: accent ? 'var(--accent-soft)' : 'oklch(100% 0 0 / 0.04)',
-      border: '1px solid var(--border)',
-    }}>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-        letterSpacing: '0.08em', textTransform: 'uppercase',
-        color: 'var(--fg-dim)', fontWeight: 600,
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{
+        borderRadius: 16, border: '1px solid var(--border)',
+        background: 'var(--bg-2)', padding: '22px 24px',
       }}>
-        {label}
-      </span>
-      <span style={{
-        fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14,
-        color: accent ? 'var(--accent)' : 'var(--fg)',
-        letterSpacing: '-0.01em',
-      }}>
-        {typeof value === 'number' ? <AnimatedNumber value={value} /> : value}
-      </span>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginBottom: 18,
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
+              Wo ist heute der meiste Druck
+            </h2>
+            <div style={{
+              marginTop: 4, fontSize: 12, color: 'var(--fg-muted)',
+            }}>
+              Kunden sortiert nach offenen Tasks, Follow-Ups, Terminen und Mails.
+            </div>
+          </div>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10.5,
+            color: 'var(--fg-dim)', letterSpacing: '0.04em',
+          }}>
+            {ranked.length} {ranked.length === 1 ? 'Kunde' : 'Kunden'}
+          </span>
+        </div>
+
+        {ranked.length === 0 ? (
+          <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
+            Heute liegt nichts an. Genieß die Ruhe.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {ranked.map(row => (
+              <div
+                key={row.customer.id}
+                onClick={() => openCustomerAt(row.customer.id, 'cockpit')}
+                style={{
+                  display: 'grid', gridTemplateColumns: '44px 1fr auto auto auto auto',
+                  alignItems: 'center', gap: 14,
+                  padding: '12px 16px', borderRadius: 12,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  cursor: 'pointer', transition: 'border-color 140ms',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+              >
+                <span style={{
+                  width: 38, height: 38, borderRadius: 10,
+                  background: 'oklch(28% 0 0 / 0.45)',
+                  border: '1px solid oklch(38% 0 0)',
+                  color: 'oklch(70% 0 0)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                }}>
+                  {row.customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{row.customer.name}</div>
+                  {row.customer.industry && (
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em',
+                      textTransform: 'uppercase', color: 'var(--fg-dim)', marginTop: 2,
+                    }}>
+                      {row.customer.industry}
+                    </div>
+                  )}
+                </div>
+                <PressurePill icon="task"  count={row.tasks}  color="var(--accent)" />
+                <PressurePill icon="fu"    count={row.fus}    color="oklch(82% 0.16 70)" />
+                <PressurePill icon="event" count={row.events} color="oklch(78% 0.13 235)" />
+                <PressurePill icon="mail"  count={row.mails}  color="var(--fg-muted)" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+function PressurePill({
+  icon, count, color,
+}: { icon: 'task' | 'fu' | 'event' | 'mail'; count: number; color: string }) {
+  if (count === 0) return <span style={{ width: 44 }} />
+  const I = icon === 'task' ? Bell : icon === 'fu' ? Reply : icon === 'event' ? Target : Mail
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 8px', borderRadius: 99,
+      background: `color-mix(in oklch, ${color} 12%, transparent)`,
+      color, border: `1px solid color-mix(in oklch, ${color} 28%, transparent)`,
+      fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700,
+      fontVariantNumeric: 'tabular-nums',
+    }}>
+      <I size={10} />
+      {count}
+    </span>
   )
 }
 
@@ -305,274 +1123,39 @@ function QuickStat({ label, value, accent }: { label: string; value: string | nu
 // Main route
 
 export function DashboardRoute() {
-  const customers   = useCustomersStore(s => s.customers)
-  const setSelected = useUiStore(s => s.setSelectedCustomer)
-  const setAppView  = useUiStore(s => s.setAppView)
-  const user        = useAuthStore(s => s.user)
-  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const view             = useUiStore(s => s.dashboardView)
+  const setDashboardView = useUiStore(s => s.setDashboardView)
+  const user             = useAuthStore(s => s.user)
+  const workspaceId      = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const salesEnabled     = useCompanyStore(s => s.modules.sales !== false)
 
-  // Finance
-  const kpis      = useFinanceStore(s => s.kpis)
-  const invoices  = useFinanceStore(s => s.invoices)
-  const loadKpis  = useFinanceStore(s => s.loadKpis)
+  // Data loads — sind in App.tsx schon in den beiden Init-Wellen,
+  // hier nur Finance ergaenzen, weil das nicht workspace-weit geladen wird.
   const loadFinance = useFinanceStore(s => s.loadAll)
-
-  // Mail
-  const emails            = useMailStore(s => s.emails)
-  const loadEmails        = useMailStore(s => s.loadEmails)
-  const selectEmail       = useMailStore(s => s.selectEmail)
-  const selectedAccountId = useMailStore(s => s.selectedAccountId)
-
-  // Calendar
-  const todayEvents    = useCalendarStore(s => s.todayEvents)
-  const isTodayLoading = useCalendarStore(s => s.isTodayLoading)
-  const loadToday      = useCalendarStore(s => s.loadToday)
-
-  // Todos & follow-ups
-  const todos        = useTodosStore(s => s.allTodos)
-  const allFollowUps = useCrmStore(s => s.allFollowUps)
-  const loadFollowUps = useCrmStore(s => s.loadAll)
-
-  // ── Initial loads ───────────────────────────────────────────────────────
+  const loadToday   = useCalendarStore(s => s.loadToday)
   useEffect(() => {
     if (!workspaceId) return
-    loadKpis(workspaceId)
     loadFinance(workspaceId)
     loadToday(workspaceId)
-    loadFollowUps(workspaceId)
-  }, [workspaceId])
+  }, [workspaceId, loadFinance, loadToday])
 
+  // Falls Sales-Modul deaktiviert ist, aber dashboardView='sales' persistiert,
+  // korrigieren wir das beim ersten Render.
   useEffect(() => {
-    if (selectedAccountId && emails.length === 0) loadEmails()
-  }, [selectedAccountId, emails.length, loadEmails])
+    if (view === 'sales' && !salesEnabled) setDashboardView('workspace')
+  }, [view, salesEnabled, setDashboardView])
 
-  // ── Derived data ────────────────────────────────────────────────────────
-  const now = new Date()
-  const dateStr = `${DAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
-  const firstName = user?.email?.split('@')[0] ?? 'User'
+  const firstName = (user?.email?.split('@')[0] ?? 'User').replace(/^./, c => c.toUpperCase())
 
-  const priorities = useMemo(
-    () => computePriorities({
-      customers,
-      todos,
-      events: todayEvents,
-      invoices,
-      followups: allFollowUps,
-    }),
-    [customers, todos, todayEvents, invoices, allFollowUps],
-  )
-  const top3 = priorities.slice(0, 3)
-
-  const usedTaskIds = useMemo(() => new Set(top3.filter(p => p.id.startsWith('task:')).map(p => p.id)), [top3])
-  const upcoming = useMemo(
-    () => upcomingTasks(todos, customers, usedTaskIds, 5),
-    [todos, customers, usedTaskIds],
-  )
-
-  const customerByEmail = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const c of customers) if (c.email) map.set(c.email.toLowerCase(), c.name)
-    return map
-  }, [customers])
-
-  const waitingEmails = useMemo<EmailHeader[]>(
-    () => emails
-      .filter(e => !e.isRead)
-      .filter(e => {
-        // Prefer mails linked to a customer (or whose sender domain matches one)
-        if (e.customerId) return true
-        if (e.fromAddr && customerByEmail.has(e.fromAddr.toLowerCase())) return true
-        return true  // fall through: still show, all unread mails count as waiting
-      })
-      .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-      .slice(0, 5),
-    [emails, customerByEmail],
-  )
-
-  const overdueFollowups = useMemo(
-    () => allFollowUps
-      .filter(f => f.status === 'offen')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .slice(0, 5),
-    [allFollowUps],
-  )
-
-  // We treat "kpis still null" as the initial-load signal — finance is the last
-  // store we wait for. Once it returns (even with all zeros), the UI is ready.
-  const loading = kpis === null
-
-  // ── Click handlers ──────────────────────────────────────────────────────
-  function openPriority(item: PriorityItem) {
-    if (item.customerId) {
-      setSelected(item.customerId)
-    } else if (item.kind === 'meeting') {
-      setAppView('calendar')
-    }
-  }
-
-  function openEmail(email: EmailHeader) {
-    selectEmail(email)
-    setAppView('mail')
-  }
-
-  // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="main-inner">
+    <div className="main-inner" style={{
+      maxWidth: 1240, margin: '0 auto', padding: '24px 28px 64px',
+    }}>
+      <DashboardHero name={firstName} />
 
-      {/* Greeting */}
-      <div className="greeting">
-        <h1 className="greeting-title">
-          {getGreeting()},<br /><em>{firstName}.</em>
-        </h1>
-        <div className="greeting-sub">
-          <span>{dateStr}</span>
-          <span>
-            <strong>{top3.length} {top3.length === 1 ? 'Sache' : 'Sachen'}</strong> heute
-          </span>
-          {waitingEmails.length > 0 && (
-            <span>{waitingEmails.length} ungelesene Mails</span>
-          )}
-        </div>
-      </div>
-
-      {/* DREI SACHEN HEUTE */}
-      <div className="section-head" style={{ marginTop: 0 }}>
-        <h2>
-          Drei Sachen heute
-          {top3.length > 0 && <span className="count">{String(top3.length).padStart(2, '0')}</span>}
-        </h2>
-      </div>
-
-      {loading ? (
-        <PrioritySkeleton />
-      ) : top3.length === 0 ? (
-        <div className="card" style={{
-          padding: '32px 28px', display: 'flex', alignItems: 'center', gap: 14,
-          marginBottom: 24,
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: 'var(--accent-soft)', color: 'var(--accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <CheckCircle2 size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Nichts Dringendes heute.</div>
-            <div style={{ fontSize: 12.5, color: 'var(--fg-muted)', marginTop: 2 }}>
-              Zeit für strategische Arbeit oder einen Kaffee.
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="priorities">
-          <AnimatePresence initial={false}>
-            {top3.map((item, i) => (
-              <motion.div
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.28, delay: i * 0.06, ease: [0.2, 0.7, 0.1, 1] }}
-                style={{ display: 'flex' }}
-              >
-                <PriorityCard item={item} index={i} onClick={() => openPriority(item)} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* NICHT VERGESSEN + WER WARTET */}
-      <div className="row" style={{ marginTop: 24 }}>
-        <SectionCard
-          title="Nicht vergessen"
-          count={upcoming.length}
-          empty="Keine offenen Tasks in den nächsten 7 Tagen."
-        >
-          {upcoming.map(({ todo, customerName }) => (
-            <TaskRow
-              key={todo.id}
-              title={todo.title}
-              customerName={customerName}
-              due={todo.dueDate}
-              onClick={() => {
-                if (todo.customerId) setSelected(todo.customerId)
-                else setAppView('clients')
-              }}
-            />
-          ))}
-        </SectionCard>
-
-        <SectionCard
-          title="Wer wartet auf dich"
-          count={waitingEmails.length + overdueFollowups.length}
-          empty="Keine offenen Antworten."
-          accent={
-            waitingEmails.length > 0
-              ? <Inbox size={14} style={{ color: 'var(--fg-muted)' }} />
-              : undefined
-          }
-        >
-          {waitingEmails.map(email => (
-            <MailRow
-              key={`mail-${email.id}`}
-              email={email}
-              customerName={
-                email.customerId
-                  ? customers.find(c => c.id === email.customerId)?.name
-                  : customerByEmail.get((email.fromAddr ?? '').toLowerCase())
-              }
-              onClick={() => openEmail(email)}
-            />
-          ))}
-          {overdueFollowups.map(fu => {
-            const cust = customers.find(c => c.id === fu.customerId)
-            return (
-              <TaskRow
-                key={`fu-${fu.id}`}
-                title={fu.title}
-                customerName={cust?.name ?? 'Follow-Up'}
-                due={fu.dueDate}
-                onClick={() => fu.customerId && setSelected(fu.customerId)}
-              />
-            )
-          })}
-        </SectionCard>
-      </div>
-
-      {/* BEZIEHUNGEN BRAUCHEN PFLEGE */}
-      <AccountSignals />
-
-      {/* TAGESPLAN */}
-      <div style={{ marginTop: 24 }}>
-        <DayTimeline />
-      </div>
-
-      {/* Stats Footer Chips */}
-      <div style={{
-        marginTop: 28,
-        display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
-      }}>
-        {loading ? (
-          <>
-            <StatChipSkeleton />
-            <StatChipSkeleton />
-            <StatChipSkeleton />
-          </>
-        ) : (
-          <>
-            <QuickStat label="Aktive Clients" value={customers.filter(c => c.status === 'aktiv').length} />
-            {kpis && <QuickStat label="Offen" value={fmtCurrency(kpis.openTotal)} />}
-            {kpis && kpis.overdueCount > 0 && (
-              <QuickStat label={`${kpis.overdueCount} Überfällig`} value={fmtCurrency(kpis.overdueTotal)} accent />
-            )}
-            {kpis && <QuickStat label="Monatsumsatz" value={fmtCurrency(kpis.monthRevenue)} />}
-          </>
-        )}
-      </div>
-
+      {view === 'workspace' && <WorkspaceView />}
+      {view === 'sales' && salesEnabled && <SalesView />}
+      {view === 'client'    && <ClientView />}
     </div>
   )
 }
