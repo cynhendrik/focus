@@ -4,7 +4,6 @@ import type { CompanyProfile, CompanyModules } from '@/types/company.types'
 
 const MODULE_LABELS: Record<keyof CompanyModules, string> = {
   sales: 'Sales',
-  crm: 'CRM',
   mail: 'Mail-Client',
   instagram: 'Instagram',
   focusAi: 'FOCUS AI',

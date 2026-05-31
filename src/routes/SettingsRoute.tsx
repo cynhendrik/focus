@@ -20,7 +20,6 @@ interface ModuleDef {
 
 const MODULE_DEFS: ModuleDef[] = [
   { key: 'sales',         label: 'Sales',         description: 'Leads, Pipeline und Deal-Tracking.',          icon: TrendingUp },
-  { key: 'crm',           label: 'CRM System',    description: 'Kundenverwaltung, Kontakte und Aktivitäten.', icon: Users      },
   { key: 'mail',          label: 'Mail-Client',   description: 'E-Mails direkt in Cynera verwalten.',         icon: Mail       },
   { key: 'instagram',     label: 'Social Media',  description: 'Instagram-Analyse und Reporting.',            icon: Share2     },
   { key: 'focusAi',       label: 'FOCUS AI',      description: 'KI-gestützte Analysen und Empfehlungen.',     icon: Sparkles   },

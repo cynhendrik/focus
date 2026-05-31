@@ -24,7 +24,6 @@ export interface CompanyProfile {
 
 export interface CompanyModules {
   sales?: boolean
-  crm?: boolean
   mail?: boolean
   instagram?: boolean
   focusAi?: boolean
