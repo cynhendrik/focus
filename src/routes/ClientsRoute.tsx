@@ -18,7 +18,7 @@ import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/Onboar
 import type { Customer } from '@/types/customer.types'
 import {
   computeClientRows, sortClientRows, countNeedsAttention,
-  customerInitials, formatEuroShort, relContactLabel, clientHue,
+  customerInitials, formatEuroShort, relContactLabel, clientVariation,
   type ClientRow, type ClientSortKey, type ClientSignalTone,
 } from '@/lib/clients-overview'
 import { scoreColor } from '@/lib/lead-score'
@@ -55,12 +55,24 @@ export function ClientsViewToggle() {
 }
 
 // ── color helpers (avatar squircle) ──────────────────────────────────────────
+// Alle Avatare liegen auf der Lime-Skala (hue=125). variation 0..1 bestimmt,
+// wie gesaettigt ein einzelner Kunde aussieht: nahe 0 → fast grau,
+// nahe 1 → voller Lime-Akzent. Lightness bleibt konstant.
+//
+// Effekt: die Liste wirkt einheitlich gruen-getoent, jeder Avatar ist aber
+// trotzdem wiedererkennbar.
 
-function avatarColors(hue: number) {
+const AVATAR_HUE    = 125
+const AVATAR_LIGHT  = 78
+const CHROMA_MIN    = 0.015
+const CHROMA_MAX    = 0.18
+
+function avatarColors(variation: number) {
+  const c = CHROMA_MIN + variation * (CHROMA_MAX - CHROMA_MIN)
   return {
-    stroke: `oklch(78% 0.18 ${hue})`,
-    ink:    `oklch(88% 0.16 ${hue})`,
-    bg:     `oklch(78% 0.18 ${hue} / 0.08)`,
+    stroke: `oklch(${AVATAR_LIGHT}% ${c.toFixed(3)} ${AVATAR_HUE})`,
+    ink:    `oklch(${AVATAR_LIGHT + 8}% ${(c * 0.85).toFixed(3)} ${AVATAR_HUE})`,
+    bg:     `oklch(${AVATAR_LIGHT}% ${c.toFixed(3)} ${AVATAR_HUE} / 0.08)`,
   }
 }
 
@@ -99,8 +111,8 @@ function ScorePill({ score, size = 'sm' }: { score: number; size?: 'xs' | 'sm' }
 
 // ── ClientAvatar — colored squircle with initials ────────────────────────────
 
-function ClientAvatar({ name, hue, size = 44 }: { name: string; hue: number; size?: number }) {
-  const { stroke, ink, bg } = avatarColors(hue)
+function ClientAvatar({ name, variation, size = 44 }: { name: string; variation: number; size?: number }) {
+  const { stroke, ink, bg } = avatarColors(variation)
   return (
     <div
       style={{
@@ -150,7 +162,7 @@ function ZuletztStrip({ recent, onOpen }: { recent: Customer[]; onOpen: (id: str
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--fg-muted)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
         >
-          <ClientAvatar name={c.name} hue={clientHue(c)} size={26} />
+          <ClientAvatar name={c.name} variation={clientVariation(c)} size={26} />
           <span style={{ whiteSpace: 'nowrap' }}>{c.name}</span>
           <ScorePill score={c.leadScore} size="xs" />
         </button>
@@ -206,7 +218,7 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
     >
       {/* Kunde */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-        <ClientAvatar name={row.customer.name} hue={row.hue} />
+        <ClientAvatar name={row.customer.name} variation={row.variation} />
         <div style={{ minWidth: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,

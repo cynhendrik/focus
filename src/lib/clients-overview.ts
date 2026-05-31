@@ -51,7 +51,7 @@ export interface ClientRow {
   openDealValue:   number       // sum of value for non-won/lost deals
   renewalInDays:   number | null // days until next open deal's expectedClose
   lastContactAt:   string | null
-  hue:             number       // 0..360, stable per customer
+  variation:       number       // 0..1, stable per customer (Avatar-Chroma)
 }
 
 interface ComputeInput {
@@ -69,18 +69,26 @@ function toMs(iso: string | undefined | null): number | null {
   return Number.isNaN(t) ? null : t
 }
 
-// FNV-1a 32-bit — deterministic small hash for color hue derivation.
-function hashHue(input: string): number {
+// FNV-1a 32-bit — deterministic small hash, normalisiert auf 0..1.
+// Wird als Chroma-Faktor benutzt: ein Kunde liegt entweder naeher an
+// Grau (Variation nahe 0) oder naeher an Lime (Variation nahe 1).
+function hashUnit(input: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < input.length; i++) {
     h ^= input.charCodeAt(i)
     h = Math.imul(h, 0x01000193)
   }
-  return Math.abs(h) % 360
+  return (Math.abs(h) % 10000) / 10000
 }
 
-export function clientHue(customer: Pick<Customer, 'id' | 'name'>): number {
-  return hashHue(customer.id || customer.name)
+/**
+ * Stabile Variation pro Kunde, 0..1. Wird in ClientsRoute zur Avatar-
+ * Einfaerbung als Chroma-Multiplier verwendet (gleicher Lime-Hue fuer alle,
+ * nur Saettigung varriert) — gibt der Liste einen einheitlichen Look statt
+ * Konfetti, jeder Kunde aber trotzdem visuell wiedererkennbar.
+ */
+export function clientVariation(customer: Pick<Customer, 'id' | 'name'>): number {
+  return hashUnit(customer.id || customer.name)
 }
 
 // Deals werden primaer ueber accountId zugeordnet; customerId ist ein
@@ -216,7 +224,7 @@ export function computeClientRows(input: ComputeInput): ClientRow[] {
         openDealValue: sumOpenDealValue(c.id, input.deals, stageByName),
         renewalInDays: daysUntilNextRenewal(c.id, input.deals, stageByName),
         lastContactAt,
-        hue:           clientHue(c),
+        variation:     clientVariation(c),
       }
     })
 }
