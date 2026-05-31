@@ -10,6 +10,7 @@ import { SmartListModal } from '@/components/smart-lists/SmartListModal'
 import { CustomerTableFiltered } from '@/components/smart-lists/CustomerTableFiltered'
 import { FilterChipBar } from '@/components/smart-lists/FilterChipBar'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { ClientsViewToggle } from './ClientsRoute'
 import type { SmartList, SmartListFilter } from '@/types/smart-list.types'
 
 const ACTIVE_STORAGE_KEY = 'cynera:smartlists:active-v1'
@@ -179,29 +180,29 @@ export function SmartListsRoute() {
             </div>
           )}
 
-          {activeList && !activeList.isSystem && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {isDirty && (
-                <button
-                  onClick={async () => {
-                    if (!working || !activeList) return
-                    await upsert({
-                      id:         activeList.id,
-                      workspaceId,
-                      name:       activeList.name,
-                      icon:       activeList.icon,
-                      filter:     working,
-                      orderIndex: activeList.orderIndex,
-                      isSystem:   activeList.isSystem,
-                    })
-                    setWorking(null)
-                  }}
-                  className="btn-primary"
-                  style={{ fontSize: 12, padding: '5px 14px' }}
-                >
-                  Speichern
-                </button>
-              )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {activeList && !activeList.isSystem && isDirty && (
+              <button
+                onClick={async () => {
+                  if (!working || !activeList) return
+                  await upsert({
+                    id:         activeList.id,
+                    workspaceId,
+                    name:       activeList.name,
+                    icon:       activeList.icon,
+                    filter:     working,
+                    orderIndex: activeList.orderIndex,
+                    isSystem:   activeList.isSystem,
+                  })
+                  setWorking(null)
+                }}
+                className="btn-primary"
+                style={{ fontSize: 12, padding: '5px 14px' }}
+              >
+                Speichern
+              </button>
+            )}
+            {activeList && !activeList.isSystem && (
               <button
                 onClick={() => setEditing(activeList)}
                 className="btn-ghost"
@@ -209,8 +210,9 @@ export function SmartListsRoute() {
               >
                 Filter bearbeiten
               </button>
-            </div>
-          )}
+            )}
+            <ClientsViewToggle />
+          </div>
         </div>
 
         {activeList && effectiveFilter && (
