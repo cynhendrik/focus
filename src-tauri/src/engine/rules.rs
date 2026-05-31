@@ -172,7 +172,6 @@ mod tests {
             account_id: "acc-2".to_string(),
             workspace_id: "ws-2".to_string(),
             deal_id: "deal-1".to_string(),
-            from_stage: Some("prospect".to_string()),
             to_stage: "won".to_string(),
         }).unwrap();
         let (score, status): (f64, String) = conn.query_row(

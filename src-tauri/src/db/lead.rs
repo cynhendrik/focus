@@ -159,23 +159,6 @@ pub fn update_pipeline_stage(conn: &Connection, id: &str, stage: &str) -> Result
     conn.query_row(&format!("{SELECT} WHERE id=?1"), [id], map_row).map_err(AppError::from)
 }
 
-pub fn update_last_activity(conn: &Connection, account_id: &str, at: &str) -> Result<(), AppError> {
-    conn.execute(
-        "UPDATE accounts SET last_activity_at=?1, updated_at=?1 WHERE id=?2",
-        rusqlite::params![at, account_id],
-    )?;
-    Ok(())
-}
-
-pub fn update_next_follow_up(conn: &Connection, account_id: &str, at: Option<&str>) -> Result<(), AppError> {
-    let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
-        "UPDATE accounts SET next_follow_up_at=?1, updated_at=?2 WHERE id=?3",
-        rusqlite::params![at, now, account_id],
-    )?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,39 +282,4 @@ mod tests {
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 
-    #[test]
-    fn update_last_activity_sets_timestamp() {
-        let conn = setup();
-        let lead = upsert_lead(&conn, lead_payload("ws-1")).unwrap();
-        let ts = "2026-06-01T10:00:00Z";
-        update_last_activity(&conn, &lead.id, ts).unwrap();
-        let updated: String = conn.query_row(
-            "SELECT last_activity_at FROM accounts WHERE id=?1",
-            [&lead.id],
-            |r| r.get(0),
-        ).unwrap();
-        assert_eq!(updated, ts);
-    }
-
-    #[test]
-    fn update_next_follow_up_sets_and_clears() {
-        let conn = setup();
-        let lead = upsert_lead(&conn, lead_payload("ws-1")).unwrap();
-        let ts = "2026-06-10T08:00:00Z";
-        update_next_follow_up(&conn, &lead.id, Some(ts)).unwrap();
-        let set: Option<String> = conn.query_row(
-            "SELECT next_follow_up_at FROM accounts WHERE id=?1",
-            [&lead.id],
-            |r| r.get(0),
-        ).unwrap();
-        assert_eq!(set.as_deref(), Some(ts));
-        // Clear it
-        update_next_follow_up(&conn, &lead.id, None).unwrap();
-        let cleared: Option<String> = conn.query_row(
-            "SELECT next_follow_up_at FROM accounts WHERE id=?1",
-            [&lead.id],
-            |r| r.get(0),
-        ).unwrap();
-        assert!(cleared.is_none());
-    }
 }

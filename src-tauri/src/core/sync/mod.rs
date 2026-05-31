@@ -1,6 +1,5 @@
 pub mod connectivity;
 pub mod push;
-pub mod pull;
 
 use serde::{Deserialize, Serialize};
 use crate::{AppError, db::pool::DbPool};

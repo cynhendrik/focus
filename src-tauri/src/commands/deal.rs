@@ -24,9 +24,6 @@ pub fn update_deal_stage(
     stage: String,
 ) -> Result<Deal, AppError> {
     let conn = db.conn();
-    let prev_stage: Option<String> = conn
-        .query_row("SELECT stage FROM deals WHERE id = ?1", [&id], |r| r.get(0))
-        .ok();
     let updated = db::deal::update_stage(&*conn, &id, &stage)?;
     let _ = crate::activity_engine::create(&*conn, &app, crate::db::activity::CreateActivityPayload {
         workspace_id: updated.workspace_id.clone(),
@@ -50,7 +47,6 @@ pub fn update_deal_stage(
         account_id:   updated.account_id.clone(),
         workspace_id: updated.workspace_id.clone(),
         deal_id:      id,
-        from_stage:   prev_stage,
         to_stage:     stage.clone(),
     })?;
     if stage == "won" {

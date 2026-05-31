@@ -13,7 +13,6 @@ pub enum CrmEvent {
         account_id:   String,
         workspace_id: String,
         deal_id:      String,
-        from_stage:   Option<String>,
         to_stage:     String,
     },
 }

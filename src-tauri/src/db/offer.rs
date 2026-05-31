@@ -51,7 +51,6 @@ pub struct OfferWithItems {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpsertOfferPayload {
-    pub id: Option<String>,
     pub workspace_id: String,
     pub created_by: String,
     pub account_id: String,
@@ -282,7 +281,6 @@ pub fn convert_to_invoice(
         .collect();
 
     let invoice_payload = crate::db::invoice::UpsertInvoicePayload {
-        id: None,
         workspace_id: workspace_id.to_string(),
         created_by: created_by.to_string(),
         account_id: offer.account_id.clone(),
@@ -337,7 +335,6 @@ mod tests {
 
     fn sample_payload(items: Vec<UpsertOfferItemPayload>) -> UpsertOfferPayload {
         UpsertOfferPayload {
-            id: None,
             workspace_id: "ws-1".into(),
             created_by: "u-1".into(),
             account_id: "acc-1".into(),
@@ -485,7 +482,6 @@ mod tests {
     fn offer_item_date_and_unit_round_trip() {
         let conn = setup();
         let payload = UpsertOfferPayload {
-            id: None,
             workspace_id: "ws-1".into(),
             created_by: "u-1".into(),
             account_id: "acc-1".into(),

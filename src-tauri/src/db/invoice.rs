@@ -55,7 +55,6 @@ pub struct InvoiceWithItems {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpsertInvoicePayload {
-    pub id: Option<String>,
     pub workspace_id: String,
     pub created_by: String,
     pub account_id: String,
@@ -489,7 +488,6 @@ mod tests {
 
     fn sample_payload(items: Vec<UpsertInvoiceItemPayload>) -> UpsertInvoicePayload {
         UpsertInvoicePayload {
-            id: None,
             workspace_id: "ws-1".into(),
             created_by: "u-1".into(),
             account_id: "acc-1".into(),
@@ -730,7 +728,6 @@ mod tests {
     fn item_date_and_unit_round_trip() {
         let conn = setup();
         let payload = UpsertInvoicePayload {
-            id: None,
             workspace_id: "ws-1".into(),
             created_by: "u-1".into(),
             account_id: "acc-1".into(),
