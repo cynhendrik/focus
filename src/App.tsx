@@ -34,6 +34,7 @@ import { PipelineRoute }         from '@/routes/PipelineRoute'
 import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
 import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
+import { SalesCockpitRoute }     from '@/routes/SalesCockpitRoute'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
@@ -159,6 +160,7 @@ export default function App() {
       case 'leads':        return <LeadsRoute />
       case 'pipeline':     return <PipelineRoute />
       case 'followups':    return <FollowupsDashboardRoute />
+      case 'sales-cockpit': return <SalesCockpitRoute />
       case 'calendar':     return <CalendarRoute />
       case 'mail':         return <MailRoute />
       case 'settings':     return <SettingsRoute />
