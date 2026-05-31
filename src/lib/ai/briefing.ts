@@ -428,17 +428,58 @@ export async function generateBriefing(input: DossierInput): Promise<CustomerBri
     throw new Error('Claude hat keinen Text-Output geliefert.')
   }
 
-  let parsed: CustomerBriefing
+  let raw: unknown
   try {
-    parsed = JSON.parse(block.text) as CustomerBriefing
+    raw = JSON.parse(block.text)
   } catch (e) {
     throw new Error(`Antwort konnte nicht als JSON gelesen werden: ${String(e)}`)
   }
 
-  if (!parsed.headline)   parsed.headline = ''
-  if (!parsed.highlights) parsed.highlights = []
-  if (!parsed.signals)    parsed.signals = []
-  if (!parsed.nextSteps)  parsed.nextSteps = []
+  // `output_config.format` ist ein noch nicht stabilisiertes Anthropic-Feature.
+  // Falls die API es entfernt oder veraendert, kommt hier ggf. ein Text-Block
+  // ohne garantierte Struktur an — also defensiv normalisieren statt blind
+  // casten und spaeter im UI auf undefined-Reads laufen.
+  return normalizeBriefing(raw)
+}
 
-  return parsed
+function asObject(v: unknown): Record<string, unknown> {
+  return (v && typeof v === 'object' && !Array.isArray(v)) ? v as Record<string, unknown> : {}
+}
+
+function asString(v: unknown): string {
+  return typeof v === 'string' ? v : ''
+}
+
+const TONES: Tone[] = ['info', 'ok', 'warn', 'bad']
+const SEVERITIES: Severity[] = ['info', 'warning', 'alert']
+
+function asTone(v: unknown): Tone {
+  return (typeof v === 'string' && (TONES as string[]).includes(v)) ? v as Tone : 'info'
+}
+
+function asSeverity(v: unknown): Severity {
+  return (typeof v === 'string' && (SEVERITIES as string[]).includes(v)) ? v as Severity : 'info'
+}
+
+function asArray(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : []
+}
+
+function normalizeBriefing(raw: unknown): CustomerBriefing {
+  const obj = asObject(raw)
+  return {
+    headline:   asString(obj.headline),
+    highlights: asArray(obj.highlights).map(h => {
+      const o = asObject(h)
+      return { title: asString(o.title), text: asString(o.text), tone: asTone(o.tone) }
+    }),
+    signals: asArray(obj.signals).map(s => {
+      const o = asObject(s)
+      return { text: asString(o.text), severity: asSeverity(o.severity) }
+    }),
+    nextSteps: asArray(obj.nextSteps).map(n => {
+      const o = asObject(n)
+      return { action: asString(o.action), reason: asString(o.reason) }
+    }),
+  }
 }
