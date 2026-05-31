@@ -1,18 +1,26 @@
-import { useEffect, useState, useMemo } from 'react'
-import { UserPlus, AlertTriangle, Clock, Activity, Pin, PinOff, Sparkles, ArrowRight, LayoutGrid, ListFilter } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import {
+  UserPlus, Sparkles, ArrowRight, LayoutGrid, ListFilter,
+  Search, ChevronRight,
+} from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
-import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useDealsStore } from '@/store/deals.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { useFinanceStore } from '@/store/finance.store'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
 import { SmartListsRoute } from './SmartListsRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
 import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
-import type { Customer, CustomerStatus } from '@/types/customer.types'
-import type { Todo } from '@/types/todo.types'
-import type { CustomerTab } from '@/store/ui.store'
+import type { Customer } from '@/types/customer.types'
+import {
+  computeClientRows, sortClientRows, countNeedsAttention,
+  customerInitials, formatEuroShort, relContactLabel, clientHue,
+  type ClientRow, type ClientSortKey, type ClientSignalTone,
+} from '@/lib/clients-overview'
 
 // ── shared view toggle (Board ↔ Liste) ────────────────────────────────────────
 
@@ -45,271 +53,247 @@ export function ClientsViewToggle() {
   )
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── color helpers (avatar squircle) ──────────────────────────────────────────
 
-function isToday(iso: string) {
-  const d = new Date(iso), n = new Date()
-  return d.getFullYear() === n.getFullYear()
-    && d.getMonth() === n.getMonth()
-    && d.getDate() === n.getDate()
+function avatarColors(hue: number) {
+  return {
+    stroke: `oklch(78% 0.18 ${hue})`,
+    ink:    `oklch(88% 0.16 ${hue})`,
+    bg:     `oklch(78% 0.18 ${hue} / 0.08)`,
+  }
 }
 
-function isOverdue(iso: string) {
-  const d = new Date(iso); d.setHours(23, 59, 59, 999)
-  return d < new Date()
+function signalColors(tone: ClientSignalTone) {
+  switch (tone) {
+    case 'bad':  return { ink: 'oklch(72% 0.20 25)',  bg: 'oklch(72% 0.20 25 / 0.10)', stroke: 'oklch(72% 0.20 25 / 0.35)' }
+    case 'warn': return { ink: 'oklch(82% 0.17 80)',  bg: 'oklch(82% 0.17 80 / 0.10)', stroke: 'oklch(82% 0.17 80 / 0.32)' }
+    case 'ok':   return { ink: 'oklch(82% 0.18 145)', bg: 'oklch(82% 0.18 145 / 0.08)', stroke: 'oklch(82% 0.18 145 / 0.28)' }
+  }
 }
 
-function relTime(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-  if (d === 0) return 'Heute'
-  if (d === 1) return 'Gestern'
-  if (d < 7)  return `vor ${d}T`
-  if (d < 30) return `vor ${Math.floor(d / 7)}W`
-  return `vor ${Math.floor(d / 30)}M`
-}
+// ── ClientAvatar — colored squircle with initials ────────────────────────────
 
-function overdueLabel(iso: string) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-  return d === 1 ? 'Gestern' : `Seit ${d}T`
-}
-
-const STATUS_TONE: Record<CustomerStatus, string> = {
-  aktiv: 'ok', lead: 'accent', inaktiv: 'warn', lost: 'bad',
-}
-const STATUS_LABEL: Record<CustomerStatus, string> = {
-  aktiv: 'Aktiv', lead: 'Lead', inaktiv: 'Inaktiv', lost: 'Lost',
-}
-
-// ── Quick Strip ───────────────────────────────────────────────────────────────
-
-function ClientChip({
-  customer, pinned, onOpen, onTogglePin,
-}: {
-  customer: Customer
-  pinned: boolean
-  onOpen: () => void
-  onTogglePin: (e: React.MouseEvent) => void
-}) {
-  const [hovered, setHovered] = useState(false)
-
+function ClientAvatar({ name, hue, size = 44 }: { name: string; hue: number; size?: number }) {
+  const { stroke, ink, bg } = avatarColors(hue)
   return (
     <div
-      style={{ position: 'relative', flexShrink: 0 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: size, height: size, borderRadius: 12,
+        background: bg, border: `1.5px solid ${stroke}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: ink, fontFamily: 'var(--font-mono)',
+        fontSize: size <= 28 ? 10 : 13, fontWeight: 700,
+        letterSpacing: '0.04em', flexShrink: 0,
+      }}
     >
-      <button
-        onClick={onOpen}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          padding: '5px 12px 5px 7px', borderRadius: 99,
-          background: 'var(--surface)',
-          border: `1px solid ${pinned ? 'var(--accent)' : 'var(--border)'}`,
-          cursor: 'pointer', fontSize: 12, fontWeight: 500,
-          color: 'var(--fg)', transition: 'border-color 150ms, box-shadow 150ms',
-          boxShadow: pinned ? '0 0 0 2px oklch(92% 0.2 125 / 0.15)' : 'none',
-        }}
-      >
-        <div style={{
-          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-          background: pinned ? 'var(--accent)' : 'var(--surface-2)',
-          color: pinned ? 'var(--accent-ink)' : 'var(--fg-muted)',
-          border: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 9, fontWeight: 700,
-          transition: 'background 150ms, color 150ms',
-        }}>
-          {customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
-        </div>
-        <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {customer.name.split(' ')[0]}
-        </span>
-      </button>
-
-      {/* Pin/Unpin button — appears on hover */}
-      {hovered && (
-        <button
-          onClick={onTogglePin}
-          title={pinned ? 'Entpinnen' : 'Anpinnen'}
-          style={{
-            position: 'absolute', top: -7, right: -7,
-            width: 18, height: 18, borderRadius: '50%',
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 1,
-            color: pinned ? 'var(--accent)' : 'var(--fg-dim)',
-          }}
-        >
-          {pinned ? <PinOff size={9} /> : <Pin size={9} />}
-        </button>
-      )}
+      {customerInitials(name)}
     </div>
   )
 }
 
-function QuickStrip({
-  customers, pinnedIds, recentClients, onOpen, onTogglePin,
-}: {
-  customers: Customer[]
-  pinnedIds: string[]
-  recentClients: Customer[]
-  onOpen: (id: string) => void
-  onTogglePin: (id: string) => void
-}) {
-  const pinned = useMemo(
-    () => pinnedIds.map(id => customers.find(c => c.id === id)).filter(Boolean) as Customer[],
-    [customers, pinnedIds],
-  )
-  const recent = useMemo(
-    () => recentClients.filter(c => !pinnedIds.includes(c.id)).slice(0, 6),
-    [recentClients, pinnedIds],
-  )
-  const strip = [...pinned, ...recent].slice(0, 8)
+// ── ZULETZT chip strip ───────────────────────────────────────────────────────
 
-  if (strip.length === 0) return null
-
+function ZuletztStrip({ recent, onOpen }: { recent: Customer[]; onOpen: (id: string) => void }) {
+  if (recent.length === 0) return null
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      padding: '14px 0', overflowX: 'auto',
+      overflowX: 'auto', padding: '4px 0',
     }}>
       <span style={{
-        fontSize: 11, color: 'var(--fg-dim)', fontWeight: 500,
-        letterSpacing: '0.06em', textTransform: 'uppercase',
-        fontFamily: 'var(--font-mono)', flexShrink: 0,
-        userSelect: 'none',
+        fontFamily: 'var(--font-mono)', fontSize: 10.5,
+        letterSpacing: '0.18em', textTransform: 'uppercase',
+        color: 'var(--fg-dim)', fontWeight: 600, flexShrink: 0,
+        userSelect: 'none', paddingRight: 4,
       }}>
         Zuletzt
       </span>
-      <div style={{ width: 1, height: 14, background: 'var(--border)', flexShrink: 0 }} />
-      {strip.map(c => (
-        <ClientChip
+      {recent.map(c => (
+        <button
           key={c.id}
-          customer={c}
-          pinned={pinnedIds.includes(c.id)}
-          onOpen={() => onOpen(c.id)}
-          onTogglePin={(e) => { e.stopPropagation(); onTogglePin(c.id) }}
-        />
+          onClick={() => onOpen(c.id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '4px 14px 4px 5px', borderRadius: 999,
+            background: 'transparent',
+            border: '1px solid var(--border)',
+            cursor: 'pointer', flexShrink: 0,
+            color: 'var(--fg)', fontSize: 12.5, fontWeight: 500,
+            transition: 'border-color 140ms, background 140ms',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--fg-muted)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+        >
+          <ClientAvatar name={c.name} hue={clientHue(c)} size={26} />
+          <span style={{ whiteSpace: 'nowrap' }}>{c.name}</span>
+        </button>
       ))}
     </div>
   )
 }
 
-// ── Board section card ────────────────────────────────────────────────────────
+// ── Signal badge ─────────────────────────────────────────────────────────────
 
-function SectionCard({
-  title, icon, count, empty, children,
-}: {
-  title: string
-  icon: React.ReactNode
-  count?: number
-  empty?: string
-  children?: React.ReactNode
-}) {
+function SignalBadge({ row }: { row: ClientRow }) {
+  const c = signalColors(row.signal.tone)
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '15px 20px', borderBottom: '1px solid var(--border)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ color: 'var(--fg-muted)', display: 'flex' }}>{icon}</span>
-          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>{title}</h3>
-        </div>
-        {count !== undefined && count > 0 && (
-          <span className="chip">{count}</span>
-        )}
-      </div>
-      <div style={{ padding: '12px 20px 16px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {children ?? (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--fg-dim)', fontSize: 12 }}>
-            {empty}
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '5px 11px', borderRadius: 999,
+      background: c.bg, border: `1px solid ${c.stroke}`,
+      color: c.ink, fontFamily: 'var(--font-mono)',
+      fontSize: 10.5, fontWeight: 600,
+      letterSpacing: '0.08em', textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+    }}>
+      {row.signal.label}
+    </span>
+  )
+}
+
+// ── Client list row ──────────────────────────────────────────────────────────
+
+const COL_TEMPLATE = '1.6fr 1fr 0.6fr 0.45fr 0.6fr 28px'
+
+function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) {
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        display: 'grid', gridTemplateColumns: COL_TEMPLATE,
+        alignItems: 'center', columnGap: 18,
+        padding: '14px 20px', borderRadius: 14,
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        cursor: 'pointer',
+        transition: 'border-color 140ms, background 140ms, transform 140ms',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = 'oklch(100% 0 0 / 0.18)'
+        e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = 'var(--border)'
+        e.currentTarget.style.background = 'var(--surface-2)'
+      }}
+    >
+      {/* Kunde */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+        <ClientAvatar name={row.customer.name} hue={row.hue} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 14.5, fontWeight: 600, color: 'var(--fg)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {row.customer.name}
           </div>
-        )}
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10.5,
+            letterSpacing: '0.14em', textTransform: 'uppercase',
+            color: 'var(--fg-dim)', marginTop: 3,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {row.customer.industry || row.customer.company || '—'}
+          </div>
+        </div>
       </div>
+
+      {/* Signal */}
+      <div><SignalBadge row={row} /></div>
+
+      {/* € im Spiel */}
+      <div style={{
+        fontSize: 15, fontWeight: 700, color: 'var(--fg)',
+        fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      }}>
+        {row.openDealValue > 0 ? formatEuroShort(row.openDealValue) : '—'}
+      </div>
+
+      {/* Renewal */}
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 12,
+        color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums',
+        whiteSpace: 'nowrap',
+      }}>
+        {row.renewalInDays !== null ? `${row.renewalInDays} T` : '—'}
+      </div>
+
+      {/* Letzter Kontakt */}
+      <div style={{
+        fontSize: 12, color: 'var(--fg-dim)',
+        whiteSpace: 'nowrap',
+      }}>
+        {relContactLabel(row.lastContactAt)}
+      </div>
+
+      {/* Arrow */}
+      <ChevronRight size={16} style={{ color: 'var(--fg-dim)', justifySelf: 'end' }} />
     </div>
   )
 }
 
-// ── Deadline row ──────────────────────────────────────────────────────────────
+// ── Column header (mono labels above the list) ───────────────────────────────
 
-function DeadlineRow({ todo, name, tone, label, onClick }: {
-  todo: Todo; name: string; tone: 'overdue' | 'today'; label: string; onClick: () => void
-}) {
+function ColumnHeader() {
+  const labelStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-mono)', fontSize: 10.5,
+    letterSpacing: '0.16em', textTransform: 'uppercase',
+    color: 'var(--fg-dim)', fontWeight: 600,
+  }
   return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        transition: 'opacity 100ms',
-      }}
-      onMouseEnter={e => (e.currentTarget.style.opacity = '0.72')}
-      onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-    >
-      <div style={{
-        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-        background: tone === 'overdue' ? 'oklch(72% 0.18 25 / 0.12)' : 'oklch(85% 0.18 90 / 0.12)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {tone === 'overdue'
-          ? <AlertTriangle size={12} style={{ color: 'var(--danger)' }} />
-          : <Clock size={12} style={{ color: 'var(--warn)' }} />}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {todo.title}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>{name}</div>
-      </div>
-      <span className="chip" data-tone={tone === 'overdue' ? 'bad' : 'warn'} style={{ fontSize: 10, flexShrink: 0 }}>
-        {label}
-      </span>
+    <div style={{
+      display: 'grid', gridTemplateColumns: COL_TEMPLATE,
+      columnGap: 18, padding: '0 20px 8px',
+    }}>
+      <span style={labelStyle}>Kunde</span>
+      <span style={labelStyle}>Signal</span>
+      <span style={labelStyle}>€ im Spiel</span>
+      <span style={labelStyle}>Renewal</span>
+      <span style={labelStyle}>Letzter Kontakt</span>
+      <span />
     </div>
   )
 }
 
-// ── Client row ────────────────────────────────────────────────────────────────
+// ── Sort tabs (Brauchen dich / Wert / Zuletzt / Name) ────────────────────────
 
-function ClientRow({ customer, lastAct, tab, onClick }: {
-  customer: Customer; lastAct: string; tab: CustomerTab; onClick: () => void
+function SortTabs({
+  active, onChange,
+}: {
+  active: ClientSortKey
+  onChange: (k: ClientSortKey) => void
 }) {
+  const TABS: { key: ClientSortKey; label: string }[] = [
+    { key: 'brauchen', label: 'Brauchen dich' },
+    { key: 'wert',     label: 'Wert' },
+    { key: 'zuletzt',  label: 'Zuletzt' },
+    { key: 'name',     label: 'Name' },
+  ]
   return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '7px 8px', borderRadius: 10, cursor: 'pointer',
-        transition: 'background 80ms',
-      }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-    >
-      <div style={{
-        width: 32, height: 32, borderRadius: 9, flexShrink: 0,
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)',
-      }}>
-        {customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {customer.name}
-        </div>
-        {customer.company && (
-          <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{customer.company}</div>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
-          {relTime(lastAct)}
-        </span>
-        <span className="chip" data-tone={STATUS_TONE[customer.status]} style={{ fontSize: 10 }}>
-          {STATUS_LABEL[customer.status]}
-        </span>
-      </div>
+    <div style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: 3, gap: 2, background: 'var(--surface-2)',
+      border: '1px solid var(--border)', borderRadius: 12,
+    }}>
+      {TABS.map(t => {
+        const isActive = active === t.key
+        return (
+          <button
+            key={t.key}
+            onClick={() => onChange(t.key)}
+            style={{
+              padding: '7px 14px', borderRadius: 9, border: 'none',
+              cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+              fontFamily: 'inherit',
+              background: isActive ? 'var(--accent)' : 'transparent',
+              color: isActive ? 'var(--accent-ink)' : 'var(--fg-muted)',
+              transition: 'background 140ms, color 140ms',
+            }}
+          >
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -320,12 +304,17 @@ function ClientBoard() {
   const customers      = useCustomersStore(s => s.customers)
   const upsertCustomer = useCustomersStore(s => s.upsert)
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
-  const allTodos       = useTodosStore(s => s.allTodos)
   const lastActivity   = useCrmStore(s => s.lastActivity)
+  const deals          = useDealsStore(s => s.deals)
+  const stages         = usePipelineStore(s => s.stages)
+  const invoices       = useFinanceStore(s => s.invoices)
+  const offers         = useFinanceStore(s => s.offers)
   const pinnedIds      = useClientPickerStore(s => s.pinnedIds)
-  const togglePin      = useClientPickerStore(s => s.togglePin)
-  const [showModal, setShowModal] = useState(false)
+
+  const [showModal, setShowModal]         = useState(false)
   const [loadingSample, setLoadingSample] = useState(false)
+  const [search, setSearch]               = useState('')
+  const [sortKey, setSortKey]             = useState<ClientSortKey>('brauchen')
 
   const loadSampleData = async (ind: IndustryProfile) => {
     setLoadingSample(true)
@@ -344,193 +333,165 @@ function ClientBoard() {
     }
   }
 
-  const activityMap = useMemo(
-    () => new Map(lastActivity.map(a => [a.accountId, a.lastActivityAt])),
-    [lastActivity],
-  )
-  const customerMap = useMemo(
-    () => new Map(customers.map(c => [c.id, c])),
-    [customers],
+  const allRows = useMemo(
+    () => computeClientRows({ customers, deals, stages, invoices, offers, lastActivity }),
+    [customers, deals, stages, invoices, offers, lastActivity],
   )
 
-  const activeCount  = useMemo(() => customers.filter(c => c.status === 'aktiv').length, [customers])
-  const todayTodos   = useMemo(
-    () => allTodos.filter(t => t.dueDate && isToday(t.dueDate) && t.status !== 'done'),
-    [allTodos],
-  )
-  const overdueTodos = useMemo(
-    () => allTodos.filter(t => t.dueDate && isOverdue(t.dueDate) && !isToday(t.dueDate) && t.status !== 'done'),
-    [allTodos],
-  )
+  const needsAttention = useMemo(() => countNeedsAttention(allRows), [allRows])
 
-  const deadlineItems = useMemo(() => [
-    ...overdueTodos.map(t => ({ todo: t, tone: 'overdue' as const, label: overdueLabel(t.dueDate!) })),
-    ...todayTodos.map(t => ({ todo: t, tone: 'today' as const, label: 'Heute' })),
-  ], [overdueTodos, todayTodos])
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return allRows
+    return allRows.filter(r =>
+      r.customer.name.toLowerCase().includes(q) ||
+      (r.customer.company ?? '').toLowerCase().includes(q) ||
+      (r.customer.industry ?? '').toLowerCase().includes(q),
+    )
+  }, [allRows, search])
 
-  // Risk: aktiv but no contact for 45+ days, or inaktiv
-  const riskClients = useMemo(() => {
-    const cutoff = Date.now() - 45 * 86400000
-    return customers
-      .filter(c => {
-        const t = new Date(activityMap.get(c.id) ?? c.updatedAt).getTime()
-        return (c.status === 'aktiv' && t < cutoff) || c.status === 'inaktiv'
-      })
-      .sort((a, b) => {
-        const aT = new Date(activityMap.get(a.id) ?? a.updatedAt).getTime()
-        const bT = new Date(activityMap.get(b.id) ?? b.updatedAt).getTime()
-        return aT - bT
-      })
-      .slice(0, 6)
-  }, [customers, activityMap])
+  const sortedRows = useMemo(() => sortClientRows(filteredRows, sortKey), [filteredRows, sortKey])
 
-  const recentClients = useMemo(() =>
-    [...customers]
-      .sort((a, b) => {
-        const aT = new Date(activityMap.get(a.id) ?? a.updatedAt).getTime()
-        const bT = new Date(activityMap.get(b.id) ?? b.updatedAt).getTime()
-        return bT - aT
-      })
-      .slice(0, 6),
-    [customers, activityMap],
-  )
+  // ZULETZT chips: pinned first, then most recent by lastContact.
+  const recentForStrip = useMemo(() => {
+    const byId = new Map(allRows.map(r => [r.customer.id, r]))
+    const pinned = pinnedIds
+      .map(id => byId.get(id)?.customer)
+      .filter((c): c is Customer => !!c)
+    const recent = [...allRows]
+      .sort((a, b) => (new Date(b.lastContactAt ?? 0).getTime()) - (new Date(a.lastContactAt ?? 0).getTime()))
+      .map(r => r.customer)
+      .filter(c => !pinnedIds.includes(c.id))
+    return [...pinned, ...recent].slice(0, 6)
+  }, [allRows, pinnedIds])
 
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 20,
-      padding: '28px 32px',
-      maxWidth: 1160, margin: '0 auto', width: '100%',
-    }}>
-      {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em' }}>
-            Kunden
-          </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>
-            Prioritäten, Risiken und letzte Aktivitäten auf einen Blick
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ClientsViewToggle />
-          <button className="btn-ghost" onClick={() => setShowModal(true)}>
-            <UserPlus size={14} /> Neuer Kunde
-          </button>
-        </div>
-      </div>
-
-      {customers.length === 0 ? (
+  if (customers.length === 0) {
+    return (
+      <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <EmptyClientBoard
           loading={loadingSample}
           onLoadSample={loadSampleData}
           onAddManual={() => setShowModal(true)}
         />
-      ) : (<>
-
-      {/* Quick Strip */}
-      <QuickStrip
-        customers={customers}
-        pinnedIds={pinnedIds}
-        recentClients={recentClients}
-        onOpen={id => openCustomerAt(id, 'ueberblick')}
-        onTogglePin={togglePin}
-      />
-
-      {/* Stats */}
-      <div className="stat-grid">
-        {[
-          { label: 'Gesamt Clients', value: customers.length,       tone: '' },
-          { label: 'Aktive Clients', value: activeCount,            tone: '' },
-          { label: 'Heute fällig',   value: todayTodos.length,   tone: todayTodos.length   > 0 ? 'warn' : '' },
-          { label: 'Überfällig',     value: overdueTodos.length, tone: overdueTodos.length > 0 ? 'bad'  : '' },
-        ].map(s => (
-          <div key={s.label} className="stat-tile" data-tone={s.tone}>
-            <span className="label">{s.label}</span>
-            <span className="value">{s.value}</span>
-          </div>
-        ))}
+        {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
       </div>
+    )
+  }
 
-      {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 22,
+      padding: '40px 48px 48px',
+      maxWidth: 1280, margin: '0 auto', width: '100%',
+    }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 11,
+            letterSpacing: '0.22em', textTransform: 'uppercase',
+            color: 'var(--accent)', fontWeight: 600, marginBottom: 14,
+          }}>
+            Kundenübersicht
+          </div>
+          <h1 style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 64, fontWeight: 700,
+            letterSpacing: '-0.035em', lineHeight: 1,
+            color: 'var(--fg)',
+          }}>
+            Clients
+          </h1>
+        </div>
 
-        {/* Left: Upcoming Deadlines — öffnet direkt Aktivitäten-Tab */}
-        <SectionCard
-          title="Upcoming Deadlines"
-          icon={<Clock size={14} />}
-          count={deadlineItems.length}
-          empty="Keine fälligen To-Dos — alles im grünen Bereich."
-        >
-          {deadlineItems.length > 0
-            ? (
-              <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {deadlineItems.map(({ todo, tone, label }) => {
-                  const c = todo.customerId ? customerMap.get(todo.customerId) : undefined
-                  return (
-                    <DeadlineRow
-                      key={todo.id}
-                      todo={todo}
-                      name={c?.name ?? '—'}
-                      tone={tone}
-                      label={label}
-                      onClick={() => c && openCustomerAt(c.id, 'historie')}
-                    />
-                  )
-                })}
-              </StaggerList>
-            )
-            : undefined}
-        </SectionCard>
-
-        {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* At Risk — öffnet Dashboard-Tab */}
-          <SectionCard
-            title="At Risk"
-            icon={<AlertTriangle size={14} />}
-            count={riskClients.length}
-            empty="Alle Clients sind up to date."
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 18,
+          fontFamily: 'var(--font-mono)', fontSize: 12,
+          color: 'var(--fg-dim)', letterSpacing: '0.04em',
+        }}>
+          <span>{allRows.length} {allRows.length === 1 ? 'Kunde' : 'Kunden'}</span>
+          {needsAttention > 0 && (
+            <span style={{ color: 'oklch(82% 0.17 80)', fontWeight: 600 }}>
+              {needsAttention} brauchen dich
+            </span>
+          )}
+          <ClientsViewToggle />
+          <button
+            className="btn-ghost"
+            onClick={() => setShowModal(true)}
+            style={{ fontFamily: 'inherit' }}
           >
-            {riskClients.length > 0
-              ? (
-                <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {riskClients.map(c => (
-                    <ClientRow
-                      key={c.id}
-                      customer={c}
-                      lastAct={activityMap.get(c.id) ?? c.updatedAt}
-                      tab="ueberblick"
-                      onClick={() => openCustomerAt(c.id, 'ueberblick')}
-                    />
-                  ))}
-                </StaggerList>
-              )
-              : undefined}
-          </SectionCard>
-
-          {/* Recent — öffnet Dashboard-Tab */}
-          <SectionCard title="Letzte Aktivität" icon={<Activity size={14} />} empty="Noch keine Clients.">
-            {recentClients.length > 0
-              ? (
-                <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {recentClients.map(c => (
-                    <ClientRow
-                      key={c.id}
-                      customer={c}
-                      lastAct={activityMap.get(c.id) ?? c.updatedAt}
-                      tab="ueberblick"
-                      onClick={() => openCustomerAt(c.id, 'ueberblick')}
-                    />
-                  ))}
-                </StaggerList>
-              )
-              : undefined}
-          </SectionCard>
+            <UserPlus size={14} /> Neu
+          </button>
         </div>
       </div>
 
-      </>)}
+      {/* Search + sort */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 280 }}>
+          <Search
+            size={16}
+            style={{
+              position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+              color: 'var(--fg-dim)', pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="In allen Kunden suchen…"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '13px 18px 13px 44px',
+              borderRadius: 12, border: '1px solid var(--border)',
+              background: 'var(--surface-2)',
+              color: 'var(--fg)', fontSize: 13.5,
+              fontFamily: 'inherit', outline: 'none',
+              transition: 'border-color 140ms',
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
+            onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          />
+        </div>
+        <SortTabs active={sortKey} onChange={setSortKey} />
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 11,
+          color: 'var(--fg-dim)', letterSpacing: '0.06em',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {sortedRows.length} / {allRows.length}
+        </span>
+      </div>
+
+      {/* ZULETZT strip */}
+      <ZuletztStrip recent={recentForStrip} onOpen={id => openCustomerAt(id, 'ueberblick')} />
+
+      {/* List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <ColumnHeader />
+        {sortedRows.length === 0 ? (
+          <div style={{
+            padding: '40px 20px', textAlign: 'center',
+            color: 'var(--fg-dim)', fontSize: 13,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 14,
+          }}>
+            Keine Kunden passen zur Suche.
+          </div>
+        ) : (
+          <StaggerList style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {sortedRows.map(row => (
+              <ClientListRow
+                key={row.customer.id}
+                row={row}
+                onOpen={() => openCustomerAt(row.customer.id, 'ueberblick')}
+              />
+            ))}
+          </StaggerList>
+        )}
+      </div>
 
       {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
     </div>
@@ -573,7 +534,6 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
         </p>
       </div>
 
-      {/* Primary CTA */}
       <button
         onClick={onAddManual}
         className="btn-primary"
@@ -594,7 +554,6 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
         <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
       </div>
 
-      {/* Sample data */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={{
           fontSize: 12.5, color: 'var(--fg-muted)',
