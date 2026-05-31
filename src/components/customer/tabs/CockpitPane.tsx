@@ -342,6 +342,113 @@ const btnGhostStyle: React.CSSProperties = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Posteingang-Mini-Liste
+
+function InboxMini({ customerId }: { customerId: string }) {
+  const emails       = useMailStore(s => s.emails)
+  const selectEmail  = useMailStore(s => s.selectEmail)
+  const setAppView   = useUiStore(s => s.setAppView)
+
+  const list = useMemo(
+    () => emails
+      .filter(e => e.customerId === customerId)
+      .sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''))
+      .slice(0, 4),
+    [emails, customerId],
+  )
+  const unreadTotal = useMemo(
+    () => emails.filter(e => e.customerId === customerId && !e.isRead).length,
+    [emails, customerId],
+  )
+
+  return (
+    <div style={{
+      borderRadius: 16, border: '1px solid var(--border)',
+      background: 'var(--bg-2)', padding: '18px 22px 16px',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        letterSpacing: '0.18em', textTransform: 'uppercase',
+        color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 4,
+      }}>
+        <span>Posteingang</span>
+        <span style={{ fontWeight: 500, color: 'var(--fg-dim)' }}>
+          {unreadTotal > 0
+            ? <><span style={{ color: 'var(--accent)', fontWeight: 700 }}>{unreadTotal}</span> ungelesen</>
+            : 'alles gelesen'}
+        </span>
+      </div>
+
+      {list.length === 0 ? (
+        <div style={{
+          padding: '18px 0 4px', color: 'var(--fg-dim)', fontSize: 12.5,
+        }}>
+          Keine E-Mails von diesem Kunden.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {list.map((e, i) => (
+            <button
+              key={e.id}
+              onClick={() => { selectEmail(e); setAppView('mail') }}
+              style={{
+                display: 'grid', gridTemplateColumns: '14px 1fr auto',
+                alignItems: 'center', gap: 12,
+                padding: '11px 0', textAlign: 'left',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: 'var(--fg)', fontFamily: 'inherit',
+                borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+              }}
+            >
+              <span style={{
+                width: 8, height: 8, borderRadius: 99,
+                background: e.isRead ? 'transparent' : 'var(--accent)',
+                border: e.isRead ? '1px solid var(--border-strong)' : 'none',
+                margin: '0 auto',
+              }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: e.isRead ? 500 : 700,
+                  color: 'var(--fg)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {e.subject || '(ohne Betreff)'}
+                </div>
+                <div style={{
+                  fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {e.fromName || e.fromAddr}
+                </div>
+              </div>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                color: 'var(--fg-dim)', letterSpacing: '0.04em',
+              }}>
+                {relTimeShort(e.sentAt)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => setAppView('mail')}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          marginTop: 14, padding: 0,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+        }}
+      >
+        Mail-Inbox öffnen <ArrowRight size={12} />
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Verlauf-Mini-Liste
 
 interface MiniEvent {
@@ -674,6 +781,9 @@ export function CockpitPane({ customerId }: Props) {
           onSkip={() => setSkipped(true)}
         />
       )}
+
+      {/* ── Posteingang ───────────────────────────────────────────────── */}
+      <InboxMini customerId={customerId} />
 
       {/* ── Verlauf ────────────────────────────────────────────────────── */}
       <HistoryMini customerId={customerId} />
