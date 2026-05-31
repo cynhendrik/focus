@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { Reply, Forward, Plus } from 'lucide-react'
+import { Reply, Forward, Plus, Focus, Inbox as InboxIcon } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { ComposeModal } from '@/components/mail/ComposeModal'
@@ -30,6 +30,38 @@ export function MailRoute() {
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const setActiveCampaign = useCampaignStore(s => s.setActive)
   const activeCampaignId  = useCampaignStore(s => s.activeCampaignId)
+
+  // ── Focus-Inbox: default-on, zeigt nur Mails mit Kunden-Bezug ──────────────
+  const [mailFocus, setMailFocus] = useState<boolean>(() => {
+    try { return localStorage.getItem('cynera:mail:focus-v1') !== 'all' }
+    catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('cynera:mail:focus-v1', mailFocus ? 'focus' : 'all') } catch {}
+  }, [mailFocus])
+
+  const customerEmailDomains = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of customers) {
+      if (!c.email) continue
+      const at = c.email.lastIndexOf('@')
+      if (at !== -1) set.add(c.email.slice(at + 1).toLowerCase())
+    }
+    return set
+  }, [customers])
+
+  const visibleEmails = useMemo(() => {
+    if (!mailFocus) return emails
+    return emails.filter(e => {
+      if (e.customerId) return true
+      if (!e.fromAddr) return false
+      const at = e.fromAddr.lastIndexOf('@')
+      if (at === -1) return false
+      return customerEmailDomains.has(e.fromAddr.slice(at + 1).toLowerCase())
+    })
+  }, [emails, mailFocus, customerEmailDomains])
+
+  const hiddenCount = mailFocus ? emails.length - visibleEmails.length : 0
 
   useEffect(() => {
     loadAccounts()
@@ -75,7 +107,10 @@ export function MailRoute() {
       <div className="greeting" style={{ marginBottom: 18 }}>
         <h1 className="greeting-title">Mail<em>.</em></h1>
         <div className="greeting-sub">
-          <span>Posteingang</span>
+          <span>{mailFocus ? 'Fokus-Inbox' : 'Posteingang'}</span>
+          {mailFocus && hiddenCount > 0 && (
+            <span>{hiddenCount} weitere ausgeblendet</span>
+          )}
           <span>Sync aktiv</span>
         </div>
       </div>
@@ -178,7 +213,44 @@ export function MailRoute() {
       <>
       {/* Middle panel: email list */}
       <div className="card" style={{ width: 288, flexShrink: 0, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0, borderRadius: 0 }}>
-        <div style={{ padding: '8px 8px 0', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ padding: '8px 8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+          {/* Focus toggle */}
+          <div style={{
+            display: 'inline-flex', padding: 2,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 8,
+          }}>
+            <button
+              onClick={() => setMailFocus(true)}
+              title="Nur Mails von Kunden oder Kunden-Domains"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 9px', border: 'none', borderRadius: 6,
+                fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                background: mailFocus ? 'var(--surface)' : 'transparent',
+                color: mailFocus ? 'var(--fg)' : 'var(--fg-muted)',
+                boxShadow: mailFocus ? 'var(--shadow-1)' : 'none',
+                transition: 'background 140ms, color 140ms',
+              }}
+            >
+              <Focus size={11} /> Fokus
+            </button>
+            <button
+              onClick={() => setMailFocus(false)}
+              title="Alle Mails anzeigen"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '4px 9px', border: 'none', borderRadius: 6,
+                fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                background: !mailFocus ? 'var(--surface)' : 'transparent',
+                color: !mailFocus ? 'var(--fg)' : 'var(--fg-muted)',
+                boxShadow: !mailFocus ? 'var(--shadow-1)' : 'none',
+                transition: 'background 140ms, color 140ms',
+              }}
+            >
+              <InboxIcon size={11} /> Alle
+            </button>
+          </div>
           <button
             onClick={() => { setComposeMode('new'); setShowCompose(true) }}
             style={{
@@ -200,10 +272,27 @@ export function MailRoute() {
         </div>
         <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
           {isLoading && <p className="text-xs text-[var(--text2)] p-3">Lädt…</p>}
-          {!isLoading && emails.length === 0 && (
+          {!isLoading && visibleEmails.length === 0 && emails.length === 0 && (
             <p className="text-xs text-[var(--text2)] p-3 text-center">Keine E-Mails</p>
           )}
-          {emails.map(email => {
+          {!isLoading && visibleEmails.length === 0 && emails.length > 0 && mailFocus && (
+            <div style={{ padding: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: 0 }}>
+                Keine Kunden-Mails in diesem Ordner.
+              </p>
+              <button
+                onClick={() => setMailFocus(false)}
+                style={{
+                  fontSize: 11, padding: '5px 10px', borderRadius: 7,
+                  border: '1px solid var(--border)', background: 'transparent',
+                  color: 'var(--fg)', cursor: 'pointer', alignSelf: 'center',
+                }}
+              >
+                {emails.length} weitere Mails zeigen
+              </button>
+            </div>
+          )}
+          {visibleEmails.map(email => {
             const senderName = email.fromName || email.fromAddr
             const senderInitial = senderName ? senderName.charAt(0).toUpperCase() : '?'
             const subject = email.subject || '(kein Betreff)'
