@@ -65,6 +65,22 @@ const KIND_META: Record<EventKind, KindMeta> = {
   deadline:  { Icon: AlarmClock,   label: 'Deadline',   color: 'oklch(72% 0.18 25)',  tint: 'oklch(72% 0.18 25 / 0.16)'  },
 }
 
+// Fallback fuer Eintraege, deren `kind` nicht (mehr) im Mapping ist —
+// z.B. Activity-Typen, die das Backend liefert, aber das Frontend noch
+// nicht kennt (stage_change u.a.). Verhindert White-Screen-Crash.
+const FALLBACK_KIND_META: KindMeta = {
+  Icon:  FileText,
+  label: 'Eintrag',
+  color: 'oklch(70% 0.02 270)',
+  tint:  'oklch(70% 0.02 270 / 0.14)',
+}
+
+function metaFor(kind: EventKind): KindMeta {
+  const m = KIND_META[kind]
+  if (!m) console.warn('[TimelinePane] unknown event kind:', kind)
+  return m ?? FALLBACK_KIND_META
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Date / grouping helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -647,7 +663,7 @@ function Composer({
   kind, onKindChange, text, onTextChange, date, onDateChange,
   menuOpen, onMenuToggle, saving, onSubmit,
 }: ComposerProps) {
-  const meta = KIND_META[kind]
+  const meta = metaFor(kind)
   const Icon = meta.Icon
   const isFollowup = kind === 'followup'
   const menuRef = useRef<HTMLDivElement>(null)
@@ -717,7 +733,7 @@ function Composer({
                 }}
               >
                 {COMPOSER_KINDS.map(k => {
-                  const m = KIND_META[k]
+                  const m = metaFor(k)
                   const I = m.Icon
                   const active = kind === k
                   return (
@@ -876,7 +892,7 @@ interface EventRowProps {
 }
 
 function EventRow({ event, delay, isExpanded, onClick, body }: EventRowProps) {
-  const meta = KIND_META[event.kind]
+  const meta = metaFor(event.kind)
   const Icon = meta.Icon
   const [hover, setHover] = useState(false)
   const isFuture = event.isFuture

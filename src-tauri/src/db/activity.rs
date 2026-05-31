@@ -187,10 +187,13 @@ pub struct AccountActivityDate {
 }
 
 pub fn get_last_activity_dates(conn: &Connection, workspace_id: &str) -> Result<Vec<AccountActivityDate>, AppError> {
+    // account_id ist NULL-faehig (z.B. fuer reine Customer-Activities ohne
+    // Account-Zuordnung). Ohne den Filter wuerde GROUP BY eine NULL-Zeile
+    // erzeugen, die wir hier als String dekodieren — das crasht.
     let mut stmt = conn.prepare(
         "SELECT account_id, MAX(created_at) as last_activity_at
          FROM activities
-         WHERE workspace_id = ?1
+         WHERE workspace_id = ?1 AND account_id IS NOT NULL
          GROUP BY account_id
          ORDER BY last_activity_at ASC"
     )?;
