@@ -71,8 +71,10 @@ export function ContactCard({ contact, onEdit, mentionCount = 0 }: Props) {
   const upsert = useContactsStore(s => s.upsert)
   const color = contactColor(fullNameOf(contact))
   const initials = initialsOf(contact)
-  const power = contact.decisionPower ? POWER_META[contact.decisionPower] : null
-  const channel = contact.preferredChannel ? CHANNEL_META[contact.preferredChannel] : null
+  // Defensive: wenn das Feld einen Wert hat, der nicht im META-Mapping
+  // ist (z.B. Daten-Migration mit altem Enum-Wert), null statt undefined.
+  const power = contact.decisionPower ? (POWER_META[contact.decisionPower] ?? null) : null
+  const channel = contact.preferredChannel ? (CHANNEL_META[contact.preferredChannel] ?? null) : null
   const bdayDays = contact.birthday ? daysUntilBirthday(contact.birthday) : null
 
   const [hover, setHover]     = useState(false)

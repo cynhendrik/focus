@@ -3,7 +3,8 @@ import type { ChatMessage, AddChatMessagePayload } from '@/types/chat.types'
 
 export const ChatService = {
   getByCustomer(customerId: string): Promise<ChatMessage[]> {
-    return invoke<ChatMessage[]>('get_chat_messages', { customerId })
+    // Backend nennt den Parameter account_id → Tauri camelCase = accountId.
+    return invoke<ChatMessage[]>('get_chat_messages', { accountId: customerId })
   },
   add(payload: AddChatMessagePayload): Promise<ChatMessage> {
     return invoke<ChatMessage>('add_chat_message', { payload })

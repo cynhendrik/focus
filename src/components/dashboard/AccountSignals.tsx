@@ -123,8 +123,9 @@ export function AccountSignals() {
 
 function SignalRow({ signal, onClick }: { signal: AccountSignal; onClick: () => void }) {
   const [hover, setHover] = useState(false)
-  const Icon = KIND_ICON[signal.insight.kind]
-  const color = SEVERITY_COLOR[signal.insight.severity]
+  // Defensive: unbekannte kinds/severities sollten die App nicht zerschiessen.
+  const Icon  = KIND_ICON[signal.insight.kind]              ?? KIND_ICON.pipeline_health
+  const color = SEVERITY_COLOR[signal.insight.severity]     ?? SEVERITY_COLOR.neutral
 
   return (
     <motion.div

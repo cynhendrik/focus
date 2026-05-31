@@ -120,9 +120,10 @@ export function InsightsStrip({ customerId }: Props) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function InsightCard({ insight, onDismiss }: { insight: Insight; onDismiss: () => void }) {
-  const Icon = KIND_ICON[insight.kind]
-  const color = SEVERITY_COLOR[insight.severity]
-  const tint = SEVERITY_TINT[insight.severity]
+  // Defensive: unbekannte kinds/severities sollten die App nicht zerschiessen.
+  const Icon  = KIND_ICON[insight.kind]              ?? Sparkles
+  const color = SEVERITY_COLOR[insight.severity]     ?? SEVERITY_COLOR.neutral
+  const tint  = SEVERITY_TINT[insight.severity]      ?? SEVERITY_TINT.neutral
   const [hover, setHover] = useState(false)
 
   return (
