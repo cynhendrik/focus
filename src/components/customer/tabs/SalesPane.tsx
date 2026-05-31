@@ -370,12 +370,18 @@ function WhatsAppPlaceholder() {
 interface Props { customerId: string }
 
 export function SalesPane({ customerId }: Props) {
-  const { customerDeals, loadForCustomer: loadDeals, moveToStage } = useDealsStore()
-  const stages = usePipelineStore(s => s.stages)
-  const { activities, loadForCustomer: loadActivities, create, update, remove } = useActivitiesStore()
-  const customer = useCustomersStore(s => s.customers.find(c => c.id === customerId))
-  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-  const user = useAuthStore(s => s.user)
+  const customerDeals   = useDealsStore(s => s.customerDeals)
+  const loadDeals       = useDealsStore(s => s.loadForCustomer)
+  const moveToStage     = useDealsStore(s => s.moveToStage)
+  const stages          = usePipelineStore(s => s.stages)
+  const activities      = useActivitiesStore(s => s.activities)
+  const loadActivities  = useActivitiesStore(s => s.loadForCustomer)
+  const create          = useActivitiesStore(s => s.create)
+  const update          = useActivitiesStore(s => s.update)
+  const remove          = useActivitiesStore(s => s.remove)
+  const customer        = useCustomersStore(s => s.customers.find(c => c.id === customerId))
+  const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const user            = useAuthStore(s => s.user)
 
   const [editDeal,   setEditDeal]   = useState<Deal | 'new' | null>(null)
   const [actModal,   setActModal]   = useState<ActivityType | null>(null)

@@ -72,7 +72,10 @@ function SortableStageRow({ stage, onDelete, onUpdate }: {
 interface Props { workspaceId: string; onClose: () => void }
 
 export function StagesManager({ workspaceId, onClose }: Props) {
-  const { stages, upsertStage, removeStage, reorder } = usePipelineStore()
+  const stages      = usePipelineStore(s => s.stages)
+  const upsertStage = usePipelineStore(s => s.upsertStage)
+  const removeStage = usePipelineStore(s => s.removeStage)
+  const reorder     = usePipelineStore(s => s.reorder)
   const [error, setError] = useState<string | null>(null)
   const [newLabel, setNewLabel] = useState('')
   const sensors = useSensors(useSensor(PointerSensor))

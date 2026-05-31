@@ -29,7 +29,9 @@ export function CampaignsTab({ onNew, onSelect }: {
   onSelect: (id: string) => void
 }) {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-  const { campaigns, isLoading, load } = useCampaignStore()
+  const campaigns = useCampaignStore(s => s.campaigns)
+  const isLoading = useCampaignStore(s => s.isLoading)
+  const load      = useCampaignStore(s => s.load)
 
   useEffect(() => {
     if (workspaceId) load(workspaceId)

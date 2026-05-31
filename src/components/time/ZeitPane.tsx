@@ -18,7 +18,10 @@ function todayISO(): string {
 }
 
 export function ZeitPane({ customerId }: Props) {
-  const { entries, loadForCustomer, add, remove } = useTimeStore()
+  const entries         = useTimeStore(s => s.entries)
+  const loadForCustomer = useTimeStore(s => s.loadForCustomer)
+  const add             = useTimeStore(s => s.add)
+  const remove          = useTimeStore(s => s.remove)
   const [desc, setDesc] = useState('')
   const [hours, setHours] = useState('')
   const [mins, setMins] = useState('')

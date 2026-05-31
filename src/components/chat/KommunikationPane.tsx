@@ -7,7 +7,10 @@ interface Props {
 }
 
 export function KommunikationPane({ customerId }: Props) {
-  const { messages, loadForCustomer, add, remove } = useChatStore()
+  const messages        = useChatStore(s => s.messages)
+  const loadForCustomer = useChatStore(s => s.loadForCustomer)
+  const add             = useChatStore(s => s.add)
+  const remove          = useChatStore(s => s.remove)
   const [text, setText] = useState('')
   const [sender, setSender] = useState<ChatSender>('user')
   const bottomRef = useRef<HTMLDivElement>(null)

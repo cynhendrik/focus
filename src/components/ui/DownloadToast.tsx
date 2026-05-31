@@ -3,7 +3,12 @@ import { useDownloadToastStore } from '@/store/download-toast.store'
 import { FileDown, CheckCircle2, AlertCircle } from 'lucide-react'
 
 export function DownloadToast() {
-  const { phase, filename, savedTo, progress, isBatch, reset } = useDownloadToastStore()
+  const phase    = useDownloadToastStore(s => s.phase)
+  const filename = useDownloadToastStore(s => s.filename)
+  const savedTo  = useDownloadToastStore(s => s.savedTo)
+  const progress = useDownloadToastStore(s => s.progress)
+  const isBatch  = useDownloadToastStore(s => s.isBatch)
+  const reset    = useDownloadToastStore(s => s.reset)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

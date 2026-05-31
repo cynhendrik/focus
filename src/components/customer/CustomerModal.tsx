@@ -16,7 +16,8 @@ const EMPTY: FormPayload = {
 }
 
 export function CustomerModal({ customer, onClose }: Props) {
-  const { upsert, remove } = useCustomersStore()
+  const upsert = useCustomersStore(s => s.upsert)
+  const remove = useCustomersStore(s => s.remove)
   const [form, setForm] = useState<FormPayload>(EMPTY)
   const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)

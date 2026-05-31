@@ -12,15 +12,37 @@ import { useCampaignStore }    from '@/store/campaign.store'
 import type { SyncProgress, MailFolder } from '@/types/mail.types'
 
 export function MailRoute() {
-  const {
-    accounts, selectedAccountId, selectedFolder, emails, selectedEmail, emailBody,
-    attachments,
-    search, syncProgress, isSyncing, isLoading,
-    folders, expandedFolders, foldersLastFetched, isFolderLoading,
-    loadAccounts, selectAccount, selectFolder, selectEmail, setSearch, sync,
-    removeAccount, setSyncProgress, assignCustomer, deleteEmail, downloadAttachment,
-    loadFolders, toggleFolder, loadEmails,
-  } = useMailStore()
+  // Selectoren statt destrukturierter Store: vermeidet Re-Renders bei
+  // jedem syncProgress-Tick und bei Field-Updates, die wir hier nicht lesen.
+  const accounts            = useMailStore(s => s.accounts)
+  const selectedAccountId   = useMailStore(s => s.selectedAccountId)
+  const selectedFolder      = useMailStore(s => s.selectedFolder)
+  const emails              = useMailStore(s => s.emails)
+  const selectedEmail       = useMailStore(s => s.selectedEmail)
+  const emailBody           = useMailStore(s => s.emailBody)
+  const attachments         = useMailStore(s => s.attachments)
+  const search              = useMailStore(s => s.search)
+  const syncProgress        = useMailStore(s => s.syncProgress)
+  const isSyncing           = useMailStore(s => s.isSyncing)
+  const isLoading           = useMailStore(s => s.isLoading)
+  const folders             = useMailStore(s => s.folders)
+  const expandedFolders     = useMailStore(s => s.expandedFolders)
+  const foldersLastFetched  = useMailStore(s => s.foldersLastFetched)
+  const isFolderLoading     = useMailStore(s => s.isFolderLoading)
+  const loadAccounts        = useMailStore(s => s.loadAccounts)
+  const selectAccount       = useMailStore(s => s.selectAccount)
+  const selectFolder        = useMailStore(s => s.selectFolder)
+  const selectEmail         = useMailStore(s => s.selectEmail)
+  const setSearch           = useMailStore(s => s.setSearch)
+  const sync                = useMailStore(s => s.sync)
+  const removeAccount       = useMailStore(s => s.removeAccount)
+  const setSyncProgress     = useMailStore(s => s.setSyncProgress)
+  const assignCustomer      = useMailStore(s => s.assignCustomer)
+  const deleteEmail         = useMailStore(s => s.deleteEmail)
+  const downloadAttachment  = useMailStore(s => s.downloadAttachment)
+  const loadFolders         = useMailStore(s => s.loadFolders)
+  const toggleFolder        = useMailStore(s => s.toggleFolder)
+  const loadEmails          = useMailStore(s => s.loadEmails)
 
   const customers = useCustomersStore(s => s.customers)
   const [showSetup, setShowSetup] = useState(false)
@@ -502,7 +524,7 @@ function formatLastFetched(ts: number): string {
 }
 
 function AccountSetupForm({ onAdd, onCancel }: { onAdd: () => void; onCancel: () => void }) {
-  const { addAccount } = useMailStore()
+  const addAccount = useMailStore(s => s.addAccount)
   const [form, setForm] = useState({
     email: '', password: '', displayName: '', imapHost: '', imapPort: '993',
   })

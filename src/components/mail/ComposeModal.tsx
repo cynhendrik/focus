@@ -102,7 +102,8 @@ function TagInput({
 export function ComposeModal({
   mode, replyTo, replyBody, accountId, onClose, onSent,
 }: ComposeModalProps) {
-  const { sendEmail, isSending } = useMailStore()
+  const sendEmail = useMailStore(s => s.sendEmail)
+  const isSending = useMailStore(s => s.isSending)
 
   const [to, setTo]           = useState<string[]>(tagInputInitial(mode, replyTo))
   const [cc, setCc]           = useState<string[]>([])

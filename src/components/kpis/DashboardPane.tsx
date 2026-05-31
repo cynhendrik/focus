@@ -12,7 +12,10 @@ interface Props {
 const EMPTY_FORM = { label: '', value: '', unit: '', target: '', period: '' }
 
 export function DashboardPane({ customerId }: Props) {
-  const { kpis, loadForCustomer, upsert, remove } = useKpisStore()
+  const kpis            = useKpisStore(s => s.kpis)
+  const loadForCustomer = useKpisStore(s => s.loadForCustomer)
+  const upsert          = useKpisStore(s => s.upsert)
+  const remove          = useKpisStore(s => s.remove)
   const todos = useTodosStore(s => s.todos)
   const followUps = useCrmStore(s => s.followUps)
   const [form, setForm] = useState(EMPTY_FORM)

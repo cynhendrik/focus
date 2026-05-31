@@ -10,8 +10,14 @@ interface Props {
 }
 
 export function WorkflowPane({ customerId }: Props) {
-  const { todos, loadForCustomer: loadTodos, upsert: upsertTodo, remove: removeTodo } = useTodosStore()
-  const { notes, loadForCustomer: loadNotes, upsert: upsertNote, remove: removeNote } = useNotesStore()
+  const todos       = useTodosStore(s => s.todos)
+  const loadTodos   = useTodosStore(s => s.loadForCustomer)
+  const upsertTodo  = useTodosStore(s => s.upsert)
+  const removeTodo  = useTodosStore(s => s.remove)
+  const notes       = useNotesStore(s => s.notes)
+  const loadNotes   = useNotesStore(s => s.loadForCustomer)
+  const upsertNote  = useNotesStore(s => s.upsert)
+  const removeNote  = useNotesStore(s => s.remove)
 
   const [newTodo, setNewTodo] = useState('')
   const [newNoteTitle, setNewNoteTitle] = useState('')

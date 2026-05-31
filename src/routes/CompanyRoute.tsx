@@ -12,7 +12,11 @@ const MODULE_LABELS: Record<keyof CompanyModules, string> = {
 }
 
 export function CompanyRoute() {
-  const { profile, modules, load, saveProfile, saveModules } = useCompanyStore()
+  const profile      = useCompanyStore(s => s.profile)
+  const modules      = useCompanyStore(s => s.modules)
+  const load         = useCompanyStore(s => s.load)
+  const saveProfile  = useCompanyStore(s => s.saveProfile)
+  const saveModules  = useCompanyStore(s => s.saveModules)
   const [form, setForm] = useState<CompanyProfile>({})
   const [saved, setSaved] = useState(false)
 

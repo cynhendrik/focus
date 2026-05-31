@@ -886,7 +886,11 @@ function DraftEditorModal({
 }
 
 export function FollowupsDashboardRoute() {
-  const { followups, loadOpenFollowups, create, update, remove } = useActivitiesStore()
+  const followups         = useActivitiesStore(s => s.followups)
+  const loadOpenFollowups = useActivitiesStore(s => s.loadOpenFollowups)
+  const create            = useActivitiesStore(s => s.create)
+  const update            = useActivitiesStore(s => s.update)
+  const remove            = useActivitiesStore(s => s.remove)
   const customers = useCustomersStore(s => s.customers)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user = useAuthStore(s => s.user)

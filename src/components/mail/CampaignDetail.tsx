@@ -37,7 +37,13 @@ function RecipientRow({ r }: { r: CampaignRecipient }) {
 }
 
 export function CampaignDetail({ campaignId, onBack }: { campaignId: string; onBack: () => void }) {
-  const { campaigns, recipients, loadRecipients, isLoading, send, setSendProgress, sendProgress } = useCampaignStore()
+  const campaigns       = useCampaignStore(s => s.campaigns)
+  const recipients      = useCampaignStore(s => s.recipients)
+  const loadRecipients  = useCampaignStore(s => s.loadRecipients)
+  const isLoading       = useCampaignStore(s => s.isLoading)
+  const send            = useCampaignStore(s => s.send)
+  const setSendProgress = useCampaignStore(s => s.setSendProgress)
+  const sendProgress    = useCampaignStore(s => s.sendProgress)
   const allLeads    = useLeadsStore(s => s.leads)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const campaign    = campaigns.find(c => c.id === campaignId)
