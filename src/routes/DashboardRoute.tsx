@@ -60,7 +60,9 @@ function formatDue(iso: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // PriorityCard — the three big cards at the top
 
-const KIND_META: Record<PriorityKind, { label: string; icon: LucideIcon; tone: 'accent' | 'warn' | 'bad' | 'info' }> = {
+type PriorityMeta = { label: string; icon: LucideIcon; tone: 'accent' | 'warn' | 'bad' | 'info' }
+
+const KIND_META: Record<PriorityKind, PriorityMeta> = {
   meeting:          { label: 'MEETING',     icon: CalIcon,      tone: 'accent' },
   overdue_task:     { label: 'TASK',        icon: AlertTriangle, tone: 'bad'    },
   today_task:       { label: 'TASK',        icon: CheckCircle2, tone: 'accent' },
@@ -69,12 +71,20 @@ const KIND_META: Record<PriorityKind, { label: string; icon: LucideIcon; tone: '
   followup_due:     { label: 'FOLLOW-UP',   icon: Bell,         tone: 'info'   },
 }
 
+const FALLBACK_META: PriorityMeta = { label: 'EINTRAG', icon: CheckCircle2, tone: 'info' }
+
+function metaFor(kind: PriorityKind): PriorityMeta {
+  const m = KIND_META[kind]
+  if (!m) console.warn('[DashboardRoute] unknown priority kind:', kind)
+  return m ?? FALLBACK_META
+}
+
 function PriorityCard({ item, index, onClick }: {
   item: PriorityItem
   index: number
   onClick: () => void
 }) {
-  const meta = KIND_META[item.kind]
+  const meta = metaFor(item.kind)
   const Icon = meta.icon
   const isHero = index === 0
   return (

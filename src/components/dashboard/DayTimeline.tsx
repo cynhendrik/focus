@@ -229,9 +229,15 @@ export function DayTimeline({ limit }: Props) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Row
 
-const KIND_VISUAL: Record<Exclude<EntryKind, 'now' | 'gap'>, { icon: LucideIcon; bg: string; color: string }> = {
+type KindVisual = { icon: LucideIcon; bg: string; color: string }
+
+const KIND_VISUAL: Record<Exclude<EntryKind, 'now' | 'gap'>, KindVisual> = {
   event: { icon: CalIcon,        bg: 'var(--accent-soft)',                color: 'var(--accent)' },
   task:  { icon: CheckCircle2,   bg: 'oklch(78% 0.13 235 / 0.18)',         color: 'var(--info)'   },
+}
+
+const FALLBACK_VISUAL: KindVisual = {
+  icon: CheckCircle2, bg: 'var(--surface-2)', color: 'var(--fg-muted)',
 }
 
 function TimelineRow({ entry, onCustomerClick }: {
@@ -246,7 +252,7 @@ function TimelineRow({ entry, onCustomerClick }: {
     return <GapRow startMin={entry.startMin} label={entry.label} />
   }
 
-  const meta = KIND_VISUAL[entry.kind]
+  const meta = KIND_VISUAL[entry.kind as Exclude<EntryKind, 'now' | 'gap'>] ?? FALLBACK_VISUAL
   const Icon = meta.icon
 
   if (entry.kind === 'event') {
