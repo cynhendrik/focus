@@ -9,7 +9,7 @@ import {
   Home, CheckSquare, Users, CreditCard,
   TrendingUp, Target, Reply, Flame,
   Calendar, Mail, Settings,
-  ChevronRight,
+  ChevronRight, BookOpen,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -77,6 +77,7 @@ function SidebarNavItem({
 export function NavSidebar() {
   const appView    = useUiStore(s => s.appView)
   const setAppView = useUiStore(s => s.setAppView)
+  const appMode    = useUiStore(s => s.appMode)
   const user       = useAuthStore(s => s.user)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
@@ -105,6 +106,7 @@ export function NavSidebar() {
 
   const initials    = user?.email ? user.email.slice(0, 2).toUpperCase() : 'CY'
   const displayName = user?.email?.split('@')[0] ?? 'User'
+  const personal    = appMode === 'personal'
 
   return (
     <aside className="sidebar">
@@ -118,38 +120,54 @@ export function NavSidebar() {
         </div>
         <div className="sidebar-brand-text">
           <strong>Focus</strong>
-          <span>CYNERA · 2026</span>
+          <span>{personal ? 'MEIN RAUM · 2026' : 'CYNERA · 2026'}</span>
         </div>
       </div>
 
-      <SidebarSection label="Workspace" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
-      {expanded.workspace && (
+      {personal ? (
+        // ── Mein Raum: fokussiert, ohne Sales-/Business-Distraktion ────────
         <>
-          <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
-          <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
-          {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
-        </>
-      )}
-
-      {modules.sales !== false && (
-        <>
-          <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
-          {expanded.sales && (
+          <SidebarSection label="Mein Raum" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
+          {expanded.workspace && (
             <>
-              <SidebarNavItem icon={Flame}       label="Cockpit"     active={appView === 'sales-cockpit'} onClick={() => setAppView('sales-cockpit')} kbd="O" />
-              <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
-              <SidebarNavItem icon={Reply}       label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" />
-              <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
+              <SidebarNavItem icon={BookOpen}  label="Journal"   active={appView === 'journal'}  onClick={() => setAppView('journal')}  kbd="J" />
+              <SidebarNavItem icon={Calendar}  label="Kalender"  active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />
             </>
           )}
         </>
-      )}
-
-      <SidebarSection label="Inbox" expanded={expanded.inbox} onToggle={() => toggle('inbox')} />
-      {expanded.inbox && (
+      ) : (
+        // ── Business: volle Plattform ─────────────────────────────────────
         <>
-          <SidebarNavItem icon={Calendar}      label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />
-          <SidebarNavItem icon={Mail}          label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />
+          <SidebarSection label="Workspace" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
+          {expanded.workspace && (
+            <>
+              <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
+              <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
+              {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
+            </>
+          )}
+
+          {modules.sales !== false && (
+            <>
+              <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
+              {expanded.sales && (
+                <>
+                  <SidebarNavItem icon={Flame}       label="Cockpit"     active={appView === 'sales-cockpit'} onClick={() => setAppView('sales-cockpit')} kbd="O" />
+                  <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
+                  <SidebarNavItem icon={Reply}       label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" />
+                  <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
+                </>
+              )}
+            </>
+          )}
+
+          <SidebarSection label="Inbox" expanded={expanded.inbox} onToggle={() => toggle('inbox')} />
+          {expanded.inbox && (
+            <>
+              <SidebarNavItem icon={Calendar}      label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />
+              <SidebarNavItem icon={Mail}          label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />
+            </>
+          )}
         </>
       )}
 
@@ -161,7 +179,7 @@ export function NavSidebar() {
         <div className="sidebar-user-avatar">{initials}</div>
         <div className="sidebar-user-text">
           <strong>{displayName}</strong>
-          <span>Cynera Focus</span>
+          <span>{personal ? 'Mein Raum' : 'Cynera Focus'}</span>
         </div>
       </div>
     </aside>

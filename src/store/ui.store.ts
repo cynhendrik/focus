@@ -41,11 +41,21 @@ export type AppView =
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'
   | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads' | 'sales-cockpit'
+  | 'journal'
+
+/**
+ * Kontext-Modus der App. Der "business"-Modus ist die volle Plattform
+ * (Sales, CRM, Finance, Mail). Der "personal"-Modus ist Hendriks
+ * "Mein Raum" — Journal, Reflexion, persoenliche Notizen — ohne
+ * Sales-Distraktion. Sidebar/Default-Route schalten sich entsprechend um.
+ */
+export type AppMode = 'business' | 'personal'
 
 interface UiState {
   theme: Theme
   selectedCustomerId: string | null
   appView: AppView
+  appMode: AppMode
   focusMode: boolean
   hasSeenIntro: boolean
   migrationDone: boolean
@@ -57,6 +67,8 @@ interface UiState {
   setSelectedCustomer: (id: string | null) => void
   openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
   setAppView: (view: AppView) => void
+  setAppMode: (mode: AppMode) => void
+  toggleAppMode: () => void
   toggleFocusMode: () => void
   markIntroSeen: () => void
   markMigrationDone: () => void
@@ -72,6 +84,7 @@ export const useUiStore = create<UiState>()(
       theme: 'dark',
       selectedCustomerId: null,
       appView: 'dashboard',
+      appMode: 'business',
       focusMode: false,
       hasSeenIntro: false,
       migrationDone: false,
@@ -91,6 +104,21 @@ export const useUiStore = create<UiState>()(
 
       setAppView: (view) =>
         set({ appView: view }),
+
+      setAppMode: (mode) =>
+        // Modus-Wechsel setzt auch die Default-Route, damit der User nicht
+        // ploetzlich in einer Sidebar-Section landet, die er gerade nicht
+        // sieht (z.B. waehrend man in 'pipeline' war und auf personal wechselt).
+        set({ appMode: mode, appView: mode === 'personal' ? 'journal' : 'dashboard' }),
+
+      toggleAppMode: () =>
+        set(s => {
+          const next: AppMode = s.appMode === 'business' ? 'personal' : 'business'
+          return {
+            appMode: next,
+            appView: next === 'personal' ? 'journal' : 'dashboard',
+          }
+        }),
 
       toggleFocusMode: () =>
         set(s => ({ focusMode: !s.focusMode })),
@@ -122,6 +150,7 @@ export const useUiStore = create<UiState>()(
         migrationDone: s.migrationDone,
         clientsView: s.clientsView,
         tasksTab: s.tasksTab,
+        appMode: s.appMode,
       }),
     }
   )
