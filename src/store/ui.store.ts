@@ -2,8 +2,19 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
-/** Canonical customer tabs — 3 instead of 9. */
-export type CustomerTab = 'ueberblick' | 'arbeiten' | 'historie'
+/**
+ * Top-Level-Tabs im Customer-Detail. 7 statt 3 — eine Ebene tiefer war
+ * dem User zu verschachtelt. Jeder Tab mappt 1:1 auf eine eigenstaendige
+ * Pane, keine Sub-Tab-Navigation mehr darunter.
+ */
+export type CustomerTab =
+  | 'cockpit'      // Briefing + Lead Score + Quick-Stats
+  | 'tasks'        // Tasks (offene + erledigte)
+  | 'notizen'      // Notebooks + Notes
+  | 'dokumente'    // Dateien + Folder
+  | 'kommunikation' // Mails + Chat + Calls
+  | 'verlauf'      // Activity-Timeline
+  | 'finanzen'     // Rechnungen + Angebote (gefiltert auf diesen Kunden)
 
 /** Clients page view mode: card board vs. filtered list (Smart Lists). */
 export type ClientsView = 'board' | 'list'
@@ -12,28 +23,46 @@ export type ClientsView = 'board' | 'list'
 export type TasksTab = 'list' | 'board' | 'focus'
 
 /** Legacy CustomerTab values, kept for backwards-compat with deep-link callers. */
-export type LegacyCustomerTab = 'dashboard' | 'kommunikation' | 'aktivitaeten' | 'informationen' | 'sales' | 'workflow' | 'arbeitsraum' | 'dateien' | 'finanzen'
+export type LegacyCustomerTab =
+  | 'ueberblick' | 'arbeiten' | 'historie'         // 3-Tab-Aera
+  | 'dashboard' | 'aktivitaeten' | 'informationen' // noch aeltere 9-Tab-Aera
+  | 'sales' | 'workflow' | 'arbeitsraum' | 'dateien'
 
-/** Map legacy tab IDs onto the new three-tab model. */
+/** Map legacy tab IDs onto the new 7-tab model. */
 export function mapLegacyCustomerTab(tab: string): CustomerTab {
   switch (tab) {
-    case 'ueberblick':
-    case 'arbeiten':
-    case 'historie':
-      return tab as CustomerTab
-    case 'dashboard':
-    case 'informationen':
-    case 'sales':
-    case 'finanzen':
-      return 'ueberblick'
-    case 'workflow':
-    case 'arbeitsraum':
-    case 'dateien':
-      return 'arbeiten'
+    // Schon im neuen Schema
+    case 'cockpit':
+    case 'tasks':
+    case 'notizen':
+    case 'dokumente':
     case 'kommunikation':
+    case 'verlauf':
+    case 'finanzen':
+      return tab as CustomerTab
+    // Mapping aus dem 3-Tab-Modell
+    case 'ueberblick':
+      return 'cockpit'
+    case 'arbeiten':
+      return 'tasks'
+    case 'historie':
+      return 'verlauf'
+    // Mapping aus dem aelteren 9-Tab-Modell
+    case 'dashboard':
+    case 'sales':
+    case 'informationen':
+      return 'cockpit'
+    case 'workflow':
+      return 'tasks'
+    case 'arbeitsraum':
+      return 'notizen'
+    case 'dateien':
+      return 'dokumente'
     case 'aktivitaeten':
+      // User-Wunsch: "nur Kommunikation ist bei Aktivitaeten"
+      return 'kommunikation'
     default:
-      return 'historie'
+      return 'cockpit'
   }
 }
 export type AppView =
@@ -77,7 +106,7 @@ export const useUiStore = create<UiState>()(
       hasSeenIntro: false,
       migrationDone: false,
       cmdPaletteOpen: false,
-      activeCustomerTab: 'ueberblick',
+      activeCustomerTab: 'cockpit',
       clientsView: 'board',
       tasksTab: 'list',
 

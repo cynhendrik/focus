@@ -1,6 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronLeft, ChevronDown, Mail as MailIcon, Phone, Clock, X, DollarSign, CalendarClock, Trash2, User } from 'lucide-react'
+import {
+  ChevronLeft, ChevronDown, Mail as MailIcon, Phone, Clock, X,
+  DollarSign, CalendarClock, Trash2, User,
+  Target, CheckCircle, FileText, File, Mail, History, Euro,
+  type LucideIcon,
+} from 'lucide-react'
 import type { CreateActivityPayload } from '@/types/pipeline.types'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore, type CustomerTab } from '@/store/ui.store'
@@ -16,31 +21,27 @@ import { useMailStore } from '@/store/mail.store'
 import { useContactsStore } from '@/store/contacts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { FinanceService } from '@/services/finance.service'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
-import { UeberblickPane } from '@/components/customer/tabs/UeberblickPane'
-import { ArbeitenPane } from '@/components/customer/tabs/ArbeitenPane'
+import { CockpitPane } from '@/components/customer/tabs/CockpitPane'
+import { WorkflowPane } from '@/components/customer/tabs/WorkflowPane'
+import { NotizPane } from '@/components/customer/tabs/NotizPane'
+import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { TimelinePane } from '@/components/customer/tabs/TimelinePane'
+import { FinanzPane } from '@/components/customer/tabs/FinanzPane'
+import { KommunikationPane } from '@/components/chat/KommunikationPane'
 import { PulseBar } from '@/components/customer/PulseBar'
 import { PrimaryContact } from '@/components/customer/PrimaryContact'
 
-function TabIcon({ id }: { id: CustomerTab }) {
-  const paths: Record<CustomerTab, string[]> = {
-    ueberblick: ['M3 12h18', 'M3 6h18', 'M3 18h18'],
-    arbeiten:   ['M9 11l3 3L22 4', 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
-    historie:   ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M12 6v6l4 2'],
-  }
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      {(paths[id] ?? []).map((d, i) => <path key={i} d={d} />)}
-    </svg>
-  )
-}
-
-const TABS: { id: CustomerTab; label: string }[] = [
-  { id: 'ueberblick', label: 'Überblick'  },
-  { id: 'arbeiten',   label: 'Arbeiten'   },
-  { id: 'historie',   label: 'Activities' },
+const TAB_DEFS: { id: CustomerTab; label: string; icon: LucideIcon }[] = [
+  { id: 'cockpit',       label: 'Cockpit',       icon: Target      },
+  { id: 'tasks',         label: 'Tasks',         icon: CheckCircle },
+  { id: 'notizen',       label: 'Notizen',       icon: FileText    },
+  { id: 'dokumente',     label: 'Dokumente',     icon: File        },
+  { id: 'kommunikation', label: 'Kommunikation', icon: Mail        },
+  { id: 'verlauf',       label: 'Verlauf',       icon: History     },
+  { id: 'finanzen',      label: 'Finanzen',      icon: Euro        },
 ]
 
 interface Props { customerId: string }
@@ -101,26 +102,35 @@ export function CustomerRoute({ customerId }: Props) {
     if (workspaceId) loadStages(workspaceId)
   }, [customerId, workspaceId])
 
-  const tabsRef = useRef<HTMLDivElement>(null)
-  const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 })
+  // Badges: live-Zaehler fuer Tasks (offen) und Finanzen (offen/ueberfaellig).
+  const openTaskCount = useTodosStore(s =>
+    s.allTodos.filter(t => t.customerId === customerId && t.status !== 'done').length,
+  )
+  const [openInvoiceCount, setOpenInvoiceCount] = useState(0)
+  useEffect(() => {
+    FinanceService.getInvoicesByAccount(customerId)
+      .then(list => setOpenInvoiceCount(
+        list.filter(i => i.status === 'open' || i.status === 'overdue').length,
+      ))
+      .catch(() => setOpenInvoiceCount(0))
+  }, [customerId])
 
-  useLayoutEffect(() => {
-    const el = tabsRef.current
-    if (!el) return
-    const active = el.querySelector(`[data-active="true"]`) as HTMLElement | null
-    if (!active) return
-    const rect = active.getBoundingClientRect()
-    const parentRect = el.getBoundingClientRect()
-    setIndicator({ left: rect.left - parentRect.left, width: rect.width, opacity: 1 })
-  }, [activeTab])
+  const tabBadges = useMemo<Partial<Record<CustomerTab, number>>>(() => ({
+    tasks:    openTaskCount    || undefined,
+    finanzen: openInvoiceCount || undefined,
+  }), [openTaskCount, openInvoiceCount])
 
   if (!customer) return <div className="p-6 text-[var(--text2)]">Kunde nicht gefunden</div>
 
   const renderPane = () => {
     switch (activeTab) {
-      case 'ueberblick': return <UeberblickPane customerId={customerId} />
-      case 'arbeiten':   return <ArbeitenPane customerId={customerId} />
-      case 'historie':   return <TimelinePane customerId={customerId} />
+      case 'cockpit':       return <CockpitPane       customerId={customerId} />
+      case 'tasks':         return <WorkflowPane      customerId={customerId} />
+      case 'notizen':       return <NotizPane       customerId={customerId} />
+      case 'dokumente':     return <DateienPane       customerId={customerId} />
+      case 'kommunikation': return <KommunikationPane customerId={customerId} />
+      case 'verlauf':       return <TimelinePane      customerId={customerId} />
+      case 'finanzen':      return <FinanzPane        customerId={customerId} />
     }
   }
 
@@ -192,31 +202,60 @@ export function CustomerRoute({ customerId }: Props) {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ marginBottom: 22 }}>
-        <div className="tabs glass" ref={tabsRef}>
-          <motion.div
-            className="tab-indicator"
-            initial={false}
-            animate={{
-              left: indicator.left,
-              width: indicator.width,
-              opacity: indicator.opacity,
-            }}
-            transition={{ type: 'spring', stiffness: 480, damping: 38, mass: 0.7 }}
-          />
-          {TABS.map(t => (
-            <div
+      {/* Tab bar — flach, underline-akzentuiert, Badges fuer Tasks + Finanzen */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch', gap: 0,
+        padding: '0 24px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg)',
+      }}>
+        {TAB_DEFS.map(t => {
+          const Ic     = t.icon
+          const active = activeTab === t.id
+          const badge  = tabBadges[t.id]
+          return (
+            <button
               key={t.id}
-              className="tab"
-              data-active={String(activeTab === t.id)}
               onClick={() => setTab(t.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '18px 18px 16px',
+                marginRight: 8,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: active ? 'var(--fg)' : 'var(--fg-dim)',
+                fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 500,
+                position: 'relative',
+                transition: 'color 140ms',
+              }}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-dim)' }}
             >
-              <TabIcon id={t.id} />
-              {t.label}
-            </div>
-          ))}
-        </div>
+              <Ic size={15} style={{ opacity: active ? 1 : 0.85 }} />
+              <span>{t.label}</span>
+              {badge !== undefined && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  minWidth: 18, height: 18, padding: '0 6px', borderRadius: 99,
+                  background: 'oklch(35% 0.10 25)',
+                  color: 'oklch(80% 0.13 25)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
+                  border: '1px solid oklch(38% 0.12 25 / 0.7)',
+                }}>
+                  {badge}
+                </span>
+              )}
+              {active && (
+                <span style={{
+                  position: 'absolute', left: 18, right: 18, bottom: -1,
+                  height: 2, borderRadius: 2,
+                  background: 'var(--accent)',
+                  boxShadow: '0 0 12px oklch(92% 0.2 125 / 0.5)',
+                }} />
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Active pane
