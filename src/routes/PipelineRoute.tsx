@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Settings2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Settings2, Bell } from 'lucide-react'
 import { useDealsStore } from '@/store/deals.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useCrmStore } from '@/store/crm.store'
 import { PipelineBoard } from '@/components/pipeline/PipelineBoard'
 import { DealModal } from '@/components/pipeline/DealModal'
 import { StagesManager } from '@/components/pipeline/StagesManager'
@@ -10,14 +11,37 @@ import type { Deal } from '@/types/pipeline.types'
 export function PipelineRoute() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const deals = useDealsStore(s => s.deals)
+  const allFollowUps = useCrmStore(s => s.allFollowUps)
   const [editDeal, setEditDeal] = useState<Deal | null | 'new'>(null)
   const [showStages, setShowStages] = useState(false)
+  const [onlyWithFollowUps, setOnlyWithFollowUps] = useState(false)
 
   const openDealsValue = deals
     .filter(d => d.stage !== 'won' && d.stage !== 'lost')
     .reduce((s, d) => s + (d.value ?? 0), 0)
 
   const openDealsCount = deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
+
+  // Customer-IDs with an open follow-up due today or earlier.
+  const dueFollowUpCustomerIds = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return new Set(
+      allFollowUps
+        .filter(f => f.status === 'offen' && f.dueDate <= today)
+        .map(f => f.customerId)
+    )
+  }, [allFollowUps])
+
+  const filteredCount = useMemo(() => {
+    if (!onlyWithFollowUps) return openDealsCount
+    return deals.filter(d =>
+      d.stage !== 'won' && d.stage !== 'lost' && dueFollowUpCustomerIds.has(d.accountId)
+    ).length
+  }, [deals, openDealsCount, onlyWithFollowUps, dueFollowUpCustomerIds])
+
+  const dealFilter = onlyWithFollowUps
+    ? (d: Deal) => dueFollowUpCustomerIds.has(d.accountId)
+    : undefined
 
   return (
     <div className="main-inner" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: 0 }}>
@@ -31,10 +55,28 @@ export function PipelineRoute() {
                   {openDealsValue.toLocaleString('de-DE')} €
                 </strong>
               </span>
-              <span>{openDealsCount} Deals</span>
+              <span>{onlyWithFollowUps ? `${filteredCount} / ${openDealsCount}` : openDealsCount} Deals</span>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+            <button
+              onClick={() => setOnlyWithFollowUps(v => !v)}
+              className={onlyWithFollowUps ? 'btn-primary' : 'btn-secondary'}
+              title="Nur Deals mit fälligen Follow-Ups anzeigen"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 12px' }}
+            >
+              <Bell size={13} />
+              Fällige Follow-Ups
+              {dueFollowUpCustomerIds.size > 0 && (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10,
+                  background: onlyWithFollowUps ? 'oklch(100% 0 0 / 0.18)' : 'var(--surface)',
+                  padding: '1px 6px', borderRadius: 99,
+                }}>
+                  {dueFollowUpCustomerIds.size}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setShowStages(v => !v)}
               className="btn-secondary"
@@ -58,7 +100,7 @@ export function PipelineRoute() {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', borderTop: '1px solid var(--border)' }}>
-        <PipelineBoard onEditDeal={deal => setEditDeal(deal)} />
+        <PipelineBoard onEditDeal={deal => setEditDeal(deal)} dealFilter={dealFilter} />
       </div>
 
       {editDeal !== null && (

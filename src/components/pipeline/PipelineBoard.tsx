@@ -65,9 +65,11 @@ function DraggableDealCard({ deal, onEdit }: { deal: Deal; onEdit: (d: Deal) => 
 
 interface Props {
   onEditDeal: (deal: Deal) => void
+  /** Optional predicate to narrow which deals are rendered in columns. */
+  dealFilter?: (deal: Deal) => boolean
 }
 
-export function PipelineBoard({ onEditDeal }: Props) {
+export function PipelineBoard({ onEditDeal, dealFilter }: Props) {
   const stages = usePipelineStore(s => s.stages)
   const deals = useDealsStore(s => s.deals)
   const moveToStage = useDealsStore(s => s.moveToStage)
@@ -93,7 +95,7 @@ export function PipelineBoard({ onEditDeal }: Props) {
   }
 
   const dealsForStage = (stageName: string) =>
-    deals.filter(d => d.stage === stageName)
+    deals.filter(d => d.stage === stageName && (!dealFilter || dealFilter(d)))
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
