@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Home, TrendingUp, Users, ArrowRight, Bell, Reply, Target, Mail,
+  Home, TrendingUp, ArrowRight, Reply, Target,
 } from 'lucide-react'
 
 import { useCustomersStore } from '@/store/customers.store'
@@ -124,6 +124,10 @@ function DashboardTabs({
   onChange: (v: DashboardView) => void
   salesEnabled: boolean
 }) {
+  // Wenn Sales-Modul aus ist, hat der Tab-Switcher nur einen Eintrag — dann
+  // gibt's nichts zu schalten und wir blenden ihn ganz aus (weniger Noise).
+  if (!salesEnabled) return null
+
   const tab = (id: DashboardView, label: string, Icon: typeof Home) => {
     const active = view === id
     return (
@@ -155,8 +159,7 @@ function DashboardTabs({
       borderRadius: 999, flexShrink: 0,
     }}>
       {tab('workspace', 'Workspace', Home)}
-      {salesEnabled && tab('sales', 'Sales', TrendingUp)}
-      {tab('client', 'Client', Users)}
+      {tab('sales',     'Sales',     TrendingUp)}
     </div>
   )
 }
@@ -958,168 +961,6 @@ function SalesView() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ClientView — Top-Kunden heute
-
-function ClientView() {
-  const customers   = useCustomersStore(s => s.customers)
-  const todos       = useTodosStore(s => s.allTodos)
-  const followUps   = useCrmStore(s => s.allFollowUps)
-  const events      = useCalendarStore(s => s.todayEvents)
-  const emails      = useMailStore(s => s.emails)
-  const openCustomerAt = useUiStore(s => s.openCustomerAt)
-
-  const todayIso = todayLocalIso()
-
-  // Pro Kunde Druck zaehlen
-  const ranked = useMemo(() => {
-    const pressure = new Map<string, { tasks: number; fus: number; events: number; mails: number }>()
-
-    for (const t of todos) {
-      if (t.status === 'done') continue
-      if (!t.customerId) continue
-      if (t.dueDate && t.dueDate > todayIso) continue
-      const p = pressure.get(t.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
-      p.tasks++
-      pressure.set(t.customerId, p)
-    }
-    for (const f of followUps) {
-      if (f.status !== 'offen') continue
-      if (f.dueDate > todayIso) continue
-      const p = pressure.get(f.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
-      p.fus++
-      pressure.set(f.customerId, p)
-    }
-    for (const ev of events) {
-      if (!ev.accountId) continue
-      const p = pressure.get(ev.accountId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
-      p.events++
-      pressure.set(ev.accountId, p)
-    }
-    // Mails ohne Antwort (letzte 7 Tage)
-    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
-    for (const e of emails) {
-      if (!e.customerId) continue
-      if (!e.sentAt || e.sentAt < sevenDaysAgo) continue
-      const p = pressure.get(e.customerId) ?? { tasks: 0, fus: 0, events: 0, mails: 0 }
-      p.mails++
-      pressure.set(e.customerId, p)
-    }
-
-    return Array.from(pressure.entries())
-      .map(([customerId, p]) => {
-        const customer = customers.find(c => c.id === customerId)
-        if (!customer) return null
-        const score = p.tasks * 3 + p.fus * 3 + p.events * 4 + p.mails * 1
-        return { customer, ...p, score }
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
-  }, [todos, followUps, events, emails, customers, todayIso])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{
-        borderRadius: 16, border: '1px solid var(--border)',
-        background: 'var(--bg-2)', padding: '22px 24px',
-      }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-          marginBottom: 18,
-        }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
-              Wo ist heute der meiste Druck
-            </h2>
-            <div style={{
-              marginTop: 4, fontSize: 12, color: 'var(--fg-muted)',
-            }}>
-              Kunden sortiert nach offenen Tasks, Follow-Ups, Terminen und Mails.
-            </div>
-          </div>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10.5,
-            color: 'var(--fg-dim)', letterSpacing: '0.04em',
-          }}>
-            {ranked.length} {ranked.length === 1 ? 'Kunde' : 'Kunden'}
-          </span>
-        </div>
-
-        {ranked.length === 0 ? (
-          <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-            Heute liegt nichts an. Genieß die Ruhe.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ranked.map(row => (
-              <div
-                key={row.customer.id}
-                onClick={() => openCustomerAt(row.customer.id, 'cockpit')}
-                style={{
-                  display: 'grid', gridTemplateColumns: '44px 1fr auto auto auto auto',
-                  alignItems: 'center', gap: 14,
-                  padding: '12px 16px', borderRadius: 12,
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  cursor: 'pointer', transition: 'border-color 140ms',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-              >
-                <span style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: 'oklch(28% 0 0 / 0.45)',
-                  border: '1px solid oklch(38% 0 0)',
-                  color: 'oklch(70% 0 0)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-                }}>
-                  {row.customer.name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{row.customer.name}</div>
-                  {row.customer.industry && (
-                    <div style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em',
-                      textTransform: 'uppercase', color: 'var(--fg-dim)', marginTop: 2,
-                    }}>
-                      {row.customer.industry}
-                    </div>
-                  )}
-                </div>
-                <PressurePill icon="task"  count={row.tasks}  color="var(--accent)" />
-                <PressurePill icon="fu"    count={row.fus}    color="oklch(82% 0.16 70)" />
-                <PressurePill icon="event" count={row.events} color="oklch(78% 0.13 235)" />
-                <PressurePill icon="mail"  count={row.mails}  color="var(--fg-muted)" />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function PressurePill({
-  icon, count, color,
-}: { icon: 'task' | 'fu' | 'event' | 'mail'; count: number; color: string }) {
-  if (count === 0) return <span style={{ width: 44 }} />
-  const I = icon === 'task' ? Bell : icon === 'fu' ? Reply : icon === 'event' ? Target : Mail
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 8px', borderRadius: 99,
-      background: `color-mix(in oklch, ${color} 12%, transparent)`,
-      color, border: `1px solid color-mix(in oklch, ${color} 28%, transparent)`,
-      fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700,
-      fontVariantNumeric: 'tabular-nums',
-    }}>
-      <I size={10} />
-      {count}
-    </span>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main route
 
 export function DashboardRoute() {
@@ -1153,9 +994,9 @@ export function DashboardRoute() {
     }}>
       <DashboardHero name={firstName} />
 
-      {view === 'workspace' && <WorkspaceView />}
-      {view === 'sales' && salesEnabled && <SalesView />}
-      {view === 'client'    && <ClientView />}
+      {view === 'sales' && salesEnabled
+        ? <SalesView />
+        : <WorkspaceView />}
     </div>
   )
 }

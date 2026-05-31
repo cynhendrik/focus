@@ -21,11 +21,10 @@ export type CustomerTab =
 /** Tasks page tab. */
 export type TasksTab = 'list' | 'board' | 'focus'
 
-/** Dashboard "Heute" hat drei View-Modi:
+/** Dashboard "Heute" hat zwei View-Modi:
  *  - workspace: alles auf einen Blick (Umsatz, Kunden, Tagesplan, Inbox)
- *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul)
- *  - client: Top-Kunden heute (wo ist der meiste Druck) */
-export type DashboardView = 'workspace' | 'sales' | 'client'
+ *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul) */
+export type DashboardView = 'workspace' | 'sales'
 
 /** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
  *  mit eigener Sidebar und eigenem Theme. */
