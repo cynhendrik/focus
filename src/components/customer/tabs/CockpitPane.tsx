@@ -1,25 +1,47 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CockpitPane — Erster Tab im Customer-Detail. Schneller Lagebericht:
-//   - KI-Briefing (BriefingCard)
-//   - Lead Score (LeadScoreCard) — was treibt den Score gerade
-//   - Quick-Stats — offene Tasks, offene Rechnungen, offene Deals, letzter Kontakt
+// CockpitPane — Customer-Lagebericht auf einen Blick.
 //
-// Keine eigene Logik, nur Komposition. Die einzelnen Cards holen ihre Daten
-// selbst aus den entsprechenden Stores.
+// Layout:
+//   1) 4 KPI-Tiles  — Kunde seit / Worth / Im Spiel / Letzter Kontakt
+//   2) Alert-Strip  — nur wenn ueberfaellige Rechnungen
+//   3) Naechster-Zug-Card — KI-Vorschlag (generateBriefing), Action-Buttons
+//   4) Verlauf-Mini-Liste — letzte 4-5 Events + Link zum vollen Verlauf
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
+import {
+  Calendar, Wallet, TrendingUp, Phone, ArrowRight, AlertTriangle,
+  Sparkles, RefreshCw, EyeOff, Mail as MailIcon, Users as UsersIcon,
+  FileText, CheckCircle2, Clock as ClockIcon, Bell,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
 import { useCustomersStore } from '@/store/customers.store'
-import { useTodosStore } from '@/store/todos.store'
 import { useDealsStore } from '@/store/deals.store'
+import { useActivitiesStore } from '@/store/activities.store'
+import { useMailStore } from '@/store/mail.store'
+import { useNotebookStore } from '@/store/notebook.store'
+import { useTodosStore } from '@/store/todos.store'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useFinanceStore } from '@/store/finance.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useUiStore } from '@/store/ui.store'
 import { FinanceService } from '@/services/finance.service'
 import type { Invoice } from '@/types/finance.types'
-import { BriefingCard } from '@/components/customer/BriefingCard'
-import { LeadScoreCard } from '@/components/customer/LeadScoreCard'
-import { CheckSquare, FileText, TrendingUp, Clock } from 'lucide-react'
+import {
+  generateBriefing, MissingApiKeyError, type CustomerBriefing,
+} from '@/lib/ai/briefing'
 
-interface Props { customerId: string }
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+
+function fmtEuroShort(n: number): string {
+  if (Math.abs(n) >= 1000) {
+    const k = n / 1000
+    return k >= 10 ? `${Math.round(k)}k` : `${k.toFixed(1).replace('.', ',')}k`
+  }
+  return Math.round(n).toString()
+}
 
 function fmtEuro(n: number): string {
   return new Intl.NumberFormat('de-DE', {
@@ -27,148 +49,644 @@ function fmtEuro(n: number): string {
   }).format(n)
 }
 
-function relTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return '—'
-  const days = Math.floor((Date.now() - t) / 86_400_000)
-  if (days <= 0) return 'heute'
-  if (days === 1) return 'vor 1 Tag'
-  if (days < 30) return `vor ${days} Tagen`
-  if (days < 365) return `vor ${Math.floor(days / 30)} Monaten`
-  return `vor ${Math.floor(days / 365)} Jahren`
+function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
-// ── Kleine Stat-Kachel ─────────────────────────────────────────────────────
+function todayIso(): string {
+  return new Date().toLocaleDateString('sv')
+}
 
-function StatTile({
-  icon, label, value, hint, tone,
+function monthsBetween(iso: string): number {
+  const start = new Date(iso)
+  const now = new Date()
+  return Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()))
+}
+
+function fmtMonthYear(iso: string): string {
+  const d = new Date(iso)
+  const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+  return `${months[d.getMonth()]} ${d.getFullYear()}`
+}
+
+function daysAgo(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  return Math.floor((Date.now() - t) / 86_400_000)
+}
+
+function relTimeShort(iso: string): string {
+  const t = new Date(iso).getTime()
+  const min = Math.floor((Date.now() - t) / 60_000)
+  if (min < 1)  return 'gerade eben'
+  if (min < 60) return `vor ${min} Min.`
+  const h = Math.floor(min / 60)
+  if (h < 24)   return h === 1 ? 'vor 1 Std.' : `vor ${h} Std.`
+  const d = Math.floor(h / 24)
+  if (d === 1)  return 'gestern'
+  if (d < 30)   return `vor ${d} Tagen`
+  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KPI-Tile
+
+function KpiTile({
+  icon: Icon, label, value, sub, accent,
 }: {
-  icon:  React.ReactNode
-  label: string
-  value: string | number
-  hint?: string
-  tone?: 'neutral' | 'accent' | 'warn'
+  icon:   LucideIcon
+  label:  string
+  value:  React.ReactNode
+  sub?:   React.ReactNode
+  accent?: boolean
 }) {
-  const ink =
-    tone === 'accent' ? 'var(--accent)'
-    : tone === 'warn' ? 'oklch(82% 0.17 80)'
-    : 'var(--fg)'
   return (
     <div style={{
       borderRadius: 14, border: '1px solid var(--border)',
-      background: 'var(--bg1)', padding: '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 8,
+      background: 'var(--bg-2)', padding: '14px 16px',
+      display: 'flex', flexDirection: 'column', gap: 8, minHeight: 102,
     }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        fontFamily: 'var(--font-mono)', fontSize: 10,
-        letterSpacing: '0.16em', textTransform: 'uppercase',
+        display: 'flex', alignItems: 'center', gap: 7,
+        fontFamily: 'var(--font-mono)', fontSize: 9.5,
+        letterSpacing: '0.18em', textTransform: 'uppercase',
         color: 'var(--fg-dim)', fontWeight: 600,
       }}>
-        <span style={{ display: 'inline-flex', color: 'var(--fg-muted)' }}>{icon}</span>
+        <Icon size={11} />
         {label}
       </div>
       <div style={{
-        fontSize: 22, fontWeight: 700, color: ink,
+        fontSize: 26, fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--fg)',
         fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
-        lineHeight: 1.1,
+        lineHeight: 1.05, letterSpacing: '-0.02em',
       }}>
         {value}
       </div>
-      {hint && (
+      {sub && (
         <div style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
-          {hint}
+          {sub}
         </div>
       )}
     </div>
   )
 }
 
-// ── Pane ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Alert-Strip
 
-export function CockpitPane({ customerId }: Props) {
-  const customer       = useCustomersStore(s => s.customers.find(c => c.id === customerId))
-  const allTodos       = useTodosStore(s => s.allTodos)
-  const loadTodos      = useTodosStore(s => s.loadForCustomer)
-  const allDeals       = useDealsStore(s => s.deals)
-  const lastActivity   = useCrmStore(s => s.lastActivity)
-
-  // Invoices direkt via Service holen (analog zu FinanzPane), weil der
-  // FinanceStore Workspace-weit laedt, aber im Customer-Detail-Tab nicht
-  // garantiert initialisiert ist.
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-
-  useEffect(() => {
-    loadTodos(customerId)
-    FinanceService.getInvoicesByAccount(customerId).then(setInvoices).catch(() => {})
-  }, [customerId, loadTodos])
-
-  const openTasks = useMemo(
-    () => allTodos.filter(t => t.customerId === customerId && t.status !== 'done').length,
-    [allTodos, customerId],
+function OverdueAlert({ count, total, onClick }: {
+  count: number; total: number; onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+        padding: '11px 16px', borderRadius: 12,
+        background: 'oklch(72% 0.18 25 / 0.10)',
+        border: '1px solid oklch(72% 0.18 25 / 0.30)',
+        color: 'oklch(80% 0.16 25)', cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 12.5, textAlign: 'left',
+        transition: 'background 140ms',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'oklch(72% 0.18 25 / 0.15)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'oklch(72% 0.18 25 / 0.10)' }}
+    >
+      <AlertTriangle size={14} />
+      <span style={{ flex: 1, fontWeight: 600 }}>
+        {count} {count === 1 ? 'überfällige Rechnung' : 'überfällige Rechnungen'} · {fmtEuro(total)}
+      </span>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em',
+        textTransform: 'uppercase', fontWeight: 700,
+      }}>
+        Zur Übersicht <ArrowRight size={11} />
+      </span>
+    </button>
   )
+}
 
-  const openInvoices = useMemo(
-    () => invoices.filter(i => i.status === 'open' || i.status === 'overdue'),
-    [invoices],
+// ─────────────────────────────────────────────────────────────────────────────
+// Nächster Zug — KI
+
+type BriefingState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'ready'; briefing: CustomerBriefing }
+  | { kind: 'error'; missingKey?: boolean; message: string }
+
+function NextMoveCard({
+  customerId,
+  state, onRegenerate, onSkip,
+}: {
+  customerId: string
+  state: BriefingState
+  onRegenerate: () => void
+  onSkip: () => void
+}) {
+  const customer = useCustomersStore(s => s.customers.find(c => c.id === customerId))
+  const setAppView = useUiStore(s => s.setAppView)
+
+  const card: React.CSSProperties = {
+    borderRadius: 16, border: '1px solid var(--accent-soft)',
+    background: 'linear-gradient(180deg, oklch(92% 0.2 125 / 0.04) 0%, var(--bg-2) 70%)',
+    padding: '18px 22px 20px',
+    boxShadow: '0 0 0 1px oklch(92% 0.2 125 / 0.08) inset',
+  }
+
+  const sectionLabel: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    fontFamily: 'var(--font-mono)', fontSize: 10,
+    letterSpacing: '0.18em', textTransform: 'uppercase',
+    color: 'var(--accent)', fontWeight: 700,
+    marginBottom: 10,
+  }
+
+  if (state.kind === 'idle' || state.kind === 'loading') {
+    return (
+      <div style={card}>
+        <div style={sectionLabel}>
+          <Sparkles size={11} /> Dein nächster Zug
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fg-muted)', fontSize: 13 }}>
+          {state.kind === 'loading' ? (
+            <>
+              <RefreshCw size={13} className="animate-spin" style={{ animation: 'spin 1.4s linear infinite' }} />
+              Cy denkt nach …
+            </>
+          ) : (
+            <>
+              <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+              Drueck auf „Cy fragen", damit ich dir einen Vorschlag mache.
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button
+            onClick={onRegenerate}
+            disabled={state.kind === 'loading' || !customer}
+            style={btnPrimaryStyle}
+          >
+            <Sparkles size={12} />
+            {state.kind === 'loading' ? 'Cy denkt …' : 'Cy fragen'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (state.kind === 'error') {
+    return (
+      <div style={{ ...card, borderColor: 'oklch(72% 0.18 25 / 0.30)' }}>
+        <div style={sectionLabel}>
+          <Sparkles size={11} /> Dein nächster Zug
+        </div>
+        <div style={{ fontSize: 13, color: 'oklch(80% 0.16 25)', marginBottom: 14 }}>
+          {state.missingKey ? 'Kein API-Key konfiguriert. ' : 'Cy konnte gerade nicht antworten: '}
+          <span style={{ color: 'var(--fg-muted)' }}>{state.message}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {state.missingKey ? (
+            <button onClick={() => setAppView('settings')} style={btnPrimaryStyle}>
+              Zu den Einstellungen
+            </button>
+          ) : (
+            <button onClick={onRegenerate} style={btnPrimaryStyle}>
+              <RefreshCw size={12} /> Nochmal versuchen
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // state.kind === 'ready'
+  const nextStep = state.briefing.nextSteps[0]
+  const supportSteps = state.briefing.nextSteps.slice(1, 3)
+  const headline = state.briefing.headline
+
+  return (
+    <div style={card}>
+      <div style={sectionLabel}>
+        <Sparkles size={11} /> Dein nächster Zug
+      </div>
+
+      {nextStep ? (
+        <>
+          <h2 style={{
+            margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--fg)',
+            letterSpacing: '-0.02em', lineHeight: 1.2,
+          }}>
+            {nextStep.action}
+          </h2>
+          {nextStep.reason && (
+            <p style={{
+              margin: '8px 0 0', fontSize: 13, color: 'var(--fg-muted)',
+              lineHeight: 1.55, maxWidth: 720,
+            }}>
+              {nextStep.reason}
+            </p>
+          )}
+
+          {supportSteps.length > 0 && (
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {supportSteps.map((s, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  fontSize: 12.5, color: 'var(--fg-muted)',
+                }}>
+                  <span style={{ color: 'var(--fg-dim)', marginTop: 2 }}>·</span>
+                  <span>{s.action}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ fontSize: 14, color: 'var(--fg)' }}>
+          {headline || 'Aktuell keine konkrete Empfehlung — alles im grünen Bereich.'}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 18, alignItems: 'center' }}>
+        <button onClick={() => setAppView('mail')} style={btnPrimaryStyle}>
+          <MailIcon size={12} /> E-Mail schreiben
+        </button>
+        <button onClick={onRegenerate} style={btnGhostStyle}>
+          <RefreshCw size={11} /> Cy neu
+        </button>
+        <button onClick={onSkip} style={btnGhostStyle}>
+          <EyeOff size={11} /> Überspringen
+        </button>
+      </div>
+    </div>
   )
+}
 
-  const openDeals = useMemo(
-    () => allDeals.filter(d => d.accountId === customerId && d.stage !== 'won' && d.stage !== 'lost'),
-    [allDeals, customerId],
-  )
+const btnPrimaryStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 7,
+  padding: '9px 16px', borderRadius: 10,
+  background: 'var(--accent)', color: 'var(--accent-ink)',
+  border: 'none', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
+}
 
-  const openDealValue = openDeals.reduce((sum, d) => sum + (d.value ?? 0), 0)
-  const openInvoiceTotal = openInvoices.reduce((sum, i) => sum + (i.total ?? 0), 0)
+const btnGhostStyle: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  padding: '7px 12px', borderRadius: 10,
+  background: 'transparent', color: 'var(--fg-muted)',
+  border: '1px solid var(--border)', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 11.5,
+}
 
-  const lastContact = useMemo(() => {
-    const entry = lastActivity.find(a => a.accountId === customerId)
-    return entry?.lastActivityAt ?? customer?.updatedAt ?? null
-  }, [lastActivity, customerId, customer])
+// ─────────────────────────────────────────────────────────────────────────────
+// Verlauf-Mini-Liste
+
+interface MiniEvent {
+  id: string
+  icon: LucideIcon
+  title: string
+  subtitle: string
+  ts: string
+}
+
+const ACTIVITY_ICON: Record<string, LucideIcon> = {
+  call: Phone, meeting: UsersIcon, email: MailIcon, note: FileText,
+  followup: Bell, todo: CheckCircle2,
+}
+
+const ACTIVITY_LABEL: Record<string, string> = {
+  call: 'Anruf', meeting: 'Meeting', email: 'E-Mail',
+  note: 'Notiz', followup: 'Follow-Up', todo: 'Task',
+}
+
+function HistoryMini({ customerId }: { customerId: string }) {
+  const activities = useActivitiesStore(s => s.activities)
+  const emails     = useMailStore(s => s.emails)
+  const setActiveCustomerTab = useUiStore(s => s.setActiveCustomerTab)
+
+  const events: MiniEvent[] = useMemo(() => {
+    const out: MiniEvent[] = []
+    for (const a of activities) {
+      if ((a.accountId ?? null) !== customerId && a.customerId !== customerId) continue
+      const ts = a.createdAt
+      if (!ts) continue
+      const Icon = ACTIVITY_ICON[a.type] ?? FileText
+      const label = ACTIVITY_LABEL[a.type] ?? 'Eintrag'
+      out.push({
+        id: `a-${a.id}`,
+        icon: Icon,
+        title: `${label}${a.title ? ` · ${a.title}` : ''}`,
+        subtitle: a.body ?? '',
+        ts,
+      })
+    }
+    for (const e of emails) {
+      if (e.customerId !== customerId) continue
+      out.push({
+        id: `m-${e.id}`,
+        icon: MailIcon,
+        title: e.subject || '(ohne Betreff)',
+        subtitle: e.fromName ?? e.fromAddr ?? '',
+        ts: e.sentAt,
+      })
+    }
+    return out
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, 5)
+  }, [activities, emails, customerId])
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 16,
-      padding: '20px 24px 32px', overflow: 'auto', height: '100%',
+      borderRadius: 16, border: '1px solid var(--border)',
+      background: 'var(--bg-2)', padding: '18px 22px 16px',
     }}>
-      {/* ── KI-Briefing ─────────────────────────────────────────────────── */}
-      <BriefingCard customerId={customerId} />
-
-      {/* ── Quick-Stats ────────────────────────────────────────────────── */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        letterSpacing: '0.18em', textTransform: 'uppercase',
+        color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 4,
       }}>
-        <StatTile
-          icon={<CheckSquare size={13} />}
-          label="Offene Tasks"
-          value={openTasks}
-          hint={openTasks === 0 ? 'Alles erledigt' : undefined}
-          tone={openTasks > 0 ? 'accent' : 'neutral'}
+        <span>Verlauf</span>
+        <span style={{ fontWeight: 500, color: 'var(--fg-dim)' }}>{events.length} letzte</span>
+      </div>
+
+      {events.length === 0 ? (
+        <div style={{
+          padding: '18px 0 4px', color: 'var(--fg-dim)', fontSize: 12.5,
+        }}>
+          Noch keine Aktivität.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {events.map((ev, i) => (
+            <div
+              key={ev.id}
+              style={{
+                display: 'grid', gridTemplateColumns: '36px 1fr auto',
+                alignItems: 'center', gap: 14,
+                padding: '12px 0',
+                borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+              }}
+            >
+              <span style={{
+                width: 32, height: 32, borderRadius: 9,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--fg-muted)',
+              }}>
+                <ev.icon size={13} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontSize: 13, fontWeight: 600, color: 'var(--fg)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {ev.title}
+                </div>
+                {ev.subtitle && (
+                  <div style={{
+                    fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {ev.subtitle}
+                  </div>
+                )}
+              </div>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                color: 'var(--fg-dim)', letterSpacing: '0.04em',
+              }}>
+                {relTimeShort(ev.ts)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={() => setActiveCustomerTab('verlauf')}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          marginTop: 14, padding: 0,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+        }}
+      >
+        Vollständigen Verlauf öffnen <ArrowRight size={12} />
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pane
+
+interface Props { customerId: string }
+
+export function CockpitPane({ customerId }: Props) {
+  const customer       = useCustomersStore(s => s.customers.find(c => c.id === customerId))
+  const deals          = useDealsStore(s => s.deals)
+  const activities     = useActivitiesStore(s => s.activities)
+  const lastActivity   = useCrmStore(s => s.lastActivity)
+  const setActiveTab   = useUiStore(s => s.setActiveCustomerTab)
+
+  // Invoices direkt vom Service (analog FinanzPane).
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  useEffect(() => {
+    FinanceService.getInvoicesByAccount(customerId).then(setInvoices).catch(() => {})
+  }, [customerId])
+
+  // Worth
+  const today = todayIso()
+  const monthStart = startOfMonth(new Date())
+  const worthTotal = useMemo(
+    () => invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.total, 0),
+    [invoices],
+  )
+  const worthMonth = useMemo(
+    () => invoices
+      .filter(i => i.status === 'paid' && new Date(i.date) >= monthStart)
+      .reduce((s, i) => s + i.total, 0),
+    [invoices, monthStart],
+  )
+
+  // Im Spiel
+  const openDeals = useMemo(
+    () => deals.filter(d =>
+      (d.accountId === customerId || d.customerId === customerId) &&
+      d.stage !== 'won' && d.stage !== 'lost',
+    ),
+    [deals, customerId],
+  )
+  const inSpielValue = openDeals.reduce((s, d) => s + (d.value ?? 0), 0)
+
+  // Ueberfaellige Rechnungen
+  const overdueList = useMemo(
+    () => invoices.filter(i =>
+      i.status === 'overdue' || (i.status === 'open' && i.dueDate && i.dueDate < today),
+    ),
+    [invoices, today],
+  )
+  const overdueTotal = overdueList.reduce((s, i) => s + i.total, 0)
+
+  // Letzter Kontakt — aus lastActivity oder neuester activity
+  const lastContact = useMemo(() => {
+    const fromCrm = lastActivity.find(a => a.accountId === customerId)?.lastActivityAt
+    const fromActs = activities
+      .filter(a => (a.accountId === customerId || a.customerId === customerId) && a.createdAt)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+    const fromAct = fromActs?.createdAt
+    const channelType = fromActs?.type ?? ''
+    const candidates = [fromCrm, fromAct, customer?.updatedAt].filter(Boolean) as string[]
+    candidates.sort((a, b) => b.localeCompare(a))
+    return {
+      iso: candidates[0] ?? null,
+      channel: channelType,
+    }
+  }, [lastActivity, activities, customer, customerId])
+
+  const lastDays = daysAgo(lastContact.iso)
+  const channelLabel = lastContact.channel
+    ? (ACTIVITY_LABEL[lastContact.channel] ?? '—')
+    : '—'
+
+  // KI-Briefing — laed nur bei expliziter Anfrage
+  const allTodos     = useTodosStore(s => s.allTodos)
+  const allEvents    = useCalendarStore(s => s.events)
+  const allInvoices  = useFinanceStore(s => s.invoices)
+  const notes        = useNotebookStore(s => s.entries)
+  const noteBooks    = useNotebookStore(s => s.books)
+  const emails       = useMailStore(s => s.emails)
+  const followUps    = useCrmStore(s => s.allFollowUps)
+  const [briefState, setBriefState] = useState<BriefingState>({ kind: 'idle' })
+  const [skipped, setSkipped] = useState(false)
+
+  const runBriefing = async () => {
+    if (!customer) return
+    setBriefState({ kind: 'loading' })
+    try {
+      const briefing = await generateBriefing({
+        customer, notes, noteBooks,
+        todos: allTodos, events: allEvents, invoices: allInvoices,
+        deals, activities, emails, followUps,
+      })
+      setBriefState({ kind: 'ready', briefing })
+      setSkipped(false)
+    } catch (err) {
+      const e = err as { message?: string }
+      if (err instanceof MissingApiKeyError) {
+        setBriefState({ kind: 'error', missingKey: true, message: e.message ?? 'Kein API-Key' })
+      } else {
+        setBriefState({ kind: 'error', message: e.message ?? String(err) })
+      }
+    }
+  }
+
+  // Bei Customer-Wechsel: Zustand zuruecksetzen
+  useEffect(() => {
+    setBriefState({ kind: 'idle' })
+    setSkipped(false)
+  }, [customerId])
+
+  if (!customer) {
+    return <div style={{ padding: 32, color: 'var(--fg-dim)' }}>Kunde nicht gefunden.</div>
+  }
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 14,
+      padding: '20px 24px 40px', overflow: 'auto', height: '100%',
+      maxWidth: 1100, margin: '0 auto', width: '100%',
+    }}>
+      {/* ── KPI-Row ────────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
+      }}>
+        <KpiTile
+          icon={Calendar}
+          label="Kunde seit"
+          value={fmtMonthYear(customer.createdAt)}
+          sub={`${monthsBetween(customer.createdAt)} ${monthsBetween(customer.createdAt) === 1 ? 'Monat' : 'Monate'}`}
         />
-        <StatTile
-          icon={<TrendingUp size={13} />}
-          label="Offene Deals"
-          value={openDeals.length}
-          hint={openDealValue > 0 ? fmtEuro(openDealValue) : '—'}
+        <KpiTile
+          icon={Wallet}
+          label="Worth"
+          value={
+            <span>
+              {fmtEuroShort(worthTotal)}
+              <span style={{
+                fontSize: 16, color: 'var(--fg-dim)', marginLeft: 2,
+                fontFamily: 'var(--font-mono)', fontWeight: 600,
+              }}>€</span>
+            </span>
+          }
+          sub={worthMonth > 0 ? `${fmtEuro(worthMonth)} · diesen Monat` : 'noch nichts diesen Monat'}
         />
-        <StatTile
-          icon={<FileText size={13} />}
-          label="Offene Rechnungen"
-          value={openInvoices.length}
-          hint={openInvoiceTotal > 0 ? fmtEuro(openInvoiceTotal) : '—'}
-          tone={openInvoices.some(i => i.status === 'overdue') ? 'warn' : 'neutral'}
+        <KpiTile
+          icon={TrendingUp}
+          label="Im Spiel"
+          value={
+            <span>
+              {fmtEuroShort(inSpielValue)}
+              <span style={{
+                fontSize: 16, color: 'var(--fg-dim)', marginLeft: 2,
+                fontFamily: 'var(--font-mono)', fontWeight: 600,
+              }}>€</span>
+            </span>
+          }
+          sub={openDeals.length > 0
+            ? `${openDeals.length} ${openDeals.length === 1 ? 'Deal' : 'Deals'} offen`
+            : 'keine offenen Deals'}
         />
-        <StatTile
-          icon={<Clock size={13} />}
+        <KpiTile
+          icon={Phone}
           label="Letzter Kontakt"
-          value={relTime(lastContact)}
+          value={
+            lastDays === null
+              ? '—'
+              : lastDays === 0 ? 'heute'
+              : lastDays === 1 ? 'gestern'
+              : <span>{lastDays} <span style={{ fontSize: 16, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>T</span></span>
+          }
+          sub={channelLabel === '—' ? undefined : channelLabel}
+          accent={lastDays !== null && lastDays <= 7}
         />
       </div>
 
-      {/* ── Lead Score ─────────────────────────────────────────────────── */}
-      {customer && (
-        <LeadScoreCard score={customer.leadScore} factors={customer.scoreFactors} />
+      {/* ── Alert ──────────────────────────────────────────────────────── */}
+      {overdueList.length > 0 && (
+        <OverdueAlert
+          count={overdueList.length}
+          total={overdueTotal}
+          onClick={() => setActiveTab('finanzen')}
+        />
+      )}
+
+      {/* ── Naechster Zug ─────────────────────────────────────────────── */}
+      {!skipped && (
+        <NextMoveCard
+          customerId={customerId}
+          state={briefState}
+          onRegenerate={runBriefing}
+          onSkip={() => setSkipped(true)}
+        />
+      )}
+
+      {/* ── Verlauf ────────────────────────────────────────────────────── */}
+      <HistoryMini customerId={customerId} />
+
+      {/* ── Indirekter Hinweis, wenn ueberhaupt nichts da ist ────────── */}
+      {!customer.email && openDeals.length === 0 && overdueList.length === 0 && (
+        <div style={{
+          textAlign: 'center', color: 'var(--fg-dim)', fontSize: 11.5,
+          padding: '12px 0',
+        }}>
+          <ClockIcon size={11} style={{ display: 'inline-block', verticalAlign: '-1px', marginRight: 5 }} />
+          Neuer Kunde — fuelle Stammdaten unter „Stammdaten" aus.
+        </div>
       )}
     </div>
   )

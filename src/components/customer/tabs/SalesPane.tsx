@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react'
 import { useDealsStore } from '@/store/deals.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useActivitiesStore } from '@/store/activities.store'
-import { useCustomersStore } from '@/store/customers.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { DealModal } from '@/components/pipeline/DealModal'
 import { ActivityModal } from '@/components/pipeline/ActivityModal'
-import { LeadScoreCard } from '@/components/customer/LeadScoreCard'
 import type { Deal, ActivityType, PipelineStage } from '@/types/pipeline.types'
 import { Phone, Users, Mail, FileText, Bell, Check, Trash2, Plus, Calendar, ChevronDown, MessageCircle } from 'lucide-react'
 
@@ -379,7 +377,6 @@ export function SalesPane({ customerId }: Props) {
   const create          = useActivitiesStore(s => s.create)
   const update          = useActivitiesStore(s => s.update)
   const remove          = useActivitiesStore(s => s.remove)
-  const customer        = useCustomersStore(s => s.customers.find(c => c.id === customerId))
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user            = useAuthStore(s => s.user)
 
@@ -430,13 +427,6 @@ export function SalesPane({ customerId }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-
-      {/* ── Lead Score (Rules Engine) ── */}
-      {customer && (
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <LeadScoreCard score={customer.leadScore} factors={customer.scoreFactors} />
-        </div>
-      )}
 
       {/* ── Deals ── */}
       <div style={{
