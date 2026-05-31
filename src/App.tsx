@@ -74,19 +74,24 @@ export default function App() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false)
 
   // ── Splash ────────────────────────────────────────────────────────────────
+  // Splash wartet auf zwei Bedingungen: ein kurzer Min-Floor (damit der Splash
+  // nicht kurz aufblitzt) UND Auth fertig. Frueher 4300 ms — das war ein
+  // fester Floor, auch wenn Auth in 200 ms zurueckkam. Jetzt 900 ms: lang
+  // genug, dass das Branding wahrgenommen wird, kurz genug, dass es sich nicht
+  // wie eine traege App anfuehlt.
   const [minTimeDone,  setMinTimeDone]  = useState(false)
   const [splashExit,   setSplashExit]   = useState(false)
   const [splashGone,   setSplashGone]   = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setMinTimeDone(true), 4300)
+    const t = setTimeout(() => setMinTimeDone(true), 900)
     return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
     if (minTimeDone && !authLoading) {
       setSplashExit(true)
-      const t = setTimeout(() => setSplashGone(true), 580)
+      const t = setTimeout(() => setSplashGone(true), 320)
       return () => clearTimeout(t)
     }
   }, [minTimeDone, authLoading])
@@ -124,11 +129,26 @@ export default function App() {
   }, [user, loadWorkspaces])
 
   useEffect(() => {
-    if (activeWorkspaceId) {
-      init()
-      initCustomers()
+    if (!activeWorkspaceId) return
+
+    // Welle 1 — alles, was die Dashboard-Route beim ersten Paint zeigt.
+    // Vorher liefen 11 Loads gleichzeitig parallel, jeder triggerte beim
+    // Settlen einen Re-Render → spuerbarer Hang beim Workspace-Wechsel.
+    init()
+    initCustomers()
+    loadCrmAll(activeWorkspaceId)
+    loadCalendar(activeWorkspaceId)
+    loadAllTodos(activeWorkspaceId)
+
+    // Welle 2 — alles, was erst beim Klick auf eine andere Route gebraucht
+    // wird, nach dem ersten Paint nachschieben (Idle wenn verfuegbar, sonst
+    // Macro-Task). Spart auf dem kritischen Pfad ~6 store-updates.
+    const ric: (cb: () => void) => number =
+      (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+        .requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200))
+
+    const handle = ric(() => {
       loadLastActivity(activeWorkspaceId)
-      loadCrmAll(activeWorkspaceId)
       SmartListService.seedSystemLists(activeWorkspaceId)
         .catch(() => {})
         .then(() => loadSmartLists(activeWorkspaceId))
@@ -136,10 +156,17 @@ export default function App() {
         loadPipelineStages(activeWorkspaceId)
       )
       loadAllDeals(activeWorkspaceId)
-      loadAllTodos(activeWorkspaceId).then(() => seedSampleAiSummaries())
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
-      loadCalendar(activeWorkspaceId)
+      // Demo-Seeder gehoert ganz nach hinten, blockiert nichts.
+      seedSampleAiSummaries()
+    })
+
+    return () => {
+      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void })
+        .cancelIdleCallback
+      if (cic) cic(handle)
+      else window.clearTimeout(handle)
     }
   }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
