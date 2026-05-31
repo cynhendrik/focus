@@ -180,9 +180,15 @@ input:focus, textarea:focus, button:focus { outline: none; }
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 100vh;
+  /* Drei-Schichten-Glow:
+     - oben-rechts: weicher gruener Halo (Hauptakzent)
+     - oben (zentriert): zarte Top-Lichtleiste, gibt der App den "warmen Atmungs-Effekt"
+     - unten-links: leiser blauer Counterpunkt
+     Werte bewusst niedrig — soll nicht "Effekt" sein, nur Atmosphaere. */
   background:
-    radial-gradient(1200px 600px at 80% -10%, oklch(92% 0.2 125 / 0.06), transparent 60%),
-    radial-gradient(900px 500px at -10% 100%, oklch(78% 0.13 235 / 0.05), transparent 60%),
+    radial-gradient(1300px 700px at 75% -12%, oklch(92% 0.20 125 / 0.13), transparent 62%),
+    radial-gradient(800px 240px at 50%  -6%, oklch(92% 0.20 125 / 0.07), transparent 70%),
+    radial-gradient(900px  500px at -10% 100%, oklch(78% 0.13 235 / 0.07), transparent 60%),
     var(--bg);
   transition: grid-template-columns 280ms cubic-bezier(.2,.7,.1,1);
 }
@@ -282,9 +288,11 @@ input:focus, textarea:focus, button:focus { outline: none; }
   display: grid;
   grid-template-columns: 220px 1fr;
   height: 100vh;
+  /* Gleiches 3-Schichten-Prinzip wie .app, in der warmen Amber-Palette. */
   background:
-    radial-gradient(900px 500px at 80% -10%, oklch(78% 0.16 60 / 0.05), transparent 60%),
-    radial-gradient(800px 400px at -10% 100%, oklch(70% 0.13 30 / 0.05), transparent 60%),
+    radial-gradient(1100px 600px at 75% -12%, oklch(78% 0.16 60 / 0.14), transparent 62%),
+    radial-gradient(800px  240px at 50%  -6%, oklch(80% 0.18 50 / 0.08), transparent 70%),
+    radial-gradient(800px  400px at -10% 100%, oklch(70% 0.13 30 / 0.08), transparent 60%),
     var(--priv-bg);
   color: var(--priv-fg);
 }
