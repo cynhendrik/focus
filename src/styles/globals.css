@@ -283,18 +283,18 @@ input:focus, textarea:focus, button:focus { outline: none; }
   --priv-fg:        oklch(96% 0.008 60);
   --priv-fg-muted:  oklch(76% 0.018 50);
   --priv-fg-dim:    oklch(58% 0.020 50);
-  --priv-accent:    #E0A177;     /* clay — leicht faded, warm */
-  --priv-accent-2:  #E8B189;     /* hover: minimal heller */
-  --priv-accent-soft: rgba(224, 161, 119, 0.14);
+  --priv-accent:    #E5B08E;     /* clay — leicht pastell */
+  --priv-accent-2:  #ECBEA0;     /* hover: minimal heller */
+  --priv-accent-soft: rgba(229, 176, 142, 0.14);
 
   display: grid;
   grid-template-columns: 230px 1fr;
   height: 100vh;
   /* 3-Schichten-Glow in der Clay-Palette. */
   background:
-    radial-gradient(1100px 600px at 75% -12%, rgba(224, 161, 119, 0.20), transparent 62%),
-    radial-gradient(800px  240px at 50%  -6%, rgba(232, 177, 137, 0.10), transparent 70%),
-    radial-gradient(800px  400px at -10% 100%, rgba(180, 110,  70, 0.10), transparent 60%),
+    radial-gradient(1100px 600px at 75% -12%, rgba(229, 176, 142, 0.20), transparent 62%),
+    radial-gradient(800px  240px at 50%  -6%, rgba(236, 190, 160, 0.10), transparent 70%),
+    radial-gradient(800px  400px at -10% 100%, rgba(190, 130,  90, 0.10), transparent 60%),
     var(--priv-bg);
   color: var(--priv-fg);
 }
