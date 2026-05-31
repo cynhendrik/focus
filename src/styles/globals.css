@@ -186,6 +186,9 @@ input:focus, textarea:focus, button:focus { outline: none; }
     var(--bg);
   transition: grid-template-columns 280ms cubic-bezier(.2,.7,.1,1);
 }
+.app[data-sidebar-collapsed="true"] {
+  grid-template-columns: 68px 1fr;
+}
 
 .main {
   position: relative;
@@ -213,6 +216,40 @@ input:focus, textarea:focus, button:focus { outline: none; }
   background: linear-gradient(180deg, oklch(100% 0 0 / 0.015), transparent 30%);
   position: relative;
   z-index: 10;
+  overflow: hidden; /* verhindert horizontales Wackeln waehrend collapse-Transition */
+}
+
+/* ── Collapsed-Variante: nur Icons, Labels/Badges/Kbds verbergen ──────────── */
+.sidebar[data-collapsed="true"] { padding: 18px 8px; }
+.sidebar[data-collapsed="true"] .sidebar-brand { padding: 8px 4px 18px; justify-content: center; }
+.sidebar[data-collapsed="true"] .sidebar-brand-text { display: none; }
+.sidebar[data-collapsed="true"] .nav-item { justify-content: center; padding: 10px 6px; }
+.sidebar[data-collapsed="true"] .nav-item > span:not(.nav-badge):not(.nav-kbd) { display: none; }
+.sidebar[data-collapsed="true"] .nav-item .nav-kbd { display: none; }
+.sidebar[data-collapsed="true"] .nav-item .nav-badge {
+  position: absolute; top: 4px; right: 4px;
+  margin: 0; padding: 0; min-width: 8px; min-height: 8px;
+  font-size: 0; line-height: 0; border-radius: 99px;
+}
+.sidebar[data-collapsed="true"] .nav-item[data-active="true"]::before {
+  left: -8px; height: 14px;
+}
+.sidebar[data-collapsed="true"] .nav-section { display: none; }
+.sidebar[data-collapsed="true"] .sidebar-user { justify-content: center; padding: 8px; }
+.sidebar[data-collapsed="true"] .sidebar-user-text { display: none; }
+
+/* Toggle-Button am unteren Rand, ueber dem Profil-Element */
+.sidebar-collapse-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 28px; margin-bottom: 6px;
+  background: transparent; border: 1px solid transparent;
+  border-radius: 8px; cursor: pointer;
+  color: var(--fg-dim);
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
+.sidebar-collapse-btn:hover {
+  background: var(--surface-2); color: var(--fg-muted);
+  border-color: var(--border);
 }
 
 .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 8px 8px 18px; }

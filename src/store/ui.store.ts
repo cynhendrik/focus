@@ -83,6 +83,8 @@ interface UiState {
   activeCustomerTab: CustomerTab
   clientsView: ClientsView
   tasksTab: TasksTab
+  /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
+  sidebarCollapsed: boolean
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
@@ -94,6 +96,7 @@ interface UiState {
   setActiveCustomerTab: (tab: CustomerTab) => void
   setClientsView: (view: ClientsView) => void
   setTasksTab: (tab: TasksTab) => void
+  toggleSidebar: () => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -109,6 +112,7 @@ export const useUiStore = create<UiState>()(
       activeCustomerTab: 'cockpit',
       clientsView: 'board',
       tasksTab: 'list',
+      sidebarCollapsed: false,
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -142,6 +146,9 @@ export const useUiStore = create<UiState>()(
 
       setTasksTab: (tab) =>
         set({ tasksTab: tab }),
+
+      toggleSidebar: () =>
+        set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
     }),
     {
       name: 'focus-ui-v2',
@@ -152,6 +159,7 @@ export const useUiStore = create<UiState>()(
         migrationDone: s.migrationDone,
         clientsView: s.clientsView,
         tasksTab: s.tasksTab,
+        sidebarCollapsed: s.sidebarCollapsed,
       }),
     }
   )

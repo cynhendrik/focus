@@ -67,6 +67,7 @@ export default function App() {
   const appView         = useUiStore(s => s.appView)
   const cmdOpen           = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
+  const sidebarCollapsed  = useUiStore(s => s.sidebarCollapsed)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
   const openPicker        = useClientPickerStore(s => s.open)
   // Onboarding signal — must be called BEFORE any early return below to satisfy
@@ -216,7 +217,7 @@ export default function App() {
 
   return (
     <AppShell>
-      <div className="app">
+      <div className="app" data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}>
         <NavSidebar />
         <main className="main">
           <Topbar />

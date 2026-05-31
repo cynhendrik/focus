@@ -9,7 +9,7 @@ import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply, Flame,
   Calendar, Mail, Settings,
-  ChevronRight,
+  ChevronRight, ChevronsLeft, ChevronsRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -37,6 +37,7 @@ function SidebarSection({
   return (
     <button
       onClick={onToggle}
+      className="nav-section"
       style={{
         display: 'flex', alignItems: 'center', gap: 4, width: '100%',
         background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -64,8 +65,10 @@ function SidebarNavItem({
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
   badge?: number; kbd?: string
 }) {
+  // title sorgt im collapsed-Mode fuer den Tooltip — sonst weiss man nicht
+  // mehr welcher Icon was bedeutet.
   return (
-    <div className="nav-item" data-active={String(active)} onClick={onClick}>
+    <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
       <Ic size={17} />
       <span>{label}</span>
       {badge ? <span className="nav-badge">{badge}</span> : null}
@@ -75,9 +78,11 @@ function SidebarNavItem({
 }
 
 export function NavSidebar() {
-  const appView    = useUiStore(s => s.appView)
-  const setAppView = useUiStore(s => s.setAppView)
-  const user       = useAuthStore(s => s.user)
+  const appView          = useUiStore(s => s.appView)
+  const setAppView       = useUiStore(s => s.setAppView)
+  const collapsed        = useUiStore(s => s.sidebarCollapsed)
+  const toggleSidebar    = useUiStore(s => s.toggleSidebar)
+  const user             = useAuthStore(s => s.user)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
   const openDealCount = useDealsStore(s =>
@@ -108,7 +113,7 @@ export function NavSidebar() {
   const inPersonal  = appView === 'journal'
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
       <div className="sidebar-brand" data-tauri-drag-region>
         <div className="sidebar-brand-logo">
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
@@ -155,6 +160,14 @@ export function NavSidebar() {
       )}
 
       <div style={{ flex: 1 }} />
+
+      <button
+        className="sidebar-collapse-btn"
+        onClick={toggleSidebar}
+        title={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
+      >
+        {collapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+      </button>
 
       <SidebarNavItem icon={Settings} label="Settings" active={appView === 'settings'} onClick={() => setAppView('settings')} />
 
