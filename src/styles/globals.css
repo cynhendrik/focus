@@ -275,11 +275,11 @@ input:focus, textarea:focus, button:focus { outline: none; }
   /* Warmes Dunkelbraun (nicht schwarz!) — Akzent #E0A177 (faded clay).
      Hue ~50 (warm-orange-braun), Chroma steigt mit Lightness fuer ein
      "weiches Leder"-Gefuehl statt scharf-anthrazit. */
-  --priv-bg:        oklch(18% 0.025 50);
-  --priv-bg-2:      oklch(21% 0.028 50);
-  --priv-surface:   oklch(24% 0.030 50);
-  --priv-surface-2: oklch(28% 0.034 50);
-  --priv-border:    oklch(34% 0.038 50);
+  --priv-bg:        oklch(14% 0.022 50);
+  --priv-bg-2:      oklch(17% 0.025 50);
+  --priv-surface:   oklch(20% 0.028 50);
+  --priv-surface-2: oklch(24% 0.032 50);
+  --priv-border:    oklch(30% 0.036 50);
   --priv-fg:        oklch(96% 0.008 60);
   --priv-fg-muted:  oklch(76% 0.018 50);
   --priv-fg-dim:    oklch(58% 0.020 50);
