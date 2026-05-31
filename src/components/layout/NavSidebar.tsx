@@ -7,7 +7,7 @@ import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
 import {
   Home, CheckSquare, Users, CreditCard,
-  TrendingUp, Target,
+  TrendingUp, Target, Reply,
   Calendar, Mail, Settings,
   ChevronRight,
 } from 'lucide-react'
@@ -15,7 +15,7 @@ import type { LucideIcon } from 'lucide-react'
 
 type SectionKey = 'workspace' | 'sales' | 'inbox'
 
-const SALES_VIEWS = new Set<string>(['leads', 'pipeline'])
+const SALES_VIEWS = new Set<string>(['leads', 'pipeline', 'followups'])
 
 function readExpanded(): Record<SectionKey, boolean> {
   try {
@@ -137,6 +137,7 @@ export function NavSidebar() {
           {expanded.sales && (
             <>
               <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
+              <SidebarNavItem icon={Reply}       label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" />
               <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
             </>
           )}
