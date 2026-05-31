@@ -272,27 +272,29 @@ input:focus, textarea:focus, button:focus { outline: none; }
    ============================================================================ */
 
 .private-shell {
-  /* Warm-anthrazit statt kuehl-anthrazit — markiert den anderen Kontext. */
-  --priv-bg:        oklch(13% 0.012 50);
-  --priv-bg-2:      oklch(15% 0.014 50);
-  --priv-surface:   oklch(17% 0.014 50);
-  --priv-surface-2: oklch(20% 0.016 50);
-  --priv-border:    oklch(28% 0.018 50);
-  --priv-fg:        oklch(96% 0.005 60);
-  --priv-fg-muted:  oklch(74% 0.012 50);
-  --priv-fg-dim:    oklch(56% 0.014 50);
-  --priv-accent:    oklch(78% 0.16 60);     /* warm amber */
-  --priv-accent-2:  oklch(72% 0.18 50);
-  --priv-accent-soft: oklch(78% 0.16 60 / 0.14);
+  /* Warmes Dunkelbraun (nicht schwarz!) — Akzent #E0A177 (faded clay).
+     Hue ~50 (warm-orange-braun), Chroma steigt mit Lightness fuer ein
+     "weiches Leder"-Gefuehl statt scharf-anthrazit. */
+  --priv-bg:        oklch(18% 0.025 50);
+  --priv-bg-2:      oklch(21% 0.028 50);
+  --priv-surface:   oklch(24% 0.030 50);
+  --priv-surface-2: oklch(28% 0.034 50);
+  --priv-border:    oklch(34% 0.038 50);
+  --priv-fg:        oklch(96% 0.008 60);
+  --priv-fg-muted:  oklch(76% 0.018 50);
+  --priv-fg-dim:    oklch(58% 0.020 50);
+  --priv-accent:    #E0A177;     /* clay — leicht faded, warm */
+  --priv-accent-2:  #E8B189;     /* hover: minimal heller */
+  --priv-accent-soft: rgba(224, 161, 119, 0.14);
 
   display: grid;
   grid-template-columns: 230px 1fr;
   height: 100vh;
-  /* Gleiches 3-Schichten-Prinzip wie .app, in der warmen Amber-Palette. */
+  /* 3-Schichten-Glow in der Clay-Palette. */
   background:
-    radial-gradient(1100px 600px at 75% -12%, oklch(78% 0.16 60 / 0.14), transparent 62%),
-    radial-gradient(800px  240px at 50%  -6%, oklch(80% 0.18 50 / 0.08), transparent 70%),
-    radial-gradient(800px  400px at -10% 100%, oklch(70% 0.13 30 / 0.08), transparent 60%),
+    radial-gradient(1100px 600px at 75% -12%, rgba(224, 161, 119, 0.20), transparent 62%),
+    radial-gradient(800px  240px at 50%  -6%, rgba(232, 177, 137, 0.10), transparent 70%),
+    radial-gradient(800px  400px at -10% 100%, rgba(180, 110,  70, 0.10), transparent 60%),
     var(--priv-bg);
   color: var(--priv-fg);
 }
@@ -356,7 +358,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .priv-btn {
   display: inline-flex; align-items: center; gap: 7px;
   background: var(--priv-accent);
-  color: oklch(20% 0.04 60);
+  color: #3a1f10;  /* dunkles Espresso fuer Kontrast auf clay */
   border: none; border-radius: 10px;
   padding: 9px 16px;
   font-family: inherit; font-size: 12.5px; font-weight: 600;

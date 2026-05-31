@@ -75,7 +75,7 @@ export function QuickCaptureRoute() {
             style={{
               width: 44, height: 44, borderRadius: 11,
               background: 'var(--priv-accent)',
-              color: 'oklch(20% 0.04 60)',
+              color: '#3a1f10',
               border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'background 140ms',
