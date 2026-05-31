@@ -34,13 +34,15 @@
 /* ========== Design Tokens ========== */
 
 :root {
-  --bg: oklch(13% 0.005 270);
-  --bg-2: oklch(15% 0.006 270);
-  --surface: oklch(18% 0.006 270);
-  --surface-2: oklch(22% 0.008 270);
-  --surface-3: oklch(26% 0.009 270);
-  --border: oklch(30% 0.01 270);
-  --border-strong: oklch(40% 0.012 270);
+  /* Hintergrund 4% heller als vorher (13% -> 17%) — Augen ermueden weniger,
+     der Kontrast zwischen den Surface-Stufen steigt sichtbar. */
+  --bg: oklch(17% 0.005 270);
+  --bg-2: oklch(20% 0.006 270);
+  --surface: oklch(23% 0.007 270);
+  --surface-2: oklch(27% 0.009 270);
+  --surface-3: oklch(31% 0.010 270);
+  --border: oklch(34% 0.011 270);
+  --border-strong: oklch(44% 0.012 270);
   --fg: oklch(98% 0 0);
   --fg-2: oklch(82% 0.005 270);
   --fg-muted: oklch(64% 0.008 270);

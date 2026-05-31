@@ -11,8 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar, Wallet, TrendingUp, Phone, ArrowRight, AlertTriangle,
-  Sparkles, RefreshCw, EyeOff, Mail as MailIcon, Users as UsersIcon,
-  FileText, CheckCircle2, Clock as ClockIcon, Bell,
+  Sparkles, RefreshCw, EyeOff, Mail as MailIcon, Clock as ClockIcon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -90,9 +89,9 @@ function relTimeShort(iso: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI-Tile
+// KPI-Cell — keine eigene Card, lebt im KPI-Strip mit Trennlinien zwischen Zellen.
 
-function KpiTile({
+function KpiCell({
   icon: Icon, label, value, sub, accent,
 }: {
   icon:   LucideIcon
@@ -103,9 +102,8 @@ function KpiTile({
 }) {
   return (
     <div style={{
-      borderRadius: 14, border: '1px solid var(--border)',
-      background: 'var(--bg-2)', padding: '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 8, minHeight: 102,
+      display: 'flex', flexDirection: 'column', gap: 8,
+      padding: '4px 20px',
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 7,
@@ -117,7 +115,7 @@ function KpiTile({
         {label}
       </div>
       <div style={{
-        fontSize: 26, fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--fg)',
+        fontSize: 28, fontWeight: 700, color: accent ? 'var(--accent)' : 'var(--fg)',
         fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
         lineHeight: 1.05, letterSpacing: '-0.02em',
       }}>
@@ -448,144 +446,10 @@ function InboxMini({ customerId }: { customerId: string }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Verlauf-Mini-Liste
-
-interface MiniEvent {
-  id: string
-  icon: LucideIcon
-  title: string
-  subtitle: string
-  ts: string
-}
-
-const ACTIVITY_ICON: Record<string, LucideIcon> = {
-  call: Phone, meeting: UsersIcon, email: MailIcon, note: FileText,
-  followup: Bell, todo: CheckCircle2,
-}
-
+// ACTIVITY_LABEL — fuer die "Letzter Kontakt"-Tile (Kanal-Label).
 const ACTIVITY_LABEL: Record<string, string> = {
   call: 'Anruf', meeting: 'Meeting', email: 'E-Mail',
   note: 'Notiz', followup: 'Follow-Up', todo: 'Task',
-}
-
-function HistoryMini({ customerId }: { customerId: string }) {
-  const activities = useActivitiesStore(s => s.activities)
-  const emails     = useMailStore(s => s.emails)
-  const setActiveCustomerTab = useUiStore(s => s.setActiveCustomerTab)
-
-  const events: MiniEvent[] = useMemo(() => {
-    const out: MiniEvent[] = []
-    for (const a of activities) {
-      if ((a.accountId ?? null) !== customerId && a.customerId !== customerId) continue
-      const ts = a.createdAt
-      if (!ts) continue
-      const Icon = ACTIVITY_ICON[a.type] ?? FileText
-      const label = ACTIVITY_LABEL[a.type] ?? 'Eintrag'
-      out.push({
-        id: `a-${a.id}`,
-        icon: Icon,
-        title: `${label}${a.title ? ` · ${a.title}` : ''}`,
-        subtitle: a.body ?? '',
-        ts,
-      })
-    }
-    for (const e of emails) {
-      if (e.customerId !== customerId) continue
-      out.push({
-        id: `m-${e.id}`,
-        icon: MailIcon,
-        title: e.subject || '(ohne Betreff)',
-        subtitle: e.fromName ?? e.fromAddr ?? '',
-        ts: e.sentAt,
-      })
-    }
-    return out
-      .sort((a, b) => b.ts.localeCompare(a.ts))
-      .slice(0, 5)
-  }, [activities, emails, customerId])
-
-  return (
-    <div style={{
-      borderRadius: 16, border: '1px solid var(--border)',
-      background: 'var(--bg-2)', padding: '18px 22px 16px',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        fontFamily: 'var(--font-mono)', fontSize: 10,
-        letterSpacing: '0.18em', textTransform: 'uppercase',
-        color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 4,
-      }}>
-        <span>Verlauf</span>
-        <span style={{ fontWeight: 500, color: 'var(--fg-dim)' }}>{events.length} letzte</span>
-      </div>
-
-      {events.length === 0 ? (
-        <div style={{
-          padding: '18px 0 4px', color: 'var(--fg-dim)', fontSize: 12.5,
-        }}>
-          Noch keine Aktivität.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {events.map((ev, i) => (
-            <div
-              key={ev.id}
-              style={{
-                display: 'grid', gridTemplateColumns: '36px 1fr auto',
-                alignItems: 'center', gap: 14,
-                padding: '12px 0',
-                borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-              }}
-            >
-              <span style={{
-                width: 32, height: 32, borderRadius: 9,
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--fg-muted)',
-              }}>
-                <ev.icon size={13} />
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{
-                  fontSize: 13, fontWeight: 600, color: 'var(--fg)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {ev.title}
-                </div>
-                {ev.subtitle && (
-                  <div style={{
-                    fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {ev.subtitle}
-                  </div>
-                )}
-              </div>
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                color: 'var(--fg-dim)', letterSpacing: '0.04em',
-              }}>
-                {relTimeShort(ev.ts)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <button
-        onClick={() => setActiveCustomerTab('verlauf')}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          marginTop: 14, padding: 0,
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          color: 'var(--accent)', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
-        }}
-      >
-        Vollständigen Verlauf öffnen <ArrowRight size={12} />
-      </button>
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -708,17 +572,22 @@ export function CockpitPane({ customerId }: Props) {
       padding: '20px 24px 40px', overflow: 'auto', height: '100%',
       maxWidth: 1100, margin: '0 auto', width: '100%',
     }}>
-      {/* ── KPI-Row ────────────────────────────────────────────────────── */}
+      {/* ── KPI-Strip — eine Card, vier Zellen, dezente Trennlinien ──── */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1px 1fr 1px 1fr 1px 1fr',
+        alignItems: 'stretch',
+        borderRadius: 16, border: '1px solid var(--border)',
+        background: 'var(--bg-2)', padding: '20px 8px',
       }}>
-        <KpiTile
+        <KpiCell
           icon={Calendar}
           label="Kunde seit"
           value={fmtMonthYear(customer.createdAt)}
           sub={`${monthsBetween(customer.createdAt)} ${monthsBetween(customer.createdAt) === 1 ? 'Monat' : 'Monate'}`}
         />
-        <KpiTile
+        <span style={{ background: 'var(--border)', alignSelf: 'stretch' }} />
+        <KpiCell
           icon={Wallet}
           label="Worth"
           value={
@@ -732,7 +601,8 @@ export function CockpitPane({ customerId }: Props) {
           }
           sub={worthMonth > 0 ? `${fmtEuro(worthMonth)} · diesen Monat` : 'noch nichts diesen Monat'}
         />
-        <KpiTile
+        <span style={{ background: 'var(--border)', alignSelf: 'stretch' }} />
+        <KpiCell
           icon={TrendingUp}
           label="Im Spiel"
           value={
@@ -748,7 +618,8 @@ export function CockpitPane({ customerId }: Props) {
             ? `${openDeals.length} ${openDeals.length === 1 ? 'Deal' : 'Deals'} offen`
             : 'keine offenen Deals'}
         />
-        <KpiTile
+        <span style={{ background: 'var(--border)', alignSelf: 'stretch' }} />
+        <KpiCell
           icon={Phone}
           label="Letzter Kontakt"
           value={
@@ -784,9 +655,6 @@ export function CockpitPane({ customerId }: Props) {
 
       {/* ── Posteingang ───────────────────────────────────────────────── */}
       <InboxMini customerId={customerId} />
-
-      {/* ── Verlauf ────────────────────────────────────────────────────── */}
-      <HistoryMini customerId={customerId} />
 
       {/* ── Indirekter Hinweis, wenn ueberhaupt nichts da ist ────────── */}
       {!customer.email && openDeals.length === 0 && overdueList.length === 0 && (
