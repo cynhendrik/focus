@@ -1,13 +1,10 @@
 import { useState, useMemo } from 'react'
-import { X, Send, Users, List } from 'lucide-react'
+import { X, Send } from 'lucide-react'
 import { useCampaignStore } from '@/store/campaign.store'
 import { useLeadsStore } from '@/store/leads.store'
-import { useSmartListsStore } from '@/store/smart-lists.store'
 import { useMailStore } from '@/store/mail.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { LeadRef } from '@/types/campaign.types'
-
-type RecipientMode = 'smartlist' | 'manual'
 
 export function CreateCampaignModal({ onClose, onCreated }: {
   onClose: () => void
@@ -15,7 +12,6 @@ export function CreateCampaignModal({ onClose, onCreated }: {
 }) {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const leads       = useLeadsStore(s => s.leads)
-  const smartLists  = useSmartListsStore(s => s.lists)
   const accounts    = useMailStore(s => s.accounts)
   const create      = useCampaignStore(s => s.create)
 
@@ -23,26 +19,22 @@ export function CreateCampaignModal({ onClose, onCreated }: {
   const [subject,     setSubject]     = useState('')
   const [body,        setBody]        = useState('')
   const [senderId,    setSenderId]    = useState(accounts[0]?.id ?? '')
-  const [mode,        setMode]        = useState<RecipientMode>('smartlist')
-  const [smartListId, setSmartListId] = useState<string>(smartLists[0]?.id ?? '')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState<string | null>(null)
 
   // Only leads with a valid email address
-  const leadsWithEmail = useMemo(() => leads.filter((l): l is typeof l & { email: string } => l.email != null && l.email !== ''), [leads])
+  const leadsWithEmail = useMemo(
+    () => leads.filter((l): l is typeof l & { email: string } => l.email != null && l.email !== ''),
+    [leads],
+  )
 
-  const resolvedLeads = useMemo((): LeadRef[] => {
-    if (mode === 'manual') {
-      return leadsWithEmail
-        .filter(l => selectedIds.has(l.id))
-        .map(l => ({ id: l.id, email: l.email, name: l.name, company: l.companyName ?? undefined }))
-    }
-    // Smart list mode: use all leads with email (v1 — full list)
-    return leadsWithEmail.map(l => ({
-      id: l.id, email: l.email, name: l.name, company: l.companyName ?? undefined,
-    }))
-  }, [mode, leadsWithEmail, selectedIds])
+  const resolvedLeads = useMemo((): LeadRef[] =>
+    leadsWithEmail
+      .filter(l => selectedIds.has(l.id))
+      .map(l => ({ id: l.id, email: l.email, name: l.name, company: l.companyName ?? undefined })),
+    [leadsWithEmail, selectedIds],
+  )
 
   const toggleLead = (id: string) => {
     setSelectedIds(s => {
@@ -66,7 +58,6 @@ export function CreateCampaignModal({ onClose, onCreated }: {
         subject: subject.trim(),
         body: body.trim(),
         senderAccountId: senderId,
-        smartListId: mode === 'smartlist' ? smartListId || undefined : undefined,
         leads: resolvedLeads,
       })
       onCreated('')
@@ -149,64 +140,30 @@ export function CreateCampaignModal({ onClose, onCreated }: {
             />
           </div>
 
-          {/* Recipient mode toggle */}
+          {/* Recipients (manuelle Auswahl) */}
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 6 }}>Empfänger</label>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-              <button
-                onClick={() => setMode('smartlist')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 12px', borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  background: mode === 'smartlist' ? 'rgba(45,212,191,0.12)' : 'rgba(255,255,255,0.05)',
-                  color: mode === 'smartlist' ? '#2dd4bf' : 'var(--fg-dim)',
-                  border: mode === 'smartlist' ? '1px solid rgba(45,212,191,0.25)' : '1px solid transparent',
-                }}
-              >
-                <List size={11} /> Smart List
-              </button>
-              <button
-                onClick={() => setMode('manual')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 12px', borderRadius: 99, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  background: mode === 'manual' ? 'rgba(163,230,53,0.12)' : 'rgba(255,255,255,0.05)',
-                  color: mode === 'manual' ? '#a3e635' : 'var(--fg-dim)',
-                  border: mode === 'manual' ? '1px solid rgba(163,230,53,0.25)' : '1px solid transparent',
-                }}
-              >
-                <Users size={11} /> Manuell
-              </button>
+            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              {leadsWithEmail.length === 0 ? (
+                <div style={{ padding: '14px 12px', fontSize: 12, color: 'var(--fg-dim)' }}>
+                  Keine Leads mit E-Mail-Adresse vorhanden.
+                </div>
+              ) : leadsWithEmail.map((l, i) => (
+                <label
+                  key={l.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer',
+                    borderBottom: i < leadsWithEmail.length - 1 ? '1px solid var(--border)' : 'none',
+                    fontSize: 12,
+                  }}
+                >
+                  <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleLead(l.id)} />
+                  <span style={{ fontWeight: 600 }}>{l.name}</span>
+                  {l.companyName && <span style={{ color: 'var(--fg-dim)' }}>· {l.companyName}</span>}
+                  <span style={{ color: 'var(--fg-dim)', marginLeft: 'auto', fontSize: 11 }}>{l.email}</span>
+                </label>
+              ))}
             </div>
-
-            {mode === 'smartlist' && (
-              <select value={smartListId} onChange={e => setSmartListId(e.target.value)} className="mock-input" style={{ width: '100%' }}>
-                {smartLists.map(sl => (
-                  <option key={sl.id} value={sl.id}>{sl.icon} {sl.name}</option>
-                ))}
-              </select>
-            )}
-
-            {mode === 'manual' && (
-              <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-                {leadsWithEmail.map((l, i) => (
-                  <label
-                    key={l.id}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', cursor: 'pointer',
-                      borderBottom: i < leadsWithEmail.length - 1 ? '1px solid var(--border)' : 'none',
-                      fontSize: 12,
-                    }}
-                  >
-                    <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleLead(l.id)} />
-                    <span style={{ fontWeight: 600 }}>{l.name}</span>
-                    {l.companyName && <span style={{ color: 'var(--fg-dim)' }}>· {l.companyName}</span>}
-                    <span style={{ color: 'var(--fg-dim)', marginLeft: 'auto', fontSize: 11 }}>{l.email}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-
             <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 6 }}>
               {resolvedLeads.length} Empfänger ausgewählt
             </div>

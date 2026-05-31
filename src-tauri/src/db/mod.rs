@@ -11,7 +11,6 @@ pub mod chat_message;
 pub mod company;
 pub mod pipeline_stage;
 pub mod automation_rule;
-pub mod smart_list;
 pub mod lead;
 pub mod invoice;
 pub mod offer;

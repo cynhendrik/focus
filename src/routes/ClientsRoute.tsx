@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  UserPlus, Sparkles, ArrowRight, LayoutGrid, ListFilter,
+  UserPlus, Sparkles, ArrowRight,
   Search, ChevronRight,
 } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
@@ -12,7 +12,6 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
-import { SmartListsRoute } from './SmartListsRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
 import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
 import type { Customer } from '@/types/customer.types'
@@ -22,37 +21,6 @@ import {
   type ClientRow, type ClientSortKey, type ClientSignalTone,
 } from '@/lib/clients-overview'
 import { scoreColor } from '@/lib/lead-score'
-
-// ── shared view toggle (Board ↔ Liste) ────────────────────────────────────────
-
-export function ClientsViewToggle() {
-  const view    = useUiStore(s => s.clientsView)
-  const setView = useUiStore(s => s.setClientsView)
-  const segBtn = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '5px 12px',
-    border: 'none', background: active ? 'var(--surface)' : 'transparent',
-    color: active ? 'var(--fg)' : 'var(--fg-muted)',
-    fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-    borderRadius: 7, cursor: 'pointer',
-    transition: 'background 140ms, color 140ms',
-    boxShadow: active ? 'var(--shadow-1)' : 'none',
-  })
-  return (
-    <div style={{
-      display: 'inline-flex', padding: 3,
-      background: 'var(--surface-2)', border: '1px solid var(--border)',
-      borderRadius: 10,
-    }}>
-      <button style={segBtn(view === 'board')} onClick={() => setView('board')} title="Board-Ansicht">
-        <LayoutGrid size={12} /> Board
-      </button>
-      <button style={segBtn(view === 'list')} onClick={() => setView('list')} title="Listen-Ansicht mit Smart Lists">
-        <ListFilter size={12} /> Liste
-      </button>
-    </div>
-  )
-}
 
 // ── color helpers (avatar squircle) ──────────────────────────────────────────
 // Alle Avatare einheitlich in dunklem Grau — kein Hash-basierter Farbtupfer,
@@ -452,7 +420,6 @@ function ClientBoard() {
               {needsAttention} brauchen dich
             </span>
           )}
-          <ClientsViewToggle />
           <button
             className="btn-ghost"
             onClick={() => setShowModal(true)}
@@ -655,14 +622,9 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
 
 export function ClientsRoute() {
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
-  const clientsView        = useUiStore(s => s.clientsView)
 
   if (selectedCustomerId) {
     return <CustomerRoute customerId={selectedCustomerId} />
-  }
-
-  if (clientsView === 'list') {
-    return <SmartListsRoute />
   }
 
   return <ClientBoard />

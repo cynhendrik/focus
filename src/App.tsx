@@ -7,8 +7,6 @@ import { Topbar }      from '@/components/layout/Topbar'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useSmartListsStore } from '@/store/smart-lists.store'
-import { SmartListService }   from '@/services/smart-list.service'
 import { PipelineService }    from '@/services/pipeline.service'
 import { usePipelineStore }   from '@/store/pipeline.store'
 import { useDealsStore }      from '@/store/deals.store'
@@ -34,7 +32,6 @@ import { PipelineRoute }         from '@/routes/PipelineRoute'
 import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
 import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
-import { SalesCockpitRoute }     from '@/routes/SalesCockpitRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
@@ -57,7 +54,6 @@ export default function App() {
   const initCustomers   = useCustomersStore(s => s.init)
   const loadLastActivity = useCrmStore(s => s.loadLastActivity)
   const loadCrmAll       = useCrmStore(s => s.loadAll)
-  const loadSmartLists  = useSmartListsStore(s => s.load)
   const loadPipelineStages = usePipelineStore(s => s.load)
   const loadAllDeals    = useDealsStore(s => s.loadAll)
   const loadAllTodos    = useTodosStore(s => s.loadAll)
@@ -153,9 +149,6 @@ export default function App() {
 
     const handle = ric(() => {
       loadLastActivity(activeWorkspaceId)
-      SmartListService.seedSystemLists(activeWorkspaceId)
-        .catch(() => {})
-        .then(() => loadSmartLists(activeWorkspaceId))
       PipelineService.seed(activeWorkspaceId).catch(() => {}).then(() =>
         loadPipelineStages(activeWorkspaceId)
       )
@@ -172,7 +165,7 @@ export default function App() {
       if (cic) cic(handle)
       else window.clearTimeout(handle)
     }
-  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadSmartLists, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
+  }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
   useSyncBridge()
 
@@ -191,7 +184,6 @@ export default function App() {
       case 'leads':        return <LeadsRoute />
       case 'pipeline':     return <PipelineRoute />
       case 'followups':    return <FollowupsDashboardRoute />
-      case 'sales-cockpit': return <SalesCockpitRoute />
       case 'journal':      return <JournalRoute />
       case 'calendar':     return <CalendarRoute />
       case 'mail':         return <MailRoute />

@@ -17,7 +17,6 @@ export type CustomerTab =
   | 'finanzen'     // Rechnungen + Angebote (gefiltert auf diesen Kunden)
 
 /** Clients page view mode: card board vs. filtered list (Smart Lists). */
-export type ClientsView = 'board' | 'list'
 
 /** Tasks page tab. */
 export type TasksTab = 'list' | 'board' | 'focus'
@@ -83,7 +82,7 @@ export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'
-  | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads' | 'sales-cockpit'
+  | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
   | 'journal'
 
 interface UiState {
@@ -95,7 +94,6 @@ interface UiState {
   migrationDone: boolean
   cmdPaletteOpen: boolean
   activeCustomerTab: CustomerTab
-  clientsView: ClientsView
   tasksTab: TasksTab
   /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
   sidebarCollapsed: boolean
@@ -112,7 +110,6 @@ interface UiState {
   markMigrationDone: () => void
   setCmdPaletteOpen: (open: boolean) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
-  setClientsView: (view: ClientsView) => void
   setTasksTab: (tab: TasksTab) => void
   toggleSidebar: () => void
   enterPrivate: (view?: PrivateView) => void
@@ -131,7 +128,6 @@ export const useUiStore = create<UiState>()(
       migrationDone: false,
       cmdPaletteOpen: false,
       activeCustomerTab: 'cockpit',
-      clientsView: 'board',
       tasksTab: 'list',
       sidebarCollapsed: false,
       appMode: 'business',
@@ -164,9 +160,6 @@ export const useUiStore = create<UiState>()(
       setActiveCustomerTab: (tab) =>
         set({ activeCustomerTab: mapLegacyCustomerTab(tab) }),
 
-      setClientsView: (view) =>
-        set({ clientsView: view }),
-
       setTasksTab: (tab) =>
         set({ tasksTab: tab }),
 
@@ -189,7 +182,6 @@ export const useUiStore = create<UiState>()(
         selectedCustomerId: s.selectedCustomerId,
         hasSeenIntro: s.hasSeenIntro,
         migrationDone: s.migrationDone,
-        clientsView: s.clientsView,
         tasksTab: s.tasksTab,
         sidebarCollapsed: s.sidebarCollapsed,
         appMode: s.appMode,

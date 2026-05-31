@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Lead-Score helpers — shared zwischen LeadScoreCard, ClientsRoute und
-// SalesCockpitRoute. Alle Funktionen sind pure und ohne Side-Effects.
+// Lead-Score helpers — shared zwischen LeadScoreCard und ClientsRoute.
+// Alle Funktionen sind pure und ohne Side-Effects.
 //
 // Score ist 0–100 und wird im Backend von der Rules Engine berechnet.
 // `scoreFactors` ist ein Record<rule_key, points> mit positiven UND negativen
@@ -47,14 +47,3 @@ export function rankFactors(factors: Record<string, number>): FactorEntry[] {
     .sort((a, b) => Math.abs(b.points) - Math.abs(a.points))
 }
 
-// 10er-Buckets von 0..100 fuer das Verteilungs-Histogramm im Cockpit.
-// Liefert ein Array von Counts (Laenge 10): [0-9, 10-19, ..., 90-100].
-export function scoreHistogram(scores: number[]): number[] {
-  const buckets = new Array(10).fill(0)
-  for (const s of scores) {
-    const clamped = Math.max(0, Math.min(100, s))
-    const idx = Math.min(9, Math.floor(clamped / 10))
-    buckets[idx]++
-  }
-  return buckets
-}
