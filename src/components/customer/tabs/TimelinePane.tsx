@@ -1550,6 +1550,17 @@ const PRIORITY_META: Record<'high' | 'normal' | 'low', {
   low:    { label: 'Niedrig', color: 'var(--fg-dim)',   fill: false, ring: false },
 }
 
+/**
+ * Mappt das Backend-Schema (p1/p2/p3/p4 oder direkt high/normal/low) auf das
+ * 3-stufige UI-Modell. `??` haette hier nicht geholfen — 'p3' ist truthy,
+ * der Fallback waere nie gegriffen, der Lookup waere undefined, Render-Crash.
+ */
+function mapTodoPriority(p: string | undefined | null): 'high' | 'normal' | 'low' {
+  if (p === 'high' || p === 'p1' || p === 'p2') return 'high'
+  if (p === 'low'  || p === 'p4')               return 'low'
+  return 'normal'
+}
+
 function TaskRow({
   todo, onToggle, onDelete, onCyclePriority,
 }: {
@@ -1561,7 +1572,7 @@ function TaskRow({
   const [hover, setHover] = useState(false)
   const isDone = todo.status === 'done'
   const due = todo.dueDate ? formatTaskDue(todo.dueDate) : null
-  const prio = PRIORITY_META[(todo.priority as 'high' | 'normal' | 'low') ?? 'normal']
+  const prio = PRIORITY_META[mapTodoPriority(todo.priority)]
   const isHigh = todo.priority === 'p1' || todo.priority === 'p2'
 
   return (
@@ -1642,7 +1653,7 @@ function TaskRow({
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 10,
           letterSpacing: '0.04em',
-          color: DUE_TONE[due.tone],
+          color: DUE_TONE[due.tone] ?? DUE_TONE.later,
           opacity: due.tone === 'later' ? 0.7 : 1,
           whiteSpace: 'nowrap',
         }}>
