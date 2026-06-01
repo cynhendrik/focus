@@ -63,7 +63,7 @@ export function IntegrationsRoute() {
             name="Google Calendar / Outlook"
             category="Kalender-Sync"
             description="Synchronisiere Termine bidirektional mit deinem Google Calendar oder Outlook. Cynera-Termine erscheinen in deinem Kalender und umgekehrt."
-            status="disconnected"
+            status="coming_soon"
           />
 
           <div style={{ margin: '8px 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>

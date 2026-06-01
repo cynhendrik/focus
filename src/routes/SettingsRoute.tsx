@@ -13,14 +13,14 @@ export function SettingsRoute() {
   const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const showDeveloper = import.meta.env.DEV ||
-    new URLSearchParams(window.location.search).has('dev')
+    localStorage.getItem('cynera:dev-mode') === '1'
 
   function renderPanel() {
     switch (settingsTab) {
       case 'workspace':    return <WorkspaceSettings workspaceId={workspaceId} />
       case 'profil':       return <ProfilSettings />
       case 'aussehen':     return <AussehensSettings />
-      case 'developer':    return <DeveloperSettings workspaceId={workspaceId} />
+      case 'developer':    return showDeveloper ? <DeveloperSettings workspaceId={workspaceId} /> : <WorkspaceSettings workspaceId={workspaceId} />
       case 'gefahrenzone': return <GefahrenzoneSettings workspaceId={workspaceId} />
     }
   }

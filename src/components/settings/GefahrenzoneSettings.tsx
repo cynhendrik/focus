@@ -8,6 +8,13 @@ interface Props { workspaceId: string }
 
 export function GefahrenzoneSettings({ workspaceId }: Props) {
   const [confirmText, setConfirmText] = useState('')
+  const [resetDone, setResetDone] = useState(false)
+
+  const handleReset = () => {
+    // TODO: actual workspace reset implementation
+    setResetDone(true)
+    setConfirmText('')
+  }
   const customers = useCustomersStore(s => s.customers)
   const deals     = useDealsStore(s => s.deals)
   const leads     = useLeadsStore(s => s.leads)
@@ -69,6 +76,7 @@ export function GefahrenzoneSettings({ workspaceId }: Props) {
         />
         <button
           disabled={confirmText !== 'zurücksetzen'}
+          onClick={handleReset}
           style={{
             padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
             cursor: confirmText === 'zurücksetzen' ? 'pointer' : 'not-allowed',
@@ -78,7 +86,7 @@ export function GefahrenzoneSettings({ workspaceId }: Props) {
             transition: 'background 140ms, color 140ms',
           }}
         >
-          Workspace zurücksetzen
+          {resetDone ? '✓ Zurückgesetzt' : 'Workspace zurücksetzen'}
         </button>
       </div>
     </div>

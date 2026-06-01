@@ -74,13 +74,17 @@ export function DeveloperSettings({ workspaceId }: Props) {
             ? <CopyRow label="Supabase URL" value={SUPABASE_URL} />
             : <div style={{ padding: '14px 20px', fontSize: 12, color: 'var(--warn)' }}>VITE_SUPABASE_URL nicht gesetzt</div>
           }
-          {WEBHOOK_SECRET
-            ? <>
-                <CopyRow label="Zoom Webhook URL" value={`${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=zoom`} />
-                <CopyRow label="Generic Webhook URL" value={`${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=generic`} />
-              </>
-            : <div style={{ padding: '14px 20px', fontSize: 12, color: 'var(--warn)', borderTop: '1px solid var(--border)' }}>VITE_LEAD_WEBHOOK_SECRET nicht gesetzt</div>
-          }
+          {SUPABASE_URL && WEBHOOK_SECRET && (
+            <>
+              <CopyRow label="Zoom Webhook URL" value={`${SUPABASE_URL}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${WEBHOOK_SECRET}&source=zoom`} />
+              <CopyRow label="Generic Webhook URL" value={`${SUPABASE_URL}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${WEBHOOK_SECRET}&source=generic`} />
+            </>
+          )}
+          {(!SUPABASE_URL || !WEBHOOK_SECRET) && (
+            <div style={{ padding: '14px 20px', fontSize: 12, color: 'var(--warn)', borderTop: SUPABASE_URL ? '1px solid var(--border)' : 'none' }}>
+              {!SUPABASE_URL ? 'VITE_SUPABASE_URL' : 'VITE_LEAD_WEBHOOK_SECRET'} nicht gesetzt
+            </div>
+          )}
         </div>
       </div>
 

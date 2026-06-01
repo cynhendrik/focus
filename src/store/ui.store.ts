@@ -203,6 +203,7 @@ export const useUiStore = create<UiState>()(
         migrationDone: s.migrationDone,
         tasksTab: s.tasksTab,
         dashboardView: s.dashboardView,
+        settingsTab: s.settingsTab,
         sidebarCollapsed: s.sidebarCollapsed,
         appMode: s.appMode,
         privateView: s.privateView,
