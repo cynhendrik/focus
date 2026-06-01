@@ -1,6 +1,7 @@
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
+import { Check, Clock } from 'lucide-react'
 
 const PRIO_COLOR: Record<TodoPriority, string> = {
   p1: 'oklch(60% 0.2 25)',
@@ -12,9 +13,14 @@ const PRIO_LABEL: Record<TodoPriority, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
-interface Props { todo: Todo }
+interface Props {
+  todo: Todo
+  onComplete: () => Promise<void>
+  onSkip: () => void
+  onPostpone: () => Promise<void>
+}
 
-export function FocusCardDefault({ todo }: Props) {
+export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props) {
   const toggleChecklist = useTodosStore(s => s.toggleChecklist)
   const accounts        = useAccountsStore(s => s.accounts)
   const account = todo.customerId
@@ -33,15 +39,33 @@ export function FocusCardDefault({ todo }: Props) {
       gap: 24,
       boxShadow: '0 8px 40px -12px oklch(0% 0 0 / 0.3)',
     }}>
+      {/* Meta row */}
       <div style={{ display: 'flex', gap: 10, fontSize: 11, alignItems: 'center' }}>
-        <span style={{ color: PRIO_COLOR[todo.priority], fontWeight: 700 }}>
-          ● {PRIO_LABEL[todo.priority]}
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          background: `${PRIO_COLOR[todo.priority]}22`,
+          color: PRIO_COLOR[todo.priority],
+          fontWeight: 700,
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          padding: '3px 9px',
+          borderRadius: 99,
+          fontSize: 10,
+        }}>
+          AUFGABE
         </span>
         {account && (
-          <span style={{ color: 'var(--fg-muted)' }}>· {account.name}</span>
+          <span style={{ color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 5, height: 5, borderRadius: 99, background: PRIO_COLOR[todo.priority], display: 'inline-block' }} />
+            {account.name}
+          </span>
         )}
       </div>
 
+      {/* Title */}
       <h1 style={{
         fontFamily: 'var(--font-display)',
         fontSize: 36,
@@ -54,12 +78,14 @@ export function FocusCardDefault({ todo }: Props) {
         {todo.title}
       </h1>
 
+      {/* Notes */}
       {todo.notes && (
         <p style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--fg-muted)', margin: 0 }}>
           {todo.notes}
         </p>
       )}
 
+      {/* Checklist */}
       {todo.checklist.length > 0 && (
         <div>
           <div style={{
@@ -110,6 +136,81 @@ export function FocusCardDefault({ todo }: Props) {
           </div>
         </div>
       )}
+
+      {/* Action row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 4,
+      }}>
+        <button
+          type="button"
+          onClick={onSkip}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '10px 18px',
+            borderRadius: 99,
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--fg-muted)',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Überspringen
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { onPostpone().catch(() => {}) }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '10px 16px',
+            borderRadius: 99,
+            border: 'none',
+            background: 'oklch(50% 0 0 / 0.08)',
+            color: 'var(--fg)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <Clock size={14} />
+          Morgen
+          <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>M</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { onComplete().catch(() => {}) }}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '12px 20px',
+            borderRadius: 99,
+            border: 'none',
+            background: 'var(--accent)',
+            color: 'var(--accent-ink)',
+            fontSize: 14,
+            fontWeight: 700,
+            boxShadow: '0 6px 20px -8px var(--accent-glow)',
+            cursor: 'pointer',
+          }}
+        >
+          <Check size={16} />
+          Erledigt · weiter
+          <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.7, fontFamily: 'var(--font-mono)' }}>
+            SPACE
+          </span>
+        </button>
+      </div>
     </div>
   )
 }
