@@ -9,8 +9,12 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useUiStore } from '@/store/ui.store'
 import { useToastStore } from '@/store/toast.store'
+import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { ActivitiesService } from '@/services/activities.service'
-import type { Lead, LeadSource, LeadStatus, UpsertLeadPayload } from '@/types/lead.types'
+import { LeadStagesManager } from '@/components/leads/LeadStagesManager'
+import { QualifyModal } from '@/components/leads/QualifyModal'
+import { DisqualifyModal } from '@/components/leads/DisqualifyModal'
+import type { Lead, LeadSource, UpsertLeadPayload } from '@/types/lead.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,15 +66,6 @@ function dotColor(iso: string): string {
 }
 
 // ── Board columns ─────────────────────────────────────────────────────────────
-
-type ColumnId = LeadStatus | 'call_booked'
-
-const COLUMNS: { id: ColumnId; label: string; hoverBg: string; dot: string }[] = [
-  { id: 'new',         label: 'New In',          hoverBg: 'rgba(59,130,246,0.10)',  dot: '#60a5fa' },
-  { id: 'attempted',   label: 'Attempted',       hoverBg: 'rgba(251,191,36,0.10)',  dot: '#fbbf24' },
-  { id: 'warm',        label: 'Warm Lead',       hoverBg: 'rgba(74,222,128,0.10)',  dot: '#4ade80' },
-  { id: 'call_booked', label: 'Termin gebucht',  hoverBg: 'rgba(208,252,105,0.12)', dot: '#D0FC69' },
-]
 
 const SIDEBAR_LIMIT = 8
 
@@ -242,14 +237,14 @@ function ContextMenu({
       <CtxItem
         label="Re-Engage (90 Tage)"
         onClick={() => act(() =>
-          bulkUpdate({ ids: [menu.lead.id], status: 'lost_reengage', reEngageDate: todayPlus(90) }, workspaceId)
+          bulkUpdate({ ids: [menu.lead.id], status: 'disqualifiziert', reEngageDate: todayPlus(90) }, workspaceId)
         )}
       />
       <CtxItem
         label="Lost (6 Monate)"
         color="var(--fg-dim)"
         onClick={() => act(() =>
-          bulkUpdate({ ids: [menu.lead.id], status: 'lost_reengage', reEngageDate: todayPlus(180) }, workspaceId)
+          bulkUpdate({ ids: [menu.lead.id], status: 'disqualifiziert', reEngageDate: todayPlus(180) }, workspaceId)
         )}
       />
 
@@ -382,8 +377,10 @@ function DraggableLeadCard({ lead, selected, onToggle, onContext, onWarm }: {
 
 // ── Droppable column ──────────────────────────────────────────────────────────
 
+type ColDef = { id: string; label: string; hoverBg: string; dot: string }
+
 function LeadColumn({ col, leads, selected, onToggle, onContext, onWarm }: {
-  col: typeof COLUMNS[number]
+  col: ColDef
   leads: Lead[]
   selected: Set<string>
   onToggle: (id: string) => void
@@ -550,22 +547,27 @@ function ReEngageSidebar({ leads }: { leads: Lead[] }) {
 // ── Phasen Board ──────────────────────────────────────────────────────────────
 
 function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onShowCreate: () => void }) {
-  const allLeads = useLeadsStore(s => s.leads)
-  const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
-  const deleteLead = useLeadsStore(s => s.deleteLead)
+  const allLeads      = useLeadsStore(s => s.leads)
+  const bulkUpdate    = useLeadsStore(s => s.bulkUpdate)
+  const deleteLead    = useLeadsStore(s => s.deleteLead)
   const convertToDeal = useLeadsStore(s => s.convertToDeal)
   const userId        = useAuthStore(s => s.user?.id ?? '')
   const setAppView    = useUiStore(s => s.setAppView)
   const showToast     = useToastStore(s => s.show)
-  const [activeLead, setActiveLead] = useState<Lead | null>(null)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
-  const [followUpLeads, setFollowUpLeads] = useState<Lead[] | null>(null)
+  const stages        = useLeadStagesStore(s => s.stages)
+
+  const [activeLead, setActiveLead]              = useState<Lead | null>(null)
+  const [selected, setSelected]                  = useState<Set<string>>(new Set())
+  const [ctxMenu, setCtxMenu]                    = useState<CtxMenu | null>(null)
+  const [followUpLeads, setFollowUpLeads]         = useState<Lead[] | null>(null)
+  const [pendingQualify, setPendingQualify]       = useState<Lead | null>(null)
+  const [pendingDisqualify, setPendingDisqualify] = useState<Lead | null>(null)
+  const [showStages, setShowStages]              = useState(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const boardLeads = useMemo(
-    () => allLeads.filter(l => l.leadStatus === 'new' || l.leadStatus === 'attempted' || l.leadStatus === 'warm'),
+    () => allLeads.filter(l => l.reEngageDate == null),
     [allLeads],
   )
 
@@ -574,10 +576,8 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
     [allLeads],
   )
 
-  const leadsForCol = (status: ColumnId) =>
-    status === 'call_booked'
-      ? []   // Drop-only column — converted leads disappear from board
-      : boardLeads.filter(l => l.leadStatus === status)
+  const leadsForStage = (stageName: string) =>
+    boardLeads.filter(l => l.leadStatus === stageName)
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -597,17 +597,47 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   const handleDragEnd = (e: DragEndEvent) => {
     setActiveLead(null)
     if (!e.over) return
-    const targetId = e.over.id as ColumnId
+    const targetStageName = e.over.id as string
     const lead = boardLeads.find(l => l.id === e.active.id)
     if (!lead) return
 
-    if (targetId === 'call_booked') {
-      handleConvertToDeal(lead)
+    const targetStage = stages.find(s => s.name === targetStageName)
+    if (!targetStage) return
+
+    if (targetStage.isQualified) {
+      setPendingQualify(lead)
       return
     }
+    if (targetStage.isDisqualified) {
+      setPendingDisqualify(lead)
+      return
+    }
+    if (lead.leadStatus !== targetStageName) {
+      bulkUpdate({ ids: [lead.id], status: targetStageName }, workspaceId)
+    }
+  }
 
-    if (lead.leadStatus !== targetId) {
-      bulkUpdate({ ids: [lead.id], status: targetId as LeadStatus }, workspaceId)
+  const handleQualifyConfirm = async (_appointmentDate?: string) => {
+    if (!pendingQualify) return
+    try {
+      await convertToDeal(pendingQualify.id, workspaceId, userId)
+      showToast({
+        message: `Deal angelegt — ${pendingQualify.name}`,
+        action: { label: '→ Pipeline öffnen', onClick: () => setAppView('pipeline') },
+      })
+    } catch (err) {
+      showToast({ message: err instanceof Error ? err.message : 'Konvertierung fehlgeschlagen', variant: 'error' })
+    } finally {
+      setPendingQualify(null)
+    }
+  }
+
+  const handleDisqualifyConfirm = async (reEngageDate: string) => {
+    if (!pendingDisqualify) return
+    try {
+      await bulkUpdate({ ids: [pendingDisqualify.id], status: 'disqualifiziert', reEngageDate }, workspaceId)
+    } finally {
+      setPendingDisqualify(null)
     }
   }
 
@@ -617,21 +647,6 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
 
   const handleWarm = (id: string) => {
     bulkUpdate({ ids: [id], status: 'warm' }, workspaceId)
-  }
-
-  const handleConvertToDeal = async (lead: Lead) => {
-    try {
-      await convertToDeal(lead.id, workspaceId, userId)
-      showToast({
-        message: `Deal angelegt — ${lead.name}`,
-        action: { label: '→ Pipeline öffnen', onClick: () => setAppView('pipeline') },
-      })
-    } catch (err) {
-      showToast({
-        message: err instanceof Error ? err.message : 'Konvertierung fehlgeschlagen',
-        variant: 'error',
-      })
-    }
   }
 
   const selectedLeads = boardLeads.filter(l => selected.has(l.id))
@@ -647,6 +662,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
       <div style={{
         padding: '10px 16px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, minHeight: 50,
+        position: 'relative',
       }}>
         {selected.size > 0 ? (
           <>
@@ -681,20 +697,35 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           </span>
         )}
         <div style={{ flex: 1 }} />
+        <button
+          className="btn-ghost"
+          style={{ fontSize: 11, padding: '5px 10px' }}
+          onClick={() => setShowStages(v => !v)}
+        >
+          Stages
+        </button>
         <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={onShowCreate}>
           + Lead
         </button>
+        {showStages && (
+          <LeadStagesManager workspaceId={workspaceId} onClose={() => setShowStages(false)} />
+        )}
       </div>
 
       {/* Board + Sidebar */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', flex: 1, overflow: 'auto' }}>
-            {COLUMNS.map(col => (
+            {stages.map(stage => (
               <LeadColumn
-                key={col.id}
-                col={col}
-                leads={leadsForCol(col.id)}
+                key={stage.id}
+                col={{
+                  id: stage.name,
+                  label: stage.label,
+                  hoverBg: `${stage.color}1A`,
+                  dot: stage.color,
+                }}
+                leads={leadsForStage(stage.name)}
                 selected={selected}
                 onToggle={toggleSelect}
                 onContext={handleContext}
@@ -703,9 +734,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
             ))}
           </div>
           <DragOverlay>
-            {activeLead
-              ? <LeadCard lead={activeLead} onContext={() => {}} isDragging />
-              : null}
+            {activeLead ? <LeadCard lead={activeLead} onContext={() => {}} isDragging /> : null}
           </DragOverlay>
         </DndContext>
 
@@ -720,12 +749,21 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           onFollowUp={leads => { setCtxMenu(null); setFollowUpLeads(leads) }}
         />
       )}
-
       {followUpLeads && (
-        <FollowUpModal
-          leads={followUpLeads}
-          workspaceId={workspaceId}
-          onClose={() => setFollowUpLeads(null)}
+        <FollowUpModal leads={followUpLeads} workspaceId={workspaceId} onClose={() => setFollowUpLeads(null)} />
+      )}
+      {pendingQualify && (
+        <QualifyModal
+          lead={pendingQualify}
+          onConfirm={handleQualifyConfirm}
+          onCancel={() => setPendingQualify(null)}
+        />
+      )}
+      {pendingDisqualify && (
+        <DisqualifyModal
+          lead={pendingDisqualify}
+          onConfirm={handleDisqualifyConfirm}
+          onCancel={() => setPendingDisqualify(null)}
         />
       )}
     </>

@@ -9,6 +9,8 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useCrmStore } from '@/store/crm.store'
 import { PipelineService }    from '@/services/pipeline.service'
 import { usePipelineStore }   from '@/store/pipeline.store'
+import { LeadStagesService }  from '@/services/lead-stages.service'
+import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useDealsStore }      from '@/store/deals.store'
 import { useTodosStore }      from '@/store/todos.store'
 import { useUiStore }   from '@/store/ui.store'
@@ -151,6 +153,9 @@ export default function App() {
       loadLastActivity(activeWorkspaceId)
       PipelineService.seed(activeWorkspaceId).catch(() => {}).then(() =>
         loadPipelineStages(activeWorkspaceId)
+      )
+      LeadStagesService.seed(activeWorkspaceId).catch(() => {}).then(() =>
+        useLeadStagesStore.getState().load(activeWorkspaceId)
       )
       loadAllDeals(activeWorkspaceId)
       syncLeads(activeWorkspaceId)
