@@ -1,100 +1,163 @@
 import { useAccountsStore } from '@/store/accounts.store'
+import { useFinanceStore } from '@/store/finance.store'
 import type { Todo } from '@/types/todo.types'
-import { Zap } from 'lucide-react'
 
 interface Props {
   stack: Todo[]
   currentIndex: number
 }
 
-const ACTION_LABEL: Record<string, string> = {
-  send_reminder: 'Erinnerung',
+function itemBorderColor(todo: Todo): string {
+  if (todo.source === 'finance') return 'oklch(60% 0.2 25)'
+  return 'oklch(55% 0 0 / 0.25)'
+}
+
+function itemIconBg(todo: Todo): string {
+  if (todo.source === 'finance') return 'oklch(60% 0.2 25 / 0.15)'
+  return 'oklch(50% 0 0 / 0.1)'
+}
+
+function itemIconColor(todo: Todo): string {
+  if (todo.source === 'finance') return 'oklch(60% 0.2 25)'
+  return 'var(--fg-dim)'
+}
+
+function itemIconLabel(todo: Todo): string {
+  if (todo.source === 'finance') return '€'
+  return '✓'
 }
 
 export function FocusQueueSidebar({ stack, currentIndex }: Props) {
   const accounts = useAccountsStore(s => s.accounts)
+  const invoices = useFinanceStore(s => s.invoices)
   const upcoming = stack.slice(currentIndex + 1)
 
   return (
     <div style={{
-      width: 272,
+      width: 300,
       flexShrink: 0,
       display: 'flex',
       flexDirection: 'column',
-      gap: 4,
       paddingLeft: 24,
       borderLeft: '1px solid var(--border)',
-      maxHeight: 'calc(100vh - 180px)',
+      maxHeight: '100%',
       overflowY: 'auto',
     }}>
+      {/* Header */}
       <div style={{
-        fontSize: 10,
-        fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color: 'var(--fg-dim)',
-        paddingTop: 10,
-        paddingBottom: 10,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 2,
+        paddingBottom: 14,
+        flexShrink: 0,
       }}>
-        Als Nächstes
+        <span style={{
+          fontSize: 10,
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-dim)',
+        }}>
+          Als Nächstes
+        </span>
+        <span style={{
+          fontSize: 10,
+          fontFamily: 'var(--font-mono)',
+          color: 'var(--fg-muted)',
+          background: 'var(--surface-3)',
+          padding: '2px 7px',
+          borderRadius: 99,
+        }}>
+          {upcoming.length}
+        </span>
       </div>
 
+      {/* Empty state */}
       {upcoming.length === 0 && (
-        <div style={{ fontSize: 13, color: 'var(--fg-dim)', paddingTop: 8 }}>
+        <div style={{ fontSize: 13, color: 'var(--fg-dim)', paddingTop: 4 }}>
           Nichts mehr offen
         </div>
       )}
 
-      {upcoming.map(todo => {
-        const account = todo.customerId
-          ? accounts.find(a => a.id === todo.customerId)
-          : undefined
-        const actionLabel = todo.actionType ? ACTION_LABEL[todo.actionType] : undefined
+      {/* Items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {upcoming.map(todo => {
+          const account = todo.customerId
+            ? accounts.find(a => a.id === todo.customerId)
+            : undefined
+          const invoice = todo.sourceRef
+            ? invoices.find(i => i.id === todo.sourceRef)
+            : undefined
+          const amount = invoice
+            ? `${(invoice.total / 1000).toFixed(1)}k €`
+            : undefined
 
-        return (
-          <div key={todo.id} style={{
-            padding: '10px 12px',
-            borderRadius: 10,
-            background: 'var(--surface-2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 3,
-          }}>
-            <div style={{
+          return (
+            <div key={todo.id} style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              fontSize: 10,
-              color: 'var(--fg-dim)',
+              gap: 10,
+              padding: '8px 10px',
+              borderRadius: 10,
+              borderLeft: `3px solid ${itemBorderColor(todo)}`,
+              background: 'transparent',
             }}>
-              {actionLabel && (
-                <span style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 3,
-                  color: 'var(--accent)',
-                  fontWeight: 600,
+              {/* Icon circle */}
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: 99,
+                background: itemIconBg(todo),
+                color: itemIconColor(todo),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}>
+                {itemIconLabel(todo)}
+              </div>
+
+              {/* Text */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 12,
+                  color: 'var(--fg)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.3,
                 }}>
-                  <Zap size={9} />
-                  {actionLabel}
+                  {todo.title}
+                </div>
+                {account && (
+                  <div style={{
+                    fontSize: 11,
+                    color: 'var(--fg-dim)',
+                    marginTop: 1,
+                  }}>
+                    {account.name}
+                  </div>
+                )}
+              </div>
+
+              {/* Amount */}
+              {amount && (
+                <span style={{
+                  fontSize: 11,
+                  color: 'var(--fg-muted)',
+                  fontFamily: 'var(--font-mono)',
+                  flexShrink: 0,
+                }}>
+                  {amount}
                 </span>
               )}
-              {account && <span>{account.name}</span>}
             </div>
-            <div style={{
-              fontSize: 13,
-              lineHeight: 1.3,
-              color: 'var(--fg)',
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-            }}>
-              {todo.title}
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
