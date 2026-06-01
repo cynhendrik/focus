@@ -1,14 +1,14 @@
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
-import type { Todo } from '@/types/todo.types'
+import type { Todo, TodoPriority } from '@/types/todo.types'
 
-const PRIO_COLOR: Record<string, string> = {
+const PRIO_COLOR: Record<TodoPriority, string> = {
   p1: 'oklch(60% 0.2 25)',
   p2: 'oklch(70% 0.18 50)',
   p3: 'oklch(80% 0.15 90)',
   p4: 'oklch(55% 0 0)',
 }
-const PRIO_LABEL: Record<string, string> = {
+const PRIO_LABEL: Record<TodoPriority, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
@@ -83,7 +83,8 @@ export function FocusCardDefault({ todo }: Props) {
                 color: item.done ? 'var(--fg-muted)' : 'var(--fg)',
               }}>
                 <button
-                  onClick={() => toggleChecklist(todo.id, item.id)}
+                  type="button"
+                  onClick={() => { toggleChecklist(todo.id, item.id).catch(() => {}) }}
                   style={{
                     width: 22,
                     height: 22,
@@ -96,6 +97,7 @@ export function FocusCardDefault({ todo }: Props) {
                     justifyContent: 'center',
                     flexShrink: 0,
                     fontSize: 12,
+                    cursor: 'pointer',
                   }}
                 >
                   {item.done ? '✓' : ''}
