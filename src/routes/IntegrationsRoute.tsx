@@ -6,6 +6,10 @@ import { ZoomSetupModal } from '@/components/integrations/ZoomSetupModal'
 import { WebhookInfoModal } from '@/components/integrations/WebhookInfoModal'
 import { useUiStore } from '@/store/ui.store'
 
+const WEBHOOK_CONFIGURED = !!(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_LEAD_WEBHOOK_SECRET
+)
+
 export function IntegrationsRoute() {
   const mailAccounts   = useMailStore(s => s.accounts)
   const setAppView     = useUiStore(s => s.setAppView)
@@ -51,10 +55,11 @@ export function IntegrationsRoute() {
             icon={Webhook}
             name="Webhook"
             category="Lead-Eingang"
-            description="Empfange Leads von deiner Website, Wix, Zapier oder externen Formularen automatisch. Deine persönliche Webhook-URL ist immer aktiv."
-            status="connected"
-            connectedDetail="Webhook aktiv"
-            onAction={() => setShowWebhook(true)}
+            description="Empfange Leads von deiner Website, Wix, Zapier oder externen Formularen. Keine Verbindung nötig — kopiere einfach deine URL und trage sie in dein Formular-Tool ein."
+            status={WEBHOOK_CONFIGURED ? 'connected' : 'disconnected'}
+            connectedLabel="URL bereit"
+            connectedDetail="Kein Setup nötig — URL kopieren & eintragen"
+            onAction={WEBHOOK_CONFIGURED ? () => setShowWebhook(true) : undefined}
             actionLabel="URL anzeigen"
           />
 

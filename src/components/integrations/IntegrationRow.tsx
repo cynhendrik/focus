@@ -9,13 +9,14 @@ interface Props {
   description: string
   status: IntegrationStatus
   connectedDetail?: string
+  connectedLabel?: string
   onAction?: () => void
   actionLabel?: string
 }
 
 export function IntegrationRow({
   icon: Icon, name, category, description,
-  status, connectedDetail, onAction, actionLabel,
+  status, connectedDetail, connectedLabel = 'Verbunden', onAction, actionLabel,
 }: Props) {
   const isComingSoon = status === 'coming_soon'
   const isConnected  = status === 'connected'
@@ -52,7 +53,7 @@ export function IntegrationRow({
               background: 'rgba(74,222,128,0.12)', color: '#4ade80',
             }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 5px rgba(74,222,128,0.7)', display: 'inline-block' }} />
-              Verbunden
+              {connectedLabel}
             </span>
           )}
           {status === 'disconnected' && (
