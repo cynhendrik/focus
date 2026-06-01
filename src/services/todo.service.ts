@@ -51,8 +51,10 @@ function activityToTodo(a: Activity): Todo {
     notes           = typeof p.notes === 'string' ? p.notes : undefined
     aiSummary       = typeof p.aiSummary === 'string' ? p.aiSummary : undefined
     calendarEventId = typeof p.calendarEventId === 'string' ? p.calendarEventId : undefined
-    source          = typeof p.source === 'string' ? p.source as Todo['source'] : undefined
-    actionType      = typeof p.actionType === 'string' ? p.actionType as Todo['actionType'] : undefined
+    const VALID_SOURCES: readonly string[] = ['manual', 'finance']
+    source          = VALID_SOURCES.includes(p.source) ? p.source as Todo['source'] : undefined
+    const VALID_ACTION_TYPES: readonly string[] = ['send_reminder']
+    actionType      = VALID_ACTION_TYPES.includes(p.actionType) ? p.actionType as Todo['actionType'] : undefined
     sourceRef       = typeof p.sourceRef === 'string' ? p.sourceRef : undefined
   } catch {}
 

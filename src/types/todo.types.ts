@@ -22,6 +22,7 @@ export interface Todo {
   dueDate?: string
   notes?: string
   aiSummary?: string
+  /** ID of a linked calendar event — set when the task was created with a clock time. */
   calendarEventId?: string
   checklist: ChecklistItem[]
   tags: string[]

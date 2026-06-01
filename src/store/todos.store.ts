@@ -80,21 +80,9 @@ export async function syncTodoFromCalendar(eventId: string, newStartAt: string):
     : 'backlog'
 
   await state.upsert({
-    id:             todo.id,
-    customerId:     todo.customerId,
-    title:          todo.title,
-    status:         todo.status,
-    priority:       todo.priority,
-    bucket:         newBucket,
-    scheduledAt:    newScheduledIso,
-    plannedMinutes: todo.plannedMinutes,
-    dueDate:        todo.dueDate,
-    notes:          todo.notes,
-    aiSummary:      todo.aiSummary,
-    calendarEventId: todo.calendarEventId,
-    checklist:      todo.checklist,
-    tags:           todo.tags,
-    assignee:       todo.assignee,
+    ...todoToPayload(todo),
+    scheduledAt: newScheduledIso,
+    bucket: newBucket,
   })
 }
 
