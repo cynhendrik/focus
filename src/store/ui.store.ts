@@ -83,10 +83,12 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
       return 'cockpit'
   }
 }
+export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'developer' | 'gefahrenzone'
+
 export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
-  | 'settings'
+  | 'settings'  | 'integrations'
   | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
   | 'journal'
 
@@ -101,6 +103,7 @@ interface UiState {
   activeCustomerTab: CustomerTab
   tasksTab: TasksTab
   dashboardView: DashboardView
+  settingsTab: SettingsTab
   /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
   sidebarCollapsed: boolean
   /** Aktiver App-Modus — Business-Plattform oder Privater Raum. */
@@ -118,6 +121,7 @@ interface UiState {
   setActiveCustomerTab: (tab: CustomerTab) => void
   setTasksTab: (tab: TasksTab) => void
   setDashboardView: (view: DashboardView) => void
+  setSettingsTab: (tab: SettingsTab) => void
   toggleSidebar: () => void
   enterPrivate: (view?: PrivateView) => void
   leavePrivate: () => void
@@ -137,6 +141,7 @@ export const useUiStore = create<UiState>()(
       activeCustomerTab: 'cockpit',
       tasksTab: 'list',
       dashboardView: 'workspace',
+      settingsTab: 'workspace',
       sidebarCollapsed: false,
       appMode: 'business',
       privateView: 'capture',
@@ -173,6 +178,9 @@ export const useUiStore = create<UiState>()(
 
       setDashboardView: (view) =>
         set({ dashboardView: view }),
+
+      setSettingsTab: (tab) =>
+        set({ settingsTab: tab }),
 
       toggleSidebar: () =>
         set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),

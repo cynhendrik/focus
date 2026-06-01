@@ -28,6 +28,7 @@ import { DashboardRoute }  from '@/routes/DashboardRoute'
 import { ClientsRoute }    from '@/routes/ClientsRoute'
 import { FinanceRoute }    from '@/routes/FinanceRoute'
 import { SettingsRoute }   from '@/routes/SettingsRoute'
+import { IntegrationsRoute } from '@/routes/IntegrationsRoute'
 import { ProfileRoute }    from '@/routes/ProfileRoute'
 import { LeadsRoute }            from '@/routes/LeadsRoute'
 import { PipelineRoute }         from '@/routes/PipelineRoute'
@@ -193,6 +194,7 @@ export default function App() {
       case 'calendar':     return <CalendarRoute />
       case 'mail':         return <MailRoute />
       case 'settings':     return <SettingsRoute />
+      case 'integrations': return <IntegrationsRoute />
       // Legacy fallbacks (consolidated wrappers removed)
       case 'sales':        return <LeadsRoute />
       case 'inbox':        return <MailRoute />

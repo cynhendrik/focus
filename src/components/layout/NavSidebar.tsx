@@ -8,7 +8,7 @@ import { useCompanyStore } from '@/store/company.store'
 import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply,
-  Calendar, Mail, Settings,
+  Calendar, Mail, Settings, Plug,
   ChevronRight, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -168,6 +168,7 @@ export function NavSidebar() {
         {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
+      <SidebarNavItem icon={Plug} label="Integrationen" active={appView === 'integrations'} onClick={() => setAppView('integrations')} />
       <SidebarNavItem icon={Settings} label="Settings" active={appView === 'settings'} onClick={() => setAppView('settings')} />
 
       {/* Eingang zum "Privaten Raum". Klick wechselt den ganzen App-Modus
