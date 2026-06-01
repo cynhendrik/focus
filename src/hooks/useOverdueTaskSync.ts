@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { log } from '@/lib/logger'
 import type { Invoice } from '@/types/finance.types'
 import type { Todo } from '@/types/todo.types'
 
@@ -18,10 +19,13 @@ export function useOverdueTaskSync() {
   const accounts  = useAccountsStore(s => s.accounts)
 
   useEffect(() => {
-    if (invoices.length === 0) return
+    if (invoices.length === 0 || accounts.length === 0) return
 
+    const processed = new Set<string>()
     for (const invoice of invoices) {
+      if (processed.has(invoice.id)) continue
       if (!shouldCreateReminderTask(invoice, allTodos)) continue
+      processed.add(invoice.id)
 
       const account = accounts.find(a => a.id === invoice.accountId)
       const customerName = account?.name ?? 'Kunde'
@@ -37,7 +41,7 @@ export function useOverdueTaskSync() {
         sourceRef:   invoice.id,
         checklist:   [],
         tags:        [],
-      }).catch(() => {})
+      }).catch((err: unknown) => log.warn('Failed to create overdue task reminder', { invoiceId: invoice.id, err }))
     }
   }, [invoices, allTodos, upsert, accounts])
 }
