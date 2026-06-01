@@ -330,8 +330,9 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
       tags:           sourceDraft.tags,
       customerId:     eventOverride?.customerId ?? effectiveCustomerId,
       calendarEventId,
-      bucket:         sourceDraft.scheduledAt && sourceDraft.scheduledAt.slice(0, 10) === todayStr
-                      ? 'today' : 'backlog',
+      bucket:         sourceDraft.scheduledAt
+                      ? (sourceDraft.scheduledAt.slice(0, 10) === todayStr ? 'today' : 'backlog')
+                      : 'today',
     })
 
     editor.commands.clearContent()
