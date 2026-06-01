@@ -5,11 +5,12 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
+import { useTodosStore } from '@/store/todos.store'
 import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply,
   Calendar, Mail, Settings, Plug,
-  ChevronRight, PanelLeftClose, PanelLeftOpen,
+  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -92,6 +93,10 @@ export function NavSidebar() {
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const isAdmin = useCompanyStore(s => s.isAdmin)
   const modules = useCompanyStore(s => s.modules)
+  const allTodos   = useTodosStore(s => s.allTodos)
+  const focusCount = allTodos.filter(t =>
+    t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')
+  ).length
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
 
@@ -134,6 +139,14 @@ export function NavSidebar() {
           <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
           <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
           {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
+          <SidebarNavItem
+            icon={Zap}
+            label="Fokus"
+            active={appView === 'focus'}
+            onClick={() => setAppView('focus')}
+            kbd="W"
+            badge={focusCount || undefined}
+          />
         </>
       )}
 

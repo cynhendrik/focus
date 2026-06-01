@@ -90,7 +90,7 @@ export type AppView =
   | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
   | 'settings'  | 'integrations'
   | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
-  | 'journal'
+  | 'journal'   | 'focus'
 
 interface UiState {
   theme: Theme
