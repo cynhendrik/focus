@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useUiStore } from '@/store/ui.store'
 import type { FocusStackApi } from '@/hooks/useFocusStack'
 import { FocusCardDefault } from './FocusCardDefault'
 import { FocusCardReminder } from './FocusCardReminder'
@@ -10,9 +11,11 @@ interface Props {
 
 export function FocusWorkspace({ focusApi }: Props) {
   const { current, currentIndex, total, stack, prev, skip, complete, postpone } = focusApi
+  const setAppView = useUiStore(s => s.setAppView)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setAppView('dashboard'); return }
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.key === 'ArrowLeft')            { e.preventDefault(); prev() }
@@ -25,7 +28,7 @@ export function FocusWorkspace({ focusApi }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [prev, skip, postpone, complete, current?.actionType])
+  }, [prev, skip, postpone, complete, current?.actionType, setAppView])
 
   if (total === 0) {
     return (

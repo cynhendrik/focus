@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useUiStore } from '@/store/ui.store'
 
 interface Props {
@@ -9,14 +8,6 @@ interface Props {
 export function FocusTopBar({ currentIndex, total }: Props) {
   const setAppView = useUiStore(s => s.setAppView)
   const progress = total > 0 ? (currentIndex + 1) / total : 0
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setAppView('dashboard')
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [setAppView])
 
   return (
     <div style={{

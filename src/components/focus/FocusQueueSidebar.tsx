@@ -90,7 +90,7 @@ export function FocusQueueSidebar({ stack, currentIndex }: Props) {
             ? invoices.find(i => i.id === todo.sourceRef)
             : undefined
           const amount = invoice
-            ? `${(invoice.total / 1000).toFixed(1)}k €`
+            ? `${Math.round(invoice.total / 1000)}k €`
             : undefined
 
           return (
