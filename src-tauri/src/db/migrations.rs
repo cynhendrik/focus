@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 18;
+const CURRENT_VERSION: u32 = 19;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -582,6 +582,27 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     ON activities(deal_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_activities_contact
                     ON activities(contact_id, created_at DESC);
+            "#)?;
+            Ok(())
+        }
+        19 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS lead_stages (
+                    id               TEXT PRIMARY KEY,
+                    workspace_id     TEXT NOT NULL,
+                    name             TEXT NOT NULL,
+                    label            TEXT NOT NULL,
+                    color            TEXT NOT NULL DEFAULT '#6B7280',
+                    order_index      INTEGER NOT NULL DEFAULT 0,
+                    is_qualified     INTEGER NOT NULL DEFAULT 0,
+                    is_disqualified  INTEGER NOT NULL DEFAULT 0,
+                    created_at       TEXT NOT NULL,
+                    UNIQUE(workspace_id, name)
+                );
+                UPDATE accounts SET lead_status = 'neu'             WHERE lead_status = 'new';
+                UPDATE accounts SET lead_status = 'kontaktiert'     WHERE lead_status = 'attempted';
+                UPDATE accounts SET lead_status = 'qualifiziert'    WHERE lead_status = 'call_booked';
+                UPDATE accounts SET lead_status = 'disqualifiziert' WHERE lead_status = 'lost_reengage';
             "#)?;
             Ok(())
         }
