@@ -36,6 +36,9 @@ function activityToTodo(a: Activity): Todo {
   let notes: string | undefined
   let aiSummary: string | undefined
   let calendarEventId: string | undefined
+  let source: Todo['source']
+  let actionType: Todo['actionType']
+  let sourceRef: string | undefined
 
   try {
     const p = JSON.parse(a.payload)
@@ -48,6 +51,9 @@ function activityToTodo(a: Activity): Todo {
     notes           = typeof p.notes === 'string' ? p.notes : undefined
     aiSummary       = typeof p.aiSummary === 'string' ? p.aiSummary : undefined
     calendarEventId = typeof p.calendarEventId === 'string' ? p.calendarEventId : undefined
+    source          = typeof p.source === 'string' ? p.source as Todo['source'] : undefined
+    actionType      = typeof p.actionType === 'string' ? p.actionType as Todo['actionType'] : undefined
+    sourceRef       = typeof p.sourceRef === 'string' ? p.sourceRef : undefined
   } catch {}
 
   const status: Todo['status'] = a.status === 'done'
@@ -71,6 +77,9 @@ function activityToTodo(a: Activity): Todo {
     checklist,
     tags,
     assignee: a.assignee,
+    source,
+    actionType,
+    sourceRef,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   }
@@ -102,6 +111,9 @@ export const TodoService = {
       notes:           payload.notes ?? null,
       aiSummary:       payload.aiSummary ?? null,
       calendarEventId: payload.calendarEventId ?? null,
+      source:          payload.source     ?? null,
+      actionType:      payload.actionType ?? null,
+      sourceRef:       payload.sourceRef  ?? null,
       is_follow_up:    false,
     })
 

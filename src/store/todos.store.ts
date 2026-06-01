@@ -157,6 +157,9 @@ function todoToPayload(t: Todo): UpsertTodoPayload {
     checklist:       t.checklist,
     tags:            t.tags,
     assignee:        t.assignee,
+    source:          t.source,
+    actionType:      t.actionType,
+    sourceRef:       t.sourceRef,
   }
 }
 
