@@ -1,7 +1,19 @@
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useUiStore } from '@/store/ui.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
-import { Check, Clock } from 'lucide-react'
+import { Check, Clock, FileText, Tag, Mail, Phone, Reply, ArrowRight } from 'lucide-react'
+import { detectFocusAction, getFocusActionConfig } from '@/lib/focus-actions'
+import type { FocusActionType } from '@/lib/focus-actions'
+import type { LucideIcon } from 'lucide-react'
+
+const ACTION_ICONS: Record<FocusActionType, LucideIcon> = {
+  invoice: FileText,
+  offer: Tag,
+  mail: Mail,
+  call: Phone,
+  followup: Reply,
+}
 
 const PRIO_COLOR: Record<TodoPriority, string> = {
   p1: 'oklch(60% 0.2 25)',
@@ -23,10 +35,28 @@ interface Props {
 export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props) {
   const toggleChecklist = useTodosStore(s => s.toggleChecklist)
   const accounts        = useAccountsStore(s => s.accounts)
+  const openCustomerAt  = useUiStore(s => s.openCustomerAt)
+  const setAppView      = useUiStore(s => s.setAppView)
   const account = todo.customerId
     ? accounts.find(a => a.id === todo.customerId)
     : undefined
   const doneCount = todo.checklist.filter(c => c.done).length
+
+  const detectedActionType = detectFocusAction(todo.title)
+  const actionConfig = detectedActionType ? getFocusActionConfig(detectedActionType) : null
+  const ActionIcon = detectedActionType ? ACTION_ICONS[detectedActionType] : null
+
+  const handleContextAction = () => {
+    if (actionConfig) {
+      if (todo.customerId) {
+        openCustomerAt(todo.customerId, actionConfig.customerTab)
+      } else {
+        setAppView(actionConfig.globalView as Parameters<typeof setAppView>[0])
+      }
+    } else if (todo.customerId) {
+      openCustomerAt(todo.customerId)
+    }
+  }
 
   return (
     <div style={{
@@ -135,6 +165,50 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
             ))}
           </div>
         </div>
+      )}
+
+      {/* Context action — keyword match or customer fallback */}
+      {(actionConfig || account) && (
+        <button
+          type="button"
+          onClick={handleContextAction}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 16px',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--surface-3)',
+            color: 'var(--fg)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            textAlign: 'left',
+            width: '100%',
+          }}
+        >
+          {ActionIcon && (
+            <span style={{
+              width: 28, height: 28, borderRadius: 8,
+              background: 'oklch(50% 0 0 / 0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+              color: 'var(--accent)',
+            }}>
+              <ActionIcon size={14} />
+            </span>
+          )}
+          <span style={{ flex: 1 }}>
+            {actionConfig ? actionConfig.label : `Bei ${account?.name ?? 'Kunden'} öffnen`}
+            {account && actionConfig && (
+              <span style={{ color: 'var(--fg-dim)', fontWeight: 400, marginLeft: 6 }}>
+                · {account.name}
+              </span>
+            )}
+          </span>
+          <ArrowRight size={14} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />
+        </button>
       )}
 
       {/* Action row */}
