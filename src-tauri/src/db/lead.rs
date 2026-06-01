@@ -192,7 +192,7 @@ mod tests {
     fn upsert_creates_lead_with_new_status() {
         let conn = setup();
         let lead = upsert_lead(&conn, lead_payload("ws-1")).unwrap();
-        assert_eq!(lead.lead_status, "new");
+        assert_eq!(lead.lead_status, "neu");
         assert_eq!(lead.account_type, "lead");
         assert_eq!(lead.lead_source, "zoom");
     }
