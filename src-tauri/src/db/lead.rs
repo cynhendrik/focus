@@ -82,7 +82,7 @@ pub fn get_leads(conn: &Connection, workspace_id: &str) -> Result<Vec<Lead>, App
 pub fn upsert_lead(conn: &Connection, payload: UpsertLeadPayload) -> Result<Lead, AppError> {
     let id = payload.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let now = chrono::Utc::now().to_rfc3339();
-    let status = payload.lead_status.unwrap_or_else(|| "new".into());
+    let status = payload.lead_status.unwrap_or_else(|| "neu".into());
     let stage = payload.pipeline_stage.unwrap_or_else(|| "inbox".into());
     conn.execute(
         "INSERT INTO accounts
@@ -118,7 +118,7 @@ pub fn bulk_update_lead_status(
     let now = chrono::Utc::now().to_rfc3339();
     for id in ids {
         conn.execute(
-            "UPDATE accounts SET lead_status=?1, re_engage_date=COALESCE(?2, re_engage_date),
+            "UPDATE accounts SET lead_status=?1, re_engage_date=?2,
              updated_at=?3 WHERE id=?4 AND account_type='lead'",
             rusqlite::params![status, re_engage_date, now, id],
         )?;

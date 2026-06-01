@@ -97,6 +97,7 @@ export function LeadStagesManager({ workspaceId, onClose }: Props) {
     const stage = stages.find(s => s.id === id)!
     await upsertStage({
       id, workspaceId, name: stage.name, label, color,
+      orderIndex: stage.orderIndex,
       isQualified: stage.isQualified, isDisqualified: stage.isDisqualified,
     } as UpsertLeadStagePayload)
   }

@@ -175,12 +175,13 @@ function FollowUpModal({
 interface CtxMenu { lead: Lead; x: number; y: number }
 
 function ContextMenu({
-  menu, workspaceId, onClose, onFollowUp,
+  menu, workspaceId, onClose, onFollowUp, warmStageName = 'warm',
 }: {
   menu: CtxMenu
   workspaceId: string
   onClose: () => void
   onFollowUp: (leads: Lead[]) => void
+  warmStageName?: string
 }) {
   const convertToClient = useLeadsStore(s => s.convertToClient)
   const deleteLead = useLeadsStore(s => s.deleteLead)
@@ -219,11 +220,11 @@ function ContextMenu({
       <div style={{ height: 1, background: 'var(--border)', margin: '2px 0 4px' }} />
 
       <CtxItem label="Follow-Up erstellen" onClick={() => act(() => onFollowUp([menu.lead]))} />
-      {menu.lead.leadStatus !== 'warm' && (
+      {menu.lead.leadStatus !== warmStageName && (
         <CtxItem
           label="→ Warm Lead"
           color="var(--accent)"
-          onClick={() => act(() => bulkUpdate({ ids: [menu.lead.id], status: 'warm' }, workspaceId))}
+          onClick={() => act(() => bulkUpdate({ ids: [menu.lead.id], status: warmStageName }, workspaceId))}
         />
       )}
       <CtxItem
@@ -646,7 +647,8 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   }
 
   const handleWarm = (id: string) => {
-    bulkUpdate({ ids: [id], status: 'warm' }, workspaceId)
+    const warmStage = stages.find(s => s.name === 'warm') ?? stages.find(s => !s.isQualified && !s.isDisqualified && s.orderIndex === 2)
+    if (warmStage) bulkUpdate({ ids: [id], status: warmStage.name }, workspaceId)
   }
 
   const selectedLeads = boardLeads.filter(l => selected.has(l.id))
@@ -747,6 +749,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           workspaceId={workspaceId}
           onClose={() => setCtxMenu(null)}
           onFollowUp={leads => { setCtxMenu(null); setFollowUpLeads(leads) }}
+          warmStageName={stages.find(s => s.name === 'warm')?.name ?? stages.find(s => !s.isQualified && !s.isDisqualified && s.orderIndex === 2)?.name ?? 'warm'}
         />
       )}
       {followUpLeads && (
@@ -789,7 +792,7 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
       email: email.trim() || undefined,
       leadSource: source,
       leadSourceDetail: sourceDetail.trim() || undefined,
-      leadStatus: 'new',
+      leadStatus: 'neu',
     }
     try {
       await upsert(payload)

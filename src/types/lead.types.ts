@@ -24,8 +24,10 @@ export interface UpsertLeadStagePayload {
 export type PipelineStage =
   | 'inbox' | 'waiting_reply' | 'replied' | 'call_booked' | 'won' | 'lost'
 
-// Kept for backward compat (legacy DB field, still present)
+// Stage names stored in DB (migrated to German in v19; accepts any string for custom stages)
 export type LeadStatus = 'new' | 'attempted' | 'warm' | 'lost_reengage'
+  | 'neu' | 'kontaktiert' | 'qualifiziert' | 'disqualifiziert'
+  | string
 
 export type LeadSource = 'zoom' | 'generic' | 'manual' | 'inbox' | 'linkedin' | 'website' | 'event'
 

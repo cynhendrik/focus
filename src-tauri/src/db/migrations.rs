@@ -603,6 +603,7 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 UPDATE accounts SET lead_status = 'kontaktiert'     WHERE lead_status = 'attempted';
                 UPDATE accounts SET lead_status = 'qualifiziert'    WHERE lead_status = 'call_booked';
                 UPDATE accounts SET lead_status = 'disqualifiziert' WHERE lead_status = 'lost_reengage';
+                -- 'warm' intentionally kept as-is (seed stage name matches)
             "#)?;
             Ok(())
         }
