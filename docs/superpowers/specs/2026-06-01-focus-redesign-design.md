@@ -106,22 +106,25 @@ Keyboard-Shortcuts bleiben: ArrowLeft, ArrowRight, M, Space (außer bei Reminder
 
 Aktionsbuttons am Ende der Karte (nicht außerhalb):
 - Links: "Überspringen" Ghost-Button → `onSkip()`
+- Mitte: "Morgen" Button (sekundär, Clock-Icon) → `onPostpone()`
 - Rechts: Primary-Button (lime) "Erledigt · weiter" → `onComplete()`
 
-Props erweitern: `{ todo: Todo, onComplete: () => Promise<void>, onSkip: () => void }`
+Props erweitern: `{ todo: Todo, onComplete: () => Promise<void>, onSkip: () => void, onPostpone: () => Promise<void> }`
 
 ### FocusCardReminder
 
-Bereits mit eigenem Send-Button. Zusätzlich links: "Überspringen" Ghost-Button.
+Bereits mit eigenem Send-Button. Zusätzlich:
+- Links: "Überspringen" Ghost-Button
+- Mitte: "Morgen" Button (sekundär)
 
-Props erweitern: `{ todo: Todo, onComplete: () => Promise<void>, onSkip: () => void }`
+Props erweitern: `{ todo: Todo, onComplete: () => Promise<void>, onSkip: () => void, onPostpone: () => Promise<void> }`
 
 ### FocusWorkspace
 
-Übergibt `onComplete={complete}` und `onSkip={skip}` an beide Card-Typen.
+Übergibt `onComplete={complete}`, `onSkip={skip}`, `onPostpone={postpone}` an beide Card-Typen.
 Entfernt die externe Aktionsbar — alles ist jetzt in den Karten.
 
-"Morgen"-Button (Postpone) bleibt nur per Tastenkürzel M erreichbar (nicht mehr sichtbar).
+"Morgen"-Button: immer sichtbar in der Karte, zusätzlich per Tastenkürzel M erreichbar.
 
 ---
 
