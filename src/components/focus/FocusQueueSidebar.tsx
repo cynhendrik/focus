@@ -24,6 +24,8 @@ export function FocusQueueSidebar({ stack, currentIndex }: Props) {
       gap: 4,
       paddingLeft: 24,
       borderLeft: '1px solid var(--border)',
+      maxHeight: 'calc(100vh - 180px)',
+      overflowY: 'auto',
     }}>
       <div style={{
         fontSize: 10,
@@ -31,6 +33,7 @@ export function FocusQueueSidebar({ stack, currentIndex }: Props) {
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
         color: 'var(--fg-dim)',
+        paddingTop: 10,
         paddingBottom: 10,
       }}>
         Als Nächstes
