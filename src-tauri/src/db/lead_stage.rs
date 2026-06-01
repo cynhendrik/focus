@@ -76,7 +76,8 @@ pub fn upsert(conn: &Connection, payload: UpsertLeadStagePayload) -> Result<Lead
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
          ON CONFLICT(id) DO UPDATE SET
            name=excluded.name, label=excluded.label,
-           order_index=excluded.order_index, color=excluded.color",
+           order_index=excluded.order_index, color=excluded.color,
+           is_qualified=excluded.is_qualified, is_disqualified=excluded.is_disqualified",
         rusqlite::params![
             id, payload.workspace_id, payload.name, payload.label,
             payload.order_index.unwrap_or(0),
@@ -98,9 +99,26 @@ pub fn delete(conn: &Connection, id: &str, workspace_id: &str) -> Result<(), App
         "SELECT is_qualified, is_disqualified FROM lead_stages WHERE id = ?1 AND workspace_id = ?2",
         rusqlite::params![id, workspace_id],
         |r| Ok((r.get::<_, i32>(0)?, r.get::<_, i32>(1)?)),
-    ).map_err(|_| AppError::NotFound(format!("Stage {id} not found")))?;
+    ).map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(format!("Stage {id} not found")),
+        other => AppError::Db(other.to_string()),
+    })?;
     if row.0 != 0 || row.1 != 0 {
-        return Err(AppError::Validation("Terminal-Stages können nicht gelöscht werden".into()));
+        return Err(AppError::Validation("Terminal stages cannot be deleted".into()));
+    }
+    // get name for referential check
+    let name: String = conn.query_row(
+        "SELECT name FROM lead_stages WHERE id = ?1",
+        [id], |r| r.get(0),
+    )?;
+    let in_use: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM accounts WHERE lead_status = ?1",
+        [&name], |r| r.get(0),
+    )?;
+    if in_use > 0 {
+        return Err(AppError::Validation(format!(
+            "Stage '{name}' is used by {in_use} lead(s) — reassign leads before deleting"
+        )));
     }
     conn.execute(
         "DELETE FROM lead_stages WHERE id = ?1 AND workspace_id = ?2",
@@ -238,5 +256,22 @@ mod tests {
         reorder(&conn, "ws-1", &reversed).unwrap();
         let reordered = get_all(&conn, "ws-1").unwrap();
         assert_eq!(reordered[0].id, stages.last().unwrap().id);
+    }
+
+    #[test]
+    fn upsert_rejects_cross_workspace_update() {
+        let conn = setup();
+        seed_defaults(&conn, "ws-1").unwrap();
+        let stages = get_all(&conn, "ws-1").unwrap();
+        let stage_id = stages[0].id.clone();
+        let result = upsert(&conn, UpsertLeadStagePayload {
+            id: Some(stage_id),
+            workspace_id: "ws-2".to_string(),
+            name: "hack".to_string(),
+            label: "Hack".to_string(),
+            order_index: None, color: None,
+            is_qualified: None, is_disqualified: None,
+        });
+        assert!(matches!(result, Err(AppError::Validation(_))));
     }
 }
