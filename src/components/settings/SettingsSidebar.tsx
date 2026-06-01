@@ -39,7 +39,7 @@ export function SettingsSidebar({ active, onChange, showDeveloper }: Props) {
               background: isActive ? 'var(--accent-soft)' : 'transparent',
               border: 'none', cursor: 'pointer',
               borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-              color: isActive ? 'var(--accent)' : 'var(--fg-muted)',
+              color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)',
               fontSize: 13, fontWeight: isActive ? 600 : 500,
               transition: 'background 120ms, color 120ms',
             }}

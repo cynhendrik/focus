@@ -52,7 +52,7 @@ export function AussehensSettings() {
                 }}
               >
                 {t.preview}
-                <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--accent)' : 'var(--fg-muted)', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)', textAlign: 'center' }}>
                   {t.label}
                 </div>
               </button>

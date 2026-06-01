@@ -52,6 +52,7 @@
   --accent-soft: oklch(92% 0.2 125 / 0.14);
   --accent-glow: oklch(92% 0.2 125 / 0.5);
   --accent-ink: oklch(15% 0 0);
+  --accent-text: oklch(92% 0.2 125);
   --danger: oklch(72% 0.18 25);
   --warn: oklch(82% 0.16 70);
   --ok: oklch(82% 0.18 155);
@@ -120,6 +121,7 @@
   --fg-2: oklch(28% 0.006 270);
   --fg-muted: oklch(46% 0.008 270);
   --fg-dim: oklch(60% 0.008 270);
+  --accent-text: oklch(28% 0.06 130);
   --shadow-glass: 0 1px 0 0 oklch(100% 0 0 / 0.9) inset, 0 0 0 1px oklch(0% 0 0 / 0.06), 0 30px 80px -20px oklch(0% 0 0 / 0.18);
   --shadow-2: 0 30px 60px -25px oklch(0% 0 0 / 0.25), 0 0 0 1px oklch(0% 0 0 / 0.04);
   --text: var(--fg);

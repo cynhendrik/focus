@@ -94,7 +94,7 @@ export function IntegrationRow({
             cursor: 'pointer', transition: 'background 140ms', border: '1px solid',
             ...(isConnected
               ? { background: 'var(--surface-2)', borderColor: 'var(--border)', color: 'var(--fg-muted)' }
-              : { background: 'rgba(208,252,105,0.12)', borderColor: 'rgba(208,252,105,0.3)', color: '#D0FC69' }
+              : { background: 'rgba(208,252,105,0.12)', borderColor: 'rgba(208,252,105,0.3)', color: 'var(--accent-text)' }
             ),
           }}
         >
