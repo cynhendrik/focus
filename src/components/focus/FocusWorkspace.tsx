@@ -178,6 +178,7 @@ export function FocusWorkspace() {
               color: 'var(--fg-muted)',
               padding: '12px 16px',
               cursor: 'pointer',
+              border: 'none',
             }}
           >
             Überspringen
