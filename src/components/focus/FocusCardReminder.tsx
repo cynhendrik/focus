@@ -5,6 +5,7 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useMailStore } from '@/store/mail.store'
 import { useToastStore } from '@/store/toast.store'
 import { MailService } from '@/services/mail.service'
+import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Contact } from '@/types/contact.types'
 import { Send, Mail } from 'lucide-react'
@@ -54,13 +55,14 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
         const email = contacts.find(c => c.email)?.email ?? ''
         setRecipient(email)
       })
-      .catch(() => {})
+      .catch((err: unknown) => log.warn('Failed to load contacts for reminder', { accountId: invoice.accountId, err }))
   }, [invoice?.accountId])
 
   // Update defaults if invoice loads after mount
   useEffect(() => {
     setSubject(defaultSubject)
     setBody(defaultBody)
+    setRecipient('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice?.id])
 
@@ -71,6 +73,10 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
     }
     if (!recipient.trim()) {
       showToast({ message: 'Bitte Empfänger-E-Mail angeben.', variant: 'error' })
+      return
+    }
+    if (!subject.trim()) {
+      showToast({ message: 'Betreff darf nicht leer sein.', variant: 'error' })
       return
     }
     setSending(true)
@@ -218,6 +224,7 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
 
       {/* Send button */}
       <button
+        type="button"
         onClick={handleSend}
         disabled={sending}
         style={{
