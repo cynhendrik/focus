@@ -1,14 +1,16 @@
 import { useEffect } from 'react'
-import { useFocusStack } from '@/hooks/useFocusStack'
+import type { FocusStackApi } from '@/hooks/useFocusStack'
 import { FocusCardDefault } from './FocusCardDefault'
 import { FocusCardReminder } from './FocusCardReminder'
 import { FocusQueueSidebar } from './FocusQueueSidebar'
-import { Check, Clock, ChevronRight } from 'lucide-react'
 
-export function FocusWorkspace() {
-  const { current, currentIndex, total, stack, prev, skip, complete, postpone } = useFocusStack()
+interface Props {
+  focusApi: FocusStackApi
+}
 
-  // Keyboard shortcuts
+export function FocusWorkspace({ focusApi }: Props) {
+  const { current, currentIndex, total, stack, prev, skip, complete, postpone } = focusApi
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
@@ -59,135 +61,34 @@ export function FocusWorkspace() {
   return (
     <div style={{
       display: 'flex',
-      gap: 0,
       height: '100%',
-      padding: '32px 40px',
+      padding: '40px 40px 40px 60px',
     }}>
-      {/* Left panel */}
+      {/* Left: card */}
       <div style={{
         flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
         minWidth: 0,
         paddingRight: 32,
+        overflowY: 'auto',
       }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{
-            fontSize: 10,
-            fontFamily: 'var(--font-mono)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--accent)',
-            fontWeight: 700,
-          }}>
-            Dein nächster Zug
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 5 }}>
-              {Array.from({ length: Math.min(total, 8) }).map((_, i) => (
-                <div key={i} style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: 99,
-                  background: i === currentIndex
-                    ? 'var(--accent)'
-                    : 'oklch(50% 0 0 / 0.2)',
-                  transition: 'background 200ms',
-                }} />
-              ))}
-              {total > 8 && (
-                <span style={{ fontSize: 10, color: 'var(--fg-dim)', marginLeft: 2 }}>
-                  +{total - 8}
-                </span>
-              )}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
-              {currentIndex + 1} / {total}
-            </span>
-          </div>
-        </div>
-
-        {/* Card */}
         {isReminder ? (
-          <FocusCardReminder todo={current} onComplete={complete} />
+          <FocusCardReminder
+            todo={current}
+            onComplete={complete}
+            onSkip={skip}
+            onPostpone={postpone}
+          />
         ) : (
-          <FocusCardDefault todo={current} />
+          <FocusCardDefault
+            todo={current}
+            onComplete={complete}
+            onSkip={skip}
+            onPostpone={postpone}
+          />
         )}
-
-        {/* Action bar */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {!isReminder && (
-            <button
-              type="button"
-              onClick={complete}
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '14px 24px',
-                borderRadius: 99,
-                background: 'var(--accent)',
-                color: 'var(--accent-ink)',
-                fontSize: 14,
-                fontWeight: 700,
-                boxShadow: '0 8px 24px -10px var(--accent-glow)',
-                cursor: 'pointer',
-              }}
-            >
-              <Check size={16} />
-              Erledigt · weiter
-              <span style={{ marginLeft: 8, fontSize: 10, opacity: 0.7, fontFamily: 'var(--font-mono)' }}>
-                SPACE
-              </span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={postpone}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '12px 18px',
-              borderRadius: 99,
-              background: 'oklch(50% 0 0 / 0.08)',
-              color: 'var(--fg)',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <Clock size={14} />
-            Morgen
-            <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>M</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={skip}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 13,
-              color: 'var(--fg-muted)',
-              padding: '12px 16px',
-              cursor: 'pointer',
-              border: 'none',
-            }}
-          >
-            Überspringen
-            <ChevronRight size={14} />
-          </button>
-        </div>
       </div>
 
-      {/* Right panel */}
+      {/* Right: queue */}
       <FocusQueueSidebar stack={stack} currentIndex={currentIndex} />
     </div>
   )
