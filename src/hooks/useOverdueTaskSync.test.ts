@@ -52,10 +52,18 @@ describe('shouldCreateReminderTask', () => {
     expect(shouldCreateReminderTask(invoice, [task])).toBe(false)
   })
 
-  it('returns true when existing task is done (reminder can be re-sent)', () => {
+  it('returns false when existing task was completed today', () => {
     const invoice = makeInvoice({ id: 'inv1' })
-    const doneTask = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done' })
-    expect(shouldCreateReminderTask(invoice, [doneTask])).toBe(true)
+    const todayIso = new Date().toISOString()
+    const doneToday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: todayIso })
+    expect(shouldCreateReminderTask(invoice, [doneToday])).toBe(false)
+  })
+
+  it('returns true when existing task was completed yesterday (can re-send)', () => {
+    const invoice = makeInvoice({ id: 'inv1' })
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString()
+    const doneYesterday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: yesterday })
+    expect(shouldCreateReminderTask(invoice, [doneYesterday])).toBe(true)
   })
 
   it('returns false for non-overdue invoice', () => {
