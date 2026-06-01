@@ -28,9 +28,9 @@ import {
 // spaeter doch eine subtile Variation reinmischen wollen.)
 function avatarColors(_variation: number) {
   return {
-    stroke: 'oklch(38% 0 0)',
-    ink:    'oklch(70% 0 0)',
-    bg:     'oklch(28% 0 0 / 0.45)',
+    stroke: 'var(--border-strong)',
+    ink:    'var(--fg-muted)',
+    bg:     'var(--surface-3)',
   }
 }
 
@@ -140,8 +140,8 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
         transition: 'border-color 140ms, background 140ms, transform 140ms',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = 'oklch(100% 0 0 / 0.18)'
-        e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)'
+        e.currentTarget.style.borderColor = 'var(--border-strong)'
+        e.currentTarget.style.background = 'var(--surface-3)'
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = 'var(--border)'
