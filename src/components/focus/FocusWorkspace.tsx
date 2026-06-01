@@ -3,6 +3,7 @@ import { useUiStore } from '@/store/ui.store'
 import type { FocusStackApi } from '@/hooks/useFocusStack'
 import { FocusCardDefault } from './FocusCardDefault'
 import { FocusCardReminder } from './FocusCardReminder'
+import { FocusCardInvoice } from './FocusCardInvoice'
 import { FocusQueueSidebar } from './FocusQueueSidebar'
 
 interface Props {
@@ -21,7 +22,7 @@ export function FocusWorkspace({ focusApi }: Props) {
       if (e.key === 'ArrowLeft')            { e.preventDefault(); prev() }
       if (e.key === 'ArrowRight')           { e.preventDefault(); skip() }
       if (e.key.toLowerCase() === 'm')      { e.preventDefault(); postpone() }
-      if (e.key === ' ' && current?.actionType !== 'send_reminder') {
+      if (e.key === ' ' && current?.actionType !== 'send_reminder' && current?.actionType !== 'create_invoice') {
         e.preventDefault()
         complete()
       }
@@ -60,6 +61,7 @@ export function FocusWorkspace({ focusApi }: Props) {
   if (!current) return null
 
   const isReminder = current.actionType === 'send_reminder'
+  const isInvoice  = current.actionType === 'create_invoice'
 
   return (
     <div style={{
@@ -76,6 +78,13 @@ export function FocusWorkspace({ focusApi }: Props) {
       }}>
         {isReminder ? (
           <FocusCardReminder
+            todo={current}
+            onComplete={complete}
+            onSkip={skip}
+            onPostpone={postpone}
+          />
+        ) : isInvoice ? (
+          <FocusCardInvoice
             todo={current}
             onComplete={complete}
             onSkip={skip}

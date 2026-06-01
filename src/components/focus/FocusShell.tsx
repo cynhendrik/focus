@@ -4,6 +4,7 @@ import { useMailStore } from '@/store/mail.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFocusStack } from '@/hooks/useFocusStack'
 import { useOverdueTaskSync } from '@/hooks/useOverdueTaskSync'
+import { useInvoiceSuggestionSync } from '@/hooks/useInvoiceSuggestionSync'
 import { FocusTopBar } from './FocusTopBar'
 import { FocusWorkspace } from './FocusWorkspace'
 
@@ -24,6 +25,7 @@ export function FocusShell() {
   }, [loadMailAccounts])
 
   useOverdueTaskSync()
+  useInvoiceSuggestionSync()
 
   return (
     <div style={{
