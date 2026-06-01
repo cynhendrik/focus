@@ -1,3 +1,26 @@
+export interface LeadStage {
+  id: string
+  workspaceId: string
+  name: string
+  label: string
+  orderIndex: number
+  color: string
+  isQualified: boolean
+  isDisqualified: boolean
+  createdAt: string
+}
+
+export interface UpsertLeadStagePayload {
+  id?: string
+  workspaceId: string
+  name: string
+  label: string
+  orderIndex?: number
+  color?: string
+  isQualified?: boolean
+  isDisqualified?: boolean
+}
+
 export type PipelineStage =
   | 'inbox' | 'waiting_reply' | 'replied' | 'call_booked' | 'won' | 'lost'
 
@@ -45,7 +68,7 @@ export interface UpsertLeadPayload {
 
 export interface BulkUpdateLeadsPayload {
   ids: string[]
-  status: LeadStatus
+  status: string          // was: LeadStatus — now accepts any stage name
   reEngageDate?: string
 }
 
