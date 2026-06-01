@@ -8,11 +8,13 @@ import { MailService } from '@/services/mail.service'
 import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Contact } from '@/types/contact.types'
-import { Send, Mail } from 'lucide-react'
+import { Send, Mail, Clock } from 'lucide-react'
 
 interface Props {
   todo: Todo
   onComplete: () => Promise<void>
+  onSkip: () => void
+  onPostpone: () => Promise<void>
 }
 
 function daysOverdue(dueDate: string): number {
@@ -25,7 +27,7 @@ function formatEur(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export function FocusCardReminder({ todo, onComplete }: Props) {
+export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Props) {
   const invoices     = useFinanceStore(s => s.invoices)
   const accounts     = useAccountsStore(s => s.accounts)
   const mailAccounts = useMailStore(s => s.accounts)
@@ -47,7 +49,6 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
   const [recipient, setRecipient] = useState('')
   const [sending, setSending]     = useState(false)
 
-  // Load primary contact email for this account
   useEffect(() => {
     if (!invoice?.accountId) return
     invoke<Contact[]>('get_contacts', { accountId: invoice.accountId })
@@ -58,7 +59,6 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
       .catch((err: unknown) => log.warn('Failed to load contacts for reminder', { accountId: invoice.accountId, err }))
   }, [invoice?.accountId])
 
-  // Update defaults if invoice loads after mount
   useEffect(() => {
     setSubject(defaultSubject)
     setBody(defaultBody)
@@ -68,7 +68,7 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
 
   const handleSend = async () => {
     if (!mailAccounts[0]) {
-      showToast({ message: 'Kein E-Mail-Konto konfiguriert. Bitte zuerst ein Konto einrichten.', variant: 'error' })
+      showToast({ message: 'Kein E-Mail-Konto konfiguriert.', variant: 'error' })
       return
     }
     if (!recipient.trim()) {
@@ -101,7 +101,7 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
   return (
     <div style={{
       background: 'var(--surface-2)',
-      borderLeft: '4px solid var(--accent)',
+      borderLeft: '4px solid oklch(60% 0.2 25)',
       borderRadius: 18,
       padding: '32px 36px',
       display: 'flex',
@@ -109,21 +109,35 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
       gap: 24,
       boxShadow: '0 8px 40px -12px oklch(0% 0 0 / 0.3)',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', gap: 10, fontSize: 11, alignItems: 'center' }}>
-        <span style={{
-          color: 'var(--accent)',
-          fontWeight: 700,
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}>
-          Finanzen
-        </span>
-        {account && <span style={{ color: 'var(--fg-muted)' }}>· {account.name}</span>}
+      {/* Meta row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            background: 'oklch(60% 0.2 25 / 0.15)',
+            color: 'oklch(60% 0.2 25)',
+            fontWeight: 700,
+            fontFamily: 'var(--font-mono)',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            padding: '3px 9px',
+            borderRadius: 99,
+            fontSize: 10,
+          }}>
+            ↗ RECHNUNG
+          </span>
+          {account && (
+            <span style={{ color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 5, height: 5, borderRadius: 99, background: 'oklch(60% 0.2 25)', display: 'inline-block' }} />
+              {account.name}
+            </span>
+          )}
+        </div>
         {invoice && (
-          <span style={{ color: 'var(--fg-dim)' }}>
-            · {formatEur(invoice.total)} €
+          <span style={{ color: 'var(--fg)', fontWeight: 600, fontSize: 14 }}>
+            {Math.round(invoice.total / 1000)}k €
           </span>
         )}
       </div>
@@ -206,7 +220,7 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
         <textarea
           value={body}
           onChange={e => setBody(e.target.value)}
-          rows={5}
+          rows={4}
           style={{
             background: 'var(--surface-2)',
             border: '1px solid var(--border)',
@@ -222,31 +236,79 @@ export function FocusCardReminder({ todo, onComplete }: Props) {
         />
       </div>
 
-      {/* Send button */}
-      <button
-        type="button"
-        onClick={handleSend}
-        disabled={sending}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          padding: '14px 28px',
-          borderRadius: 99,
-          background: sending ? 'var(--surface-3)' : 'var(--accent)',
-          color: sending ? 'var(--fg-muted)' : 'var(--accent-ink)',
-          fontSize: 14,
-          fontWeight: 700,
-          boxShadow: sending ? 'none' : '0 8px 24px -10px var(--accent-glow)',
-          cursor: sending ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          alignSelf: 'flex-start',
-        }}
-      >
-        <Send size={15} />
-        {sending ? 'Wird gesendet…' : 'Erinnerung senden'}
-      </button>
+      {/* Action row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 4,
+      }}>
+        <button
+          type="button"
+          onClick={onSkip}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '10px 18px',
+            borderRadius: 99,
+            border: '1px solid var(--border)',
+            background: 'transparent',
+            color: 'var(--fg-muted)',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Überspringen
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { onPostpone().catch(() => {}) }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '10px 16px',
+            borderRadius: 99,
+            border: 'none',
+            background: 'oklch(50% 0 0 / 0.08)',
+            color: 'var(--fg)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          <Clock size={14} />
+          Morgen
+          <span style={{ fontSize: 10, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>M</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={sending}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '12px 20px',
+            borderRadius: 99,
+            border: 'none',
+            background: sending ? 'var(--surface-3)' : 'var(--accent)',
+            color: sending ? 'var(--fg-muted)' : 'var(--accent-ink)',
+            fontSize: 14,
+            fontWeight: 700,
+            boxShadow: sending ? 'none' : '0 6px 20px -8px var(--accent-glow)',
+            cursor: sending ? 'not-allowed' : 'pointer',
+            transition: 'all 200ms',
+          }}
+        >
+          <Send size={15} />
+          {sending ? 'Wird gesendet…' : 'Erinnerung senden'}
+        </button>
+      </div>
     </div>
   )
 }
