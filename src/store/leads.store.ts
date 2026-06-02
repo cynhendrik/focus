@@ -106,6 +106,9 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
 
     // 2) Create deal pointing to the now-customer (same ID)
     const userIdSafe = userId || lead.workspaceId  // never empty, but createdBy is required
+    const sourceNote = lead.leadSourceDetail
+      ? `Lead-Quelle: ${lead.leadSourceDetail}`
+      : `Lead-Quelle: ${lead.leadSource}`
     const deal = await DealsService.upsert({
       workspaceId,
       createdBy: userIdSafe,
@@ -114,6 +117,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       title: lead.name,
       stage: firstStage.name,
       value: 0,
+      notes: sourceNote,
     })
 
     // 3) Refresh customers — the converted lead is now a customer in DB

@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 19;
+const CURRENT_VERSION: u32 = 20;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -605,6 +605,12 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 UPDATE accounts SET lead_status = 'disqualifiziert' WHERE lead_status = 'lost_reengage';
                 -- 'warm' intentionally kept as-is (seed stage name matches)
             "#)?;
+            Ok(())
+        }
+        20 => {
+            if table_exists(conn, "deals") && !column_exists(conn, "deals", "notes") {
+                conn.execute_batch("ALTER TABLE deals ADD COLUMN notes TEXT;")?;
+            }
             Ok(())
         }
         _ => Ok(()),

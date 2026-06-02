@@ -52,6 +52,7 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
       value: value ? parseFloat(value) : undefined,
       probability: probability ? parseInt(probability) : undefined,
       expectedClose: expectedClose || undefined,
+      notes: initial?.notes,
     }
     try {
       await upsert(payload)

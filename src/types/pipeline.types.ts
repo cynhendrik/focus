@@ -36,6 +36,7 @@ export interface Deal {
   probability?: number
   expectedClose?: string
   owner?: string
+  notes?: string
   createdAt: string
   updatedAt: string
 }
@@ -51,6 +52,7 @@ export interface UpsertDealPayload {
   value?: number
   probability?: number
   expectedClose?: string
+  notes?: string
 }
 
 export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'followup'

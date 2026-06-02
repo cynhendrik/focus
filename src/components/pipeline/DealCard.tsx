@@ -58,6 +58,19 @@ export function DealCard({ deal, onEdit, isDragging }: Props) {
         {deal.title}
       </div>
 
+      {/* Lead source badge */}
+      {deal.notes?.startsWith('Lead-Quelle:') && (
+        <div style={{ marginBottom: 8 }}>
+          <span style={{
+            fontSize: 9.5, padding: '1px 7px', borderRadius: 99,
+            background: 'oklch(68% 0.2 50 / 0.12)', color: 'oklch(68% 0.2 50)',
+            fontFamily: 'var(--font-mono)', letterSpacing: '0.05em', fontWeight: 700,
+          }}>
+            🏷 {deal.notes.replace('Lead-Quelle: ', '')}
+          </span>
+        </div>
+      )}
+
       {/* Value + probability */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span style={{

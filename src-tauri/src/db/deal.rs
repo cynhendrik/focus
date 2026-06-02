@@ -18,6 +18,7 @@ pub struct Deal {
     pub probability: Option<i64>,
     pub expected_close: Option<String>,
     pub owner: Option<String>,
+    pub notes: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -38,12 +39,13 @@ pub struct UpsertDealPayload {
     pub probability: Option<i64>,
     pub expected_close: Option<String>,
     pub owner: Option<String>,
+    pub notes: Option<String>,
 }
 
 pub fn get_by_account(conn: &Connection, account_id: &str) -> Result<Vec<Deal>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, workspace_id, created_by, account_id, contact_id, customer_id, title, stage,
-                value, currency, probability, expected_close, owner, created_at, updated_at
+                value, currency, probability, expected_close, owner, notes, created_at, updated_at
          FROM deals WHERE account_id = ?1 ORDER BY created_at DESC"
     )?;
     let rows = stmt.query_map([account_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
@@ -53,7 +55,7 @@ pub fn get_by_account(conn: &Connection, account_id: &str) -> Result<Vec<Deal>, 
 pub fn get_by_workspace(conn: &Connection, workspace_id: &str) -> Result<Vec<Deal>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, workspace_id, created_by, account_id, contact_id, customer_id, title, stage,
-                value, currency, probability, expected_close, owner, created_at, updated_at
+                value, currency, probability, expected_close, owner, notes, created_at, updated_at
          FROM deals WHERE workspace_id = ?1 ORDER BY created_at DESC"
     )?;
     let rows = stmt.query_map([workspace_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
@@ -63,7 +65,7 @@ pub fn get_by_workspace(conn: &Connection, workspace_id: &str) -> Result<Vec<Dea
 pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Deal>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, workspace_id, created_by, account_id, contact_id, customer_id, title, stage,
-                value, currency, probability, expected_close, owner, created_at, updated_at
+                value, currency, probability, expected_close, owner, notes, created_at, updated_at
          FROM deals WHERE customer_id = ?1 ORDER BY created_at DESC"
     )?;
     let rows = stmt.query_map([customer_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
@@ -77,27 +79,28 @@ pub fn upsert(conn: &Connection, payload: UpsertDealPayload) -> Result<Deal, App
     conn.execute(
         "INSERT INTO deals (id, workspace_id, created_by, account_id, contact_id, customer_id,
                             title, stage, value, currency, probability, expected_close, owner,
-                            pending_sync, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,1,?14,?14)
+                            notes, pending_sync, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,1,?15,?15)
          ON CONFLICT(id) DO UPDATE SET
            title=excluded.title, stage=excluded.stage, value=excluded.value,
            currency=excluded.currency, probability=excluded.probability,
            expected_close=excluded.expected_close, owner=excluded.owner,
            contact_id=excluded.contact_id, customer_id=excluded.customer_id,
+           notes=excluded.notes,
            pending_sync=1, updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.account_id, payload.contact_id,
             payload.customer_id,
             payload.title, payload.stage.unwrap_or_else(|| "prospect".into()),
             payload.value, payload.currency.unwrap_or_else(|| "EUR".into()),
-            payload.probability, payload.expected_close, payload.owner, now,
+            payload.probability, payload.expected_close, payload.owner, payload.notes, now,
         ],
     )?;
     crate::core::sync::enqueue(conn, "deals", &id, "INSERT",
         serde_json::json!({"id": id, "account_id": account_id}))?;
     conn.query_row(
         "SELECT id, workspace_id, created_by, account_id, contact_id, customer_id, title, stage,
-                value, currency, probability, expected_close, owner, created_at, updated_at
+                value, currency, probability, expected_close, owner, notes, created_at, updated_at
          FROM deals WHERE id = ?1", [&id], map_row,
     ).map_err(AppError::from)
 }
@@ -117,7 +120,7 @@ pub fn update_stage(conn: &Connection, id: &str, stage: &str) -> Result<Deal, Ap
     if n == 0 { return Err(AppError::NotFound(format!("Deal {id} not found"))); }
     conn.query_row(
         "SELECT id, workspace_id, created_by, account_id, contact_id, customer_id, title, stage,
-                value, currency, probability, expected_close, owner, created_at, updated_at
+                value, currency, probability, expected_close, owner, notes, created_at, updated_at
          FROM deals WHERE id = ?1", [id], map_row,
     ).map_err(AppError::from)
 }
@@ -129,7 +132,7 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Deal> {
         title: r.get(6)?, stage: r.get(7)?, value: r.get(8)?,
         currency: r.get::<_, Option<String>>(9)?.unwrap_or_else(|| "EUR".into()),
         probability: r.get(10)?, expected_close: r.get(11)?,
-        owner: r.get(12)?, created_at: r.get(13)?, updated_at: r.get(14)?,
+        owner: r.get(12)?, notes: r.get(13)?, created_at: r.get(14)?, updated_at: r.get(15)?,
     })
 }
 
@@ -165,7 +168,7 @@ mod tests {
             account_id: acc_id.clone(), contact_id: None, customer_id: None,
             title: "Website Relaunch".into(), stage: Some("proposal".into()),
             value: Some(5000.0), currency: None, probability: Some(60),
-            expected_close: Some("2026-06-30".into()), owner: None,
+            expected_close: Some("2026-06-30".into()), owner: None, notes: None,
         }).unwrap();
         assert_eq!(d.title, "Website Relaunch");
         assert_eq!(d.stage, "proposal");
@@ -180,7 +183,7 @@ mod tests {
             id: None, workspace_id: "ws-1".into(), created_by: "u-1".into(),
             account_id: acc_id, contact_id: None, customer_id: None,
             title: "Deal".into(), stage: None, value: None, currency: None,
-            probability: None, expected_close: None, owner: None,
+            probability: None, expected_close: None, owner: None, notes: None,
         }).unwrap();
         let updated = update_stage(&conn, &d.id, "won").unwrap();
         assert_eq!(updated.stage, "won");
@@ -194,7 +197,7 @@ mod tests {
             id: None, workspace_id: "ws-1".into(), created_by: "u-1".into(),
             account_id: acc_id.clone(), contact_id: None, customer_id: None,
             title: "D1".into(), stage: None, value: None, currency: None,
-            probability: None, expected_close: None, owner: None,
+            probability: None, expected_close: None, owner: None, notes: None,
         }).unwrap();
         assert_eq!(get_by_account(&conn, &acc_id).unwrap().len(), 1);
     }
@@ -208,14 +211,14 @@ mod tests {
             account_id: acc_id.clone(), customer_id: Some("cust-1".into()),
             contact_id: None, title: "D1".into(),
             stage: None, value: None, currency: None, probability: None,
-            expected_close: None, owner: None,
+            expected_close: None, owner: None, notes: None,
         }).unwrap();
         upsert(&conn, UpsertDealPayload {
             id: None, workspace_id: "ws-1".into(), created_by: "u-1".into(),
             account_id: acc_id.clone(), customer_id: Some("cust-2".into()),
             contact_id: None, title: "D2".into(),
             stage: None, value: None, currency: None, probability: None,
-            expected_close: None, owner: None,
+            expected_close: None, owner: None, notes: None,
         }).unwrap();
         let cust1_deals = get_by_customer(&conn, "cust-1").unwrap();
         assert_eq!(cust1_deals.len(), 1);
@@ -232,7 +235,7 @@ mod tests {
                 account_id: acc_id.clone(), customer_id: None,
                 contact_id: None, title: format!("D{i}"),
                 stage: None, value: None, currency: None, probability: None,
-                expected_close: None, owner: None,
+                expected_close: None, owner: None, notes: None,
             }).unwrap();
         }
         assert_eq!(get_by_workspace(&conn, "ws-1").unwrap().len(), 3);
