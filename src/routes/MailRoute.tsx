@@ -85,20 +85,23 @@ export function MailRoute() {
     const todayStr = today.toISOString().slice(0, 10)
     const scheduledStr = scheduledDate.toISOString()
 
-    await upsertTodo({
-      title:       `${selectedEmail.subject ?? '(Mail)'} beantworten`,
-      customerId:  selectedEmail.customerId ?? undefined,
-      priority:    'p2',
-      bucket:      scheduledStr.slice(0, 10) === todayStr ? 'today' : 'backlog',
-      scheduledAt: scheduledStr,
-      actionType:  'reply_mail',
-      source:      'manual',
-      notes:       `Von: ${selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>` : selectedEmail.fromAddr}`,
-      checklist:   [],
-      tags:        [],
-    }).catch(() => {})
-
-    showToast({ message: 'Mail als Aufgabe angelegt.', variant: 'success' })
+    try {
+      await upsertTodo({
+        title:       `${selectedEmail.subject ?? '(Mail)'} beantworten`,
+        customerId:  selectedEmail.customerId ?? undefined,
+        priority:    'p2',
+        bucket:      scheduledStr.slice(0, 10) === todayStr ? 'today' : 'backlog',
+        scheduledAt: scheduledStr,
+        actionType:  'reply_mail',
+        source:      'manual',
+        notes:       `Von: ${selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>` : selectedEmail.fromAddr}`,
+        checklist:   [],
+        tags:        [],
+      })
+      showToast({ message: 'Mail als Aufgabe angelegt.', variant: 'success' })
+    } catch {
+      showToast({ message: 'Fehler beim Anlegen der Aufgabe.', variant: 'error' })
+    }
   }
 
   // ── Focus-Inbox: default-on, zeigt nur Mails mit Kunden-Bezug ──────────────
