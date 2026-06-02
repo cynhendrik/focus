@@ -100,11 +100,19 @@ export function NavSidebar() {
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
 
+  // Helper: module is ON unless explicitly set to false
+  const mod = (key: keyof typeof modules, defaultOn = true) =>
+    modules[key] === undefined ? defaultOn : !!modules[key]
+
   useEffect(() => {
-    if (modules.sales === false && SALES_VIEWS.has(appView)) {
-      setAppView('dashboard')
-    }
-  }, [modules.sales, appView, setAppView])
+    if (!mod('crm') && (appView === 'clients' || SALES_VIEWS.has(appView))) setAppView('dashboard')
+    if (!mod('finanzen') && appView === 'invoices')  setAppView('dashboard')
+    if (!mod('mail')     && appView === 'mail')      setAppView('dashboard')
+    if (!mod('kalender') && appView === 'calendar')  setAppView('dashboard')
+    if (!mod('leads',  true)  && appView === 'leads') setAppView('dashboard')
+    if (!mod('focus')  && appView === 'focus')       setAppView('dashboard')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modules, appView, setAppView])
 
   const toggle = (key: SectionKey) => {
     setExpanded(prev => {
@@ -136,38 +144,43 @@ export function NavSidebar() {
       <SidebarSection label="Workspace" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
       {expanded.workspace && (
         <>
-          <SidebarNavItem icon={Home}        label="Heute"       active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
-          <SidebarNavItem icon={Users}       label="Clients"     active={appView === 'clients'}     onClick={() => setAppView('clients')}     kbd="C" badge={clientsCount || undefined} />
-          {isAdmin && <SidebarNavItem icon={CreditCard}  label="Finanzen"    active={appView === 'invoices'}    onClick={() => setAppView('invoices')}    kbd="F" />}
-          <SidebarNavItem
-            icon={Zap}
-            label="Fokus"
-            active={appView === 'focus'}
-            onClick={() => setAppView('focus')}
-            kbd="W"
-            badge={focusCount || undefined}
-          />
+          <SidebarNavItem icon={Home} label="Heute" active={appView === 'dashboard'} onClick={() => setAppView('dashboard')} kbd="H" />
+          {mod('crm') && (
+            <SidebarNavItem icon={Users} label="Clients" active={appView === 'clients'} onClick={() => setAppView('clients')} kbd="C" badge={clientsCount || undefined} />
+          )}
+          {mod('finanzen') && isAdmin && (
+            <SidebarNavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'} onClick={() => setAppView('invoices')} kbd="F" />
+          )}
+          {mod('focus') && (
+            <SidebarNavItem icon={Zap} label="Fokus" active={appView === 'focus'} onClick={() => setAppView('focus')} kbd="W" badge={focusCount || undefined} />
+          )}
         </>
       )}
 
-      {modules.sales !== false && (
+      {mod('crm') && (
         <>
           <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
           {expanded.sales && (
             <>
-              <SidebarNavItem icon={Target}      label="Leads"       active={appView === 'leads'}       onClick={() => setAppView('leads')}       kbd="N" badge={newLeadsCount || undefined} />
-              <SidebarNavItem icon={Reply}       label="Follow-Ups"  active={appView === 'followups'}   onClick={() => setAppView('followups')}   kbd="U" />
-              <SidebarNavItem icon={TrendingUp}  label="Pipeline"    active={appView === 'pipeline'}    onClick={() => setAppView('pipeline')}    kbd="P" badge={openDealCount || undefined} />
+              {mod('leads', true) && (
+                <SidebarNavItem icon={Target} label="Leads" active={appView === 'leads'} onClick={() => setAppView('leads')} kbd="N" badge={newLeadsCount || undefined} />
+              )}
+              <SidebarNavItem icon={Reply}      label="Follow-Ups" active={appView === 'followups'} onClick={() => setAppView('followups')} kbd="U" />
+              <SidebarNavItem icon={TrendingUp} label="Pipeline"   active={appView === 'pipeline'}  onClick={() => setAppView('pipeline')}  kbd="P" badge={openDealCount || undefined} />
             </>
           )}
         </>
       )}
 
-      <SidebarSection label="Inbox" expanded={expanded.inbox} onToggle={() => toggle('inbox')} />
-      {expanded.inbox && (
+      {(mod('mail') || mod('kalender')) && (
         <>
-          <SidebarNavItem icon={Calendar}      label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />
-          <SidebarNavItem icon={Mail}          label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />
+          <SidebarSection label="Inbox" expanded={expanded.inbox} onToggle={() => toggle('inbox')} />
+          {expanded.inbox && (
+            <>
+              {mod('kalender') && <SidebarNavItem icon={Calendar} label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />}
+              {mod('mail')     && <SidebarNavItem icon={Mail}     label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />}
+            </>
+          )}
         </>
       )}
 
