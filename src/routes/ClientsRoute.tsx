@@ -15,6 +15,7 @@ import { CustomerRoute } from './CustomerRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
 import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
 import type { Customer } from '@/types/customer.types'
+import { isPrivateCustomer } from '@/types/customer.types'
 import {
   computeClientRows, sortClientRows, countNeedsAttention,
   customerInitials, formatEuroShort, relContactLabel, clientVariation,
@@ -272,7 +273,7 @@ function SortTabs({
 // ── Client Board ──────────────────────────────────────────────────────────────
 
 function ClientBoard() {
-  const customers      = useCustomersStore(s => s.customers)
+  const allCustomers   = useCustomersStore(s => s.customers)
   const upsertCustomer = useCustomersStore(s => s.upsert)
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
   const lastActivity   = useCrmStore(s => s.lastActivity)
@@ -281,6 +282,12 @@ function ClientBoard() {
   const invoices       = useFinanceStore(s => s.invoices)
   const offers         = useFinanceStore(s => s.offers)
   const pinnedIds      = useClientPickerStore(s => s.pinnedIds)
+
+  // Private Kunden (isPrivate=true oder Sentinel-ID) aus dem Geschäfts-CRM ausblenden
+  const customers = useMemo(
+    () => allCustomers.filter(c => !isPrivateCustomer(c)),
+    [allCustomers],
+  )
 
   const [showModal, setShowModal]         = useState(false)
   const [loadingSample, setLoadingSample] = useState(false)
