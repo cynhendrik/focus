@@ -5,7 +5,6 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFocusStack } from '@/hooks/useFocusStack'
 import { useOverdueTaskSync } from '@/hooks/useOverdueTaskSync'
 import { useInvoiceSuggestionSync } from '@/hooks/useInvoiceSuggestionSync'
-import { FocusTopBar } from './FocusTopBar'
 import { FocusWorkspace } from './FocusWorkspace'
 
 export function FocusShell() {
@@ -20,27 +19,14 @@ export function FocusShell() {
     if (invoices.length === 0) loadFinance(activeWorkspaceId)
   }, [activeWorkspaceId, invoices.length, loadFinance])
 
-  useEffect(() => {
-    loadMailAccounts()
-  }, [loadMailAccounts])
+  useEffect(() => { loadMailAccounts() }, [loadMailAccounts])
 
   useOverdueTaskSync()
   useInvoiceSuggestionSync()
 
   return (
-    <div style={{
-      height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      background: 'var(--bg)',
-    }}>
-      <FocusTopBar
-        currentIndex={focusApi.currentIndex}
-        total={focusApi.total}
-      />
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <FocusWorkspace focusApi={focusApi} />
-      </div>
+    <div style={{ height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+      <FocusWorkspace focusApi={focusApi} />
     </div>
   )
 }
