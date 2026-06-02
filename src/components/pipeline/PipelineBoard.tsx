@@ -6,13 +6,15 @@ import {
 } from '@dnd-kit/core'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useDealsStore } from '@/store/deals.store'
-import { DealCard } from './DealCard'
+import { DealCard, isDealStalled } from './DealCard'
 import type { Deal, PipelineStage } from '@/types/pipeline.types'
 
-function DroppableColumn({ stage, deals, onEdit }: {
+function DroppableColumn({ stage, deals, onEdit, showStallWarnings }: {
   stage: PipelineStage & { displayName: string; colorDot: string }
   deals: Deal[]
   onEdit: (deal: Deal) => void
+  /** When true, stalled deals get the warning chip. False for won/lost columns. */
+  showStallWarnings: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.name })
   const totalValue = deals.reduce((s, d) => s + (d.value ?? 0), 0)
@@ -42,7 +44,12 @@ function DroppableColumn({ stage, deals, onEdit }: {
       </div>
       <div>
         {deals.map(deal => (
-          <DraggableDealCard key={deal.id} deal={deal} onEdit={onEdit} />
+          <DraggableDealCard
+            key={deal.id}
+            deal={deal}
+            onEdit={onEdit}
+            isStalled={showStallWarnings && isDealStalled(deal)}
+          />
         ))}
         {deals.length === 0 && (
           <div style={{ border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 9, padding: 16, textAlign: 'center' }}>
@@ -54,11 +61,15 @@ function DroppableColumn({ stage, deals, onEdit }: {
   )
 }
 
-function DraggableDealCard({ deal, onEdit }: { deal: Deal; onEdit: (d: Deal) => void }) {
+function DraggableDealCard({ deal, onEdit, isStalled }: {
+  deal: Deal
+  onEdit: (d: Deal) => void
+  isStalled: boolean
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: deal.id })
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.4 : 1 }}>
-      <DealCard deal={deal} onEdit={onEdit} isDragging={isDragging} />
+      <DealCard deal={deal} onEdit={onEdit} isDragging={isDragging} isStalled={isStalled} />
     </div>
   )
 }
@@ -106,6 +117,7 @@ export function PipelineBoard({ onEditDeal, dealFilter }: Props) {
             stage={{ ...stage, displayName: stage.label, colorDot: stage.color }}
             deals={dealsForStage(stage.name)}
             onEdit={onEditDeal}
+            showStallWarnings={true}
           />
         ))}
         {wonStage && (
@@ -114,6 +126,7 @@ export function PipelineBoard({ onEditDeal, dealFilter }: Props) {
             stage={{ ...wonStage, displayName: wonStage.label, colorDot: '#22C55E' }}
             deals={dealsForStage(wonStage.name)}
             onEdit={onEditDeal}
+            showStallWarnings={false}
           />
         )}
         {lostStage && (
@@ -122,6 +135,7 @@ export function PipelineBoard({ onEditDeal, dealFilter }: Props) {
             stage={{ ...lostStage, displayName: lostStage.label, colorDot: 'var(--fg-dim)' }}
             deals={dealsForStage(lostStage.name)}
             onEdit={onEditDeal}
+            showStallWarnings={false}
           />
         )}
       </div>
