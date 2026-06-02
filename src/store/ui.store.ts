@@ -83,7 +83,7 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
       return 'cockpit'
   }
 }
-export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'developer' | 'gefahrenzone'
+export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'integrationen' | 'developer' | 'gefahrenzone'
 
 export type AppView =
   | 'dashboard' | 'profile'

@@ -23,12 +23,23 @@ export interface CompanyProfile {
 }
 
 export interface CompanyModules {
+  // Kern
+  crm?: boolean        // Kundenverwaltung, Pipeline, Deals, Follow-Ups (default: true)
+  finanzen?: boolean   // Rechnungen & Angebote (default: true)
+  focus?: boolean      // Focus-Modus (default: true)
+  // Kommunikation
+  mail?: boolean       // E-Mail Integration (default: true)
+  kalender?: boolean   // Kalender & Termine (default: true)
+  // Erweiterungen
+  leads?: boolean      // Lead Management (default: false)
+  kampagnen?: boolean  // E-Mail Kampagnen (default: false)
+  // KI
+  corra?: boolean      // CORRA KI-Assistent (default: false)
+  // Legacy
   sales?: boolean
-  mail?: boolean
   instagram?: boolean
   focusAi?: boolean
   zeiterfassung?: boolean
-  /** Pro-Bündel: schaltet Kampagnen + Automationen frei. */
   pro?: boolean
 }
 

@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import { useCompanyStore } from '@/store/company.store'
 import type { CompanyProfile, CompanyModules } from '@/types/company.types'
 
-const MODULE_LABELS: Record<keyof CompanyModules, string> = {
-  sales: 'Sales',
-  mail: 'Mail-Client',
-  instagram: 'Instagram',
-  focusAi: 'FOCUS AI',
-  zeiterfassung: 'Zeiterfassung',
-  pro: 'Pro-Modus',
+const MODULE_LABELS: Partial<Record<keyof CompanyModules, string>> = {
+  crm: 'CRM System', finanzen: 'Finanzen', focus: 'Focus-Modus',
+  mail: 'Mail-Client', kalender: 'Kalender',
+  leads: 'Leads', kampagnen: 'Kampagnen', corra: 'CORRA KI',
+  sales: 'Sales', instagram: 'Instagram', focusAi: 'FOCUS AI',
+  zeiterfassung: 'Zeiterfassung', pro: 'Pro-Modus',
 }
 
 export function CompanyRoute() {
