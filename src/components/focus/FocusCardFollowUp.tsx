@@ -17,7 +17,8 @@ interface Props {
   onPostpone: () => Promise<void>
 }
 
-const ACCENT = 'oklch(65% 0.18 50)'
+// Spec: Follow-Up → --warn, Antwort/Mail → --info
+const ACCENT = 'var(--warn)'
 
 export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Props) {
   const accounts     = useAccountsStore(s => s.accounts)
@@ -26,7 +27,7 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
 
   const account = todo.customerId ? accounts.find(a => a.id === todo.customerId) : undefined
   const isReplyMail = todo.actionType === 'reply_mail'
-  const accentColor = isReplyMail ? 'oklch(60% 0.15 240)' : ACCENT
+  const accentColor = isReplyMail ? 'var(--info)' : ACCENT
 
   const [contactName, setContactName] = useState('')
   const [recipient, setRecipient]     = useState('')

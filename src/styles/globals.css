@@ -34,15 +34,14 @@
 /* ========== Design Tokens ========== */
 
 :root {
-  /* Hintergrund 4% heller als vorher (13% -> 17%) — Augen ermueden weniger,
-     der Kontrast zwischen den Surface-Stufen steigt sichtbar. */
-  --bg: oklch(17% 0.005 270);
-  --bg-2: oklch(20% 0.006 270);
-  --surface: oklch(23% 0.007 270);
-  --surface-2: oklch(27% 0.009 270);
-  --surface-3: oklch(31% 0.010 270);
-  --border: oklch(34% 0.011 270);
-  --border-strong: oklch(44% 0.012 270);
+  /* Flächen — warmes Neutral, Hue 270. Werte 1:1 aus Design-System. */
+  --bg: oklch(13% 0.005 270);
+  --bg-2: oklch(15% 0.006 270);
+  --surface: oklch(18% 0.006 270);
+  --surface-2: oklch(22% 0.008 270);
+  --surface-3: oklch(26% 0.009 270);
+  --border: oklch(30% 0.01 270);
+  --border-strong: oklch(40% 0.012 270);
   --fg: oklch(98% 0 0);
   --fg-2: oklch(82% 0.005 270);
   --fg-muted: oklch(64% 0.008 270);
@@ -1468,4 +1467,76 @@ div:hover > .file-delete-btn {
 @keyframes focusSlideUp {
   from { opacity: 0; transform: translateY(100%); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== Focus-Modus ========== */
+
+.focus-backdrop {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(1000px 700px at 15% -8%, var(--accent-soft), transparent 55%),
+    radial-gradient(900px 650px at 100% 110%, oklch(78% 0.13 235 / 0.12), transparent 55%),
+    var(--bg);
+  overflow: hidden;
+}
+
+/* Dezenter Aurora-Drift — der einzige Dauer-Loop im Focus-Modus */
+.focus-aurora {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(1100px 600px at 20% 10%, var(--accent-soft), transparent 60%),
+    radial-gradient(800px 500px at 90% 80%, oklch(78% 0.13 235 / 0.08), transparent 55%);
+  animation: aurora-drift 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes aurora-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(2%, 1%) scale(1.02); }
+  66%  { transform: translate(-1%, 2%) scale(0.99); }
+  100% { transform: translate(1%, -1%) scale(1.01); }
+}
+
+/* Focus-Karte — radius-xl + shadow-2, Farb-Rail links per --fc */
+.focus-card {
+  background: var(--surface-2);
+  border-left: 4px solid var(--fc, var(--accent));
+  border-radius: var(--radius-xl);
+  padding: 32px 36px;
+  box-shadow: var(--shadow-2);
+  display: flex; flex-direction: column; gap: 24px;
+  position: relative; z-index: 1;
+}
+
+/* Focus Farb-Rails — semantische Tokens je Move-Typ */
+.focus-card[data-type="invoice"]  { --fc: var(--danger); }
+.focus-card[data-type="reminder"] { --fc: var(--danger); }
+.focus-card[data-type="mail"]     { --fc: var(--info); }
+.focus-card[data-type="followup"] { --fc: var(--warn); }
+.focus-card[data-type="deal"]     { --fc: var(--accent); }
+.focus-card[data-type="internal"] { --fc: oklch(76% 0.12 300); }
+
+/* Aktionsleiste */
+.focus-actions {
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* Primär-Button im Focus — radius 12px (nicht Pille!) */
+.focus-fire {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 22px; border-radius: 12px; border: none;
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 6px 20px -8px var(--accent-glow);
+  transition: transform 180ms cubic-bezier(.2,.7,.1,1), box-shadow 220ms ease;
+}
+.focus-fire:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -10px var(--accent-glow); }
+.focus-fire:disabled { background: var(--surface-3); color: var(--fg-muted); box-shadow: none; cursor: not-allowed; }
+
+/* Pulsierender Sende-Status */
+.focus-sending-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: pulse 1.4s infinite;
 }

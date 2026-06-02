@@ -25,7 +25,8 @@ export function FocusShell() {
   useInvoiceSuggestionSync()
 
   return (
-    <div style={{ height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+    <div className="focus-backdrop">
+      <div className="focus-aurora" aria-hidden />
       <FocusWorkspace focusApi={focusApi} />
     </div>
   )

@@ -32,10 +32,11 @@ function buildSubject(level: number, invoiceNumber: string | undefined, total: n
   return `2. Mahnung · Rechnung ${num} · ${amt} € [dringend]`
 }
 
+// Spec: Rechnung/Geld → --danger für alle Mahnstufen, Stärke steigt
 const LEVEL_COLOR = [
-  'oklch(78% 0.22 125)',  // Erinnerung — accent green
-  'oklch(62% 0.2 25)',    // 1. Mahnung — orange-red
-  'oklch(55% 0.25 15)',   // 2. Mahnung — deep red
+  'var(--warn)',    // Erinnerung — freundlich, gelb
+  'var(--danger)',  // 1. Mahnung — rot
+  'var(--danger)',  // 2. Mahnung — rot (dunkler via opacity)
 ]
 const LEVEL_BADGE = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung']
 

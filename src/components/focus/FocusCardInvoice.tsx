@@ -27,7 +27,8 @@ function formatEur(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const ACCENT_RED = 'oklch(60% 0.2 25)'
+// Spec: Rechnung/Geld → --danger
+const ACCENT_RED = 'var(--danger)'
 
 export function FocusCardInvoice({ todo, onComplete, onSkip, onPostpone }: Props) {
   const invoices     = useFinanceStore(s => s.invoices)

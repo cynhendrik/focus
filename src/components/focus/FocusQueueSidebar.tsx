@@ -16,44 +16,19 @@ interface ItemMeta {
 
 function getItemMeta(todo: Todo): ItemMeta {
   if (todo.actionType === 'create_invoice' || (todo.source === 'finance' && todo.sourceRef)) {
-    return {
-      borderColor: 'oklch(60% 0.2 25)',
-      iconBg: 'oklch(60% 0.2 25 / 0.15)',
-      iconColor: 'oklch(60% 0.2 25)',
-      label: '€',
-    }
+    return { borderColor: 'var(--danger)', iconBg: 'oklch(72% 0.18 25 / 0.15)', iconColor: 'var(--danger)', label: '€' }
   }
   if (todo.actionType === 'send_reminder') {
-    return {
-      borderColor: 'oklch(65% 0.18 50)',
-      iconBg: 'oklch(65% 0.18 50 / 0.15)',
-      iconColor: 'oklch(65% 0.18 50)',
-      label: '↑',
-    }
+    return { borderColor: 'var(--warn)', iconBg: 'oklch(82% 0.16 70 / 0.15)', iconColor: 'var(--warn)', label: '↑' }
   }
   const title = todo.title.toLowerCase()
   if (title.includes('mail') || title.includes('e-mail') || title.includes('antwort') || title.includes('re:')) {
-    return {
-      borderColor: 'oklch(60% 0.15 240)',
-      iconBg: 'oklch(60% 0.15 240 / 0.15)',
-      iconColor: 'oklch(60% 0.15 240)',
-      label: '✉',
-    }
+    return { borderColor: 'var(--info)', iconBg: 'oklch(78% 0.13 235 / 0.15)', iconColor: 'var(--info)', label: '✉' }
   }
   if (title.includes('deal') || title.includes('angebot') || title.includes('pitch')) {
-    return {
-      borderColor: 'oklch(65% 0.18 140)',
-      iconBg: 'oklch(65% 0.18 140 / 0.15)',
-      iconColor: 'oklch(65% 0.18 140)',
-      label: '↗',
-    }
+    return { borderColor: 'var(--accent)', iconBg: 'var(--accent-soft)', iconColor: 'var(--accent)', label: '↗' }
   }
-  return {
-    borderColor: 'oklch(55% 0 0 / 0.3)',
-    iconBg: 'oklch(50% 0 0 / 0.1)',
-    iconColor: 'var(--fg-dim)',
-    label: '✓',
-  }
+  return { borderColor: 'oklch(55% 0 0 / 0.3)', iconBg: 'oklch(50% 0 0 / 0.1)', iconColor: 'var(--fg-dim)', label: '✓' }
 }
 
 export function FocusQueueSidebar({ stack, currentIndex }: Props) {
