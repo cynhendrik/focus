@@ -46,24 +46,32 @@ describe('shouldCreateReminderTask', () => {
     expect(shouldCreateReminderTask(invoice, [])).toBe(true)
   })
 
-  it('returns false when an open task already references the invoice', () => {
+  it('returns false when an open send_reminder task already references the invoice', () => {
     const invoice = makeInvoice({ id: 'inv1' })
-    const task = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'open' })
+    const task = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'open', actionType: 'send_reminder' })
     expect(shouldCreateReminderTask(invoice, [task])).toBe(false)
   })
 
-  it('returns false when existing task was completed today', () => {
+  it('returns false when reminder was completed today (within 7-day cooldown)', () => {
     const invoice = makeInvoice({ id: 'inv1' })
     const todayIso = new Date().toISOString()
-    const doneToday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: todayIso })
+    const doneToday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: todayIso, actionType: 'send_reminder' })
     expect(shouldCreateReminderTask(invoice, [doneToday])).toBe(false)
   })
 
-  it('returns true when existing task was completed yesterday (can re-send)', () => {
+  it('returns false when reminder was completed yesterday (within 7-day cooldown)', () => {
     const invoice = makeInvoice({ id: 'inv1' })
     const yesterday = new Date(Date.now() - 86_400_000).toISOString()
-    const doneYesterday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: yesterday })
-    expect(shouldCreateReminderTask(invoice, [doneYesterday])).toBe(true)
+    const doneYesterday = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: yesterday, actionType: 'send_reminder' })
+    // 1 day since first reminder — cooldown is 7 days, not yet ready
+    expect(shouldCreateReminderTask(invoice, [doneYesterday])).toBe(false)
+  })
+
+  it('returns true when 8 days have passed after first reminder (cooldown expired)', () => {
+    const invoice = makeInvoice({ id: 'inv1' })
+    const eightDaysAgo = new Date(Date.now() - 8 * 86_400_000).toISOString()
+    const doneOld = makeTodo({ id: 't1', sourceRef: 'inv1', status: 'done', updatedAt: eightDaysAgo, actionType: 'send_reminder' })
+    expect(shouldCreateReminderTask(invoice, [doneOld])).toBe(true)
   })
 
   it('returns false for non-overdue invoice', () => {
