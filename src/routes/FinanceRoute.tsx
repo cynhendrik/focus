@@ -432,9 +432,9 @@ export function FinanceRoute() {
     return realInvoices.filter(i => i.status === invoiceFilter && i.status !== 'draft')
   }, [realInvoices, invoiceFilter])
 
-  // Active offers (pipeline)
+  // Active offers (pipeline) — includes accepted so user can convert to invoice
   const activeOffers = useMemo(() =>
-    offers.filter(o => o.status === 'draft' || o.status === 'sent'),
+    offers.filter(o => o.status === 'draft' || o.status === 'sent' || o.status === 'accepted'),
     [offers],
   )
 
@@ -589,8 +589,10 @@ export function FinanceRoute() {
                         const acc = accounts.find(a => a.id === offer.accountId)
                         if (acc) await downloadOfferPDF(full, profile, acc)
                       }} />
-                      <RowBtn icon={<ChevronRight size={12} />} label="→ Rechnung" tone="accent"
-                        onClick={() => convertOfferToInvoice(offer.id, workspaceId, user?.id ?? '')} />
+                      {offer.status === 'accepted' && (
+                        <RowBtn icon={<ChevronRight size={12} />} label="→ Rechnung" tone="accent"
+                          onClick={() => convertOfferToInvoice(offer.id, workspaceId, user?.id ?? '')} />
+                      )}
                       <RowBtn icon={<Trash2 size={12} />} label="Löschen" tone="bad" onClick={() => deleteOffer(offer.id)} />
                     </div>
                   </td>
@@ -643,10 +645,8 @@ export function FinanceRoute() {
           </>
         )}
 
-        {offers.filter(o => o.status === 'accepted' || o.status === 'rejected').length > 0 && (
+        {offers.filter(o => o.status === 'rejected').length > 0 && (
           <div style={{ padding: '10px 20px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--fg-dim)', display: 'flex', gap: 12 }}>
-            <span>{offers.filter(o => o.status === 'accepted').length} angenommen</span>
-            <span>·</span>
             <span>{offers.filter(o => o.status === 'rejected').length} abgelehnt</span>
           </div>
         )}
