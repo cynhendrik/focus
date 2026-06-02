@@ -55,6 +55,21 @@ export function TaskBoardCard({ todo }: { todo: Todo }) {
       }}>
         {todo.title}
       </div>
+      {todo.aiSummary && (
+        <span style={{
+          display: 'block',
+          fontSize: 11,
+          color: 'var(--fg-dim)',
+          marginTop: 2,
+          fontStyle: 'italic',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          maxWidth: '100%',
+        }}>
+          {todo.aiSummary}
+        </span>
+      )}
       <div style={{ display: 'flex', gap: 8, fontSize: 11, color: 'var(--fg-dim)' }}>
         {todo.checklist.length > 0 && <span>{doneCount}/{todo.checklist.length}</span>}
         {todo.plannedMinutes && <span>⏱ {todo.plannedMinutes}m</span>}

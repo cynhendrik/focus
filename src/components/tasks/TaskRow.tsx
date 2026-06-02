@@ -84,13 +84,31 @@ export function TaskRow({ todo }: Props) {
           {todo.status === 'done' ? '✓' : ''}
         </button>
 
-        <span style={{
-          flex: 1, fontSize: 13.5, fontWeight: 500,
-          color: 'var(--fg)',
-          textDecoration: todo.status === 'done' ? 'line-through' : 'none',
-        }}>
-          {todo.title}
-        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{
+            display: 'block', fontSize: 13.5, fontWeight: 500,
+            color: 'var(--fg)',
+            textDecoration: todo.status === 'done' ? 'line-through' : 'none',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {todo.title}
+          </span>
+          {todo.aiSummary && (
+            <span style={{
+              display: 'block',
+              fontSize: 11,
+              color: 'var(--fg-dim)',
+              marginTop: 2,
+              fontStyle: 'italic',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
+            }}>
+              {todo.aiSummary}
+            </span>
+          )}
+        </div>
 
         <span style={{
           fontSize: 10, fontWeight: 700,
