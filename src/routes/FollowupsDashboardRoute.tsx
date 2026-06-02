@@ -19,6 +19,8 @@ import type { FollowUpQueueItem } from '@/types/follow-up-queue.types'
 
 type Category = 'reply' | 'email' | 'call' | 'whatsapp' | 'task'
 
+const PRIO_ORDER: Record<string, number> = { high: 0, normal: 1, low: 2 }
+
 interface CatDef {
   label: string
   color: string
@@ -120,6 +122,16 @@ function FollowupRow({
           </span>
           {customer?.company && (
             <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>· {customer.company}</span>
+          )}
+          {customer?.priority === 'high' && (
+            <span style={{
+              fontSize: 9, padding: '1px 6px', borderRadius: 99,
+              background: 'oklch(60% 0.2 25 / 0.12)', color: 'oklch(60% 0.2 25)',
+              fontWeight: 700, fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+              display: 'inline-block',
+            }}>
+              Dringend
+            </span>
           )}
         </div>
         {fu.title && (
@@ -914,21 +926,31 @@ export function FollowupsDashboardRoute() {
 
   const openFollowups = useMemo(() => followups.filter(f => f.status === 'open'), [followups])
 
+  const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c])), [customers])
+
   const todayItems = useMemo(() =>
     openFollowups
       .filter(f => f.dueAt ? isTodayOrBefore(f.dueAt) : false)
-      .sort((a, b) => (a.dueAt ?? '').localeCompare(b.dueAt ?? '')),
-    [openFollowups],
+      .sort((a, b) => {
+        const pa = PRIO_ORDER[customerMap.get(a.customerId ?? '')?.priority ?? 'normal'] ?? 1
+        const pb = PRIO_ORDER[customerMap.get(b.customerId ?? '')?.priority ?? 'normal'] ?? 1
+        if (pa !== pb) return pa - pb
+        return (a.dueAt ?? '').localeCompare(b.dueAt ?? '')
+      }),
+    [openFollowups, customerMap],
   )
 
   const nextItems = useMemo(() =>
     openFollowups
       .filter(f => !f.dueAt || !isTodayOrBefore(f.dueAt))
-      .sort((a, b) => (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999')),
-    [openFollowups],
+      .sort((a, b) => {
+        const pa = PRIO_ORDER[customerMap.get(a.customerId ?? '')?.priority ?? 'normal'] ?? 1
+        const pb = PRIO_ORDER[customerMap.get(b.customerId ?? '')?.priority ?? 'normal'] ?? 1
+        if (pa !== pb) return pa - pb
+        return (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999')
+      }),
+    [openFollowups, customerMap],
   )
-
-  const customerMap = useMemo(() => new Map(customers.map(c => [c.id, c])), [customers])
   const leadMap = useMemo(() => new Map(leads.map(l => [l.id, l])), [leads])
   const dueQueueItems = useFollowUpQueueStore(s => s.dueToday())
 
