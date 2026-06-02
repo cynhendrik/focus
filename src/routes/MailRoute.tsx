@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { Reply, Forward, Plus, Focus, Inbox as InboxIcon } from 'lucide-react'
+import { Reply, Forward, Plus, Focus, Inbox as InboxIcon, ListTodo } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useCustomersStore } from '@/store/customers.store'
+import { useTodosStore } from '@/store/todos.store'
+import { useToastStore } from '@/store/toast.store'
 import { ComposeModal } from '@/components/mail/ComposeModal'
 import { FolderTree } from '@/components/mail/FolderTree'
 import { CampaignsTab }        from '@/components/mail/CampaignsTab'
@@ -52,6 +54,52 @@ export function MailRoute() {
   const [showNewCampaign, setShowNewCampaign] = useState(false)
   const setActiveCampaign = useCampaignStore(s => s.setActive)
   const activeCampaignId  = useCampaignStore(s => s.activeCampaignId)
+
+  const upsertTodo  = useTodosStore(s => s.upsert)
+  const showToast   = useToastStore(s => s.show)
+  const [showTodoPicker, setShowTodoPicker] = useState(false)
+  const todoPickerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showTodoPicker) return
+    const handler = (e: MouseEvent) => {
+      if (todoPickerRef.current && !todoPickerRef.current.contains(e.target as Node)) {
+        setShowTodoPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showTodoPicker])
+
+  const createMailTodo = async (when: 'today' | 'tomorrow' | 'in3days') => {
+    if (!selectedEmail) return
+    setShowTodoPicker(false)
+
+    const today = new Date()
+    const scheduledDate = when === 'today'
+      ? today
+      : when === 'tomorrow'
+      ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 9, 0)
+      : new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3, 9, 0)
+
+    const todayStr = today.toISOString().slice(0, 10)
+    const scheduledStr = scheduledDate.toISOString()
+
+    await upsertTodo({
+      title:       `${selectedEmail.subject ?? '(Mail)'} beantworten`,
+      customerId:  selectedEmail.customerId ?? undefined,
+      priority:    'p2',
+      bucket:      scheduledStr.slice(0, 10) === todayStr ? 'today' : 'backlog',
+      scheduledAt: scheduledStr,
+      actionType:  'reply_mail',
+      source:      'manual',
+      notes:       `Von: ${selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>` : selectedEmail.fromAddr}`,
+      checklist:   [],
+      tags:        [],
+    }).catch(() => {})
+
+    showToast({ message: 'Mail als Aufgabe angelegt.', variant: 'success' })
+  }
 
   // ── Focus-Inbox: default-on, zeigt nur Mails mit Kunden-Bezug ──────────────
   const [mailFocus, setMailFocus] = useState<boolean>(() => {
@@ -358,6 +406,21 @@ export function MailRoute() {
                   <div className="mail-from">{senderName}</div>
                   <div className="mail-subj">{subject}</div>
                 </div>
+                {email.customerId && (() => {
+                  const cust = customers.find(c => c.id === email.customerId)
+                  if (!cust) return null
+                  return (
+                    <span style={{
+                      fontSize: 9.5, padding: '1px 7px', borderRadius: 99,
+                      background: 'var(--surface-3)', color: 'var(--fg-dim)',
+                      fontWeight: 600, flexShrink: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 80,
+                      whiteSpace: 'nowrap', display: 'inline-block',
+                    }}>
+                      {cust.name}
+                    </span>
+                  )
+                })()}
                 <span className="mail-time">{time}</span>
               </div>
             )
@@ -396,6 +459,53 @@ export function MailRoute() {
                 >
                   <Forward size={13} /> Weiterleiten
                 </button>
+
+                {/* → Aufgabe Button with date picker */}
+                <div style={{ position: 'relative' }} ref={todoPickerRef}>
+                  <button
+                    onClick={() => setShowTodoPicker(v => !v)}
+                    title="Als Aufgabe in den Fokus-Modus bringen"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      fontSize: 12, padding: '4px 10px', borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: showTodoPicker ? 'var(--accent-soft)' : 'none',
+                      color: showTodoPicker ? 'var(--accent)' : 'var(--fg)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <ListTodo size={13} /> Aufgabe
+                  </button>
+                  {showTodoPicker && (
+                    <div style={{
+                      position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                      background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 10, padding: '6px 0', zIndex: 100,
+                      boxShadow: '0 8px 24px -4px oklch(0% 0 0 / 0.3)',
+                      minWidth: 140,
+                    }}>
+                      {([
+                        ['today',    '📌 Heute'],
+                        ['tomorrow', '📅 Morgen'],
+                        ['in3days',  '🗓 In 3 Tagen'],
+                      ] as const).map(([when, label]) => (
+                        <button
+                          key={when}
+                          onClick={() => { createMailTodo(when).catch(() => {}) }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '7px 14px', fontSize: 12, color: 'var(--fg)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-3)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <select
                   value={selectedEmail.customerId ?? ''}
                   onChange={e => assignCustomer(selectedEmail.id, e.target.value || null)}
