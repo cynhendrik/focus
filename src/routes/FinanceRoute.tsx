@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { OfferForm } from '@/components/finance/OfferForm'
 import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
+import { MahnwesenPanel } from '@/components/finance/MahnwesenPanel'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import { downloadInvoicePDF, batchExportInvoicesPDF, getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
 import { downloadOfferPDF } from '@/components/finance/OfferPDF'
@@ -343,6 +344,7 @@ export function FinanceRoute() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user        = useAuthStore(s => s.user)
 
+  const [financeTab, setFinanceTab] = useState<'uebersicht' | 'mahnwesen'>('uebersicht')
   const [period,        setPeriod]        = useState<Period>('monat')
   const [customFrom,    setCustomFrom]    = useState('')
   const [customTo,      setCustomTo]      = useState('')
@@ -463,7 +465,46 @@ export function FinanceRoute() {
         )}
       </div>
 
-      {/* ── Umsatz ─────────────────────────────────────────────────────────── */}
+      {/* Tab-Switcher */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {([
+          { key: 'uebersicht', label: 'Übersicht' },
+          { key: 'mahnwesen',  label: 'Mahnwesen', badge: overdueInvoices.length || undefined },
+        ] as const).map(tab => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setFinanceTab(tab.key)}
+            style={{
+              padding: '8px 16px',
+              fontSize: 13, fontWeight: financeTab === tab.key ? 600 : 500,
+              color: financeTab === tab.key ? 'var(--fg)' : 'var(--fg-muted)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              borderBottom: `2px solid ${financeTab === tab.key ? 'var(--accent)' : 'transparent'}`,
+              marginBottom: -1,
+              display: 'flex', alignItems: 'center', gap: 7,
+              transition: 'color 160ms, border-color 160ms',
+            }}
+          >
+            {tab.label}
+            {'badge' in tab && tab.badge ? (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                padding: '1px 6px', borderRadius: 99,
+                background: 'oklch(72% 0.18 25 / 0.14)', color: 'var(--danger)',
+              }}>
+                {tab.badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      {/* Mahnwesen Tab */}
+      {financeTab === 'mahnwesen' && <MahnwesenPanel />}
+
+      {/* ── Umsatz (nur im Übersicht-Tab) ────────────────────────────────── */}
+      {financeTab === 'uebersicht' && <>
       <div className="card" style={{ padding: '24px 28px', overflow: 'hidden', position: 'relative' }}>
 
         {/* Subtle background glow blob */}
@@ -820,6 +861,7 @@ export function FinanceRoute() {
           }}
         />
       )}
+      </>}
     </div>
   )
 }
