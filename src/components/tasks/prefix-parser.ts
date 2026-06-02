@@ -1,4 +1,4 @@
-import type { TodoPriority } from '@/types/todo.types'
+import type { TodoPriority, TodoActionType } from '@/types/todo.types'
 
 export interface TaskDraft {
   title: string
@@ -10,6 +10,8 @@ export interface TaskDraft {
   tags: string[]
   /** Customer reference — populated either by the @-mention popover or legacy +Kunde. */
   customerId?: string
+  /** Detected at creation time from keywords — stored in DB, never re-inferred from title. */
+  actionType?: TodoActionType
 }
 
 const RE_PRIORITY = /^(!{1,2})$/

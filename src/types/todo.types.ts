@@ -2,7 +2,7 @@ export type TodoPriority  = 'p1' | 'p2' | 'p3' | 'p4'
 export type TodoBucket    = 'backlog' | 'today' | 'in_progress' | 'done'
 export type TodoStatus    = 'open' | 'in_progress' | 'done'
 export type TodoSource    = 'manual' | 'finance'
-export type TodoActionType = 'send_reminder' | 'create_invoice'
+export type TodoActionType = 'send_reminder' | 'create_invoice' | 'followup' | 'reply_mail' | 'write_offer' | 'call'
 
 export interface ChecklistItem {
   id: string

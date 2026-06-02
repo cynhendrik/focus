@@ -8,6 +8,7 @@ import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { parseTaskText, type TaskDraft } from './prefix-parser'
+import { detectActionType, ACTION_TYPE_LABELS } from '@/lib/action-keywords'
 import { CalendarEventConfirmCard, type PendingEventDraft } from './CalendarEventConfirmCard'
 import {
   MentionPopover, extractMentionQuery, useMentionPopoverState,
@@ -115,10 +116,11 @@ export function TaskComposer({ customerId }: Props = {}) {
   })
 
   // Parse the text with currently resolved mentions
-  const draft = useMemo(
-    () => parseTaskText(text, { mentions }),
-    [text, mentions],
-  )
+  const draft = useMemo(() => {
+    const parsed = parseTaskText(text, { mentions })
+    parsed.actionType = detectActionType(parsed.title) ?? undefined
+    return parsed
+  }, [text, mentions])
 
   const effectiveCustomerId = useMemo(
     () => customerId ?? draft.customerId,
@@ -204,13 +206,14 @@ export function TaskComposer({ customerId }: Props = {}) {
     }
 
     await upsert({
-      title: eventOverride?.title ?? title,
+      title:          eventOverride?.title ?? title,
       priority:       sourceDraft.priority ?? 'p3',
       scheduledAt:    sourceDraft.scheduledAt,
       plannedMinutes: eventOverride?.plannedMinutes ?? sourceDraft.plannedMinutes,
       tags:           sourceDraft.tags,
       customerId:     eventOverride?.customerId ?? effectiveCustomerId,
       calendarEventId,
+      actionType:     sourceDraft.actionType,
       bucket:         sourceDraft.scheduledAt && sourceDraft.scheduledAt.slice(0, 10) === todayStr
                       ? 'today' : 'backlog',
     })
@@ -314,6 +317,9 @@ export function TaskComposer({ customerId }: Props = {}) {
             <Calendar size={10} style={{ marginRight: 4, display: 'inline', verticalAlign: '-1px' }} />
             Kalender · {draft.plannedMinutes ?? 30}m
           </Chip>
+        )}
+        {draft.actionType && ACTION_TYPE_LABELS[draft.actionType] && (
+          <Chip color="accent">{ACTION_TYPE_LABELS[draft.actionType]}</Chip>
         )}
         {draft.tags.map(t => <Chip key={t} color="muted">#{t}</Chip>)}
         {!customerId && effectiveCustomerId && (() => {
