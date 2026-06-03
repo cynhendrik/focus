@@ -62,7 +62,7 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     .slice(0, 10)
 
   const unreadEmails = input.emails
-    .filter(e => !e.isRead && e.customerId !== null)
+    .filter(e => !e.isRead && e.customerId != null)
     .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
     .slice(0, 10)
 
@@ -145,7 +145,7 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
 
 export function parseCorraResponse(raw: string): CorraIntelligenceResponse {
   const trimmed = raw.trim()
-  const fenceMatch = /^```(?:json)?\s*([\s\S]*?)\s*```$/m.exec(trimmed)
+  const fenceMatch = /^```(?:json)?\s*([\s\S]*?)\s*```$/s.exec(trimmed)
   const jsonStr = fenceMatch ? fenceMatch[1].trim() : trimmed
   try {
     const parsed: unknown = JSON.parse(jsonStr)
