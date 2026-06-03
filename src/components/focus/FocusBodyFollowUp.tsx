@@ -28,12 +28,10 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
   const showToast    = useToastStore(s => s.show)
 
   const account     = todo.customerId ? accounts.find(a => a.id === todo.customerId) : undefined
-  const isReplyMail = todo.actionType === 'reply_mail'
-  const accentColor = isReplyMail ? 'var(--info)' : ACCENT
 
   const [contactName, setContactName] = useState('')
   const [recipient, setRecipient]     = useState('')
-  const [subject, setSubject]         = useState(isReplyMail ? 'Re: …' : 'Kurz nachgehakt')
+  const [subject, setSubject]         = useState('Kurz nachgehakt')
   const [body, setBody]               = useState('')
   const [sending, setSending]         = useState(false)
   const [generating, setGenerating]   = useState(false)
@@ -57,17 +55,16 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
 
   useEffect(() => {
     setGenerating(true)
-    generateCorraDraft(
-      isReplyMail
-        ? { kind: 'reply_mail', customerName: account?.name ?? '', contactName, subject: todo.title, notes: todo.notes }
-        : { kind: 'followup', customerName: account?.name ?? '', contactName, topic: todo.title, notes: todo.notes }
-    )
+    generateCorraDraft({
+      kind: 'followup',
+      customerName: account?.name ?? '',
+      contactName,
+      topic: todo.title,
+      notes: todo.notes,
+    })
       .then(draft => { if (draft) { setBody(draft); setHasCorraDraft(true) } })
       .catch(() => {
-        setBody(isReplyMail
-          ? 'Danke für deine Nachricht! Ich schaue mir das an und melde mich kurz bei dir.'
-          : 'Wollte kurz nachfragen, wie es läuft — gibt es Neuigkeiten von deiner Seite?'
-        )
+        setBody('Wollte kurz nachfragen, wie es läuft — gibt es Neuigkeiten von deiner Seite?')
       })
       .finally(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,11 +74,13 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
     if (generating) return
     setGenerating(true)
     try {
-      const draft = await generateCorraDraft(
-        isReplyMail
-          ? { kind: 'reply_mail', customerName: account?.name ?? '', contactName, subject: todo.title, notes: todo.notes }
-          : { kind: 'followup', customerName: account?.name ?? '', contactName, topic: todo.title, notes: todo.notes }
-      )
+      const draft = await generateCorraDraft({
+        kind: 'followup',
+        customerName: account?.name ?? '',
+        contactName,
+        topic: todo.title,
+        notes: todo.notes,
+      })
       if (draft) { setBody(draft); setHasCorraDraft(true) }
     } catch {
       showToast({ message: 'CORRA konnte keinen Entwurf generieren.', variant: 'error' })
@@ -100,7 +99,7 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
         accountId: mailAccounts[0].id, to: [recipient.trim()],
         subject: subject.trim(), bodyText: body.trim(),
       })
-      showToast({ message: isReplyMail ? 'Antwort gesendet.' : 'Follow-Up gesendet.', variant: 'success' })
+      showToast({ message: 'Follow-Up gesendet.', variant: 'success' })
       await onComplete()
     } catch {
       showToast({ message: 'Senden fehlgeschlagen.', variant: 'error' })
@@ -109,8 +108,7 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
     }
   }
 
-  const contextText = todo.notes
-    ?? (isReplyMail ? 'Eine Antwort ist fällig — CORRA hat einen Entwurf vorbereitet.' : 'Kein aktiver Kontakt — Zeit für eine kurze Nachricht.')
+  const contextText = todo.notes ?? 'Kein aktiver Kontakt — Zeit für eine kurze Nachricht.'
 
   return (
     <div style={{ overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -118,7 +116,7 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
       {/* Context */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{ color: accentColor, fontSize: 14, marginTop: 1, flexShrink: 0 }}>→</span>
+          <span style={{ color: ACCENT, fontSize: 14, marginTop: 1, flexShrink: 0 }}>→</span>
           <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.6 }}>{contextText}</p>
         </div>
         <CorraHintBox hint={corraHint} />
@@ -168,7 +166,7 @@ export function FocusBodyFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button type="button" onClick={handleSend} disabled={sending || generating} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 99, border: 'none', background: (sending || generating) ? 'var(--surface-3)' : 'var(--accent)', color: (sending || generating) ? 'var(--fg-muted)' : 'var(--accent-ink)', fontSize: 13, fontWeight: 700, boxShadow: (sending || generating) ? 'none' : '0 4px 16px -6px var(--accent-glow)', cursor: (sending || generating) ? 'not-allowed' : 'pointer', transition: 'all 200ms' }}>
           <Send size={14} />
-          {sending ? 'Wird gesendet…' : isReplyMail ? 'Antwort senden' : 'Nachfassen'}
+          {sending ? 'Wird gesendet…' : 'Nachfassen'}
         </button>
         <button type="button" onClick={regenerate} disabled={generating} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '11px 18px', borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface-2)', color: generating ? 'var(--fg-dim)' : 'var(--fg)', fontSize: 13, fontWeight: 600, cursor: generating ? 'not-allowed' : 'pointer' }}>
           {generating ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={13} />}
