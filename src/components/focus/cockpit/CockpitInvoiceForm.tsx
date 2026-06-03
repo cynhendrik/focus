@@ -38,7 +38,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
   const betragNum = parseFloat(betrag.replace(',', '.')) || 0
 
   const handleCreate = async () => {
-    if (!beschreibung.trim() || betragNum <= 0 || !workspaceId || !userId) return
+    if (!beschreibung.trim() || betragNum <= 0 || !workspaceId || !userId || !customerId) return
     setSaving(true)
     try {
       await FinanceService.createInvoice({
