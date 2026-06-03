@@ -159,20 +159,20 @@ export function generateCorraContextHint(input: CorraContextHintInput): string {
   const parts: string[] = []
 
   if (input.taskKind === 'reminder') {
-    if (input.avgPaymentDays && input.daysOverdue) {
+    if (input.avgPaymentDays != null && input.daysOverdue != null) {
       if (input.daysOverdue > input.avgPaymentDays * 1.5) {
         parts.push(`${input.customerName} zahlt normalerweise in ${input.avgPaymentDays} Tagen — Tag ${input.daysOverdue} ist ungewöhnlich.`)
       }
     }
-    if (input.daysOverdue !== undefined) {
+    if (input.daysOverdue != null) {
       parts.push(input.daysOverdue > 14 ? 'Ton: bestimmt, aber fair.' : 'Ton: freundlich — wahrscheinlich nur vergessen.')
     }
   }
 
   if (input.taskKind === 'followup') {
-    if (input.lastContactDays && input.lastContactDays > 30) {
+    if (input.lastContactDays != null && input.lastContactDays > 30) {
       parts.push(`Letzter Kontakt vor ${input.lastContactDays} Tagen — kurz mit dem Kontext einsteigen.`)
-    } else if (input.lastContactDays && input.lastContactDays < 3) {
+    } else if (input.lastContactDays != null && input.lastContactDays < 3) {
       parts.push('Letzter Kontakt war erst vor Kurzem — knapp halten.')
     }
   }

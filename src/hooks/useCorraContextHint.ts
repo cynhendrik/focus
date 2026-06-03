@@ -20,8 +20,9 @@ export function useCorraContextHint(
 
     // Average payment days based on paid invoices for this account
     const paidInvoices = invoices.filter(
-      i => i.accountId === customerId && i.status === 'paid',
+      i => i.accountId === customerId && i.status === 'paid' && !!i.dueDate && !!i.updatedAt,
     )
+    // TODO: replace updatedAt with paidAt when the field exists on Invoice
     let avgPaymentDays: number | undefined
     if (paidInvoices.length > 0) {
       const daysArr = paidInvoices.map(i => {
@@ -48,7 +49,7 @@ export function useCorraContextHint(
       const latest = customerActivities
         .map(a => new Date(a.updatedAt).getTime())
         .sort((a, b) => b - a)[0]
-      lastContactDays = Math.floor((Date.now() - latest) / 86_400_000)
+      lastContactDays = Math.max(0, Math.floor((Date.now() - latest) / 86_400_000))
     }
 
     // Open deal with value (Deal links via accountId only — no customerId field on Deal)
