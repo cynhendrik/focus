@@ -16,6 +16,7 @@ import type { Todo } from '@/types/todo.types'
 import type { InvoiceItem } from '@/types/finance.types'
 import type { Contact } from '@/types/contact.types'
 import { Send, Paperclip, Clock } from 'lucide-react'
+import { CorraHintBox } from './CorraHintBox'
 
 interface Props {
   todo: Todo
@@ -179,24 +180,7 @@ export function FocusCardInvoice({ todo, onComplete, onSkip, onPostpone }: Props
         </p>
       )}
 
-      {corraHint && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 9,
-          padding: '11px 14px', borderRadius: 10,
-          background: 'oklch(60% 0.25 280 / 0.06)',
-          border: '1px solid oklch(60% 0.25 280 / 0.15)',
-        }}>
-          <span style={{
-            width: 22, height: 22, borderRadius: 99, flexShrink: 0,
-            background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
-          }}>✦</span>
-          <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
-            <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
-            {corraHint}
-          </span>
-        </div>
-      )}
+      <CorraHintBox hint={corraHint} />
 
       {/* Invoice preview */}
       {invoice && (

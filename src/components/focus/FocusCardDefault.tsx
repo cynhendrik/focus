@@ -13,6 +13,7 @@ import { detectFocusAction, getFocusActionConfig } from '@/lib/focus-actions'
 import type { FocusActionType } from '@/lib/focus-actions'
 import type { LucideIcon } from 'lucide-react'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
+import { CorraHintBox } from './CorraHintBox'
 
 const ACTION_ICONS: Record<FocusActionType, LucideIcon> = {
   invoice: FileText, offer: Tag, mail: Mail, call: Phone, followup: Reply,
@@ -56,6 +57,7 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
   const [noteText, setNoteText]     = useState('')
   const [showNote, setShowNote]     = useState(false)
   const [savingNote, setSavingNote] = useState(false)
+  const [saveError, setSaveError]   = useState(false)
 
   const resolvedActionType = todo.actionType === 'create_invoice' || todo.actionType === 'write_offer'
     ? (todo.actionType === 'create_invoice' ? 'invoice' : 'offer')
@@ -124,24 +126,7 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
           </div>
         )}
 
-        {corraHint && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 9,
-            padding: '11px 14px', borderRadius: 10,
-            background: 'oklch(60% 0.25 280 / 0.06)',
-            border: '1px solid oklch(60% 0.25 280 / 0.15)',
-          }}>
-            <span style={{
-              width: 22, height: 22, borderRadius: 99, flexShrink: 0,
-              background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
-            }}>✦</span>
-            <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
-              <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
-              {corraHint}
-            </span>
-          </div>
-        )}
+        <CorraHintBox hint={corraHint} />
       </div>
 
       {/* Checklist */}
@@ -255,11 +240,17 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
                   boxSizing: 'border-box',
                 }}
               />
+              {saveError && (
+                <p style={{ fontSize: 11, color: 'oklch(72% 0.18 25)', margin: 0 }}>
+                  Konnte nicht gespeichert werden — bitte erneut versuchen.
+                </p>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
                   disabled={!noteText.trim() || savingNote}
                   onClick={async () => {
+                    setSaveError(false)
                     if (!noteText.trim() || !todo.customerId || !workspaceId || !userId) return
                     setSavingNote(true)
                     try {
@@ -274,7 +265,8 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
                       setNoteText('')
                       setShowNote(false)
                     } catch {
-                      // fail silently — convenience feature
+                      setSaveError(true)
+                      // keep note open so user doesn't lose their text
                     } finally {
                       setSavingNote(false)
                     }
