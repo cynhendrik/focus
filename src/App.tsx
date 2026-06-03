@@ -36,6 +36,7 @@ import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
 import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
+import { CorraRoute }            from '@/routes/CorraRoute'
 import { FocusShell }            from '@/components/focus/FocusShell'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
@@ -206,6 +207,7 @@ export default function App() {
       case 'mail':         return <MailRoute />
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
+      case 'corra':        return <CorraRoute />
       // Legacy fallbacks (consolidated wrappers removed)
       case 'sales':        return <LeadsRoute />
       case 'inbox':        return <MailRoute />
