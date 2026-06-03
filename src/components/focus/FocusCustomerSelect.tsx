@@ -106,14 +106,16 @@ export function FocusCustomerSelect({ stack, onSelectCustomer }: Props) {
           return (
             <div
               key={custId}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectCustomer(custId)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectCustomer(custId) } }}
               style={{
                 background: 'var(--surface-2)',
                 border: `1px solid ${group.urgency === 'critical' || group.urgency === 'high' ? 'oklch(72% 0.18 25 / 0.2)' : 'var(--border)'}`,
                 borderRadius: 16, overflow: 'hidden',
                 cursor: 'pointer',
                 display: 'flex', flexDirection: 'column',
-                transition: 'all 200ms',
               }}
             >
               {/* Header */}
@@ -160,7 +162,10 @@ export function FocusCustomerSelect({ stack, onSelectCustomer }: Props) {
                     }}>
                       <div style={{
                         width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                        background: `${color}18`, color,
+                        background: color.startsWith('var(')
+                          ? 'oklch(50% 0 0 / 0.08)'
+                          : `${color}18`,
+                        color,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 9, fontWeight: 700,
                       }}>
