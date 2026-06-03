@@ -6,6 +6,7 @@ import { FocusBodyDefault } from './FocusBodyDefault'
 import { FocusBodyReminder } from './FocusBodyReminder'
 import { FocusBodyInvoice } from './FocusBodyInvoice'
 import { FocusBodyFollowUp } from './FocusBodyFollowUp'
+import { FocusBodyEmail } from './FocusBodyEmail'
 import { FocusCockpitBar } from './FocusCockpitBar'
 
 interface Props {
@@ -22,7 +23,8 @@ export function FocusWorkSurface({ todo, onComplete, onSkip, onPostpone }: Props
 
   const isReminder = todo.actionType === 'send_reminder'
   const isInvoice  = todo.actionType === 'create_invoice'
-  const isFollowup = todo.actionType === 'followup' || todo.actionType === 'reply_mail'
+  const isEmail    = todo.actionType === 'reply_mail' || todo.actionType === 'write_email'
+  const isFollowup = todo.actionType === 'followup'
 
   return (
     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -38,6 +40,8 @@ export function FocusWorkSurface({ todo, onComplete, onSkip, onPostpone }: Props
           <FocusBodyReminder todo={todo} onComplete={onComplete} onSkip={onSkip} onPostpone={onPostpone} />
         ) : isInvoice ? (
           <FocusBodyInvoice todo={todo} onComplete={onComplete} onSkip={onSkip} onPostpone={onPostpone} />
+        ) : isEmail ? (
+          <FocusBodyEmail key={todo.id} todo={todo} onComplete={onComplete} onSkip={onSkip} onPostpone={onPostpone} />
         ) : isFollowup ? (
           <FocusBodyFollowUp todo={todo} onComplete={onComplete} onSkip={onSkip} onPostpone={onPostpone} />
         ) : (
