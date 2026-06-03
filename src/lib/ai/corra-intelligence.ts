@@ -22,6 +22,7 @@ export interface CorraIntelligenceResponse {
 }
 
 export interface CorraMessage {
+  id?: string           // stable key for AnimatePresence
   role: 'user' | 'assistant'
   text: string
   actions?: CorraActionItem[]
@@ -53,7 +54,7 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     input.accounts.find(a => a.id === id)?.name ?? id
 
   const openTodos = input.todos
-    .filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress'))
+    .filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress' || t.status === 'in_progress'))
     .slice(0, 15)
 
   const overdueInvoices = input.invoices
@@ -134,7 +135,7 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     lines.push('')
   }
 
-  if (lines.length === 2) {
+  if (openTodos.length === 0 && overdueInvoices.length === 0 && unreadEmails.length === 0 && openDeals.length === 0 && todayEvents.length === 0) {
     lines.push('Keine offenen Aufgaben, Rechnungen oder Mails heute.')
   }
 

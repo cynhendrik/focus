@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -21,14 +21,18 @@ import { log } from '@/lib/logger'
 interface AnthropicTextBlock { type: 'text'; text: string }
 interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: string }> }
 
-const GREETING: CorraMessage = {
+const makeGreeting = (): CorraMessage => ({
+  id: '0',
   role: 'assistant',
   text: 'Hey — ich bin CORRA Intelligence. Ich habe Zugriff auf deine Todos, Rechnungen, Mails und Deals.\n\nWas möchtest du wissen?',
-}
+})
 
 export function CorraRoute() {
-  const [messages, setMessages] = useState<CorraMessage[]>([GREETING])
+  const [messages, setMessages] = useState<CorraMessage[]>(() => [makeGreeting()])
   const [loading, setLoading]   = useState(false)
+
+  const msgIdRef = useRef(0)
+  const nextId = () => String(++msgIdRef.current)
 
   const invoices       = useFinanceStore(s => s.invoices)
   const todos          = useTodosStore(s => s.allTodos)
@@ -41,7 +45,7 @@ export function CorraRoute() {
   const showToast      = useToastStore(s => s.show)
 
   const handleSend = useCallback(async (text: string) => {
-    const userMsg: CorraMessage = { role: 'user', text }
+    const userMsg: CorraMessage = { id: nextId(), role: 'user', text }
     setMessages(prev => [...prev, userMsg])
     setLoading(true)
 
@@ -79,14 +83,14 @@ export function CorraRoute() {
 
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', text: parsed.text, actions: parsed.actions, focusCta: parsed.focusCta },
+        { id: nextId(), role: 'assistant', text: parsed.text, actions: parsed.actions, focusCta: parsed.focusCta },
       ])
     } catch (e) {
       const errText = e instanceof MissingApiKeyError
         ? 'Kein API-Key konfiguriert — bitte in den Einstellungen hinterlegen.'
         : 'Verbindungsfehler. Versuche es erneut.'
       log.warn('CORRA Intelligence API error', { err: e })
-      setMessages(prev => [...prev, { role: 'assistant', text: errText }])
+      setMessages(prev => [...prev, { id: nextId(), role: 'assistant', text: errText }])
     } finally {
       setLoading(false)
     }
@@ -96,20 +100,24 @@ export function CorraRoute() {
     try {
       for (const action of actions) {
         if (action.type === 'invoice') {
+          const inv = invoices.find(i => i.id === action.id)
           await upsertTodo({
             title:      `Mahnung: ${action.label}`,
             actionType: 'send_reminder',
             sourceRef:  action.id,
+            customerId: inv?.accountId,
             bucket:     'today',
             priority:   'p1',
             checklist:  [],
             tags:       [],
           })
         } else if (action.type === 'mail') {
+          const mail = emails.find(e => e.id === action.id)
           await upsertTodo({
             title:      `${action.label} beantworten`,
             actionType: 'reply_mail',
             sourceRef:  action.id,
+            customerId: mail?.customerId ?? undefined,
             bucket:     'today',
             priority:   'p1',
             checklist:  [],
@@ -122,7 +130,7 @@ export function CorraRoute() {
     } catch {
       showToast({ message: 'Fehler beim Anlegen der Fokus-Aufgaben.', variant: 'error' })
     }
-  }, [upsertTodo, setAppView, showToast])
+  }, [upsertTodo, setAppView, showToast, invoices, emails])
 
   const handleExport = useCallback(() => {
     const lines = messages.map(m => {
@@ -133,13 +141,13 @@ export function CorraRoute() {
       return `${prefix} ${m.text}${actionLines}`
     })
     const content = `# CORRA Intelligence — ${new Date().toLocaleDateString('de-DE')}\n\n${lines.join('\n\n')}`
-    navigator.clipboard.writeText(content).then(() => {
-      showToast({ message: 'Protokoll in Zwischenablage kopiert.', variant: 'success' })
-    })
+    navigator.clipboard.writeText(content)
+      .then(() => showToast({ message: 'Protokoll in Zwischenablage kopiert.', variant: 'success' }))
+      .catch(() => showToast({ message: 'Kopieren fehlgeschlagen.', variant: 'error' }))
   }, [messages, showToast])
 
   const handleClear = useCallback(() => {
-    setMessages([GREETING])
+    setMessages([makeGreeting()])
   }, [])
 
   return (

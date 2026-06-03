@@ -102,7 +102,7 @@ export function CorraChat({ messages, loading, onSend, onFocusActions, onExport,
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => (
             <CorraMessage
-              key={i}
+              key={msg.id ?? String(i)}
               message={msg}
               onFocusActions={onFocusActions}
             />
