@@ -69,7 +69,7 @@ export function FocusCustomerPanel({ customerId, customerName, completedCount, t
     <div style={{
       width: 220, flexShrink: 0,
       borderRight: '1px solid var(--border)',
-      background: 'oklch(8% 0 0)',
+      background: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
@@ -172,7 +172,7 @@ export function FocusCustomerPanel({ customerId, customerName, completedCount, t
                   <div key={act.id} style={{
                     display: 'flex', alignItems: 'flex-start', gap: 8,
                     padding: '6px 0',
-                    borderBottom: i < recentActs.length - 1 ? '1px solid oklch(50% 0 0 / 0.06)' : undefined,
+                    borderBottom: i < recentActs.length - 1 ? '1px solid var(--border)' : undefined,
                   }}>
                     <div style={{
                       width: 7, height: 7, borderRadius: 99, flexShrink: 0, marginTop: 4,

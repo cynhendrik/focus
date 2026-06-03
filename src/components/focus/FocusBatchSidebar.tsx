@@ -36,7 +36,7 @@ export function FocusBatchSidebar({ stack, currentIndex, completedToday, totalTo
     <div style={{
       width: 260, flexShrink: 0,
       borderLeft: '1px solid var(--border)',
-      background: 'oklch(8% 0 0)',
+      background: 'var(--bg)',
       display: 'flex', flexDirection: 'column',
     }}>
       {/* Header */}
