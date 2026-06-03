@@ -66,11 +66,11 @@ export function CorraActionCard({ actions, focusCta, onFocus }: Props) {
         onClick={onFocus}
         style={{
           width: '100%', padding: '9px 14px', border: 'none', borderRadius: 8,
-          background: 'linear-gradient(135deg, var(--accent), #7c3aed)',
+          background: 'var(--accent)',
           color: 'var(--accent-ink)', fontSize: 11, fontWeight: 700,
           cursor: 'pointer', display: 'flex', alignItems: 'center',
           justifyContent: 'center', gap: 6,
-          boxShadow: '0 0 12px color-mix(in srgb, var(--accent) 30%, transparent)',
+          boxShadow: '0 0 12px var(--accent-glow)',
         }}
       >
         <span>⚡</span> {focusCta}

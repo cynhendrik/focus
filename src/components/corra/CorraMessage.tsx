@@ -27,12 +27,12 @@ export function CorraMessage({ message, onFocusActions }: Props) {
       {!isUser && (
         <div style={{
           width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+          background: 'var(--accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 10px rgba(124,58,237,0.35)',
+          boxShadow: '0 0 10px var(--accent-glow)',
           marginTop: 2,
         }}>
-          <Sparkles size={12} style={{ color: '#fff' }} />
+          <Sparkles size={12} style={{ color: 'var(--accent-ink)' }} />
         </div>
       )}
 
@@ -41,10 +41,10 @@ export function CorraMessage({ message, onFocusActions }: Props) {
         padding: '12px 15px',
         borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
         background: isUser
-          ? 'linear-gradient(135deg, #1e1b4b, #2d1b69)'
+          ? 'oklch(92% 0.2 125 / 0.1)'
           : 'var(--surface-2)',
         border: isUser
-          ? '1px solid rgba(124,58,237,0.3)'
+          ? '1px solid oklch(92% 0.2 125 / 0.35)'
           : '1px solid var(--border)',
         fontSize: 13,
         lineHeight: 1.6,

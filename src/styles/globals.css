@@ -1546,8 +1546,8 @@ div:hover > .file-delete-btn {
   margin: 6px 8px 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(124, 58, 237, 0.3);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(124, 58, 237, 0.12));
+  border: 1px solid var(--accent-soft);
+  background: var(--accent-soft);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1557,27 +1557,27 @@ div:hover > .file-delete-btn {
 }
 
 .corra-nav-button[data-active="true"] {
-  border-color: rgba(124, 58, 237, 0.65);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.25), rgba(124, 58, 237, 0.25));
+  border-color: oklch(92% 0.2 125 / 0.5);
+  background: oklch(92% 0.2 125 / 0.18);
   animation: none;
 }
 
 .corra-nav-button:hover:not([data-active="true"]) {
-  border-color: rgba(124, 58, 237, 0.5);
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(124, 58, 237, 0.2));
+  border-color: oklch(92% 0.2 125 / 0.35);
+  background: oklch(92% 0.2 125 / 0.12);
 }
 
 .corra-nav-orb {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 10px rgba(124, 58, 237, 0.55);
+  box-shadow: 0 0 10px var(--accent-glow);
   flex-shrink: 0;
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .corra-nav-text {
@@ -1589,13 +1589,13 @@ div:hover > .file-delete-btn {
 .corra-nav-text span {
   font-size: 12px;
   font-weight: 700;
-  color: #c4b5fd;
+  color: var(--accent-text);
   letter-spacing: -0.01em;
 }
 
 .corra-nav-text small {
   font-size: 8px;
-  color: rgba(167, 139, 250, 0.6);
+  color: oklch(92% 0.2 125 / 0.6);
   font-family: var(--font-mono);
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1612,6 +1612,6 @@ div:hover > .file-delete-btn {
 }
 
 @keyframes corraPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
-  50%       { box-shadow: 0 0 14px 2px rgba(124, 58, 237, 0.25); }
+  0%, 100% { box-shadow: 0 0 0 0 oklch(92% 0.2 125 / 0); }
+  50%       { box-shadow: 0 0 14px 2px oklch(92% 0.2 125 / 0.3); }
 }

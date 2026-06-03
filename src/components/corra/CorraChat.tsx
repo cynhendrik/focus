@@ -56,11 +56,11 @@ export function CorraChat({ messages, loading, onSend, onFocusActions, onExport,
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+            background: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(124,58,237,0.45)',
+            boxShadow: '0 0 16px var(--accent-glow)',
           }}>
-            <span style={{ color: '#fff', fontSize: 14 }}>✦</span>
+            <span style={{ color: 'var(--accent-ink)', fontSize: 14 }}>✦</span>
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.02em' }}>
@@ -113,10 +113,10 @@ export function CorraChat({ messages, loading, onSend, onFocusActions, onExport,
           <div style={{ display: 'flex', padding: '0 24px', gap: 10, alignItems: 'center' }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span style={{ color: '#fff', fontSize: 12 }}>✦</span>
+              <span style={{ color: 'var(--accent-ink)', fontSize: 12 }}>✦</span>
             </div>
             <div style={{
               padding: '10px 14px',
@@ -167,15 +167,12 @@ export function CorraChat({ messages, loading, onSend, onFocusActions, onExport,
             disabled={!input.trim() || loading}
             style={{
               width: 34, height: 34, borderRadius: '50%', border: 'none', flexShrink: 0,
-              background: input.trim() && !loading
-                ? 'linear-gradient(135deg, #4f46e5, #7c3aed)'
-                : 'var(--surface-3)',
-              color: input.trim() && !loading ? '#fff' : 'var(--fg-dim)',
+              background: input.trim() && !loading ? 'var(--accent)' : 'var(--surface-3)',
+              color: input.trim() && !loading ? 'var(--accent-ink)' : 'var(--fg-dim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
               transition: 'all 160ms',
-              boxShadow: input.trim() && !loading
-                ? '0 0 10px rgba(124,58,237,0.4)' : 'none',
+              boxShadow: input.trim() && !loading ? '0 0 10px var(--accent-glow)' : 'none',
             }}
           >
             <Send size={13} />
