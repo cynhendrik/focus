@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useTodosStore } from '@/store/todos.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
+import type { Account } from '@/types/account.types'
 
 const PRIO_ORDER: Record<TodoPriority, number> = { p1: 0, p2: 1, p3: 2, p4: 3 }
 
@@ -21,6 +22,46 @@ export function sortFocus(a: Todo, b: Todo): number {
   const sb = b.scheduledAt ?? ''
   if (sa !== sb) return sa.localeCompare(sb)
   return a.createdAt.localeCompare(b.createdAt)
+}
+
+export type FocusUrgency = 'critical' | 'high' | 'normal' | 'low'
+
+export interface CustomerFocusGroup {
+  customerId: string | null  // null = tasks with no customerId ("Allgemein")
+  customerName: string
+  tasks: Todo[]
+  urgency: FocusUrgency
+}
+
+function computeUrgency(tasks: Todo[]): FocusUrgency {
+  if (tasks.some(t => t.actionType === 'send_reminder')) return 'critical'
+  if (tasks.some(t => t.priority === 'p1' || t.actionType === 'create_invoice')) return 'high'
+  if (tasks.every(t => t.priority === 'p4')) return 'low'
+  return 'normal'
+}
+
+const URGENCY_ORDER: Record<FocusUrgency, number> = { critical: 0, high: 1, normal: 2, low: 3 }
+
+export function groupFocusByCustomer(
+  stack: Todo[],
+  accounts: Account[],
+): CustomerFocusGroup[] {
+  const map = new Map<string | null, Todo[]>()
+  for (const todo of stack) {
+    const key = todo.customerId ?? null
+    map.set(key, [...(map.get(key) ?? []), todo])
+  }
+  const groups: CustomerFocusGroup[] = []
+  for (const [customerId, tasks] of map) {
+    const account = customerId ? accounts.find(a => a.id === customerId) : undefined
+    groups.push({
+      customerId,
+      customerName: account?.name ?? (customerId ? customerId.slice(0, 8) : 'Allgemein'),
+      tasks: [...tasks].sort(sortFocus),
+      urgency: computeUrgency(tasks),
+    })
+  }
+  return groups.sort((a, b) => URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency])
 }
 
 export interface FocusStackApi {
