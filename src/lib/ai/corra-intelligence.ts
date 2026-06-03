@@ -1,7 +1,7 @@
 import type { Invoice } from '@/types/finance.types'
 import type { Todo } from '@/types/todo.types'
 import type { EmailHeader } from '@/types/mail.types'
-import type { Deal } from '@/types/deal.types'
+import type { Deal } from '@/types/pipeline.types'
 import type { CalendarEvent } from '@/types/calendar.types'
 import type { Account } from '@/types/account.types'
 
