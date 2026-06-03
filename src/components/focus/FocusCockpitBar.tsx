@@ -104,7 +104,7 @@ export function FocusCockpitBar({ customerId, customerName }: Props) {
             <span style={{
               width: 18, height: 18, borderRadius: 5, fontSize: 9, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: activeTab === tab.id ? 'rgba(181,240,35,0.1)' : 'transparent',
+              background: activeTab === tab.id ? 'var(--accent-soft)' : 'transparent',
               color: activeTab === tab.id ? 'var(--accent)' : '#484858',
             }}>
               {tab.icon}

@@ -129,7 +129,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, color: '#484858' }}>Fällig in {Math.round((new Date(dueDate).getTime() - Date.now()) / 86_400_000)} Tagen</span>
+        <span style={{ fontSize: 10, color: '#484858' }}>Fällig in {Math.max(0, Math.round((new Date(dueDate).getTime() - Date.now()) / 86_400_000))} Tagen</span>
         <div style={{ flex: 1 }} />
         {/* CORRA Begleit-Mail button — only active when beschreibung + betrag filled */}
         {betragNum > 0 && beschreibung.trim() && (
@@ -173,7 +173,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
         <button
           type="button"
           onClick={handleCreate}
-          disabled={!beschreibung.trim() || betragNum <= 0 || saving || !customerId}
+          disabled={!beschreibung.trim() || betragNum <= 0 || saving || !customerId || !workspaceId || !userId}
           style={{
             padding: '7px 18px', borderRadius: 99, border: 'none',
             background: !beschreibung.trim() || betragNum <= 0 || saving ? 'rgba(255,255,255,0.06)' : 'var(--accent)',

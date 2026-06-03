@@ -34,6 +34,7 @@ export function FocusSessionView({ customerId, onBack }: Props) {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if ((e.target as HTMLElement)?.isContentEditable) return
       if (e.key === 'Escape') { onBack(); return }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); prev() }
       if (e.key === 'ArrowRight') { e.preventDefault(); skip() }
