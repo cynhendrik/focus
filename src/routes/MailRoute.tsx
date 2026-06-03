@@ -86,6 +86,10 @@ export function MailRoute() {
     const scheduledStr = scheduledDate.toISOString()
 
     try {
+      const displayStr = selectedEmail.fromName
+        ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>`
+        : selectedEmail.fromAddr
+
       await upsertTodo({
         title:       `${selectedEmail.subject ?? '(Mail)'} beantworten`,
         customerId:  selectedEmail.customerId ?? undefined,
@@ -94,7 +98,12 @@ export function MailRoute() {
         scheduledAt: scheduledStr,
         actionType:  'reply_mail',
         source:      'manual',
-        notes:       `Von: ${selectedEmail.fromName ? `${selectedEmail.fromName} <${selectedEmail.fromAddr}>` : selectedEmail.fromAddr}`,
+        sourceRef:   selectedEmail.id,
+        notes:       [
+          `Von: ${displayStr}`,
+          `fromAddr: ${selectedEmail.fromAddr}`,
+          `sentAt: ${selectedEmail.sentAt}`,
+        ].join('\n'),
         checklist:   [],
         tags:        [],
       })
