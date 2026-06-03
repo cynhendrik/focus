@@ -10,6 +10,7 @@ import { FocusCardReminder } from './FocusCardReminder'
 import { FocusCardInvoice } from './FocusCardInvoice'
 import { FocusCardFollowUp } from './FocusCardFollowUp'
 import { FocusCorraChat } from './FocusCorraChat'
+import { FocusCockpitBar } from './FocusCockpitBar'
 import { Sparkles } from 'lucide-react'
 
 interface Props {
@@ -204,22 +205,32 @@ export function FocusSessionView({ customerId, onBack }: Props) {
           />
         ) : (
           <div style={{
-            flex: 1, minWidth: 0,
-            overflowY: 'auto',
-            padding: '32px 40px',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
-            <div style={{ width: '100%', maxWidth: 580 }}>
-              {isReminder ? (
-                <FocusCardReminder todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
-              ) : isInvoice ? (
-                <FocusCardInvoice  todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
-              ) : isFollowup ? (
-                <FocusCardFollowUp todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
-              ) : (
-                <FocusCardDefault  todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
-              )}
+            {/* Cards scrollable area */}
+            <div style={{
+              flex: 1, overflowY: 'auto',
+              padding: '32px 40px',
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            }}>
+              <div style={{ width: '100%', maxWidth: 580 }}>
+                {isReminder ? (
+                  <FocusCardReminder todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
+                ) : isInvoice ? (
+                  <FocusCardInvoice  todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
+                ) : isFollowup ? (
+                  <FocusCardFollowUp todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
+                ) : (
+                  <FocusCardDefault  todo={current} onComplete={complete} onSkip={skip} onPostpone={postpone} />
+                )}
+              </div>
             </div>
+
+            {/* Cockpit Bar — persistent at bottom */}
+            <FocusCockpitBar
+              customerId={customerId}
+              customerName={customerName}
+            />
           </div>
         )}
 
