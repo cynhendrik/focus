@@ -31,9 +31,9 @@ export function FocusSessionView({ customerId, onBack }: Props) {
   // Keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onBack(); return }
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'Escape') { onBack(); return }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); prev() }
       if (e.key === 'ArrowRight') { e.preventDefault(); skip() }
       if (e.key.toLowerCase() === 'm') { e.preventDefault(); postpone() }
