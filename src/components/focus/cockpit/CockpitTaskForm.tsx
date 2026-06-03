@@ -53,7 +53,7 @@ export function CockpitTaskForm({ customerId, customerName, onCreated }: Props) 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Customer chip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, color: '#484858', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Für</span>
+        <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Für</span>
         <span style={{
           background: 'oklch(60% 0.25 280 / 0.12)', color: 'oklch(75% 0.2 280)',
           borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 600,
@@ -71,7 +71,7 @@ export function CockpitTaskForm({ customerId, customerName, onCreated }: Props) 
         placeholder="Neue Aufgabe…"
         style={{
           width: '100%', padding: '9px 12px', borderRadius: 9,
-          border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+          border: '1px solid var(--border)', background: 'var(--surface)',
           color: 'var(--fg)', fontSize: 13, outline: 'none',
           fontFamily: 'inherit',
         }}
@@ -88,9 +88,9 @@ export function CockpitTaskForm({ customerId, customerName, onCreated }: Props) 
               onClick={() => setPriority(p.value)}
               style={{
                 padding: '3px 9px', borderRadius: 99, cursor: 'pointer',
-                border: `1px solid ${priority === p.value ? p.color : 'rgba(255,255,255,0.07)'}`,
+                border: `1px solid ${priority === p.value ? p.color : 'var(--border)'}`,
                 background: priority === p.value ? `${p.color}18` : 'transparent',
-                color: priority === p.value ? p.color : '#555',
+                color: priority === p.value ? p.color : 'var(--fg-dim)',
                 fontSize: 10, fontWeight: 600, transition: 'all 160ms',
               }}
             >
@@ -108,8 +108,8 @@ export function CockpitTaskForm({ customerId, customerName, onCreated }: Props) 
           onChange={e => setDueDate(e.target.value)}
           style={{
             padding: '4px 8px', borderRadius: 7,
-            border: '1px solid rgba(255,255,255,0.07)', background: '#141419',
-            color: dueDate ? 'var(--fg)' : '#484858', fontSize: 11, outline: 'none',
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            color: dueDate ? 'var(--fg)' : 'var(--fg-dim)', fontSize: 11, outline: 'none',
           }}
         />
 
@@ -120,8 +120,8 @@ export function CockpitTaskForm({ customerId, customerName, onCreated }: Props) 
           disabled={!title.trim() || saving}
           style={{
             padding: '7px 18px', borderRadius: 99, border: 'none',
-            background: !title.trim() || saving ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
-            color: !title.trim() || saving ? '#484858' : 'var(--accent-ink)',
+            background: !title.trim() || saving ? 'var(--surface-2)' : 'var(--accent)',
+            color: !title.trim() || saving ? 'var(--fg-dim)' : 'var(--accent-ink)',
             fontSize: 12, fontWeight: 700, cursor: !title.trim() || saving ? 'not-allowed' : 'pointer',
           }}
         >

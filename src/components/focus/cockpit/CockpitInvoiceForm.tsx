@@ -77,7 +77,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Customer chip */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, color: '#484858', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Für</span>
+        <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Für</span>
         <span style={{
           background: 'oklch(60% 0.25 280 / 0.12)', color: 'oklch(75% 0.2 280)',
           borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 600,
@@ -95,7 +95,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
           placeholder="Leistung beschreiben…"
           style={{
             padding: '9px 12px', borderRadius: 9,
-            border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+            border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
           }}
         />
@@ -109,11 +109,11 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
             step="0.01"
             style={{
               width: '100%', padding: '9px 28px 9px 12px', borderRadius: 9,
-              border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+              border: '1px solid var(--border)', background: 'var(--surface)',
               color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'var(--font-mono)',
             }}
           />
-          <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#484858', fontSize: 12 }}>€</span>
+          <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-dim)', fontSize: 12 }}>€</span>
         </div>
         <input
           type="date"
@@ -121,7 +121,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
           onChange={e => setDueDate(e.target.value)}
           style={{
             padding: '9px 8px', borderRadius: 9,
-            border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+            border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--fg)', fontSize: 11, outline: 'none',
           }}
         />
@@ -129,7 +129,7 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, color: '#484858' }}>Fällig in {Math.max(0, Math.round((new Date(dueDate).getTime() - Date.now()) / 86_400_000))} Tagen</span>
+        <span style={{ fontSize: 10, color: 'var(--fg-dim)' }}>Fällig in {Math.max(0, Math.round((new Date(dueDate).getTime() - Date.now()) / 86_400_000))} Tagen</span>
         <div style={{ flex: 1 }} />
         {/* CORRA Begleit-Mail button — only active when beschreibung + betrag filled */}
         {betragNum > 0 && beschreibung.trim() && (
@@ -176,8 +176,8 @@ export function CockpitInvoiceForm({ customerId, customerName, onCorraInvoiceDra
           disabled={!beschreibung.trim() || betragNum <= 0 || saving || !customerId || !workspaceId || !userId}
           style={{
             padding: '7px 18px', borderRadius: 99, border: 'none',
-            background: !beschreibung.trim() || betragNum <= 0 || saving ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
-            color: !beschreibung.trim() || betragNum <= 0 || saving ? '#484858' : 'var(--accent-ink)',
+            background: !beschreibung.trim() || betragNum <= 0 || saving ? 'var(--surface-2)' : 'var(--accent)',
+            color: !beschreibung.trim() || betragNum <= 0 || saving ? 'var(--fg-dim)' : 'var(--accent-ink)',
             fontSize: 12, fontWeight: 700,
             cursor: !beschreibung.trim() || betragNum <= 0 || saving ? 'not-allowed' : 'pointer',
           }}

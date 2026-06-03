@@ -21,9 +21,9 @@ export function CorraLamp({ state, onClick }: Props) {
       style={{
         width: 28, height: 28, borderRadius: 99,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: `1px solid ${isOff ? 'rgba(255,255,255,0.07)' : 'oklch(60% 0.25 280 / 0.3)'}`,
+        border: `1px solid ${isOff ? 'var(--border)' : 'oklch(60% 0.25 280 / 0.3)'}`,
         background: isOff ? 'transparent' : 'oklch(60% 0.25 280 / 0.08)',
-        color: isOff ? '#484858' : 'oklch(75% 0.2 280)',
+        color: isOff ? 'var(--fg-dim)' : 'oklch(75% 0.2 280)',
         cursor: isOff || isLoading ? 'not-allowed' : 'pointer',
         transition: 'all 200ms',
         animation: state === 'ready' ? 'lampPulse 2s ease-in-out infinite' : undefined,

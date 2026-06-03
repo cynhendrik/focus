@@ -34,8 +34,8 @@ export function FocusCockpitBar({ customerId, customerName }: Props) {
   const allDeals      = useDealsStore(s => s.deals)
   const showToast     = useToastStore(s => s.show)
 
-  // Lamp readiness
-  const emailLampReady   = activeTab === 'email'   && mailSubject.trim().length > 3
+  // Lamp readiness — only the email tab uses the lamp (invoice has its own inline button)
+  const emailLampReady   = activeTab === 'email' && mailSubject.trim().length > 3
   const currentLampState: LampState = lampState === 'loading'
     ? 'loading'
     : emailLampReady ? 'ready' : 'off'
@@ -76,15 +76,15 @@ export function FocusCockpitBar({ customerId, customerName }: Props) {
 
   return (
     <div style={{
-      borderTop: '1px solid rgba(255,255,255,0.07)',
-      background: '#0f0f14',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--bg)',
       flexShrink: 0,
     }}>
       {/* Tab bar */}
       <div style={{
         display: 'flex', alignItems: 'center',
         padding: '0 20px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        borderBottom: '1px solid var(--border)',
       }}>
         {TABS.map(tab => (
           <button
@@ -96,7 +96,7 @@ export function FocusCockpitBar({ customerId, customerName }: Props) {
               padding: '9px 14px',
               fontSize: 11, fontWeight: 600, cursor: 'pointer',
               background: 'none', border: 'none',
-              color: activeTab === tab.id ? 'var(--fg)' : '#484858',
+              color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg-dim)',
               borderBottom: `2px solid ${activeTab === tab.id ? 'var(--accent)' : 'transparent'}`,
               transition: 'all 180ms',
             }}
@@ -105,7 +105,7 @@ export function FocusCockpitBar({ customerId, customerName }: Props) {
               width: 18, height: 18, borderRadius: 5, fontSize: 9, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: activeTab === tab.id ? 'var(--accent-soft)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--accent)' : '#484858',
+              color: activeTab === tab.id ? 'var(--accent)' : 'var(--fg-dim)',
             }}>
               {tab.icon}
             </span>

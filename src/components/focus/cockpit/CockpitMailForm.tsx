@@ -99,14 +99,14 @@ export const CockpitMailForm = forwardRef<CockpitMailFormRef, Props>(
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {/* AN */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#484858', width: 40, flexShrink: 0 }}>AN</span>
+          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', width: 40, flexShrink: 0 }}>AN</span>
           <input
             value={to}
             onChange={e => setTo(e.target.value)}
             placeholder="E-Mail-Adresse…"
             style={{
               flex: 1, padding: '7px 10px', borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.07)', background: '#141419',
+              border: '1px solid var(--border)', background: 'var(--surface)',
               color: 'var(--fg)', fontSize: 12, outline: 'none',
             }}
           />
@@ -114,14 +114,14 @@ export const CockpitMailForm = forwardRef<CockpitMailFormRef, Props>(
 
         {/* BETREFF */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#484858', width: 40, flexShrink: 0 }}>BETREFF</span>
+          <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', width: 40, flexShrink: 0 }}>BETREFF</span>
           <input
             value={subject}
             onChange={e => setSubject(e.target.value)}
             placeholder="Betreff…"
             style={{
               flex: 1, padding: '7px 10px', borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.07)', background: '#141419',
+              border: '1px solid var(--border)', background: 'var(--surface)',
               color: 'var(--fg)', fontSize: 12, fontWeight: 600, outline: 'none',
             }}
           />
@@ -129,7 +129,7 @@ export const CockpitMailForm = forwardRef<CockpitMailFormRef, Props>(
 
         {/* TipTap body */}
         <div style={{
-          background: '#141419', border: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 9, padding: '10px 12px', minHeight: 72,
         }}>
           <EditorContent editor={editor} />
@@ -143,8 +143,8 @@ export const CockpitMailForm = forwardRef<CockpitMailFormRef, Props>(
             disabled={sending}
             style={{
               padding: '7px 20px', borderRadius: 99, border: 'none',
-              background: sending ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
-              color: sending ? '#484858' : 'var(--accent-ink)',
+              background: sending ? 'var(--surface-2)' : 'var(--accent)',
+              color: sending ? 'var(--fg-dim)' : 'var(--accent-ink)',
               fontSize: 12, fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer',
             }}
           >
