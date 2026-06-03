@@ -73,13 +73,11 @@ export function FocusBodyEmail({ todo, onComplete, onSkip, onPostpone }: Props) 
   useEffect(() => {
     if (!editor) return
     setGenerating(true)
-    generateCorraDraft({
-      kind: 'reply_mail',
-      customerName: account?.name ?? '',
-      contactName: fromLine,
-      subject: todo.title,
-      notes: todo.notes,
-    })
+    generateCorraDraft(
+      isReply
+        ? { kind: 'reply_mail', customerName: account?.name ?? '', contactName: fromLine, subject: todo.title, notes: todo.notes }
+        : { kind: 'followup', customerName: account?.name ?? '', contactName: fromLine, topic: todo.title, notes: todo.notes }
+    )
       .then(draft => {
         if (draft) {
           editor.commands.setContent(`<p>${draft.replace(/\n/g, '</p><p>')}</p>`)
@@ -99,13 +97,11 @@ export function FocusBodyEmail({ todo, onComplete, onSkip, onPostpone }: Props) 
     if (generating || !editor) return
     setGenerating(true)
     try {
-      const draft = await generateCorraDraft({
-        kind: 'reply_mail',
-        customerName: account?.name ?? '',
-        contactName: fromLine,
-        subject,
-        notes: todo.notes,
-      })
+      const draft = await generateCorraDraft(
+        isReply
+          ? { kind: 'reply_mail', customerName: account?.name ?? '', contactName: fromLine, subject, notes: todo.notes }
+          : { kind: 'followup', customerName: account?.name ?? '', contactName: fromLine, topic: subject || todo.title, notes: todo.notes }
+      )
       if (draft) {
         editor.commands.setContent(`<p>${draft.replace(/\n/g, '</p><p>')}</p>`)
         setHasCorraDraft(true)
@@ -115,7 +111,7 @@ export function FocusBodyEmail({ todo, onComplete, onSkip, onPostpone }: Props) 
     } finally {
       setGenerating(false)
     }
-  }, [generating, editor, account?.name, fromLine, subject, todo.notes, showToast])
+  }, [generating, editor, account?.name, fromLine, subject, todo.notes, showToast, isReply, todo.title])
 
   const handleSend = async () => {
     const bodyText = editor?.getText() ?? ''
