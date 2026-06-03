@@ -11,9 +11,8 @@ import { generateCorraDraft } from '@/lib/ai/corra'
 import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Contact } from '@/types/contact.types'
-import { Send, Sparkles, Loader, AlertTriangle, Mail } from 'lucide-react'
+import { Send, Sparkles, Loader, AlertTriangle, Mail, MessageCircle } from 'lucide-react'
 import { useCorraContextHint } from '@/hooks/useCorraContextHint'
-import { MessageCircle } from 'lucide-react'
 
 interface Props {
   todo: Todo
@@ -316,7 +315,7 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
           <input
             value={recipient}
             onChange={e => setRecipient(e.target.value)}
-            placeholder="E-Mail-Adresse…"
+            placeholder={channel === 'whatsapp' ? 'Handynummer…' : 'E-Mail-Adresse…'}
             style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 13, color: 'var(--fg)', outline: 'none' }}
           />
         </div>
