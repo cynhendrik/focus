@@ -10,9 +10,9 @@ interface Props {
 
 function getTypeMeta(t: Todo): { icon: string; label: string; color: string; bg: string } {
   if (t.actionType === 'send_reminder')
-    return { icon: '€', label: 'Mahnung',   color: 'oklch(72% 0.18 25)', bg: 'oklch(72% 0.18 25 / 0.1)' }
+    return { icon: '€', label: 'Mahnung',   color: 'var(--danger)', bg: 'oklch(72% 0.18 25 / 0.1)' }
   if (t.actionType === 'create_invoice')
-    return { icon: '€', label: 'Rechnung',  color: 'oklch(72% 0.18 25)', bg: 'oklch(72% 0.18 25 / 0.1)' }
+    return { icon: '€', label: 'Rechnung',  color: 'var(--danger)', bg: 'oklch(72% 0.18 25 / 0.1)' }
   if (t.actionType === 'reply_mail')
     return { icon: '✉', label: 'Antwort',   color: 'var(--info)',         bg: 'oklch(78% 0.13 235 / 0.1)' }
   if (t.actionType === 'followup')

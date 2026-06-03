@@ -54,9 +54,8 @@ export function FocusCustomerPanel({ customerId, customerName, completedCount, t
   const account = accounts.find(a => a.id === customerId)
 
   const customerInvoices = invoices.filter(i => i.accountId === customerId)
-  const openInvoiceTotal = customerInvoices
-    .filter(i => i.status !== 'paid')
-    .reduce((sum, i) => sum + i.total, 0)
+  const openInvoices = customerInvoices.filter(i => i.status !== 'paid')
+  const openInvoiceTotal = openInvoices.reduce((sum, i) => sum + i.total, 0)
 
   const recentActs = [...activities]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -141,7 +140,7 @@ export function FocusCustomerPanel({ customerId, customerName, completedCount, t
           <KpiTile
             label="Offene Rechnungen"
             value={`${openInvoiceTotal.toLocaleString('de-DE')} €`}
-            sub={`${customerInvoices.filter(i => i.status !== 'paid').length} offen`}
+            sub={`${openInvoices.length} offen`}
             valueColor="oklch(72% 0.18 25)"
           />
         )}
