@@ -23,6 +23,8 @@ const PRIO_LABEL: Record<TodoPriority, string> = {
 function getAccentColor(todo: Todo): string {
   if (todo.actionType === 'send_reminder' || todo.actionType === 'create_invoice') return 'var(--danger)'
   if (todo.actionType === 'followup' || todo.actionType === 'reply_mail') return 'var(--warn)'
+  if (todo.actionType === 'write_offer') return 'var(--accent)'
+  if (todo.actionType === 'call') return 'var(--info)'
   return PRIO_COLOR[todo.priority] ?? 'var(--accent)'
 }
 
@@ -31,6 +33,8 @@ function getPrioLabel(todo: Todo): string {
   if (todo.actionType === 'create_invoice') return 'Rechnung'
   if (todo.actionType === 'followup') return 'Follow-Up'
   if (todo.actionType === 'reply_mail') return 'Antwort'
+  if (todo.actionType === 'write_offer') return 'Angebot'
+  if (todo.actionType === 'call') return 'Anruf'
   return PRIO_LABEL[todo.priority] ?? 'Aufgabe'
 }
 
