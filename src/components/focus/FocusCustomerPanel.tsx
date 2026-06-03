@@ -58,6 +58,7 @@ export function FocusCustomerPanel({ customerId, customerName, completedCount, t
   const openInvoiceTotal = openInvoices.reduce((sum, i) => sum + i.total, 0)
 
   const recentActs = [...activities]
+    .filter(a => a.accountId === customerId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 4)
 
