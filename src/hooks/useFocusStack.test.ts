@@ -76,6 +76,7 @@ describe('groupFocusByCustomer', () => {
     ]
     const accounts = [makeAccount('c1', 'Acme'), makeAccount('c2', 'Beta')]
     const groups = groupFocusByCustomer(tasks, accounts)
+    expect(groups).toHaveLength(2)
     expect(groups.map(g => g.customerId)).toContain('c1')
     expect(groups.find(g => g.customerId === 'c1')?.tasks).toHaveLength(2)
     expect(groups.find(g => g.customerId === 'c2')?.tasks).toHaveLength(1)
@@ -85,6 +86,27 @@ describe('groupFocusByCustomer', () => {
     const tasks = [makeTodo({ id: 'a', customerId: 'c1', actionType: 'send_reminder' })]
     const groups = groupFocusByCustomer(tasks, [makeAccount('c1', 'Acme')])
     expect(groups[0].urgency).toBe('critical')
+  })
+
+  it('puts p1 tasks as high urgency', () => {
+    const tasks = [makeTodo({ id: 'a', customerId: 'c1', priority: 'p1' })]
+    const groups = groupFocusByCustomer(tasks, [makeAccount('c1', 'Acme')])
+    expect(groups[0].urgency).toBe('high')
+  })
+
+  it('puts create_invoice tasks as high urgency', () => {
+    const tasks = [makeTodo({ id: 'a', customerId: 'c1', actionType: 'create_invoice' })]
+    const groups = groupFocusByCustomer(tasks, [makeAccount('c1', 'Acme')])
+    expect(groups[0].urgency).toBe('high')
+  })
+
+  it('puts all-p4 tasks as low urgency', () => {
+    const tasks = [
+      makeTodo({ id: 'a', customerId: 'c1', priority: 'p4' }),
+      makeTodo({ id: 'b', customerId: 'c1', priority: 'p4' }),
+    ]
+    const groups = groupFocusByCustomer(tasks, [makeAccount('c1', 'Acme')])
+    expect(groups[0].urgency).toBe('low')
   })
 
   it('sorts critical before normal', () => {
