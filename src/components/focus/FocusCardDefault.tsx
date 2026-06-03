@@ -4,6 +4,9 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useUiStore } from '@/store/ui.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useActivitiesStore } from '@/store/activities.store'
+import { useAuthStore } from '@/store/auth.store'
+import { useCorraContextHint } from '@/hooks/useCorraContextHint'
 import type { Todo, TodoPriority } from '@/types/todo.types'
 import { Check, ArrowRight, FileText, Tag, Mail, Phone, Reply } from 'lucide-react'
 import { detectFocusAction, getFocusActionConfig } from '@/lib/focus-actions'
@@ -45,6 +48,14 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
   const account   = todo.customerId ? accounts.find(a => a.id === todo.customerId) : undefined
   const doneCount = todo.checklist.filter(c => c.done).length
   const accentColor = PRIO_COLOR[todo.priority] ?? PRIO_COLOR.p3
+
+  const corraHint      = useCorraContextHint(todo.customerId, account?.name ?? '', 'general')
+  const createActivity = useActivitiesStore(s => s.create)
+  const userId         = useAuthStore(s => s.user?.id)
+
+  const [noteText, setNoteText]     = useState('')
+  const [showNote, setShowNote]     = useState(false)
+  const [savingNote, setSavingNote] = useState(false)
 
   const resolvedActionType = todo.actionType === 'create_invoice' || todo.actionType === 'write_offer'
     ? (todo.actionType === 'create_invoice' ? 'invoice' : 'offer')
@@ -110,6 +121,25 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
             <span style={{ color: accentColor, fontSize: 14, marginTop: 1, flexShrink: 0 }}>→</span>
             <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.6 }}>{todo.notes}</p>
+          </div>
+        )}
+
+        {corraHint && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 9,
+            padding: '11px 14px', borderRadius: 10,
+            background: 'oklch(60% 0.25 280 / 0.06)',
+            border: '1px solid oklch(60% 0.25 280 / 0.15)',
+          }}>
+            <span style={{
+              width: 22, height: 22, borderRadius: 99, flexShrink: 0,
+              background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+            }}>✦</span>
+            <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+              <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
+              {corraHint}
+            </span>
           </div>
         )}
       </div>
@@ -189,6 +219,90 @@ export function FocusCardDefault({ todo, onComplete, onSkip, onPostpone }: Props
           </span>
           <ArrowRight size={15} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />
         </button>
+      )}
+
+      {/* Schnellnotiz */}
+      {todo.customerId && (
+        <div>
+          {!showNote ? (
+            <button
+              type="button"
+              onClick={() => setShowNote(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '10px 14px', borderRadius: 10,
+                border: '1px dashed var(--border)', background: 'transparent',
+                color: 'var(--fg-dim)', fontSize: 12, cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 14 }}>✎</span>
+              Schnellnotiz hinzufügen…
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                autoFocus
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                placeholder="Notiz…"
+                rows={3}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10,
+                  border: '1px solid var(--border)', background: 'var(--surface-2)',
+                  color: 'var(--fg)', fontSize: 13, outline: 'none',
+                  resize: 'none', fontFamily: 'inherit', lineHeight: 1.6,
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={!noteText.trim() || savingNote}
+                  onClick={async () => {
+                    if (!noteText.trim() || !todo.customerId || !workspaceId || !userId) return
+                    setSavingNote(true)
+                    try {
+                      await createActivity({
+                        workspaceId,
+                        createdBy: userId,
+                        accountId: todo.customerId,
+                        type: 'note',
+                        title: 'Schnellnotiz aus Focus',
+                        body: noteText.trim(),
+                      })
+                      setNoteText('')
+                      setShowNote(false)
+                    } catch {
+                      // fail silently — convenience feature
+                    } finally {
+                      setSavingNote(false)
+                    }
+                  }}
+                  style={{
+                    padding: '7px 16px', borderRadius: 99, border: 'none',
+                    background: 'var(--accent)', color: 'var(--accent-ink)',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    opacity: !noteText.trim() || savingNote ? 0.5 : 1,
+                  }}
+                >
+                  {savingNote ? 'Speichert…' : 'Speichern'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNote(false); setNoteText('') }}
+                  style={{
+                    padding: '7px 14px', borderRadius: 99,
+                    border: '1px solid var(--border)', background: 'transparent',
+                    color: 'var(--fg-dim)', fontSize: 12, cursor: 'pointer',
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Actions */}

@@ -4,6 +4,7 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useCorraContextHint } from '@/hooks/useCorraContextHint'
 import { useToastStore } from '@/store/toast.store'
 import { useMailStore } from '@/store/mail.store'
 import { useCompanyStore } from '@/store/company.store'
@@ -41,6 +42,13 @@ export function FocusCardInvoice({ todo, onComplete, onSkip, onPostpone }: Props
 
   const invoice = invoices.find(i => i.id === todo.sourceRef)
   const account = invoice ? accounts.find(a => a.id === invoice.accountId) : undefined
+
+  const corraHint = useCorraContextHint(
+    invoice?.accountId,
+    account?.name ?? '',
+    'invoice',
+    invoice?.id,
+  )
 
   const [items, setItems]           = useState<InvoiceItem[]>([])
   const [billingEmail, setBillingEmail] = useState<string>('')
@@ -169,6 +177,25 @@ export function FocusCardInvoice({ todo, onComplete, onSkip, onPostpone }: Props
         <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.5 }}>
           {todo.notes}
         </p>
+      )}
+
+      {corraHint && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 9,
+          padding: '11px 14px', borderRadius: 10,
+          background: 'oklch(60% 0.25 280 / 0.06)',
+          border: '1px solid oklch(60% 0.25 280 / 0.15)',
+        }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: 99, flexShrink: 0,
+            background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+          }}>✦</span>
+          <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+            <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
+            {corraHint}
+          </span>
+        </div>
       )}
 
       {/* Invoice preview */}
