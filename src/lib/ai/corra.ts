@@ -134,3 +134,52 @@ export async function generateCorraDraft(ctx: CorraContext): Promise<string> {
   const block = response.content.find((b): b is AnthropicTextBlock => b.type === 'text')
   return block?.text.trim() ?? ''
 }
+
+// ---------------------------------------------------------------------------
+// CORRA Context Hints — synchronous, rule-based (no API calls)
+// ---------------------------------------------------------------------------
+
+export type CorraHintTaskKind = 'reminder' | 'followup' | 'invoice' | 'general'
+
+export interface CorraContextHintInput {
+  customerName: string
+  taskKind: CorraHintTaskKind
+  avgPaymentDays?: number
+  daysOverdue?: number
+  lastContactDays?: number
+  openDealValue?: number
+  openDealTitle?: string
+}
+
+function formatEurHint(n: number): string {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+}
+
+export function generateCorraContextHint(input: CorraContextHintInput): string {
+  const parts: string[] = []
+
+  if (input.taskKind === 'reminder') {
+    if (input.avgPaymentDays && input.daysOverdue) {
+      if (input.daysOverdue > input.avgPaymentDays * 1.5) {
+        parts.push(`${input.customerName} zahlt normalerweise in ${input.avgPaymentDays} Tagen — Tag ${input.daysOverdue} ist ungewöhnlich.`)
+      }
+    }
+    if (input.daysOverdue !== undefined) {
+      parts.push(input.daysOverdue > 14 ? 'Ton: bestimmt, aber fair.' : 'Ton: freundlich — wahrscheinlich nur vergessen.')
+    }
+  }
+
+  if (input.taskKind === 'followup') {
+    if (input.lastContactDays && input.lastContactDays > 30) {
+      parts.push(`Letzter Kontakt vor ${input.lastContactDays} Tagen — kurz mit dem Kontext einsteigen.`)
+    } else if (input.lastContactDays && input.lastContactDays < 3) {
+      parts.push('Letzter Kontakt war erst vor Kurzem — knapp halten.')
+    }
+  }
+
+  if (input.openDealValue && input.openDealTitle) {
+    parts.push(`Offener Deal: „${input.openDealTitle}" (${formatEurHint(input.openDealValue)}) — Beziehung schonen.`)
+  }
+
+  return parts.slice(0, 2).join(' ')
+}
