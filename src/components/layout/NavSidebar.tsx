@@ -10,7 +10,7 @@ import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply,
   Calendar, Mail, Settings, Plug,
-  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap,
+  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -138,6 +138,22 @@ export function NavSidebar() {
         <div className="sidebar-brand-text">
           <strong>Focus</strong>
           <span>CYNERA · 2026</span>
+        </div>
+      </div>
+
+      {/* CORRA Intelligence — premium nav button above Workspace */}
+      <div
+        className="corra-nav-button"
+        data-active={appView === 'corra' ? 'true' : 'false'}
+        onClick={() => setAppView('corra')}
+        title="CORRA Intelligence"
+      >
+        <div className="corra-nav-orb">
+          <Sparkles size={12} />
+        </div>
+        <div className="corra-nav-text">
+          <span>CORRA</span>
+          <small>Intelligence</small>
         </div>
       </div>
 
