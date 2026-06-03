@@ -12,6 +12,8 @@ import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Contact } from '@/types/contact.types'
 import { Send, Sparkles, Loader, AlertTriangle, Mail } from 'lucide-react'
+import { useCorraContextHint } from '@/hooks/useCorraContextHint'
+import { MessageCircle } from 'lucide-react'
 
 interface Props {
   todo: Todo
@@ -57,6 +59,13 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
     ).length
   }, [invoice, allTodos])
 
+  const corraHint = useCorraContextHint(
+    invoice?.accountId,
+    account?.name ?? '',
+    'reminder',
+    invoice?.id,
+  )
+
   const accentColor = LEVEL_COLOR[dunningLevel] ?? LEVEL_COLOR[2]
   const daysOverdue = invoice
     ? Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / 86_400_000))
@@ -68,6 +77,7 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
   const [sending, setSending]     = useState(false)
   const [generating, setGenerating] = useState(false)
   const [hasCorraDraft, setHasCorraDraft] = useState(false)
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('email')
 
   // Load contact email
   useEffect(() => {
@@ -126,6 +136,10 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
   }
 
   const handleSend = async () => {
+    if (channel === 'whatsapp') {
+      showToast({ message: 'WhatsApp-Versand kommt bald.', variant: 'info' })
+      return
+    }
     if (!mailAccounts[0]) { showToast({ message: 'Kein E-Mail-Konto konfiguriert.', variant: 'error' }); return }
     if (!recipient.trim()) { showToast({ message: 'Bitte Empfänger-E-Mail angeben.', variant: 'error' }); return }
     setSending(true)
@@ -214,6 +228,25 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
             Nach dieser Mahnung: manuell über Inkasso / rechtliche Schritte entscheiden.
           </div>
         )}
+
+        {corraHint && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 9,
+            padding: '11px 14px', borderRadius: 10,
+            background: 'oklch(60% 0.25 280 / 0.06)',
+            border: '1px solid oklch(60% 0.25 280 / 0.15)',
+          }}>
+            <span style={{
+              width: 22, height: 22, borderRadius: 99, flexShrink: 0,
+              background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+            }}>✦</span>
+            <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+              <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
+              {corraHint}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Compose area */}
@@ -231,14 +264,31 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
           <div style={{ display: 'flex', gap: 6 }}>
             <button
               type="button"
+              onClick={() => setChannel('email')}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '5px 12px', borderRadius: 8,
-                background: 'var(--accent)', color: 'var(--accent-ink)',
-                border: 'none', fontSize: 12, fontWeight: 600, cursor: 'default',
+                background: channel === 'email' ? 'var(--accent)' : 'transparent',
+                color: channel === 'email' ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                border: channel === 'email' ? 'none' : '1px solid var(--border)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
               }}
             >
               <Mail size={12} /> E-Mail
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannel('whatsapp')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: channel === 'whatsapp' ? 'var(--accent)' : 'transparent',
+                color: channel === 'whatsapp' ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                border: channel === 'whatsapp' ? 'none' : '1px solid var(--border)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <MessageCircle size={12} /> WhatsApp
             </button>
           </div>
           {hasCorraDraft && !generating && (
@@ -272,17 +322,19 @@ export function FocusCardReminder({ todo, onComplete, onSkip, onPostpone }: Prop
         </div>
 
         {/* BETREFF */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 14,
-          padding: '10px 16px', borderBottom: '1px solid var(--border)',
-        }}>
-          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', flexShrink: 0, width: 44 }}>BETREFF</span>
-          <input
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 13, color: 'var(--fg)', fontWeight: 600, outline: 'none' }}
-          />
-        </div>
+        {channel === 'email' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '10px 16px', borderBottom: '1px solid var(--border)',
+          }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', flexShrink: 0, width: 44 }}>BETREFF</span>
+            <input
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 13, color: 'var(--fg)', fontWeight: 600, outline: 'none' }}
+            />
+          </div>
+        )}
 
         {/* Body */}
         <textarea

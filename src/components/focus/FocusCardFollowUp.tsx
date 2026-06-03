@@ -9,6 +9,8 @@ import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Contact } from '@/types/contact.types'
 import { Send, Sparkles, Loader, Mail } from 'lucide-react'
+import { useCorraContextHint } from '@/hooks/useCorraContextHint'
+import { MessageCircle } from 'lucide-react'
 
 interface Props {
   todo: Todo
@@ -36,6 +38,13 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
   const [sending, setSending]         = useState(false)
   const [generating, setGenerating]   = useState(false)
   const [hasCorraDraft, setHasCorraDraft] = useState(false)
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('email')
+
+  const corraHint = useCorraContextHint(
+    todo.customerId,
+    account?.name ?? '',
+    'followup',
+  )
 
   useEffect(() => {
     if (!todo.customerId) return
@@ -88,6 +97,10 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
   }
 
   const handleSend = async () => {
+    if (channel === 'whatsapp') {
+      showToast({ message: 'WhatsApp-Versand kommt bald.', variant: 'info' })
+      return
+    }
     if (!mailAccounts[0]) { showToast({ message: 'Kein E-Mail-Konto konfiguriert.', variant: 'error' }); return }
     if (!recipient.trim()) { showToast({ message: 'Bitte eine Empfänger-E-Mail angeben.', variant: 'error' }); return }
     setSending(true)
@@ -149,6 +162,25 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
           <span style={{ color: accentColor, fontSize: 14, marginTop: 1, flexShrink: 0 }}>→</span>
           <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.6 }}>{contextText}</p>
         </div>
+
+        {corraHint && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 9,
+            padding: '11px 14px', borderRadius: 10,
+            background: 'oklch(60% 0.25 280 / 0.06)',
+            border: '1px solid oklch(60% 0.25 280 / 0.15)',
+          }}>
+            <span style={{
+              width: 22, height: 22, borderRadius: 99, flexShrink: 0,
+              background: 'oklch(60% 0.25 280 / 0.2)', color: 'oklch(75% 0.2 280)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+            }}>✦</span>
+            <span style={{ fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+              <span style={{ color: 'oklch(75% 0.2 280)', fontWeight: 500 }}>CORRA: </span>
+              {corraHint}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Compose area */}
@@ -158,14 +190,36 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 16px', borderBottom: '1px solid var(--border)',
         }}>
-          <button type="button" style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 12px', borderRadius: 8,
-            background: 'var(--accent)', color: 'var(--accent-ink)',
-            border: 'none', fontSize: 12, fontWeight: 600, cursor: 'default',
-          }}>
-            <Mail size={12} /> E-Mail
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => setChannel('email')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: channel === 'email' ? 'var(--accent)' : 'transparent',
+                color: channel === 'email' ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                border: channel === 'email' ? 'none' : '1px solid var(--border)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <Mail size={12} /> E-Mail
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannel('whatsapp')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 12px', borderRadius: 8,
+                background: channel === 'whatsapp' ? 'var(--accent)' : 'transparent',
+                color: channel === 'whatsapp' ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                border: channel === 'whatsapp' ? 'none' : '1px solid var(--border)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <MessageCircle size={12} /> WhatsApp
+            </button>
+          </div>
           {hasCorraDraft && !generating && (
             <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', display: 'flex', alignItems: 'center', gap: 5 }}>
               <Sparkles size={9} /> CORRA-ENTWURF · EDITIERBAR
@@ -196,14 +250,16 @@ export function FocusCardFollowUp({ todo, onComplete, onSkip, onPostpone }: Prop
         </div>
 
         {/* BETREFF */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', flexShrink: 0, width: 44 }}>BETREFF</span>
-          <input
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 13, color: 'var(--fg)', fontWeight: 600, outline: 'none' }}
-          />
-        </div>
+        {channel === 'email' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)', flexShrink: 0, width: 44 }}>BETREFF</span>
+            <input
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 13, color: 'var(--fg)', fontWeight: 600, outline: 'none' }}
+            />
+          </div>
+        )}
 
         {/* Body */}
         <textarea
