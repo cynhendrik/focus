@@ -14,7 +14,7 @@ function fmtEur(n: number) {
 export function WidgetRevenue() {
   const invoices = useFinanceStore(s => s.invoices)
 
-  const { paidNow, paidPrev, trend, bars } = useMemo(() => {
+  const { paidNow, trend, bars } = useMemo(() => {
     const now = new Date()
     const weekStart = startOfWeek(now)
     const prevWeekStart = new Date(weekStart); prevWeekStart.setDate(prevWeekStart.getDate() - 7)
@@ -42,7 +42,7 @@ export function WidgetRevenue() {
     }
     const maxBar = Math.max(...bars, 1)
 
-    return { paidNow, paidPrev, trend: trendPct, bars: bars.map(b => b / maxBar) }
+    return { paidNow, trend: trendPct, bars: bars.map(b => b / maxBar) }
   }, [invoices])
 
   const overdueCount = invoices.filter(i => i.status === 'overdue').length

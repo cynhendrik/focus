@@ -21,9 +21,10 @@ export function WidgetWeek() {
 
   const totalThisWeek = eventsPerDay.reduce((s, es) => s + es.length, 0)
 
+  const nowIso = now.toISOString().slice(0, 16) // "YYYY-MM-DDTHH:MM"
   const todayEvents = (eventsPerDay[dayOfWeek] ?? [])
     .sort((a, b) => a.startAt.localeCompare(b.startAt))
-  const nextEvent = todayEvents[0]
+  const nextEvent = todayEvents.find(e => e.startAt.slice(0, 16) >= nowIso) ?? todayEvents[todayEvents.length - 1]
 
   return (
     <div style={{ minWidth: 300, maxWidth: 380, position: 'relative' }}>

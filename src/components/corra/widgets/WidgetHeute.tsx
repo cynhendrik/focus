@@ -14,10 +14,11 @@ export function WidgetHeute() {
     t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')
   )
   const unreadMails = emails.filter(e => !e.isRead && e.customerId != null)
-  const todayEvents = allEvents
+  const allTodayEvents = allEvents
     .filter(e => e.startAt.startsWith(todayStr))
     .sort((a, b) => a.startAt.localeCompare(b.startAt))
-    .slice(0, 4)
+
+  const todayEvents = allTodayEvents.slice(0, 4) // only for timeline
 
   type TodayItem =
     | { kind: 'event'; time: string; label: string }
@@ -61,7 +62,7 @@ export function WidgetHeute() {
       </div>
 
       <div style={{ display: 'flex', gap: 24, marginBottom: 20 }}>
-        <Counter value={todayEvents.length} label="TERMINE" />
+        <Counter value={allTodayEvents.length} label="TERMINE" />
         <div style={{ width: 1, background: 'rgba(163,230,53,0.1)', alignSelf: 'stretch' }} />
         <Counter value={todayTodos.length} label="AUFGABEN" />
         <div style={{ width: 1, background: 'rgba(163,230,53,0.1)', alignSelf: 'stretch' }} />

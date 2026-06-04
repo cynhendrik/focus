@@ -6,7 +6,7 @@ import type { Todo, UpsertTodoPayload } from '@/types/todo.types'
 export function WidgetTodos() {
   const allTodos   = useTodosStore(s => s.allTodos)
   const upsertTodo = useTodosStore(s => s.upsert)
-  const [completing, setCompleting] = useState<string | null>(null)
+  const [completing, setCompleting] = useState<Set<string>>(new Set())
 
   const todayTodos = allTodos
     .filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress'))
@@ -14,7 +14,7 @@ export function WidgetTodos() {
     .slice(0, 5)
 
   const handleDone = async (todo: Todo) => {
-    setCompleting(todo.id)
+    setCompleting(prev => new Set(prev).add(todo.id))
     try {
       const payload: UpsertTodoPayload = {
         id: todo.id, title: todo.title, status: 'done', bucket: 'done',
@@ -23,7 +23,7 @@ export function WidgetTodos() {
       }
       await upsertTodo(payload)
     } finally {
-      setCompleting(null)
+      setCompleting(prev => { const next = new Set(prev); next.delete(todo.id); return next })
     }
   }
 
@@ -54,7 +54,7 @@ export function WidgetTodos() {
             <button
               type="button"
               onClick={() => handleDone(todo)}
-              disabled={completing === todo.id}
+              disabled={completing.has(todo.id)}
               style={{
                 width: 18, height: 18, borderRadius: 5,
                 border: '1px solid rgba(163,230,53,0.4)',
@@ -65,7 +65,7 @@ export function WidgetTodos() {
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(163,230,53,0.15)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
             >
-              {completing === todo.id && <Loader size={10} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />}
+              {completing.has(todo.id) && <Loader size={10} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />}
             </button>
             <span style={{ fontSize: 13, color: '#ddd', flex: 1 }}>{todo.title}</span>
             <span style={{ fontSize: 9, color: 'rgba(163,230,53,0.35)', fontFamily: 'var(--font-mono)' }}>
