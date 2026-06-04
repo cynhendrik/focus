@@ -413,24 +413,70 @@ function WorkspaceView() {
 
       {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
       {!queueLoading && currentItem && (
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.div
-            key={`${currentItem.id}-${queueIndex}`}
-            custom={direction}
-            initial={{ opacity: 0, x: direction * 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: direction * -30 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-          >
-            <HeuteTile
-              item={currentItem}
-              index={queueIndex}
-              total={queueItems.length}
-              onDone={handleDone}
-              onSkip={handleSkip}
-            />
-          </motion.div>
-        </AnimatePresence>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          {/* Aktuelle Kachel */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <AnimatePresence mode="wait" custom={direction}>
+              <motion.div
+                key={`${currentItem.id}-${queueIndex}`}
+                custom={direction}
+                initial={{ opacity: 0, x: direction * 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: direction * -30 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <HeuteTile
+                  item={currentItem}
+                  index={queueIndex}
+                  total={queueItems.length}
+                  onDone={handleDone}
+                  onSkip={handleSkip}
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Als nächstes */}
+          {queueItems.slice(queueIndex + 1, queueIndex + 4).length > 0 && (
+            <div style={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{
+                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600,
+                padding: '0 2px',
+              }}>
+                Als nächstes
+              </span>
+              {queueItems.slice(queueIndex + 1, queueIndex + 4).map((next, i) => {
+                const typeLabel =
+                  next.type === 'invoice_reminder' ? 'Mahnung' :
+                  next.type === 'mail_reply'        ? 'Mail' :
+                  next.type === 'followup'          ? 'Follow-up' : 'Todo'
+                return (
+                  <div key={next.id} style={{
+                    borderRadius: 12, border: '1px solid var(--border)',
+                    background: 'var(--surface-1)', padding: '12px 14px',
+                    opacity: 1 - i * 0.2,
+                    display: 'flex', flexDirection: 'column', gap: 5,
+                  }}>
+                    <span style={{
+                      fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
+                      textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700,
+                    }}>
+                      {typeLabel}
+                    </span>
+                    <span style={{
+                      fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.4,
+                      display: '-webkit-box', WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>
+                      {next.reason}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       )}
       {!queueLoading && queueIndex >= queueItems.length && queueItems.length > 0 && (
         <div style={{
