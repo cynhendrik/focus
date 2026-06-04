@@ -74,3 +74,35 @@ describe('buildCorraIntelligenceContext', () => {
     expect(ctx).not.toContain('RECHNUNGEN ÜBERFÄLLIG')
   })
 })
+
+describe('parseCorraResponse — widget field', () => {
+  it('extracts valid widget type', () => {
+    const raw = JSON.stringify({ text: 'Dein Umsatz:', widget: 'revenue' })
+    expect(parseCorraResponse(raw).widget).toBe('revenue')
+  })
+
+  it('rejects unknown widget value', () => {
+    const raw = JSON.stringify({ text: 'Hallo', widget: 'unknown' })
+    expect(parseCorraResponse(raw).widget).toBeUndefined()
+  })
+
+  it('handles missing widget field gracefully', () => {
+    const raw = JSON.stringify({ text: 'Hallo' })
+    expect(parseCorraResponse(raw).widget).toBeUndefined()
+  })
+
+  it('still parses text when widget present', () => {
+    const raw = JSON.stringify({ text: 'Umsatz diese Woche', widget: 'revenue' })
+    const result = parseCorraResponse(raw)
+    expect(result.text).toBe('Umsatz diese Woche')
+    expect(result.widget).toBe('revenue')
+  })
+
+  it('accepts all valid widget types', () => {
+    const types = ['revenue', 'todos', 'mails', 'week', 'heute'] as const
+    for (const type of types) {
+      const raw = JSON.stringify({ text: 'x', widget: type })
+      expect(parseCorraResponse(raw).widget).toBe(type)
+    }
+  })
+})

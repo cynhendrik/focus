@@ -15,8 +15,13 @@ export interface CorraActionItem {
   urgency: string
 }
 
+export type CorraWidgetType = 'revenue' | 'todos' | 'mails' | 'week' | 'heute'
+
+const VALID_WIDGETS = new Set<string>(['revenue', 'todos', 'mails', 'week', 'heute'])
+
 export interface CorraIntelligenceResponse {
   text: string
+  widget?: CorraWidgetType
   actions?: CorraActionItem[]
   focusCta?: string
 }
@@ -25,6 +30,7 @@ export interface CorraMessage {
   id?: string           // stable key for AnimatePresence
   role: 'user' | 'assistant'
   text: string
+  widget?: CorraWidgetType
   actions?: CorraActionItem[]
   focusCta?: string
 }
@@ -156,9 +162,12 @@ export function parseCorraResponse(raw: string): CorraIntelligenceResponse {
       'text' in parsed &&
       typeof (parsed as { text: unknown }).text === 'string'
     ) {
-      const p = parsed as { text: string; actions?: unknown; focusCta?: unknown }
+      const p = parsed as { text: string; widget?: unknown; actions?: unknown; focusCta?: unknown }
       return {
         text:     p.text,
+        widget:   typeof p.widget === 'string' && VALID_WIDGETS.has(p.widget)
+                    ? p.widget as CorraWidgetType
+                    : undefined,
         actions:  Array.isArray(p.actions) ? (p.actions as CorraActionItem[]) : undefined,
         focusCta: typeof p.focusCta === 'string' ? p.focusCta : undefined,
       }
@@ -198,4 +207,12 @@ REGELN:
 - Ton: direkt, kompetent, kein Berater-Speak
 - Zahlen immer mit konkreten Werten (€, Tage, Namen)
 - IDs EXAKT aus dem Kontext übernehmen (nach "ID:")
-- Nur Daten aus dem Kontext — keine Erfindungen`
+- Nur Daten aus dem Kontext — keine Erfindungen
+
+WIDGET-FELD (optional, nur wenn inhaltlich passend):
+Wenn deine Antwort primär Umsatz/Rechnungen/Finanzen zeigt → füge "widget": "revenue" ins JSON
+Wenn deine Antwort Todos/Aufgaben zeigt → "widget": "todos"
+Wenn deine Antwort Mails/Nachrichten zeigt → "widget": "mails"
+Wenn deine Antwort Kalender/Termine/Woche zeigt → "widget": "week"
+Wenn deine Antwort einen Tagesüberblick gibt (mehrere Kategorien) → "widget": "heute"
+Bei reinen Text-Antworten (Erklärungen, Fragen) → kein "widget" Feld`
