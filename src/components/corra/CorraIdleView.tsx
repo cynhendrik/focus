@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { motion, useMotionValue, useSpring } from 'framer-motion'
+import { motion, useMotionValue } from 'framer-motion'
 import { CorraSuggestedPrompts } from './CorraSuggestedPrompts'
 
 interface Props {
@@ -11,16 +11,19 @@ export function CorraIdleView({ onSend, loading }: Props) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Mouse-following glow
-  const rawX = useMotionValue(-9999)
-  const rawY = useMotionValue(-9999)
-  const glowX = useSpring(rawX, { stiffness: 55, damping: 22 })
-  const glowY = useSpring(rawY, { stiffness: 55, damping: 22 })
+  // Exact mouse-following glow — no spring lag
+  const glowX = useMotionValue(-9999)
+  const glowY = useMotionValue(-9999)
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    rawX.set(e.clientX - rect.left)
-    rawY.set(e.clientY - rect.top)
+    glowX.set(e.clientX - rect.left)
+    glowY.set(e.clientY - rect.top)
+  }
+
+  const handleMouseLeave = () => {
+    glowX.set(-9999)
+    glowY.set(-9999)
   }
 
   const handleSend = () => {
@@ -37,6 +40,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
   return (
     <div
       onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       style={{
         position: 'absolute', inset: 0,
         display: 'flex', flexDirection: 'column',
@@ -45,14 +49,14 @@ export function CorraIdleView({ onSend, loading }: Props) {
         overflow: 'hidden',
       }}
     >
-      {/* Mouse-following glow */}
+      {/* Exact mouse glow */}
       <motion.div
         style={{
           position: 'absolute',
-          width: 480, height: 480,
+          width: 520, height: 520,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(163,230,53,0.14) 0%, rgba(163,230,53,0.04) 45%, transparent 70%)',
-          filter: 'blur(48px)',
+          background: 'radial-gradient(circle, rgba(163,230,53,0.16) 0%, rgba(163,230,53,0.05) 40%, transparent 70%)',
+          filter: 'blur(52px)',
           x: glowX,
           y: glowY,
           translateX: '-50%',
@@ -67,35 +71,8 @@ export function CorraIdleView({ onSend, loading }: Props) {
         position: 'absolute', inset: 0, pointerEvents: 'none',
         backgroundImage: 'radial-gradient(circle, rgba(163,230,53,0.07) 1px, transparent 1px)',
         backgroundSize: '22px 22px',
+        zIndex: 0,
       }} />
-
-      {/* Animated lime blobs */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        <div style={{
-          position: 'absolute', width: 600, height: 600, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.08)',
-          filter: 'blur(110px)',
-          bottom: '-10%', left: '-8%',
-          animation: 'blob1 14s ease-in-out infinite',
-          willChange: 'transform',
-        }} />
-        <div style={{
-          position: 'absolute', width: 500, height: 500, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.06)',
-          filter: 'blur(100px)',
-          top: '-15%', right: '-10%',
-          animation: 'blob2 18s ease-in-out infinite',
-          willChange: 'transform',
-        }} />
-        <div style={{
-          position: 'absolute', width: 380, height: 380, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.05)',
-          filter: 'blur(90px)',
-          top: '40%', left: '55%',
-          animation: 'blob3 22s ease-in-out infinite',
-          willChange: 'transform',
-        }} />
-      </div>
 
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 24px' }}>
@@ -175,27 +152,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
         {/* Suggested prompts */}
         <CorraSuggestedPrompts onSelect={text => { setInput(''); onSend(text) }} />
       </div>
-
-      <style>{`
-        @keyframes blob1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          25%       { transform: translate(60px, -50px) scale(1.08); }
-          50%       { transform: translate(20px, 40px) scale(0.95); }
-          75%       { transform: translate(-40px, -20px) scale(1.03); }
-        }
-        @keyframes blob2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          30%       { transform: translate(-70px, 50px) scale(1.06); }
-          60%       { transform: translate(50px, -30px) scale(0.92); }
-          80%       { transform: translate(-20px, 60px) scale(1.04); }
-        }
-        @keyframes blob3 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          20%       { transform: translate(-40px, -60px) scale(1.1); }
-          55%       { transform: translate(60px, 30px) scale(0.9); }
-          80%       { transform: translate(-10px, -40px) scale(1.05); }
-        }
-      `}</style>
     </div>
   )
 }
