@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { motion, useMotionValue, useSpring } from 'framer-motion'
 import { CorraSuggestedPrompts } from './CorraSuggestedPrompts'
 
 interface Props {
@@ -9,6 +10,18 @@ interface Props {
 export function CorraIdleView({ onSend, loading }: Props) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Mouse-following glow
+  const rawX = useMotionValue(-9999)
+  const rawY = useMotionValue(-9999)
+  const glowX = useSpring(rawX, { stiffness: 55, damping: 22 })
+  const glowY = useSpring(rawY, { stiffness: 55, damping: 22 })
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    rawX.set(e.clientX - rect.left)
+    rawY.set(e.clientY - rect.top)
+  }
 
   const handleSend = () => {
     const text = input.trim()
@@ -22,13 +35,33 @@ export function CorraIdleView({ onSend, loading }: Props) {
   }
 
   return (
-    <div style={{
-      position: 'absolute', inset: 0,
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: '#080808',
-      overflow: 'hidden',
-    }}>
+    <div
+      onMouseMove={handleMouseMove}
+      style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: '#080808',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Mouse-following glow */}
+      <motion.div
+        style={{
+          position: 'absolute',
+          width: 480, height: 480,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(163,230,53,0.14) 0%, rgba(163,230,53,0.04) 45%, transparent 70%)',
+          filter: 'blur(48px)',
+          x: glowX,
+          y: glowY,
+          translateX: '-50%',
+          translateY: '-50%',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+
       {/* Dot grid */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -40,24 +73,24 @@ export function CorraIdleView({ onSend, loading }: Props) {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         <div style={{
           position: 'absolute', width: 600, height: 600, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.13)',
-          filter: 'blur(100px)',
+          background: 'rgba(163,230,53,0.08)',
+          filter: 'blur(110px)',
           bottom: '-10%', left: '-8%',
           animation: 'blob1 14s ease-in-out infinite',
           willChange: 'transform',
         }} />
         <div style={{
           position: 'absolute', width: 500, height: 500, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.09)',
-          filter: 'blur(90px)',
+          background: 'rgba(163,230,53,0.06)',
+          filter: 'blur(100px)',
           top: '-15%', right: '-10%',
           animation: 'blob2 18s ease-in-out infinite',
           willChange: 'transform',
         }} />
         <div style={{
           position: 'absolute', width: 380, height: 380, borderRadius: '50%',
-          background: 'rgba(163,230,53,0.07)',
-          filter: 'blur(80px)',
+          background: 'rgba(163,230,53,0.05)',
+          filter: 'blur(90px)',
           top: '40%', left: '55%',
           animation: 'blob3 22s ease-in-out infinite',
           willChange: 'transform',
