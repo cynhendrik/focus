@@ -35,13 +35,13 @@
 
 :root {
   /* Flächen — warmes Neutral, Hue 270. Werte 1:1 aus Design-System. */
-  --bg: oklch(13% 0.005 270);
-  --bg-2: oklch(15% 0.006 270);
-  --surface: oklch(18% 0.006 270);
-  --surface-2: oklch(22% 0.008 270);
-  --surface-3: oklch(26% 0.009 270);
-  --border: oklch(30% 0.01 270);
-  --border-strong: oklch(40% 0.012 270);
+  --bg: oklch(19% 0.006 270);
+  --bg-2: oklch(21% 0.007 270);
+  --surface: oklch(24% 0.008 270);
+  --surface-2: oklch(28% 0.009 270);
+  --surface-3: oklch(32% 0.01 270);
+  --border: oklch(36% 0.011 270);
+  --border-strong: oklch(46% 0.013 270);
   --fg: oklch(98% 0 0);
   --fg-2: oklch(82% 0.005 270);
   --fg-muted: oklch(64% 0.008 270);
