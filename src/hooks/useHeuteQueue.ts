@@ -14,17 +14,16 @@ export function useHeuteQueue() {
   const [items, setItems]     = useState<HeuteQueueItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  const invoices       = useFinanceStore(s => s.invoices)
-  const todos          = useTodosStore(s => s.allTodos)
-  const emails         = useMailStore(s => s.emails)
-  const deals          = useDealsStore(s => s.deals)
-  const calendarEvents = useCalendarStore(s => s.events)
-  const accounts       = useAccountsStore(s => s.accounts)
-
-  const input = { todos, invoices, emails, deals, calendarEvents, accounts }
-
   const load = useCallback(async () => {
     setLoading(true)
+    const input = {
+      todos:          useTodosStore.getState().allTodos,
+      invoices:       useFinanceStore.getState().invoices,
+      emails:         useMailStore.getState().emails,
+      deals:          useDealsStore.getState().deals,
+      calendarEvents: useCalendarStore.getState().events,
+      accounts:       useAccountsStore.getState().accounts,
+    }
     try {
       const queue = await fetchHeuteQueue(input)
       setItems(queue.length > 0 ? queue : staticHeuteQueue(input))
@@ -36,7 +35,6 @@ export function useHeuteQueue() {
     } finally {
       setLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => { load() }, [load])
