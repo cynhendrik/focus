@@ -4,7 +4,8 @@
 // die Inhalte unterscheiden sich pro Tab.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Home, TrendingUp, ArrowRight, Reply, Target,
 } from 'lucide-react'
@@ -22,10 +23,14 @@ import { useDealsStore } from '@/store/deals.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
+import { useToastStore } from '@/store/toast.store'
+import { useHeuteQueue } from '@/hooks/useHeuteQueue'
+import { HeuteTile } from '@/components/heute/HeuteTile'
 
 import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
 import type { Todo } from '@/types/todo.types'
+import type { UpsertTodoPayload } from '@/types/todo.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -247,8 +252,46 @@ function WorkspaceView() {
   const followUps = useCrmStore(s => s.allFollowUps)
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
+  const upsertTodo = useTodosStore(s => s.upsert)
+  const showToast  = useToastStore(s => s.show)
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
+
+  // Heute-Cockpit queue
+  const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
+  const [queueIndex, setQueueIndex] = useState(0)
+  const [direction, setDirection]   = useState<1 | -1>(1)
+
+  const advance = useCallback(() => {
+    setDirection(1)
+    setQueueIndex(prev => prev + 1)
+  }, [])
+
+  const handleDone = useCallback(async () => {
+    const item = queueItems[queueIndex]
+    if (!item) return
+    try {
+      if (item.type === 'todo' || item.type === 'mail_reply' || item.type === 'followup') {
+        const todo = todos.find(t => t.id === item.id)
+        if (todo) {
+          const payload: UpsertTodoPayload = {
+            id: todo.id, title: todo.title, status: 'done', bucket: 'done',
+            priority: todo.priority, customerId: todo.customerId,
+            actionType: todo.actionType, sourceRef: todo.sourceRef,
+            notes: todo.notes, checklist: todo.checklist, tags: todo.tags,
+          }
+          await upsertTodo(payload)
+        }
+      }
+    } catch {
+      showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
+    }
+    advance()
+  }, [queueItems, queueIndex, todos, upsertTodo, advance, showToast])
+
+  const handleSkip = useCallback(() => advance(), [advance])
+
+  const currentItem = queueItems[queueIndex]
 
   // Umsatz
   const { paidNow, paidPrev, label, hintPrevLabel } = useMemo(() => {
@@ -367,6 +410,56 @@ function WorkspaceView() {
           action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
         />
       </div>
+
+      {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
+      {!queueLoading && currentItem && (
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={`${currentItem.id}-${queueIndex}`}
+            custom={direction}
+            initial={{ opacity: 0, x: direction * 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: direction * -30 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <HeuteTile
+              item={currentItem}
+              index={queueIndex}
+              total={queueItems.length}
+              onDone={handleDone}
+              onSkip={handleSkip}
+            />
+          </motion.div>
+        </AnimatePresence>
+      )}
+      {!queueLoading && queueIndex >= queueItems.length && queueItems.length > 0 && (
+        <div style={{
+          borderRadius: 16, border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)',
+          background: 'var(--surface-1)', padding: '24px 32px',
+          display: 'flex', alignItems: 'center', gap: 16,
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%', background: 'var(--accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 16px var(--accent-glow)', flexShrink: 0,
+          }}>
+            <span style={{ color: 'var(--accent-ink)', fontSize: 16 }}>✓</span>
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>Alles erledigt für heute.</div>
+            <button
+              type="button"
+              onClick={() => { setQueueIndex(0); reshuffle() }}
+              style={{
+                background: 'none', border: 'none', color: 'var(--accent)',
+                fontSize: 12, cursor: 'pointer', padding: 0, marginTop: 4,
+              }}
+            >
+              Neu prüfen →
+            </button>
+          </div>
+        </div>
+      )}
 
       <TagesplanCard events={events} todos={todos} customers={customers} />
 

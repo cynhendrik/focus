@@ -93,10 +93,6 @@ export function NavSidebar() {
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const isAdmin = useCompanyStore(s => s.isAdmin)
   const modules = useCompanyStore(s => s.modules)
-  const allTodos   = useTodosStore(s => s.allTodos)
-  const focusCount = allTodos.filter(t =>
-    t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')
-  ).length
 
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
 
@@ -110,7 +106,6 @@ export function NavSidebar() {
     if (!mod('mail')     && appView === 'mail')      setAppView('dashboard')
     if (!mod('kalender') && appView === 'calendar')  setAppView('dashboard')
     if (!mod('leads',  true)  && appView === 'leads') setAppView('dashboard')
-    if (!mod('focus')  && appView === 'focus')       setAppView('dashboard')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modules, appView, setAppView])
 
@@ -166,9 +161,6 @@ export function NavSidebar() {
           )}
           {mod('finanzen') && isAdmin && (
             <SidebarNavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'} onClick={() => setAppView('invoices')} kbd="F" />
-          )}
-          {mod('focus') && (
-            <SidebarNavItem icon={Zap} label="Fokus" active={appView === 'focus'} onClick={() => setAppView('focus')} kbd="W" badge={focusCount || undefined} />
           )}
         </>
       )}
