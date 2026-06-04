@@ -17,8 +17,8 @@ export function CorraIdleView({ onSend, loading }: Props) {
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    glowX.set(e.clientX - rect.left)
-    glowY.set(e.clientY - rect.top)
+    glowX.set(e.clientX - rect.left - 260)  // 260 = half of 520px glow
+    glowY.set(e.clientY - rect.top - 260)
   }
 
   const handleMouseLeave = () => {
@@ -59,8 +59,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
           filter: 'blur(52px)',
           x: glowX,
           y: glowY,
-          translateX: '-50%',
-          translateY: '-50%',
           pointerEvents: 'none',
           zIndex: 0,
         }}
