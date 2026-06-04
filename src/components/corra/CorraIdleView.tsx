@@ -53,6 +53,8 @@ export function CorraIdleView({ onSend, loading }: Props) {
       <motion.div
         style={{
           position: 'absolute',
+          top: 0,
+          left: 0,
           width: 520, height: 520,
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(163,230,53,0.16) 0%, rgba(163,230,53,0.05) 40%, transparent 70%)',
