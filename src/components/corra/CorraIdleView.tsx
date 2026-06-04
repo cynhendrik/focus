@@ -36,14 +36,33 @@ export function CorraIdleView({ onSend, loading }: Props) {
         backgroundSize: '22px 22px',
       }} />
 
-      {/* Aurora */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: [
-          'radial-gradient(ellipse 55% 45% at 15% 85%, rgba(163,230,53,0.09) 0%, transparent 65%)',
-          'radial-gradient(ellipse 45% 35% at 85% 15%, rgba(163,230,53,0.06) 0%, transparent 60%)',
-        ].join(', '),
-      }} />
+      {/* Animated lime blobs */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        <div style={{
+          position: 'absolute', width: 600, height: 600, borderRadius: '50%',
+          background: 'rgba(163,230,53,0.13)',
+          filter: 'blur(100px)',
+          bottom: '-10%', left: '-8%',
+          animation: 'blob1 14s ease-in-out infinite',
+          willChange: 'transform',
+        }} />
+        <div style={{
+          position: 'absolute', width: 500, height: 500, borderRadius: '50%',
+          background: 'rgba(163,230,53,0.09)',
+          filter: 'blur(90px)',
+          top: '-15%', right: '-10%',
+          animation: 'blob2 18s ease-in-out infinite',
+          willChange: 'transform',
+        }} />
+        <div style={{
+          position: 'absolute', width: 380, height: 380, borderRadius: '50%',
+          background: 'rgba(163,230,53,0.07)',
+          filter: 'blur(80px)',
+          top: '40%', left: '55%',
+          animation: 'blob3 22s ease-in-out infinite',
+          willChange: 'transform',
+        }} />
+      </div>
 
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 24px' }}>
@@ -123,6 +142,27 @@ export function CorraIdleView({ onSend, loading }: Props) {
         {/* Suggested prompts */}
         <CorraSuggestedPrompts onSelect={text => { setInput(''); onSend(text) }} />
       </div>
+
+      <style>{`
+        @keyframes blob1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          25%       { transform: translate(60px, -50px) scale(1.08); }
+          50%       { transform: translate(20px, 40px) scale(0.95); }
+          75%       { transform: translate(-40px, -20px) scale(1.03); }
+        }
+        @keyframes blob2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          30%       { transform: translate(-70px, 50px) scale(1.06); }
+          60%       { transform: translate(50px, -30px) scale(0.92); }
+          80%       { transform: translate(-20px, 60px) scale(1.04); }
+        }
+        @keyframes blob3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          20%       { transform: translate(-40px, -60px) scale(1.1); }
+          55%       { transform: translate(60px, 30px) scale(0.9); }
+          80%       { transform: translate(-10px, -40px) scale(1.05); }
+        }
+      `}</style>
     </div>
   )
 }
