@@ -37,7 +37,7 @@ import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
 import { CorraRoute }            from '@/routes/CorraRoute'
-import { FocusShell }            from '@/components/focus/FocusShell'
+import { HeuteRoute }            from '@/routes/HeuteRoute'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
@@ -186,7 +186,7 @@ export default function App() {
   if (appView === 'focus') {
     return (
       <AppShell>
-        <FocusShell />
+        <HeuteRoute />
         <DownloadToast />
         <ToastViewport />
       </AppShell>
