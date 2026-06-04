@@ -38,11 +38,13 @@ export function parseHeuteQueue(raw: string): HeuteQueueItem[] {
   try {
     const parsed: unknown = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
+    const VALID_TYPES = new Set<string>(['invoice_reminder', 'mail_reply', 'todo', 'followup'])
     return parsed
       .filter((item): item is HeuteQueueItem =>
         item !== null &&
         typeof item === 'object' &&
         typeof (item as HeuteQueueItem).type === 'string' &&
+        VALID_TYPES.has((item as HeuteQueueItem).type) &&
         typeof (item as HeuteQueueItem).id === 'string' &&
         typeof (item as HeuteQueueItem).reason === 'string'
       )
@@ -58,15 +60,14 @@ export function staticHeuteQueue(input: CorraContextInput): HeuteQueueItem[] {
   // 1. Overdue invoices — sort by total * daysOverdue descending
   const overdueInvoices = input.invoices
     .filter((i: Invoice) => i.status === 'overdue')
-    .map((i: Invoice) => ({
-      invoice: i,
-      score: i.total * Math.floor((Date.now() - new Date(i.dueDate).getTime()) / 86_400_000),
-    }))
+    .map((i: Invoice) => {
+      const days = Math.max(0, Math.floor((Date.now() - new Date(i.dueDate).getTime()) / 86_400_000))
+      return { invoice: i, score: i.total * days, days }
+    })
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
 
-  for (const { invoice, score } of overdueInvoices) {
-    const days = Math.floor(score / invoice.total)
+  for (const { invoice, days } of overdueInvoices) {
     items.push({
       type: 'invoice_reminder',
       id: invoice.id,
