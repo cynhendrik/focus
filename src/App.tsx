@@ -45,6 +45,7 @@ import { GlobalQuickComposer } from '@/components/global/GlobalQuickComposer'
 import { ToastViewport }       from '@/components/ui/Toast'
 import { SplashScreen }        from '@/components/ui/SplashScreen'
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
+import { QuickCaptureModal }   from '@/components/layout/QuickCaptureModal'
 import { OnboardingWizard, hasCompletedOnboarding } from '@/components/onboarding/OnboardingWizard'
 import { seedSampleAiSummaries } from '@/lib/seed-ai-summaries'
 
@@ -66,8 +67,9 @@ export default function App() {
   const loadCalendar    = useCalendarStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
-  const cmdOpen           = useUiStore(s => s.cmdPaletteOpen)
-  const setCmdPaletteOpen = useUiStore(s => s.setCmdPaletteOpen)
+  const cmdOpen             = useUiStore(s => s.cmdPaletteOpen)
+  const setCmdPaletteOpen   = useUiStore(s => s.setCmdPaletteOpen)
+  const setQuickCaptureOpen = useUiStore(s => s.setQuickCaptureOpen)
   const sidebarCollapsed  = useUiStore(s => s.sidebarCollapsed)
   const appMode           = useUiStore(s => s.appMode)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
@@ -117,10 +119,16 @@ export default function App() {
         setCmdPaletteOpen(true)
         return
       }
+      // Cmd/Ctrl+Shift+N → Quick Capture
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'n') {
+        e.preventDefault()
+        setQuickCaptureOpen(true)
+        return
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [openPicker, setCmdPaletteOpen])
+  }, [openPicker, setCmdPaletteOpen, setQuickCaptureOpen])
 
   useEffect(() => {
     if (DEV_BYPASS && !activeWorkspaceId) {
@@ -226,6 +234,7 @@ export default function App() {
     return (
       <AppShell>
         <PrivateShell />
+        <QuickCaptureModal />
         <DownloadToast />
         <ToastViewport />
       </AppShell>
@@ -247,6 +256,7 @@ export default function App() {
       </div>
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
       {pickerOpen && <ClientPicker />}
+      <QuickCaptureModal />
       <DownloadToast />
       <ToastViewport />
       <GlobalQuickComposer />

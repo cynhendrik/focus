@@ -10,7 +10,7 @@ import {
   Home, Users, CreditCard,
   TrendingUp, Target, Reply,
   Calendar, Mail, Settings, Plug,
-  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap, Sparkles,
+  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap, Sparkles, PenLine,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -82,6 +82,7 @@ export function NavSidebar() {
   const appView          = useUiStore(s => s.appView)
   const setAppView       = useUiStore(s => s.setAppView)
   const collapsed        = useUiStore(s => s.sidebarCollapsed)
+  const setQuickCapture  = useUiStore(s => s.setQuickCaptureOpen)
   const toggleSidebar    = useUiStore(s => s.toggleSidebar)
   const enterPrivate     = useUiStore(s => s.enterPrivate)
   const user             = useAuthStore(s => s.user)
@@ -193,6 +194,35 @@ export function NavSidebar() {
       )}
 
       <div style={{ flex: 1 }} />
+
+      {/* Quick Capture */}
+      <button
+        type="button"
+        onClick={() => setQuickCapture(true)}
+        title="Quick Capture (⌘⇧N)"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: collapsed ? '10px 0' : '10px 14px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          margin: '0 8px 4px',
+          borderRadius: 10, border: '1px dashed var(--border)',
+          background: 'transparent', cursor: 'pointer',
+          color: 'var(--fg-dim)', fontSize: 12,
+          transition: 'all 140ms',
+          width: collapsed ? 'calc(100% - 16px)' : 'calc(100% - 16px)',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = 'var(--accent)'
+          e.currentTarget.style.color = 'var(--accent)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = 'var(--border)'
+          e.currentTarget.style.color = 'var(--fg-dim)'
+        }}
+      >
+        <PenLine size={14} style={{ flexShrink: 0 }} />
+        {!collapsed && <span>Quick Capture</span>}
+      </button>
 
       <button
         className="sidebar-collapse-btn"
