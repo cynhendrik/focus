@@ -120,7 +120,12 @@
   --fg-2: oklch(28% 0.006 270);
   --fg-muted: oklch(46% 0.008 270);
   --fg-dim: oklch(60% 0.008 270);
-  --accent-text: oklch(28% 0.06 130);
+  --accent:      oklch(50% 0.22 125);
+  --accent-2:    oklch(44% 0.22 125);
+  --accent-soft: oklch(50% 0.22 125 / 0.12);
+  --accent-glow: oklch(50% 0.22 125 / 0.3);
+  --accent-text: oklch(50% 0.22 125);
+  --accent-ink:  oklch(98% 0 0);
   --shadow-glass: 0 1px 0 0 oklch(100% 0 0 / 0.9) inset, 0 0 0 1px oklch(0% 0 0 / 0.06), 0 30px 80px -20px oklch(0% 0 0 / 0.18);
   --shadow-2: 0 30px 60px -25px oklch(0% 0 0 / 0.25), 0 0 0 1px oklch(0% 0 0 / 0.04);
   --text: var(--fg);
@@ -426,8 +431,10 @@ input:focus, textarea:focus, button:focus { outline: none; }
 }
 
 .nav-item--primary { font-weight: 700; }
-.nav-item--featured { color: var(--accent); font-weight: 600; }
-.nav-item--featured[data-active="true"] { color: var(--accent); }
+.nav-item--featured { color: var(--fg-2); font-weight: 600; }
+.nav-item--featured svg { color: var(--accent); }
+.nav-item--featured[data-active="true"] { color: var(--fg); }
+.nav-item--featured[data-active="true"] svg { color: var(--accent); }
 
 .nav-capture {
   display: flex; align-items: center; gap: 10px;
