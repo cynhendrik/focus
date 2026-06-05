@@ -244,6 +244,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
   left: -8px; height: 14px;
 }
 .sidebar[data-collapsed="true"] .nav-section { display: none; }
+.sidebar[data-collapsed="true"] .nav-capture { padding: 10px 6px; justify-content: center; }
+.sidebar[data-collapsed="true"] .nav-capture span { display: none; }
 .sidebar[data-collapsed="true"] .sidebar-user { justify-content: center; padding: 8px; }
 .sidebar[data-collapsed="true"] .sidebar-user-text { display: none; }
 
@@ -422,6 +424,21 @@ input:focus, textarea:focus, button:focus { outline: none; }
   font-weight: 600; color: var(--accent-ink); background: var(--accent);
   padding: 1px 6px; border-radius: 99px;
 }
+
+.nav-item--primary { font-weight: 700; }
+.nav-item--featured { color: var(--accent); font-weight: 600; }
+.nav-item--featured[data-active="true"] { color: var(--accent); }
+
+.nav-capture {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; margin: 0 0 2px;
+  border-radius: 10px; border: 1px dashed oklch(100% 0 0 / 0.1);
+  background: transparent; cursor: pointer;
+  color: var(--fg-dim); font-size: 13px;
+  transition: border-color 140ms ease, color 140ms ease;
+  width: 100%;
+}
+.nav-capture:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Smart Lists */
 .smart-list-item .smart-list-actions { display: flex; gap: 0; opacity: 0; transition: opacity 150ms; }
@@ -1541,128 +1558,18 @@ div:hover > .file-delete-btn {
   animation: pulse 1.4s infinite;
 }
 
-/* ─── CORRA Intelligence nav item ───────────────────────────────────────────── */
-/* Kein Sonderdesign mehr — gleiche Form wie alle anderen Nav-Items.
-   Das Lime-Icon ist der einzige visuelle Unterschied. */
-.corra-nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 10px;
-  font-size: 13.5px; color: var(--fg-2);
-  cursor: pointer; position: relative; user-select: none;
-  transition: background 180ms ease, color 180ms ease;
-  width: 100%;
-}
-.corra-nav-item:hover { background: oklch(100% 0 0 / 0.04); color: var(--fg); }
-.corra-nav-item[data-active="true"] {
-  background: var(--surface-2); color: var(--fg); box-shadow: var(--shadow-1);
-}
-.corra-nav-item[data-active="true"]::before {
-  content: ""; position: absolute; left: -14px; top: 50%;
-  transform: translateY(-50%); width: 3px; height: 18px;
-  background: var(--accent); border-radius: 0 4px 4px 0;
-}
-/* Das Sparkles-Icon bekommt Lime-Farbe — dezent aber eindeutig */
-.corra-nav-item .corra-icon {
-  color: var(--accent);
-  filter: drop-shadow(0 0 4px var(--accent-glow));
-  flex-shrink: 0;
-}
-.corra-nav-item .corra-label {
-  flex: 1;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.corra-nav-item .corra-kbd {
-  font-family: var(--font-mono); font-size: 9px;
-  color: var(--fg-dim); padding: 1px 5px; border-radius: 4px;
-  background: oklch(100% 0 0 / 0.04);
-  letter-spacing: 0.04em;
-}
-
 /* Nav-Sektion Label — ersetzt Divider, viel sauberer */
 .nav-section-label {
-  padding: 14px 10px 4px;
+  padding: 12px 10px 3px;
   font-size: 9.5px; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--fg-dim); font-family: var(--font-mono);
   user-select: none;
 }
 
-/* Heute als Primär-Item */
-.nav-item-heute {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 10px;
-  font-size: 13.5px; font-weight: 700; color: var(--fg-2);
-  cursor: pointer; position: relative; user-select: none;
-  transition: background 180ms ease, color 180ms ease;
-  width: 100%;
-}
-.nav-item-heute:hover { background: oklch(100% 0 0 / 0.04); color: var(--fg); }
-.nav-item-heute[data-active="true"] {
-  background: var(--surface-2); color: var(--fg); box-shadow: var(--shadow-1);
-}
-.nav-item-heute[data-active="true"]::before {
-  content: ""; position: absolute; left: -14px; top: 50%;
-  transform: translateY(-50%); width: 3px; height: 18px;
-  background: var(--accent); border-radius: 0 4px 4px 0;
-}
-.nav-item-heute .nav-kbd {
-  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
-  color: var(--fg-dim); padding: 1px 5px; border-radius: 4px;
-  background: oklch(100% 0 0 / 0.04);
-}
-
-/* Inbox Sub-Items — minimal eingerückt */
-.nav-item-sub {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 10px 6px 24px; border-radius: 8px;
-  font-size: 13px; color: var(--fg-muted);
-  cursor: pointer; position: relative; user-select: none;
-  transition: background 140ms ease, color 140ms ease;
-  width: 100%;
-}
-.nav-item-sub:hover { background: oklch(100% 0 0 / 0.04); color: var(--fg); }
-.nav-item-sub[data-active="true"] { color: var(--fg); background: var(--surface-2); }
-.nav-item-sub[data-active="true"]::before {
-  content: ""; position: absolute; left: -14px; top: 50%;
-  transform: translateY(-50%); width: 3px; height: 14px;
-  background: var(--accent); border-radius: 0 4px 4px 0;
-}
-.nav-item-sub .nav-badge {
-  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
-  font-weight: 600; color: var(--accent-ink); background: var(--accent);
-  padding: 1px 6px; border-radius: 99px;
-}
-
-/* Inbox-Header */
-.nav-inbox-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: 10px;
-  font-size: 13.5px; color: var(--fg-2);
-  cursor: pointer; user-select: none;
-  transition: background 180ms ease, color 180ms ease;
-  width: 100%;
-}
-.nav-inbox-header:hover { background: oklch(100% 0 0 / 0.04); color: var(--fg); }
-
-/* Light mode overrides für CORRA-Icon Sichtbarkeit — Icon ist bereits lime, kein Fix nötig */
-[data-theme="light"] .corra-nav-item .corra-icon {
-  filter: drop-shadow(0 0 3px oklch(60% 0.2 125 / 0.4));
-}
 
 /* Collapsed */
-.sidebar[data-collapsed="true"] .corra-nav-item { justify-content: center; padding: 10px 6px; }
-.sidebar[data-collapsed="true"] .corra-nav-item .corra-label,
-.sidebar[data-collapsed="true"] .corra-nav-item .corra-kbd { display: none; }
 .sidebar[data-collapsed="true"] .nav-section-label { display: none; }
-.sidebar[data-collapsed="true"] .nav-item-heute { justify-content: center; padding: 10px 6px; }
-.sidebar[data-collapsed="true"] .nav-item-heute > span:not(.nav-kbd) { display: none; }
-.sidebar[data-collapsed="true"] .nav-item-heute .nav-kbd { display: none; }
-.sidebar[data-collapsed="true"] .nav-inbox-header { justify-content: center; padding: 10px 6px; }
-.sidebar[data-collapsed="true"] .nav-inbox-header > span,
-.sidebar[data-collapsed="true"] .nav-inbox-header svg:last-child { display: none; }
-.sidebar[data-collapsed="true"] .nav-item-sub { justify-content: center; padding: 8px 6px; }
-.sidebar[data-collapsed="true"] .nav-item-sub > span:not(.nav-badge) { display: none; }
 
 @keyframes corraPulse {
   0%, 100% { box-shadow: 0 0 0 0 oklch(92% 0.2 125 / 0); }

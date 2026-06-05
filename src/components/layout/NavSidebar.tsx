@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
-import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
@@ -9,11 +7,9 @@ import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
   Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
-  ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-// Standard nav item
 function NavItem({
   icon: Ic, label, active, onClick, badge, kbd,
 }: {
@@ -30,78 +26,8 @@ function NavItem({
   )
 }
 
-// Inbox sub-item
-function SubItem({
-  icon: Ic, label, active, onClick, badge,
-}: {
-  icon: LucideIcon; label: string; active: boolean; onClick: () => void; badge?: number
-}) {
-  return (
-    <div className="nav-item-sub" data-active={String(active)} onClick={onClick} title={label}>
-      <Ic size={14} />
-      <span>{label}</span>
-      {badge ? <span className="nav-badge">{badge}</span> : null}
-    </div>
-  )
-}
-
-// Section label
 function SectionLabel({ children }: { children: string }) {
   return <div className="nav-section-label">{children}</div>
-}
-
-// Aufklappbarer Inbox-Bereich
-function InboxSection({
-  appView, setAppView, unreadMails, collapsed,
-}: {
-  appView: string; setAppView: (v: string) => void
-  unreadMails: number; collapsed: boolean
-}) {
-  const [open, setOpen] = useState(true)
-  const inboxActive = ['posteingang', 'calendar'].includes(appView)
-
-  if (collapsed) {
-    return (
-      <NavItem icon={Mail} label="Posteingang" active={inboxActive}
-        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
-      />
-    )
-  }
-
-  return (
-    <div>
-      <div
-        className="nav-inbox-header"
-        onClick={() => setOpen(o => !o)}
-      >
-        <Mail size={16} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1 }}>Inbox</span>
-        {unreadMails > 0 && !open && (
-          <span className="nav-badge" style={{ marginLeft: 'auto' }}>{unreadMails}</span>
-        )}
-        <ChevronRight
-          size={11}
-          style={{
-            color: 'var(--fg-dim)',
-            transition: 'transform 200ms',
-            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-            flexShrink: 0,
-            marginLeft: open || unreadMails === 0 ? 'auto' : 4,
-          }}
-        />
-      </div>
-      {open && (
-        <>
-          <SubItem icon={Mail}     label="Posteingang" active={appView === 'posteingang'}
-            onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
-          />
-          <SubItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
-            onClick={() => setAppView('calendar')}
-          />
-        </>
-      )}
-    </div>
-  )
 }
 
 export function NavSidebar() {
@@ -112,7 +38,6 @@ export function NavSidebar() {
   const toggleSidebar   = useUiStore(s => s.toggleSidebar)
   const user            = useAuthStore(s => s.user)
 
-  const clientsCount  = useCustomersStore(s => s.customers.length)
   const openDealCount = useDealsStore(s =>
     s.deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
   )
@@ -122,11 +47,6 @@ export function NavSidebar() {
   const akquiseBadge = (newLeadsCount + openDealCount) || undefined
   const displayName  = user?.email?.split('@')[0] ?? 'Nutzer'
   const initials     = displayName.slice(0, 2).toUpperCase()
-
-  useEffect(() => {
-    if (['leads', 'pipeline', 'followups'].includes(appView)) setAppView('akquise')
-    if (appView === 'mail') setAppView('posteingang')
-  }, [appView, setAppView])
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
@@ -146,21 +66,22 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA — gleiche Form wie alle anderen, aber Lime-Sparkle-Icon */}
+      {/* CORRA — featured, kein Section-Label */}
       <div
-        className="corra-nav-item"
+        className="nav-item nav-item--featured"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <Sparkles size={16} className="corra-icon" />
-        <span className="corra-label">CORRA</span>
-        {!collapsed && <span className="corra-kbd">⌘K</span>}
+        <Sparkles size={16} />
+        <span>CORRA</span>
+        {!collapsed && <span className="nav-kbd">⌘K</span>}
       </div>
 
-      {/* HEUTE — bold, Primär-Destination */}
+      {/* HEUTE */}
+      {!collapsed && <SectionLabel>Heute</SectionLabel>}
       <div
-        className="nav-item-heute"
+        className="nav-item nav-item--primary"
         data-active={appView === 'dashboard' ? 'true' : 'false'}
         onClick={() => setAppView('dashboard')}
         title="Heute (H)"
@@ -170,62 +91,46 @@ export function NavSidebar() {
         {!collapsed && <span className="nav-kbd">H</span>}
       </div>
 
-      {/* ── INBOX ── */}
+      {/* INBOX — flat, kein Accordion */}
       {!collapsed && <SectionLabel>Inbox</SectionLabel>}
+      <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
+      <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
+        onClick={() => setAppView('calendar')} />
+      <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
+        onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 
-      <InboxSection
-        appView={appView}
-        setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
-        unreadMails={unreadMails}
-        collapsed={collapsed}
-      />
-
-      <NavItem icon={Clock} label="Zeitmanagement"
-        active={appView === 'zeitmanagement'}
-        onClick={() => setAppView('zeitmanagement')} kbd="Z"
-      />
-
-      {/* ── WORKSPACE ── */}
+      {/* WORKSPACE */}
       {!collapsed && <SectionLabel>Workspace</SectionLabel>}
-
       <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
-        onClick={() => setAppView('clients')}   badge={clientsCount || undefined} kbd="C" />
+        onClick={() => setAppView('clients')} kbd="C" />
       <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
-        onClick={() => setAppView('akquise')}  badge={akquiseBadge}              kbd="A" />
+        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A" />
       <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
-        onClick={() => setAppView('invoices')}                                    kbd="F" />
+        onClick={() => setAppView('invoices')} kbd="F" />
 
       <div style={{ flex: 1 }} />
 
       {/* Quick Capture */}
       <button
         type="button"
+        className="nav-capture"
         onClick={() => setQuickCapture(true)}
         title="Quick Capture (⌘⇧N)"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: collapsed ? '10px 0' : '9px 10px',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          margin: '0 0 2px',
-          borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)',
-          background: 'transparent', cursor: 'pointer',
-          color: 'var(--fg-dim)', fontSize: 13,
-          transition: 'all 140ms', width: '100%',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--fg-dim)' }}
       >
         <PenLine size={15} style={{ flexShrink: 0 }} />
         {!collapsed && <span>Quick Capture</span>}
       </button>
 
-      <button className="sidebar-collapse-btn" onClick={toggleSidebar}
+      <button type="button" className="sidebar-collapse-btn" onClick={toggleSidebar}
         title={collapsed ? 'Ausklappen' : 'Einklappen'}>
         {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
-      <NavItem icon={Plug}     label="Integrationen" active={appView === 'integrations'} onClick={() => setAppView('integrations')} />
-      <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings'}     onClick={() => setAppView('settings')} />
+      <NavItem icon={Plug}     label="Integrationen" active={appView === 'integrations'}
+        onClick={() => setAppView('integrations')} />
+      <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings'}
+        onClick={() => setAppView('settings')} />
 
       {/* Profil */}
       <div
