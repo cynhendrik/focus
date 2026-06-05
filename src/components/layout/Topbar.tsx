@@ -8,10 +8,10 @@ export function Topbar({ children }: { children?: ReactNode }) {
   return (
     <div className="topbar">
       {children}
-      <button className="icon-btn glass" onClick={toggleTheme} title="Theme wechseln">
+      <button className="icon-btn" onClick={toggleTheme} title="Theme wechseln">
         <Sun size={16} />
       </button>
-      <button className="icon-btn glass" title="Benachrichtigungen">
+      <button className="icon-btn" title="Benachrichtigungen">
         <Bell size={16} />
       </button>
     </div>
