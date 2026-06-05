@@ -112,7 +112,7 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // ⌘K → CORRA Intelligence
+      // ⌘K → KORA Intelligence
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'k') {
         e.preventDefault()
         setAppView('corra')

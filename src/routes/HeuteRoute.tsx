@@ -46,7 +46,7 @@ function HeuteLoading() {
         boxShadow: '0 0 12px var(--accent-glow)',
       }} />
       <span style={{ fontSize: 12, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>
-        CORRA priorisiert…
+        KORA priorisiert…
       </span>
       <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }`}</style>
     </div>
@@ -119,7 +119,7 @@ export function HeuteRoute() {
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.02em' }}>Heute</div>
           <div style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-            {loading ? 'CORRA priorisiert…' : `${items.length} AUFGABEN · ${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}`}
+            {loading ? 'KORA priorisiert…' : `${items.length} AUFGABEN · ${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })}`}
           </div>
         </div>
         <button type="button" onClick={() => { setIndex(0); reshuffle() }}

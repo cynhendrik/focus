@@ -29,7 +29,7 @@ type Phase = 'idle' | 'active'
 const makeGreeting = (): CorraMessage => ({
   id: '0',
   role: 'assistant',
-  text: 'Hey — ich bin CORRA. Was möchtest du wissen?',
+  text: 'Hey — ich bin KORA. Was möchtest du wissen?',
 })
 
 export function CorraRoute() {
@@ -103,7 +103,7 @@ export function CorraRoute() {
       const errText = e instanceof MissingApiKeyError
         ? 'Kein API-Key konfiguriert — bitte in den Einstellungen hinterlegen.'
         : 'Verbindungsfehler. Versuche es erneut.'
-      log.warn('CORRA error', { err: e })
+      log.warn('KORA error', { err: e })
       setMessages(prev => [...prev, { id: nextId(), role: 'assistant', text: errText }])
     } finally {
       setLoading(false)
@@ -205,7 +205,7 @@ export function CorraRoute() {
                     fontSize: 9, color: 'rgba(163,230,53,0.3)',
                     fontFamily: 'var(--font-mono)', letterSpacing: '0.15em',
                   }}>
-                    CORRA INTELLIGENCE
+                    KORA INTELLIGENCE
                   </div>
                 </motion.div>
               )}

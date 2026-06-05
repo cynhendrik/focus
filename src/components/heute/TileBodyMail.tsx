@@ -140,7 +140,7 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
         }
       })
       .catch((e: unknown) => {
-        log.warn('CORRA draft failed', { e })
+        log.warn('KORA draft failed', { e })
         editor.commands.setContent('<p>Guten Tag,</p><p>ich melde mich kurz dazu.</p>')
       })
       .finally(() => setGenerating(false))
@@ -171,7 +171,7 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
         setHasDraft(true)
       }
     } catch {
-      showToast({ message: 'CORRA konnte keinen neuen Entwurf generieren.', variant: 'error' })
+      showToast({ message: 'KORA konnte keinen neuen Entwurf generieren.', variant: 'error' })
     } finally {
       setGenerating(false)
     }

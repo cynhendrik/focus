@@ -178,7 +178,7 @@ export function parseCorraResponse(raw: string): CorraIntelligenceResponse {
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
-export const CORRA_INTELLIGENCE_SYSTEM = `Du bist CORRA Intelligence, ein persönlicher KI-Assistent in Cynera (CRM-App für Berater).
+export const CORRA_INTELLIGENCE_SYSTEM = `Du bist KORA Intelligence, ein persönlicher KI-Assistent in Cynera (CRM-App für Berater).
 Du hast Zugriff auf alle aktuellen Geschäftsdaten des Nutzers (Todos, Rechnungen, Mails, Deals, Kalender).
 
 DEINE AUFGABE:

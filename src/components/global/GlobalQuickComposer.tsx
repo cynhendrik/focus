@@ -90,7 +90,7 @@ function FloatingBubble({ open, onClick }: { open: boolean; onClick: () => void 
   return createPortal(
     <button
       onClick={onClick}
-      aria-label={open ? 'CORRA schließen' : 'CORRA öffnen'}
+      aria-label={open ? 'KORA schließen' : 'KORA öffnen'}
       style={{
         position: 'fixed', bottom: 24, right: 24, zIndex: 800,
         width: 52, height: 52, borderRadius: '50%',
@@ -190,8 +190,8 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   )
 
   const placeholderText = pinnedCustomer
-    ? `! Aufgabe für ${pinnedCustomer.name}… oder frag CORRA`
-    : '! für Aufgabe · Sonst CORRA fragen…'
+    ? `! Aufgabe für ${pinnedCustomer.name}… oder frag KORA`
+    : '! für Aufgabe · Sonst KORA fragen…'
 
   const editor = useEditor({
     extensions: [
@@ -277,7 +277,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
         body: {
           model: 'claude-haiku-4-5-20251001',
           max_tokens: 512,
-          system: [{ type: 'text', text: `Du bist CORRA, KI-Assistent in Cynera CRM. Antworte kurz, direkt, auf Deutsch. Kein Bullshit.\n\n${ctx}`, cache_control: { type: 'ephemeral' } }],
+          system: [{ type: 'text', text: `Du bist KORA, KI-Assistent in Cynera CRM. Antworte kurz, direkt, auf Deutsch. Kein Bullshit.\n\n${ctx}`, cache_control: { type: 'ephemeral' } }],
           messages: [{ role: 'user', content: question }],
         },
       })
@@ -423,7 +423,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
         }
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            {isTaskMode ? 'Aufgabe erstellen' : 'CORRA'}
+            {isTaskMode ? 'Aufgabe erstellen' : 'KORA'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 1 }}>
             {isTaskMode
@@ -463,7 +463,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
                 : <Sparkles size={10} style={{ color: 'var(--accent-ink)' }} />
               }
             </div>
-            <span>{corraLoading ? 'CORRA denkt…' : corraReply}</span>
+            <span>{corraLoading ? 'KORA denkt…' : corraReply}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -538,7 +538,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
               ? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>✓ {savedHint}</span>
               : isTaskMode
               ? <>→ Erstellt: <strong style={{ color: 'var(--fg-muted)' }}>{wantsCalendar ? 'Termin' : 'Aufgabe'}</strong></>
-              : <>→ CORRA antwortet</>
+              : <>→ KORA antwortet</>
             }
           </span>
           <span style={{ fontFamily: 'var(--font-mono)' }}>

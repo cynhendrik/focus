@@ -98,7 +98,7 @@ const SECTIONS: { section: string; items: ModuleDef[] }[] = [
     items: [
       {
         key: 'corra',
-        label: 'CORRA KI',
+        label: 'KORA KI',
         description: 'Entwürfe, Analysen und Antworten per KI. Benötigt Anthropic API-Key in den Entwickler-Einstellungen.',
         icon: Sparkles,
         color: 'var(--accent)',

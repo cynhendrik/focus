@@ -14,7 +14,7 @@ export interface HeuteQueueItem {
   reason: string
 }
 
-export const CORRA_HEUTE_SYSTEM = `Du bist CORRA, persönlicher Assistent in Cynera (CRM für Berater).
+export const CORRA_HEUTE_SYSTEM = `Du bist KORA, persönlicher Assistent in Cynera (CRM für Berater).
 
 Erstelle eine priorisierte Aufgabenliste für heute. Reihenfolge:
 1. Mahnwesen — Rechnungen deren Fälligkeitsdatum vergangen ist UND nicht bezahlt/storniert (status != paid/cancelled/draft), sortiert nach Betrag × Tage überfällig

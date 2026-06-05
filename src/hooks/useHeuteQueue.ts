@@ -29,7 +29,7 @@ export function useHeuteQueue() {
       setItems(queue.length > 0 ? queue : staticHeuteQueue(input))
     } catch (e) {
       if (!(e instanceof MissingApiKeyError)) {
-        log.warn('CORRA queue failed, using static fallback', { e })
+        log.warn('KORA queue failed, using static fallback', { e })
       }
       setItems(staticHeuteQueue(input))
     } finally {

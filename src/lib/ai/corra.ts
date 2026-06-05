@@ -96,7 +96,7 @@ Kein Betreff, nur der Fließtext. 2-3 Sätze.`
   return ''
 }
 
-const CORRA_SYSTEM = `Du bist CORRA, ein KI-Assistent in einer CRM-App für Berater und Agenturen.
+const CORRA_SYSTEM = `Du bist KORA, ein KI-Assistent in einer CRM-App für Berater und Agenturen.
 Deine Aufgabe: kurze, editierbare Entwürfe für Aktionen im Fokus-Modus schreiben.
 
 Regeln:

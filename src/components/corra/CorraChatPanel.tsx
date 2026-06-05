@@ -92,7 +92,7 @@ export function CorraChatPanel({ messages, loading, onSend, onFocusActions, onCl
                 {loading && (
                   <div style={{ display: 'flex', padding: '6px 14px', gap: 8, alignItems: 'center' }}>
                     <Loader size={10} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-                    <span style={{ fontSize: 11, color: 'rgba(163,230,53,0.4)' }}>CORRA denkt…</span>
+                    <span style={{ fontSize: 11, color: 'rgba(163,230,53,0.4)' }}>KORA denkt…</span>
                   </div>
                 )}
                 <div ref={bottomRef} />

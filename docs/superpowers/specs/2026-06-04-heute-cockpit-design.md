@@ -38,17 +38,18 @@ Das ersetzt den bestehenden Focus-Bereich vollständig. Kein Kunden-Auswahlschri
 
 ## Queue-Logik: Was kommt in die Kacheln?
 
-Der Hook `useHeuteQueue` aggregiert alle Quellen und sortiert nach Priorität:
+**CORRA sortiert die Queue** — ein einziger API-Call beim Start des Heute-Cockpits. CORRA kennt alle Daten (Rechnungsbetrag, Kundenwert, Überfälligkeitstage, Mail-Absender) und priorisiert intelligent.
 
-| Priorität | Quelle | Kachel-Typ | Aktion |
-|-----------|--------|-----------|--------|
-| 1 | Invoices `status=overdue` | `invoice_reminder` | Mail mit Anhang senden |
-| 2 | Todos `bucket=today`, `priority=p1` | `todo` oder `mail_reply` | Abhaken oder Mail senden |
-| 3 | EmailHeaders ungelesen mit `customerId` | `mail_reply` | Antwort senden |
-| 4 | Todos `bucket=today`, `priority=p2+` | `todo` | Abhaken |
-| 5 | CalendarEvents heute | `event` | Info-Kachel, Überspringen |
+Generelle Reihenfolge die CORRA als Leitlinie bekommt:
+1. **Mahnwesen** — überfällige Rechnungen (nach Betrag × Tage überfällig gewichtet)
+2. **Mails** — ungelesene Kunden-Mails (nach Kundenwert + Wartezeit)
+3. **Todos** — heutige Aufgaben (nach Priority-Flag)
 
-Maximal 10 Kacheln pro Tag. Events ohne Handlungsbedarf erscheinen nur wenn die Queue sonst leer wäre.
+CORRA gibt eine geordnete Liste von Item-IDs + je eine kurze Begründungszeile zurück (wird als Kontext-Text in der Kachel angezeigt). Maximal 10 Items.
+
+Der Call läuft einmal beim Öffnen des Heute-Views. Ein "Neu sortieren"-Button triggert einen neuen Call. Ergebnis wird im Session-State gehalten (kein Persist — jeden Tag frisch).
+
+**Fallback:** Wenn kein API-Key oder CORRA nicht erreichbar → statische Sortierung: Mahnwesen → Mails → Todos.
 
 ---
 

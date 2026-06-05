@@ -84,13 +84,13 @@ export function NavSidebar() {
         className="nav-corra-card"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
-        title="CORRA Intelligence (⌘K)"
+        title="KORA Intelligence (⌘K)"
       >
         <div className="nav-corra-card__icon">
           <Sparkles size={15} />
         </div>
         <div className="nav-corra-card__body">
-          <span className="nav-corra-card__title">CORRA</span>
+          <span className="nav-corra-card__title">KORA</span>
           <span className="nav-corra-card__sub">KI-ASSISTENT</span>
         </div>
         {corraBadge ? (

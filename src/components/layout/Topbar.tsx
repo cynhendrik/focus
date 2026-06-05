@@ -7,7 +7,7 @@ import type { LucideIcon } from 'lucide-react'
 
 const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: LucideIcon }>> = {
   dashboard:      { label: 'Heute',          tag: 'DEIN TAG',      Icon: Sunrise    },
-  corra:          { label: 'CORRA',          tag: 'KI-ASSISTENT',  Icon: Sparkles   },
+  corra:          { label: 'KORA',           tag: 'KI-ASSISTENT',  Icon: Sparkles   },
   clients:        { label: 'Kunden',         tag: 'CRM',           Icon: Users      },
   invoices:       { label: 'Finanzen',       tag: 'BUCHHALTUNG',   Icon: CreditCard },
   akquise:        { label: 'Akquise',        tag: 'PIPELINE',      Icon: Target     },
@@ -20,40 +20,29 @@ const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: Luci
 }
 
 export function Topbar() {
-  const appView    = useUiStore(s => s.appView)
+  const appView     = useUiStore(s => s.appView)
   const toggleTheme = useUiStore(s => s.toggleTheme)
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
-  const { label, tag, Icon } = meta
+  const { label, tag } = meta
 
   return (
     <div className="topbar">
-      {/* Left: current view */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'var(--surface-2)',
-          border: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
+      {/* Left: current view — kein Icon */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{
+          fontSize: 17, fontWeight: 700, color: 'var(--fg)',
+          letterSpacing: '-0.02em', lineHeight: 1,
         }}>
-          <Icon size={16} style={{ color: 'var(--fg-dim)' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{
-            fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-            letterSpacing: '-0.02em', lineHeight: 1,
-          }}>
-            {label}
-          </span>
-          <span style={{
-            fontSize: 10, fontFamily: 'var(--font-mono)',
-            color: 'var(--fg-dim)', letterSpacing: '0.14em',
-            textTransform: 'uppercase', fontWeight: 600,
-          }}>
-            {tag}
-          </span>
-        </div>
+          {label}
+        </span>
+        <span style={{
+          fontSize: 10, fontFamily: 'var(--font-mono)',
+          color: 'var(--fg-dim)', letterSpacing: '0.14em',
+          textTransform: 'uppercase', fontWeight: 600,
+        }}>
+          {tag}
+        </span>
       </div>
 
       {/* Right: controls */}

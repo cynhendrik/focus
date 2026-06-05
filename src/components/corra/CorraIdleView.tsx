@@ -171,7 +171,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
               fontFamily: 'var(--font-mono)', letterSpacing: '0.18em',
               textTransform: 'uppercase', marginBottom: 10,
             }}>
-              CORRA INTELLIGENCE
+              KORA INTELLIGENCE
             </div>
             <div style={{
               fontSize: 26, fontWeight: 700,
@@ -231,7 +231,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
             onKeyDown={handleKey}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Frag CORRA — Umsatz, Todos, Mails, Deals…"
+            placeholder="Frag KORA — Umsatz, Todos, Mails, Deals…"
             rows={1}
             style={{
               flex: 1, background: 'transparent', border: 'none',
