@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ArrowRight, Reply, Target,
+  ArrowRight,
 } from 'lucide-react'
 
 import { useCustomersStore } from '@/store/customers.store'
@@ -17,9 +17,6 @@ import { useMailStore } from '@/store/mail.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useDealsStore } from '@/store/deals.store'
-import { usePipelineStore } from '@/store/pipeline.store'
-import { useLeadsStore } from '@/store/leads.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { HeuteTile } from '@/components/heute/HeuteTile'
@@ -783,268 +780,11 @@ function InboxRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SalesView — Pipeline, Follow-Ups, Neue Leads
-
-function SalesView() {
-  const deals     = useDealsStore(s => s.deals)
-  const stages    = usePipelineStore(s => s.stages)
-  const followUps = useCrmStore(s => s.allFollowUps)
-  const leads     = useLeadsStore(s => s.leads)
-  const setAppView = useUiStore(s => s.setAppView)
-
-  const openDeals = useMemo(() => {
-    const byName = new Map(stages.map(s => [s.name, s]))
-    return deals.filter(d => {
-      const s = byName.get(d.stage)
-      return !s || (!s.isWon && !s.isLost)
-    })
-  }, [deals, stages])
-  const pipelineValue = openDeals.reduce((s, d) => s + (d.value ?? 0), 0)
-  const wonValue = useMemo(() => {
-    const wonName = stages.find(s => s.isWon)?.name
-    if (!wonName) return 0
-    return deals.filter(d => d.stage === wonName).reduce((s, d) => s + (d.value ?? 0), 0)
-  }, [deals, stages])
-
-  // Stage-Breakdown (nur offene Stages)
-  const stageBreakdown = useMemo(() => {
-    const open = stages.filter(s => !s.isWon && !s.isLost).sort((a, b) => a.orderIndex - b.orderIndex)
-    return open.map(s => ({
-      stage: s,
-      count: deals.filter(d => d.stage === s.name).length,
-      value: deals.filter(d => d.stage === s.name).reduce((sum, d) => sum + (d.value ?? 0), 0),
-    }))
-  }, [stages, deals])
-
-  const todayIso = todayLocalIso()
-  const fuDueOrOverdue = useMemo(
-    () => followUps
-      .filter(f => f.status === 'offen' && f.dueDate <= todayIso)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .slice(0, 8),
-    [followUps, todayIso],
-  )
-
-  const newLeadsThisWeek = useMemo(() => {
-    const sow = startOfWeek(new Date()).toISOString()
-    return leads
-      .filter(l => l.createdAt >= sow)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, 8)
-  }, [leads])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* KPI-Zeile */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
-      }}>
-        <KpiCard
-          label="Pipeline-Wert"
-          value={
-            <span>
-              {fmtKEur(pipelineValue)}
-              <span style={{ fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>k€</span>
-            </span>
-          }
-          hint={<><span style={{ color: 'var(--accent)', fontWeight: 600 }}>{openDeals.length}</span><span>offene Deals</span></>}
-          action={{ label: 'Zur Pipeline', onClick: () => setAppView('pipeline') }}
-        />
-        <KpiCard
-          label="Gewonnen"
-          value={
-            <span>
-              {fmtKEur(wonValue)}
-              <span style={{ fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>k€</span>
-            </span>
-          }
-          hint={<span>kumuliert</span>}
-        />
-        <KpiCard
-          label="Fällige Follow-Ups"
-          value={String(fuDueOrOverdue.length)}
-          accentValue={fuDueOrOverdue.length > 0}
-          hint={<span>heute oder überfällig</span>}
-          action={{ label: 'Zu Follow-Ups', onClick: () => setAppView('followups') }}
-        />
-      </div>
-
-      {/* Pipeline-Stage-Breakdown */}
-      <div style={{
-        borderRadius: 16, border: '1px solid var(--border)',
-        background: 'var(--bg-2)', padding: '20px 22px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
-            Pipeline-Verteilung
-          </h2>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--fg-dim)' }}>
-            {stageBreakdown.length} Stages
-          </span>
-        </div>
-
-        {stageBreakdown.length === 0 ? (
-          <div style={{ padding: '20px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-            Noch keine Stages konfiguriert.
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${stageBreakdown.length}, 1fr)`, gap: 10 }}>
-            {stageBreakdown.map(({ stage, count, value }) => (
-              <div
-                key={stage.id}
-                onClick={() => setAppView('pipeline')}
-                style={{
-                  padding: 14, borderRadius: 12,
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', gap: 6,
-                  transition: 'border-color 140ms',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-              >
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.10em',
-                  textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 700,
-                }}>
-                  {stage.label}
-                </span>
-                <span style={{
-                  fontSize: 28, fontWeight: 700, color: 'var(--fg)',
-                  fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
-                }}>
-                  {count}
-                </span>
-                <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
-                  {value > 0 ? `${fmtKEur(value)} k€` : '—'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Zwei-Spalten: Follow-Ups + Neue Leads */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-        <div style={{
-          borderRadius: 16, border: '1px solid var(--border)',
-          background: 'var(--bg-2)', padding: '20px 22px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>
-              Fällige Follow-Ups
-            </h2>
-            <Reply size={13} style={{ color: 'var(--fg-dim)' }} />
-          </div>
-          {fuDueOrOverdue.length === 0 ? (
-            <div style={{ padding: '10px 4px', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-              Keine offenen Follow-Ups.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {fuDueOrOverdue.map(f => {
-                const isOverdue = f.dueDate < todayIso
-                return (
-                  <div
-                    key={f.id}
-                    onClick={() => setAppView('followups')}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 12px', borderRadius: 10,
-                      background: 'var(--surface)', border: '1px solid var(--border)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <span style={{
-                      width: 6, height: 6, borderRadius: 99,
-                      background: isOverdue ? 'oklch(72% 0.18 25)' : 'var(--accent)',
-                      flexShrink: 0,
-                    }} />
-                    <span style={{
-                      flex: 1, fontSize: 13, color: 'var(--fg)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {f.title}
-                    </span>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                      color: isOverdue ? 'oklch(72% 0.18 25)' : 'var(--fg-dim)',
-                    }}>
-                      {isOverdue ? 'überfällig' : 'heute'}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div style={{
-          borderRadius: 16, border: '1px solid var(--border)',
-          background: 'var(--bg-2)', padding: '20px 22px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>
-              Neue Leads · diese Woche
-            </h2>
-            <Target size={13} style={{ color: 'var(--fg-dim)' }} />
-          </div>
-          {newLeadsThisWeek.length === 0 ? (
-            <div style={{ padding: '10px 4px', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-              Keine neuen Leads.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {newLeadsThisWeek.map(l => (
-                <div
-                  key={l.id}
-                  onClick={() => setAppView('leads')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '9px 12px', borderRadius: 10,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{
-                    flex: 1, fontSize: 13, color: 'var(--fg)', fontWeight: 600,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {l.name}
-                  </span>
-                  {l.companyName && (
-                    <span style={{
-                      fontSize: 11.5, color: 'var(--fg-muted)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      · {l.companyName}
-                    </span>
-                  )}
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                    color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
-                  }}>
-                    {new Date(l.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Main route
 
 export function DashboardRoute() {
-  const view             = useUiStore(s => s.dashboardView)
-  const setDashboardView = useUiStore(s => s.setDashboardView)
-  const user             = useAuthStore(s => s.user)
-  const workspaceId      = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
-  const salesEnabled     = useCompanyStore(s => s.modules.sales !== false)
+  const user        = useAuthStore(s => s.user)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   // Data loads — sind in App.tsx schon in den beiden Init-Wellen,
   // hier nur Finance ergaenzen, weil das nicht workspace-weit geladen wird.
@@ -1056,12 +796,6 @@ export function DashboardRoute() {
     loadToday(workspaceId)
   }, [workspaceId, loadFinance, loadToday])
 
-  // Falls Sales-Modul deaktiviert ist, aber dashboardView='sales' persistiert,
-  // korrigieren wir das beim ersten Render.
-  useEffect(() => {
-    if (view === 'sales' && !salesEnabled) setDashboardView('workspace')
-  }, [view, salesEnabled, setDashboardView])
-
   const firstName = (user?.email?.split('@')[0] ?? 'User').replace(/^./, c => c.toUpperCase())
 
   return (
@@ -1069,10 +803,7 @@ export function DashboardRoute() {
       maxWidth: 1240, margin: '0 auto', padding: '24px 28px 64px',
     }}>
       <DashboardHero name={firstName} />
-
-      {view === 'sales' && salesEnabled
-        ? <SalesView />
-        : <WorkspaceView />}
+      <WorkspaceView />
     </div>
   )
 }
