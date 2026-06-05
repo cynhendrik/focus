@@ -88,9 +88,9 @@ export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'integrationen' 
 
 export type AppView =
   | 'dashboard' | 'profile'
-  | 'clients'   | 'akquise'   | 'invoices'
+  | 'clients'   | 'akquise'        | 'invoices'
   | 'settings'  | 'integrations'
-  | 'posteingang'
+  | 'posteingang' | 'zeitmanagement'
   | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
   | 'journal'   | 'focus'     | 'corra'
   | 'notes'     | 'inbox'     | 'sales'

@@ -40,6 +40,7 @@ import { CorraRoute }            from '@/routes/CorraRoute'
 import { NotesRoute }            from '@/routes/NotesRoute'
 import { AkquiseRoute }          from '@/routes/AkquiseRoute'
 import { PosteingangRoute }      from '@/routes/PosteingangRoute'
+import { ZeitmanagementRoute }   from '@/routes/ZeitmanagementRoute'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
@@ -212,16 +213,17 @@ export default function App() {
       case 'journal':      return <JournalRoute />
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
-      case 'corra':        return <CorraRoute />
-      case 'notes':        return <NotesRoute />
-      // Redirects — alte Views auf neue umleiten
-      case 'leads':        return <AkquiseRoute />
-      case 'pipeline':     return <AkquiseRoute />
-      case 'followups':    return <AkquiseRoute />
-      case 'mail':         return <PosteingangRoute />
-      case 'calendar':     return <PosteingangRoute />
-      case 'sales':        return <AkquiseRoute />
-      case 'inbox':        return <PosteingangRoute />
+      case 'corra':           return <CorraRoute />
+      case 'notes':           return <NotesRoute />
+      case 'zeitmanagement':  return <ZeitmanagementRoute />
+      case 'calendar':        return <CalendarRoute />
+      // Redirects
+      case 'leads':           return <AkquiseRoute />
+      case 'pipeline':        return <AkquiseRoute />
+      case 'followups':       return <AkquiseRoute />
+      case 'mail':            return <PosteingangRoute />
+      case 'sales':           return <AkquiseRoute />
+      case 'inbox':           return <PosteingangRoute />
       default:             return <DashboardRoute />
     }
   }
