@@ -6,7 +6,7 @@ import { useMailStore } from '@/store/mail.store'
 import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
-  Settings, PanelLeftClose, PanelLeftOpen, PenLine, BrainCircuit,
+  Settings, PanelLeftClose, PanelLeftOpen, PenLine, Cpu,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -74,7 +74,7 @@ export function NavSidebar() {
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <BrainCircuit size={16} />
+        <Cpu size={16} />
         <span>CORRA</span>
         {!collapsed && <span className="nav-kbd">⌘K</span>}
       </div>
