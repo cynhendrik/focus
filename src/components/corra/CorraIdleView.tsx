@@ -91,14 +91,19 @@ export function CorraIdleView({ onSend, loading }: Props) {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 24px' }}>
         {/* Orb + title */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 36 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: isDark ? 'var(--accent)' : 'oklch(14% 0 0)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: isDark ? '0 0 32px rgba(163,230,53,0.35)' : '0 2px 8px rgba(0,0,0,0.15)',
-          }}>
-            <span style={{ color: isDark ? 'var(--accent-ink)' : '#fff', fontSize: 18 }}>✦</span>
-          </div>
+          {loading ? (
+            <div className="corra-spinner" />
+          ) : (
+            <div className="corra-dots">
+              <div className="cd cd-center" />
+              <div className="cd cd-1" />
+              <div className="cd cd-2" />
+              <div className="cd cd-3" />
+              <div className="cd cd-4" />
+              <div className="cd cd-5" />
+              <div className="cd cd-6" />
+            </div>
+          )}
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 9,

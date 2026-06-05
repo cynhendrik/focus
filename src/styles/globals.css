@@ -1631,3 +1631,65 @@ div:hover > .file-delete-btn {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50%       { box-shadow: 0 0 14px 2px var(--accent-glow); }
 }
+
+/* ─── CORRA Orb Animations ─────────────────────────────────────────── */
+
+/* Dots: B4 Explode & Collect */
+.corra-dots { position: relative; width: 90px; height: 90px; }
+
+.cd {
+  position: absolute; border-radius: 50%;
+  background: var(--accent);
+  top: 50%; left: 50%;
+}
+.cd-center {
+  width: 14px; height: 14px;
+  box-shadow: 0 0 16px var(--accent-glow);
+  animation: cdCenter 2.8s ease-in-out infinite;
+}
+.cd-1 { width: 10px; height: 10px; animation: cdEx0 2.8s ease-in-out infinite 0.00s; }
+.cd-2 { width:  7px; height:  7px; animation: cdEx1 2.8s ease-in-out infinite 0.06s; opacity: 0.85; }
+.cd-3 { width:  7px; height:  7px; animation: cdEx2 2.8s ease-in-out infinite 0.12s; opacity: 0.85; }
+.cd-4 { width:  5px; height:  5px; animation: cdEx3 2.8s ease-in-out infinite 0.06s; opacity: 0.65; }
+.cd-5 { width:  5px; height:  5px; animation: cdEx4 2.8s ease-in-out infinite 0.10s; opacity: 0.65; }
+.cd-6 { width:  5px; height:  5px; animation: cdEx5 2.8s ease-in-out infinite 0.04s; opacity: 0.65; }
+
+@keyframes cdCenter {
+  0%, 100% { transform: translate(-50%,-50%) scale(1.1); }
+  50%       { transform: translate(-50%,-50%) scale(0.7); }
+  60%       { transform: translate(-50%,-50%) scale(0.5); }
+}
+@keyframes cdEx0 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% + 33px), calc(-50% - 10px)); }
+}
+@keyframes cdEx1 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% + 10px), calc(-50% - 35px)); }
+}
+@keyframes cdEx2 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% - 30px), calc(-50% - 20px)); }
+}
+@keyframes cdEx3 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% - 33px), calc(-50% + 18px)); }
+}
+@keyframes cdEx4 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% + 5px), calc(-50% + 37px)); }
+}
+@keyframes cdEx5 {
+  0%, 35%, 100% { transform: translate(-50%,-50%); }
+  55%, 80%      { transform: translate(calc(-50% + 30px), calc(-50% + 24px)); }
+}
+
+/* Spinner: Loading-Zustand */
+.corra-spinner {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 2.5px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: corraSpin 0.75s linear infinite;
+}
+@keyframes corraSpin { to { transform: rotate(360deg); } }
