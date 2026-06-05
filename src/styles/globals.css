@@ -463,34 +463,28 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .nav-item--primary { font-weight: 700; }
 
 .nav-item--featured {
-  color: oklch(78% 0.18 280);
-  font-weight: 600;
-  background: linear-gradient(to right, oklch(55% 0.25 280 / 0.13), transparent 85%);
-  border: 1px solid oklch(55% 0.25 280 / 0.18);
-  position: relative;
-  overflow: hidden;
+  color: var(--accent-ink);
+  font-weight: 700;
+  background: linear-gradient(to right, var(--accent) 0%, oklch(92% 0.2 125 / 0.08) 65%, transparent);
+  border: 1px solid oklch(92% 0.2 125 / 0.35);
 }
-.nav-item--featured::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, oklch(70% 0.22 280 / 0.07) 0%, transparent 60%);
-  pointer-events: none;
+.nav-item--featured svg { color: var(--accent-ink); }
+.nav-item--featured .nav-kbd {
+  background: oklch(0% 0 0 / 0.12);
+  color: oklch(20% 0 0 / 0.55);
 }
-.nav-item--featured svg { color: oklch(78% 0.18 280); }
 .nav-item--featured:hover {
-  background: linear-gradient(to right, oklch(55% 0.25 280 / 0.2), transparent 85%);
-  border-color: oklch(55% 0.25 280 / 0.3);
-  color: oklch(88% 0.14 280);
+  background: linear-gradient(to right, var(--accent) 0%, oklch(92% 0.2 125 / 0.14) 65%, transparent);
+  color: var(--accent-ink);
 }
 .nav-item--featured[data-active="true"] {
-  background: linear-gradient(to right, oklch(55% 0.25 280 / 0.22), transparent 85%);
-  border-color: oklch(55% 0.25 280 / 0.35);
-  color: oklch(90% 0.12 280);
+  background: linear-gradient(to right, var(--accent) 0%, oklch(92% 0.2 125 / 0.12) 65%, transparent);
+  border-color: oklch(92% 0.2 125 / 0.5);
+  color: var(--accent-ink);
   box-shadow: none;
 }
-.nav-item--featured[data-active="true"] svg { color: oklch(85% 0.16 280); }
-.nav-item--featured[data-active="true"]::before { background: oklch(70% 0.22 280); }
+.nav-item--featured[data-active="true"] svg { color: var(--accent-ink); }
+.nav-item--featured[data-active="true"]::before { background: oklch(60% 0.22 125); }
 
 .nav-capture {
   display: flex; align-items: center; gap: 10px;
