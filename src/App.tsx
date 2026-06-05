@@ -262,11 +262,13 @@ export default function App() {
         <NavSidebar />
         <main className="main">
           <Topbar />
-          <ErrorBoundary>
-            <RouteSwitch viewKey={routeKey}>
-              {renderMain()}
-            </RouteSwitch>
-          </ErrorBoundary>
+          <div className="main-content">
+            <ErrorBoundary>
+              <RouteSwitch viewKey={routeKey}>
+                {renderMain()}
+              </RouteSwitch>
+            </ErrorBoundary>
+          </div>
         </main>
       </div>
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}

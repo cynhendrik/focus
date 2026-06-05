@@ -3,6 +3,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
+import { useFinanceStore } from '@/store/finance.store'
+import { useTodosStore } from '@/store/todos.store'
 import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
@@ -43,10 +45,20 @@ export function NavSidebar() {
   )
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
+  const overdueCount  = useFinanceStore(s =>
+    s.invoices.filter(i => {
+      if (i.status === 'paid' || i.status === 'cancelled' || i.status === 'draft') return false
+      return i.status === 'overdue' || new Date(i.dueDate) < new Date()
+    }).length
+  )
+  const todayTodos = useTodosStore(s =>
+    s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')).length
+  )
 
-  const akquiseBadge = (newLeadsCount + openDealCount) || undefined
-  const displayName  = user?.email?.split('@')[0] ?? 'Nutzer'
-  const initials     = displayName.slice(0, 2).toUpperCase()
+  const akquiseBadge  = (newLeadsCount + openDealCount) || undefined
+  const corraBadge    = overdueCount + unreadMails + todayTodos || undefined
+  const displayName   = user?.email?.split('@')[0] ?? 'Nutzer'
+  const initials      = displayName.slice(0, 2).toUpperCase()
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
@@ -66,18 +78,25 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* AI */}
-      {!collapsed && <SectionLabel>AI</SectionLabel>}
-      <div
-        className="nav-item nav-item--featured"
+      {/* CORRA — prominent AI card */}
+      <button
+        type="button"
+        className="nav-corra-card"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <Sparkles size={16} />
-        <span>CORRA</span>
-        {!collapsed && <span className="nav-kbd">⌘K</span>}
-      </div>
+        <div className="nav-corra-card__icon">
+          <Sparkles size={15} />
+        </div>
+        <div className="nav-corra-card__body">
+          <span className="nav-corra-card__title">CORRA</span>
+          <span className="nav-corra-card__sub">KI-ASSISTENT</span>
+        </div>
+        {corraBadge ? (
+          <span className="nav-corra-card__badge">{corraBadge}</span>
+        ) : null}
+      </button>
 
       {/* HEUTE */}
       {!collapsed && <SectionLabel>Heute</SectionLabel>}
