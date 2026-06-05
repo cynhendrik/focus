@@ -17,51 +17,6 @@ const HEADLINES = [
   'Wie läuft die Pipeline?',
 ]
 
-const CONSTELLATION_LINES = [
-  { x1: '12%', y1: '22%', x2: '26%', y2: '38%' },
-  { x1: '26%', y1: '38%', x2: '44%', y2: '30%' },
-  { x1: '68%', y1: '16%', x2: '80%', y2: '30%' },
-  { x1: '80%', y1: '30%', x2: '72%', y2: '50%' },
-  { x1: '18%', y1: '68%', x2: '34%', y2: '60%' },
-  { x1: '34%', y1: '60%', x2: '52%', y2: '72%' },
-  { x1: '74%', y1: '68%', x2: '86%', y2: '56%' },
-  { x1: '44%', y1: '30%', x2: '52%', y2: '16%' },
-]
-
-function Constellation({ isDark }: { isDark: boolean }) {
-  const [visible, setVisible] = useState<number[]>([0, 3, 6])
-
-  useEffect(() => {
-    const tick = setInterval(() => {
-      setVisible(prev => {
-        const next = [...prev]
-        const removeIdx = Math.floor(Math.random() * next.length)
-        next.splice(removeIdx, 1)
-        const candidates = CONSTELLATION_LINES.map((_, i) => i).filter(i => !next.includes(i))
-        if (candidates.length > 0) next.push(candidates[Math.floor(Math.random() * candidates.length)])
-        return next
-      })
-    }, 2400)
-    return () => clearInterval(tick)
-  }, [])
-
-  return (
-    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
-      {CONSTELLATION_LINES.map((line, i) => (
-        <line
-          key={i}
-          x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-          stroke={isDark
-            ? `rgba(163,230,53,${visible.includes(i) ? 0.22 : 0})`
-            : `rgba(0,0,0,${visible.includes(i) ? 0.09 : 0})`}
-          strokeWidth={1}
-          strokeLinecap="round"
-          style={{ transition: 'stroke 1.8s ease' }}
-        />
-      ))}
-    </svg>
-  )
-}
 
 export function CorraIdleView({ onSend, loading }: Props) {
   const [input, setInput]               = useState('')
@@ -139,9 +94,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
         background: 'var(--bg)', overflow: 'hidden',
       }}
     >
-      {/* Constellation */}
-      <Constellation isDark={isDark} />
-
       {/* Ambient glow — Dark Mode only */}
       {isDark && (
         <div style={{
