@@ -143,7 +143,7 @@ export function CorraRoute() {
   return (
     <div style={{
       position: 'relative', height: '100%', overflow: 'hidden',
-      background: '#080808',
+      background: 'var(--bg)',
     }}>
       {/* Idle phase */}
       <AnimatePresence>

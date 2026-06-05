@@ -45,11 +45,24 @@ export function CorraIdleView({ onSend, loading }: Props) {
         position: 'absolute', inset: 0,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: '#080808',
+        background: 'var(--bg)',
         overflow: 'hidden',
       }}
     >
-      {/* Exact mouse glow */}
+      {/* Static ambient center glow — always visible */}
+      <div style={{
+        position: 'absolute',
+        top: '50%', left: '50%',
+        transform: 'translate(-50%, -60%)',
+        width: 700, height: 700,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(163,230,53,0.08) 0%, rgba(163,230,53,0.03) 45%, transparent 70%)',
+        filter: 'blur(60px)',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }} />
+
+      {/* Mouse-following glow */}
       <motion.div
         style={{
           position: 'absolute',
@@ -57,7 +70,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
           left: 0,
           width: 520, height: 520,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(163,230,53,0.16) 0%, rgba(163,230,53,0.05) 40%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(163,230,53,0.18) 0%, rgba(163,230,53,0.06) 40%, transparent 70%)',
           filter: 'blur(52px)',
           x: glowX,
           y: glowY,
@@ -69,7 +82,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
       {/* Dot grid */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: 'radial-gradient(circle, rgba(163,230,53,0.07) 1px, transparent 1px)',
+        backgroundImage: 'radial-gradient(circle, rgba(163,230,53,0.1) 1px, transparent 1px)',
         backgroundSize: '22px 22px',
         zIndex: 0,
       }} />
