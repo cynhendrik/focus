@@ -1611,6 +1611,30 @@ div:hover > .file-delete-btn {
   display: none;
 }
 
+/* Light mode: CORRA button bekommt dunklen Hintergrund damit Lime-Akzent sichtbar bleibt */
+[data-theme="light"] .corra-nav-button {
+  background: oklch(22% 0.01 270);
+  border-color: oklch(22% 0.01 270);
+}
+
+[data-theme="light"] .corra-nav-button[data-active="true"] {
+  background: oklch(18% 0.01 270);
+  border-color: oklch(92% 0.2 125 / 0.5);
+}
+
+[data-theme="light"] .corra-nav-button:hover:not([data-active="true"]) {
+  background: oklch(26% 0.01 270);
+  border-color: oklch(92% 0.2 125 / 0.3);
+}
+
+[data-theme="light"] .corra-nav-text span {
+  color: oklch(92% 0.2 125);
+}
+
+[data-theme="light"] .corra-nav-text small {
+  color: oklch(80% 0.15 125 / 0.8);
+}
+
 @keyframes corraPulse {
   0%, 100% { box-shadow: 0 0 0 0 oklch(92% 0.2 125 / 0); }
   50%       { box-shadow: 0 0 14px 2px oklch(92% 0.2 125 / 0.3); }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useCustomersStore } from '@/store/customers.store'
@@ -9,19 +9,20 @@ import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
   Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
+  ChevronRight, Inbox,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 function NavItem({
-  icon: Ic, label, active, onClick, badge, kbd,
+  icon: Ic, label, active, onClick, badge, kbd, bold,
 }: {
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
-  badge?: number; kbd?: string
+  badge?: number; kbd?: string; bold?: boolean
 }) {
   return (
     <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
       <Ic size={17} />
-      <span>{label}</span>
+      <span style={bold ? { fontWeight: 700 } : undefined}>{label}</span>
       {badge ? <span className="nav-badge">{badge}</span> : null}
       {kbd && !badge ? <span className="nav-kbd">{kbd}</span> : null}
     </div>
@@ -30,6 +31,73 @@ function NavItem({
 
 function NavDivider() {
   return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 10px' }} />
+}
+
+// Aufklappbare Inbox-Gruppe
+function InboxGroup({
+  appView, setAppView, unreadMails, sidebarCollapsed,
+}: {
+  appView: string
+  setAppView: (v: string) => void
+  unreadMails: number
+  sidebarCollapsed: boolean
+}) {
+  const [open, setOpen] = useState(true)
+  const inboxActive = ['posteingang', 'calendar'].includes(appView)
+
+  if (sidebarCollapsed) {
+    return (
+      <NavItem
+        icon={Inbox} label="Posteingang" active={inboxActive}
+        onClick={() => setAppView('posteingang')}
+        badge={unreadMails || undefined}
+      />
+    )
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div
+        className="nav-item"
+        data-active="false"
+        onClick={() => setOpen(o => !o)}
+        title="Inbox"
+        style={{ userSelect: 'none' }}
+      >
+        <Inbox size={17} />
+        <span style={{ flex: 1 }}>Inbox</span>
+        {unreadMails > 0 && !open && (
+          <span className="nav-badge">{unreadMails}</span>
+        )}
+        <ChevronRight
+          size={10}
+          style={{
+            color: 'var(--fg-dim)',
+            transition: 'transform 180ms',
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            flexShrink: 0,
+            marginLeft: 'auto',
+          }}
+        />
+      </div>
+
+      {/* Sub-Items */}
+      {open && (
+        <div style={{ paddingLeft: 8 }}>
+          <NavItem
+            icon={Mail}     label="Posteingang" active={appView === 'posteingang'}
+            onClick={() => setAppView('posteingang')}
+            badge={unreadMails || undefined}
+          />
+          <NavItem
+            icon={Calendar} label="Kalender" active={appView === 'calendar'}
+            onClick={() => setAppView('calendar')}
+          />
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function NavSidebar() {
@@ -48,11 +116,9 @@ export function NavSidebar() {
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
 
   const akquiseBadge = (newLeadsCount + openDealCount) || undefined
+  const displayName  = user?.email?.split('@')[0] ?? 'Nutzer'
+  const initials     = displayName.slice(0, 2).toUpperCase()
 
-  const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
-  const initials    = displayName.slice(0, 2).toUpperCase()
-
-  // Redirects
   useEffect(() => {
     if (['leads', 'pipeline', 'followups'].includes(appView)) setAppView('akquise')
     if (appView === 'mail') setAppView('posteingang')
@@ -76,7 +142,7 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA — top, special button */}
+      {/* CORRA — ganz oben */}
       <div
         className="corra-nav-button"
         data-active={appView === 'corra' ? 'true' : 'false'}
@@ -90,21 +156,36 @@ export function NavSidebar() {
         </div>
       </div>
 
-      <NavItem icon={Home}   label="Heute"  active={appView === 'dashboard'}   onClick={() => setAppView('dashboard')}   kbd="H" />
+      {/* Heute — bold */}
+      <NavItem
+        icon={Home} label="Heute" bold
+        active={appView === 'dashboard'}
+        onClick={() => setAppView('dashboard')} kbd="H"
+      />
 
       <NavDivider />
 
-      {/* Inbox-Gruppe */}
-      <NavItem icon={Mail}     label="Posteingang"     active={appView === 'posteingang'}    onClick={() => setAppView('posteingang')}    badge={unreadMails || undefined} kbd="P" />
-      <NavItem icon={Calendar} label="Kalender"        active={appView === 'calendar'}       onClick={() => setAppView('calendar')}       kbd="K" />
-      <NavItem icon={Clock}    label="Zeitmanagement"  active={appView === 'zeitmanagement'} onClick={() => setAppView('zeitmanagement')} kbd="Z" />
+      {/* Inbox aufklappbar */}
+      <InboxGroup
+        appView={appView}
+        setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
+        unreadMails={unreadMails}
+        sidebarCollapsed={collapsed}
+      />
+
+      {/* Zeitmanagement flach */}
+      <NavItem
+        icon={Clock} label="Zeitmanagement"
+        active={appView === 'zeitmanagement'}
+        onClick={() => setAppView('zeitmanagement')} kbd="Z"
+      />
 
       <NavDivider />
 
-      {/* Kunden & Sales */}
+      {/* Kunden & Business */}
       <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}   onClick={() => setAppView('clients')}   badge={clientsCount || undefined} kbd="C" />
-      <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}   onClick={() => setAppView('akquise')}  badge={akquiseBadge} kbd="A" />
-      <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}  onClick={() => setAppView('invoices')} kbd="F" />
+      <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}   onClick={() => setAppView('akquise')}  badge={akquiseBadge}              kbd="A" />
+      <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}  onClick={() => setAppView('invoices')}                                    kbd="F" />
 
       <div style={{ flex: 1 }} />
 
