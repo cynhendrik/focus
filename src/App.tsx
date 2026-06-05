@@ -38,6 +38,8 @@ import { MailRoute }             from '@/routes/MailRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
 import { CorraRoute }            from '@/routes/CorraRoute'
 import { NotesRoute }            from '@/routes/NotesRoute'
+import { AkquiseRoute }          from '@/routes/AkquiseRoute'
+import { PosteingangRoute }      from '@/routes/PosteingangRoute'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
@@ -68,6 +70,7 @@ export default function App() {
   const loadCalendar    = useCalendarStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
   const appView         = useUiStore(s => s.appView)
+  const setAppView      = useUiStore(s => s.setAppView)
   const cmdOpen             = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen   = useUiStore(s => s.setCmdPaletteOpen)
   const setQuickCaptureOpen = useUiStore(s => s.setQuickCaptureOpen)
@@ -108,19 +111,25 @@ export default function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Cmd/Ctrl+K → Client picker (jump to a specific customer)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // ⌘K → CORRA Intelligence
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'k') {
+        e.preventDefault()
+        setAppView('corra')
+        return
+      }
+      // ⌘Shift+K → Kunden-Schnellsuche (ehemals ⌘K)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'k') {
         e.preventDefault()
         openPicker()
         return
       }
-      // Cmd/Ctrl+J → Global Spotlight search (across everything)
+      // ⌘J → Globale Suche
       if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
         e.preventDefault()
         setCmdPaletteOpen(true)
         return
       }
-      // Cmd/Ctrl+Shift+N → Quick Capture
+      // ⌘Shift+N → Quick Capture
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'n') {
         e.preventDefault()
         setQuickCaptureOpen(true)
@@ -129,7 +138,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [openPicker, setCmdPaletteOpen, setQuickCaptureOpen])
+  }, [openPicker, setCmdPaletteOpen, setQuickCaptureOpen, setAppView])
 
   useEffect(() => {
     if (DEV_BYPASS && !activeWorkspaceId) {
@@ -198,19 +207,21 @@ export default function App() {
       case 'profile':      return <ProfileRoute />
       case 'clients':      return <ClientsRoute />
       case 'invoices':     return <FinanceRoute />
-      case 'leads':        return <LeadsRoute />
-      case 'pipeline':     return <PipelineRoute />
-      case 'followups':    return <FollowupsDashboardRoute />
+      case 'akquise':      return <AkquiseRoute />
+      case 'posteingang':  return <PosteingangRoute />
       case 'journal':      return <JournalRoute />
-      case 'calendar':     return <CalendarRoute />
-      case 'mail':         return <MailRoute />
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
       case 'corra':        return <CorraRoute />
       case 'notes':        return <NotesRoute />
-      // Legacy fallbacks (consolidated wrappers removed)
-      case 'sales':        return <LeadsRoute />
-      case 'inbox':        return <MailRoute />
+      // Redirects — alte Views auf neue umleiten
+      case 'leads':        return <AkquiseRoute />
+      case 'pipeline':     return <AkquiseRoute />
+      case 'followups':    return <AkquiseRoute />
+      case 'mail':         return <PosteingangRoute />
+      case 'calendar':     return <PosteingangRoute />
+      case 'sales':        return <AkquiseRoute />
+      case 'inbox':        return <PosteingangRoute />
       default:             return <DashboardRoute />
     }
   }
