@@ -189,7 +189,8 @@ function WorkspaceView() {
   const upsertTodo = useTodosStore(s => s.upsert)
   const showToast  = useToastStore(s => s.show)
 
-  const [revRange, setRevRange] = useState<'week' | 'month'>('week')
+  const [revRange, setRevRange]     = useState<'week' | 'month'>('week')
+  const [viewMode, setViewMode]     = useState<'fokus' | 'übersicht'>('fokus')
 
   // Heute-Cockpit queue
   const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
@@ -345,8 +346,90 @@ function WorkspaceView() {
         />
       </div>
 
-      {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
-      {!queueLoading && currentItem && (
+      {/* Heute-Cockpit — Header mit Toggle */}
+      {!queueLoading && queueItems.length > 0 && queueIndex < queueItems.length && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <span style={{
+            fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600,
+          }}>
+            Dein Tag · {queueItems.length - queueIndex} offen
+          </span>
+          <div style={{
+            display: 'inline-flex', padding: 2, gap: 2,
+            background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 99,
+          }}>
+            {(['fokus', 'übersicht'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '4px 11px', borderRadius: 99,
+                  background: viewMode === mode ? 'var(--accent)' : 'transparent',
+                  color: viewMode === mode ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700,
+                  letterSpacing: '0.10em', textTransform: 'uppercase',
+                }}
+              >
+                {mode === 'fokus' ? 'Fokus' : 'Übersicht'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Übersicht-Modus — alle Queue-Items als Liste */}
+      {!queueLoading && viewMode === 'übersicht' && queueItems.length > 0 && queueIndex < queueItems.length && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+          {queueItems.slice(queueIndex).map((item, i) => {
+            const typeLabel =
+              item.type === 'invoice_reminder' ? 'Mahnung' :
+              item.type === 'mail_reply'        ? 'Mail' :
+              item.type === 'followup'          ? 'Follow-up' : 'Todo'
+            const typeColor =
+              item.type === 'invoice_reminder' ? 'oklch(72% 0.18 25)' :
+              item.type === 'mail_reply'        ? 'oklch(70% 0.15 250)' :
+              item.type === 'followup'          ? 'oklch(70% 0.18 50)' : 'var(--accent)'
+            return (
+              <div key={item.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 12,
+                border: '1px solid var(--border)', background: 'var(--surface-1)',
+              }}>
+                <span style={{
+                  fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)',
+                  width: 20, flexShrink: 0, textAlign: 'right',
+                }}>{queueIndex + i + 1}.</span>
+                <span style={{
+                  fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                  letterSpacing: '0.1em', textTransform: 'uppercase',
+                  color: typeColor, background: `${typeColor}18`,
+                  padding: '2px 7px', borderRadius: 99, flexShrink: 0,
+                }}>{typeLabel}</span>
+                <span style={{
+                  flex: 1, fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.4,
+                  overflow: 'hidden', display: '-webkit-box',
+                  WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+                }}>{item.reason}</span>
+                <button
+                  onClick={() => { setQueueIndex(queueIndex + i); setViewMode('fokus') }}
+                  style={{
+                    padding: '5px 12px', borderRadius: 8, border: 'none',
+                    background: i === 0 ? 'var(--accent)' : 'var(--surface-2)',
+                    color: i === 0 ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                    fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
+                    fontFamily: 'inherit',
+                  }}
+                >{i === 0 ? 'Jetzt →' : 'Fokus'}</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Fokus-Modus — DEIN NÄCHSTER ZUG */}
+      {!queueLoading && viewMode === 'fokus' && currentItem && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {/* Aktuelle Kachel */}
           <div style={{ flex: 1, minWidth: 0 }}>
