@@ -60,9 +60,11 @@ interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: strin
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function GlobalQuickComposer() {
-  const open   = useGlobalComposerStore(s => s.open)
-  const close  = useGlobalComposerStore(s => s.close)
-  const toggle = useGlobalComposerStore(s => s.toggle)
+  const open    = useGlobalComposerStore(s => s.open)
+  const close   = useGlobalComposerStore(s => s.close)
+  const toggle  = useGlobalComposerStore(s => s.toggle)
+  const appView = useUiStore(s => s.appView)
+  const inCorra = appView === 'corra'
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,7 +78,7 @@ export function GlobalQuickComposer() {
 
   return (
     <>
-      <FloatingBubble open={open} onClick={toggle} />
+      {!inCorra && <FloatingBubble open={open} onClick={toggle} />}
       <AnimatePresence>{open && <Panel onClose={close} />}</AnimatePresence>
     </>
   )
