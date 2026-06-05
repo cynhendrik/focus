@@ -21,10 +21,10 @@ export type CustomerTab =
 /** Tasks page tab. */
 export type TasksTab = 'list' | 'board' | 'focus'
 
-/** Dashboard "Heute" hat zwei View-Modi:
- *  - workspace: alles auf einen Blick (Umsatz, Kunden, Tagesplan, Inbox)
- *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul)
- *  @deprecated Workspace/Sales-Tabs entfernt — Heute zeigt direkt die CORRA-Queue */
+/**
+ * Dashboard "Heute" hatte zwei View-Modi.
+ * @deprecated Workspace/Sales-Tabs entfernt — Heute zeigt direkt die CORRA-Queue
+ */
 export type DashboardView = 'workspace' | 'sales'
 
 /** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
