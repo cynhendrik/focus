@@ -66,7 +66,8 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA */}
+      {/* AI */}
+      {!collapsed && <SectionLabel>AI</SectionLabel>}
       <div
         className="nav-item nav-item--featured"
         data-active={appView === 'corra' ? 'true' : 'false'}
@@ -78,7 +79,8 @@ export function NavSidebar() {
         {!collapsed && <span className="nav-kbd">⌘K</span>}
       </div>
 
-      {/* HEUTE — kein Section-Label, steht für sich */}
+      {/* HEUTE */}
+      {!collapsed && <SectionLabel>Heute</SectionLabel>}
       <div
         className="nav-item nav-item--primary"
         data-active={appView === 'dashboard' ? 'true' : 'false'}
@@ -90,8 +92,8 @@ export function NavSidebar() {
         {!collapsed && <span className="nav-kbd">H</span>}
       </div>
 
-      {/* INBOX */}
-      {!collapsed && <SectionLabel>Inbox</SectionLabel>}
+      {/* KOMMUNIKATION */}
+      {!collapsed && <SectionLabel>Kommunikation</SectionLabel>}
       <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
       <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
