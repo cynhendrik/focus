@@ -1,74 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
-import { useTodosStore } from '@/store/todos.store'
+import { useMailStore } from '@/store/mail.store'
 import {
-  Home, Users, CreditCard,
-  TrendingUp, Target, Reply,
-  Calendar, Mail, Settings, Plug,
-  ChevronRight, PanelLeftClose, PanelLeftOpen, Zap, Sparkles, PenLine,
-  NotebookText,
+  Home, Users, CreditCard, Target, Inbox,
+  Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-type SectionKey = 'workspace' | 'sales' | 'inbox'
-
-const SALES_VIEWS = new Set<string>(['leads', 'pipeline', 'followups'])
-
-function readExpanded(): Record<SectionKey, boolean> {
-  try {
-    const saved = localStorage.getItem('nav-sections-v1')
-    if (saved) return JSON.parse(saved)
-  } catch {}
-  return { workspace: true, sales: true, inbox: true }
-}
-
-function SidebarSection({
-  label,
-  expanded,
-  onToggle,
-}: {
-  label: string
-  expanded: boolean
-  onToggle: () => void
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className="nav-section"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 4, width: '100%',
-        background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-        padding: '14px 10px 6px', fontFamily: 'var(--font-mono)', fontSize: 10,
-        letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-dim)',
-      }}
-    >
-      <span style={{ flex: 1 }}>{label}</span>
-      <ChevronRight
-        size={10}
-        style={{
-          transition: 'transform 200ms',
-          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-          color: 'var(--fg-dim)',
-          flexShrink: 0,
-        }}
-      />
-    </button>
-  )
-}
-
-function SidebarNavItem({
+function NavItem({
   icon: Ic, label, active, onClick, badge, kbd,
 }: {
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
   badge?: number; kbd?: string
 }) {
-  // title sorgt im collapsed-Mode fuer den Tooltip — sonst weiss man nicht
-  // mehr welcher Icon was bedeutet.
   return (
     <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
       <Ic size={17} />
@@ -79,51 +28,61 @@ function SidebarNavItem({
   )
 }
 
+function NavDivider() {
+  return (
+    <div style={{
+      height: 1,
+      background: 'rgba(255,255,255,0.06)',
+      margin: '6px 12px',
+    }} />
+  )
+}
+
 export function NavSidebar() {
-  const appView          = useUiStore(s => s.appView)
-  const setAppView       = useUiStore(s => s.setAppView)
-  const collapsed        = useUiStore(s => s.sidebarCollapsed)
-  const setQuickCapture  = useUiStore(s => s.setQuickCaptureOpen)
-  const toggleSidebar    = useUiStore(s => s.toggleSidebar)
-  const enterPrivate     = useUiStore(s => s.enterPrivate)
-  const user             = useAuthStore(s => s.user)
+  const appView         = useUiStore(s => s.appView)
+  const setAppView      = useUiStore(s => s.setAppView)
+  const collapsed       = useUiStore(s => s.sidebarCollapsed)
+  const setQuickCapture = useUiStore(s => s.setQuickCaptureOpen)
+  const toggleSidebar   = useUiStore(s => s.toggleSidebar)
+  const enterPrivate    = useUiStore(s => s.enterPrivate)
+  const user            = useAuthStore(s => s.user)
+  const modules         = useCompanyStore(s => s.modules)
+  const isAdmin         = useCompanyStore(s => s.isAdmin)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
   const openDealCount = useDealsStore(s =>
     s.deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
   )
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
-  const isAdmin = useCompanyStore(s => s.isAdmin)
-  const modules = useCompanyStore(s => s.modules)
+  const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
 
-  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>(readExpanded)
-
-  // Helper: module is ON unless explicitly set to false
   const mod = (key: keyof typeof modules, defaultOn = true) =>
     modules[key] === undefined ? defaultOn : !!modules[key]
 
+  // Redirects: alte Views auf neue umleiten
   useEffect(() => {
-    if (!mod('crm') && (appView === 'clients' || SALES_VIEWS.has(appView))) setAppView('dashboard')
-    if (!mod('finanzen') && appView === 'invoices')  setAppView('dashboard')
-    if (!mod('mail')     && appView === 'mail')      setAppView('dashboard')
-    if (!mod('kalender') && appView === 'calendar')  setAppView('dashboard')
-    if (!mod('leads',  true)  && appView === 'leads') setAppView('dashboard')
+    if (appView === 'leads' || appView === 'pipeline' || appView === 'followups') {
+      setAppView('akquise')
+    }
+    if (appView === 'mail' || appView === 'calendar') {
+      setAppView('posteingang')
+    }
+    if (!mod('crm') && (appView === 'clients' || appView === 'akquise')) {
+      setAppView('dashboard')
+    }
+    if (!mod('finanzen') && appView === 'invoices') setAppView('dashboard')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modules, appView, setAppView])
 
-  const toggle = (key: SectionKey) => {
-    setExpanded(prev => {
-      const next = { ...prev, [key]: !prev[key] }
-      try { localStorage.setItem('nav-sections-v1', JSON.stringify(next)) } catch {}
-      return next
-    })
-  }
+  const akquiseBadge     = (newLeadsCount + openDealCount) || undefined
+  const posteingangBadge = unreadMails || undefined
 
   const initials    = user?.email ? user.email.slice(0, 2).toUpperCase() : 'CY'
-  const displayName = user?.email?.split('@')[0] ?? 'User'
+  const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
+      {/* Brand */}
       <div className="sidebar-brand" data-tauri-drag-region>
         <div className="sidebar-brand-logo">
           <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
@@ -138,12 +97,18 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA Intelligence — premium nav button above Workspace */}
+      {/* Hauptnavigation */}
+      <NavItem
+        icon={Home} label="Heute" active={appView === 'dashboard'}
+        onClick={() => setAppView('dashboard')} kbd="H"
+      />
+
+      {/* CORRA — prominenter Sonderstil */}
       <div
         className="corra-nav-button"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
-        title="CORRA Intelligence"
+        title="CORRA Intelligence (⌘K)"
       >
         <div className="corra-nav-orb">
           <Sparkles size={12} />
@@ -154,45 +119,34 @@ export function NavSidebar() {
         </div>
       </div>
 
-      <SidebarSection label="Workspace" expanded={expanded.workspace} onToggle={() => toggle('workspace')} />
-      {expanded.workspace && (
-        <>
-          <SidebarNavItem icon={Home} label="Heute" active={appView === 'dashboard'} onClick={() => setAppView('dashboard')} kbd="H" />
-          <SidebarNavItem icon={NotebookText} label="Notizen" active={appView === 'notes'} onClick={() => setAppView('notes')} kbd="Z" />
-          {mod('crm') && (
-            <SidebarNavItem icon={Users} label="Clients" active={appView === 'clients'} onClick={() => setAppView('clients')} kbd="C" badge={clientsCount || undefined} />
-          )}
-          {mod('finanzen') && isAdmin && (
-            <SidebarNavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'} onClick={() => setAppView('invoices')} kbd="F" />
-          )}
-        </>
-      )}
+      <NavDivider />
 
       {mod('crm') && (
-        <>
-          <SidebarSection label="Sales" expanded={expanded.sales} onToggle={() => toggle('sales')} />
-          {expanded.sales && (
-            <>
-              {mod('leads', true) && (
-                <SidebarNavItem icon={Target} label="Leads" active={appView === 'leads'} onClick={() => setAppView('leads')} kbd="N" badge={newLeadsCount || undefined} />
-              )}
-              <SidebarNavItem icon={Reply}      label="Follow-Ups" active={appView === 'followups'} onClick={() => setAppView('followups')} kbd="U" />
-              <SidebarNavItem icon={TrendingUp} label="Pipeline"   active={appView === 'pipeline'}  onClick={() => setAppView('pipeline')}  kbd="P" badge={openDealCount || undefined} />
-            </>
-          )}
-        </>
+        <NavItem
+          icon={Users} label="Kunden" active={appView === 'clients'}
+          onClick={() => setAppView('clients')} kbd="K"
+          badge={clientsCount || undefined}
+        />
       )}
-
+      {mod('crm') && (
+        <NavItem
+          icon={Target} label="Akquise" active={appView === 'akquise'}
+          onClick={() => setAppView('akquise')} kbd="A"
+          badge={akquiseBadge}
+        />
+      )}
+      {mod('finanzen') && isAdmin && (
+        <NavItem
+          icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
+          onClick={() => setAppView('invoices')} kbd="F"
+        />
+      )}
       {(mod('mail') || mod('kalender')) && (
-        <>
-          <SidebarSection label="Inbox" expanded={expanded.inbox} onToggle={() => toggle('inbox')} />
-          {expanded.inbox && (
-            <>
-              {mod('kalender') && <SidebarNavItem icon={Calendar} label="Kalender" active={appView === 'calendar'} onClick={() => setAppView('calendar')} kbd="K" />}
-              {mod('mail')     && <SidebarNavItem icon={Mail}     label="Mail"     active={appView === 'mail'}     onClick={() => setAppView('mail')}     kbd="M" />}
-            </>
-          )}
-        </>
+        <NavItem
+          icon={Inbox} label="Posteingang" active={appView === 'posteingang'}
+          onClick={() => setAppView('posteingang')} kbd="P"
+          badge={posteingangBadge}
+        />
       )}
 
       <div style={{ flex: 1 }} />
@@ -211,7 +165,7 @@ export function NavSidebar() {
           background: 'transparent', cursor: 'pointer',
           color: 'var(--fg-dim)', fontSize: 12,
           transition: 'all 140ms',
-          width: collapsed ? 'calc(100% - 16px)' : 'calc(100% - 16px)',
+          width: 'calc(100% - 16px)',
         }}
         onMouseEnter={e => {
           e.currentTarget.style.borderColor = 'var(--accent)'
@@ -226,6 +180,7 @@ export function NavSidebar() {
         {!collapsed && <span>Quick Capture</span>}
       </button>
 
+      {/* Sidebar collapse */}
       <button
         className="sidebar-collapse-btn"
         onClick={toggleSidebar}
@@ -234,15 +189,16 @@ export function NavSidebar() {
         {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
-      <SidebarNavItem icon={Plug} label="Integrationen" active={appView === 'integrations'} onClick={() => setAppView('integrations')} />
-      <SidebarNavItem icon={Settings} label="Settings" active={appView === 'settings'} onClick={() => setAppView('settings')} />
+      <NavItem
+        icon={Settings} label="Einstellungen" active={appView === 'settings'}
+        onClick={() => setAppView('settings')}
+      />
 
-      {/* Eingang zum "Privaten Raum". Klick wechselt den ganzen App-Modus
-          und ersetzt das Layout — siehe PrivateShell in App.tsx. */}
+      {/* Privater Raum */}
       <div
         className="sidebar-user"
         onClick={() => enterPrivate()}
-        title="Privater Raum oeffnen"
+        title="Privater Raum öffnen"
         style={{ cursor: 'pointer' }}
       >
         <div className="sidebar-user-avatar">{initials}</div>
