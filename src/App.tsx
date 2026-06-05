@@ -37,6 +37,7 @@ import { CalendarRoute }         from '@/routes/CalendarRoute'
 import { MailRoute }             from '@/routes/MailRoute'
 import { JournalRoute }          from '@/routes/JournalRoute'
 import { CorraRoute }            from '@/routes/CorraRoute'
+import { NotesRoute }            from '@/routes/NotesRoute'
 import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
@@ -206,6 +207,7 @@ export default function App() {
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
       case 'corra':        return <CorraRoute />
+      case 'notes':        return <NotesRoute />
       // Legacy fallbacks (consolidated wrappers removed)
       case 'sales':        return <LeadsRoute />
       case 'inbox':        return <MailRoute />

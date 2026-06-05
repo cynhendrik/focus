@@ -26,7 +26,7 @@ import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
 import { CockpitPane } from '@/components/customer/tabs/CockpitPane'
 import { WorkflowPane } from '@/components/customer/tabs/WorkflowPane'
-import { NotizPane } from '@/components/customer/tabs/NotizPane'
+import { CustomerNotesPane } from '@/components/notes/CustomerNotesPane'
 import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { TimelinePane } from '@/components/customer/tabs/TimelinePane'
 import { FinanzPane } from '@/components/customer/tabs/FinanzPane'
@@ -126,7 +126,7 @@ export function CustomerRoute({ customerId }: Props) {
     switch (activeTab) {
       case 'cockpit':       return <CockpitPane       customerId={customerId} />
       case 'tasks':         return <WorkflowPane      customerId={customerId} />
-      case 'notizen':       return <NotizPane       customerId={customerId} />
+      case 'notizen':       return <CustomerNotesPane accountId={customerId} />
       case 'dokumente':     return <DateienPane       customerId={customerId} />
       case 'kommunikation': return <KommunikationPane customerId={customerId} />
       case 'verlauf':       return <TimelinePane      customerId={customerId} />

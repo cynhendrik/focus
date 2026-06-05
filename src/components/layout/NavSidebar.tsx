@@ -11,6 +11,7 @@ import {
   TrendingUp, Target, Reply,
   Calendar, Mail, Settings, Plug,
   ChevronRight, PanelLeftClose, PanelLeftOpen, Zap, Sparkles, PenLine,
+  NotebookText,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -157,6 +158,7 @@ export function NavSidebar() {
       {expanded.workspace && (
         <>
           <SidebarNavItem icon={Home} label="Heute" active={appView === 'dashboard'} onClick={() => setAppView('dashboard')} kbd="H" />
+          <SidebarNavItem icon={NotebookText} label="Notizen" active={appView === 'notes'} onClick={() => setAppView('notes')} kbd="Z" />
           {mod('crm') && (
             <SidebarNavItem icon={Users} label="Clients" active={appView === 'clients'} onClick={() => setAppView('clients')} kbd="C" badge={clientsCount || undefined} />
           )}

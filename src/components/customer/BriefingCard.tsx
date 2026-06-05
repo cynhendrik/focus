@@ -10,7 +10,7 @@ import { useDealsStore } from '@/store/deals.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useMailStore } from '@/store/mail.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useNotebookStore } from '@/store/notebook.store'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useUiStore } from '@/store/ui.store'
 
 import {
@@ -45,8 +45,7 @@ export function BriefingCard({ customerId }: Props) {
   const customer = useCustomersStore(s => s.customers.find(c => c.id === customerId))
   const setAppView = useUiStore(s => s.setAppView)
 
-  const notes      = useNotebookStore(s => s.entries)
-  const noteBooks  = useNotebookStore(s => s.books)
+  const notes      = useNotesModuleStore(s => s.entries)
   const todos      = useTodosStore(s => s.allTodos)
   const events     = useCalendarStore(s => s.events)
   const invoices   = useFinanceStore(s => s.invoices)
@@ -75,7 +74,6 @@ export function BriefingCard({ customerId }: Props) {
       const briefing = await generateBriefing({
         customer,
         notes,
-        noteBooks,
         todos,
         events,
         invoices,

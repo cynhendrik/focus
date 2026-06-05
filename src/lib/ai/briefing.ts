@@ -7,7 +7,7 @@ import type { Deal } from '@/types/pipeline.types'
 import type { Activity } from '@/types/pipeline.types'
 import type { EmailHeader } from '@/types/mail.types'
 import type { FollowUp } from '@/types/crm.types'
-import type { NoteEntry, NoteBook } from '@/store/notebook.store'
+import type { NoteEntry } from '@/types/notes-module.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types — what the UI consumes
@@ -45,7 +45,6 @@ export interface CustomerBriefing {
 export interface DossierInput {
   customer: Customer
   notes: NoteEntry[]
-  noteBooks: NoteBook[]
   todos: Todo[]
   events: CalendarEvent[]
   invoices: Invoice[]
@@ -91,7 +90,7 @@ function fmtMoney(n: number): string {
  * parse JSON. Sorted newest-first within each section.
  */
 export function buildDossier(input: DossierInput): string {
-  const { customer, notes, noteBooks, todos, events, invoices, deals, activities, emails, followUps } = input
+  const { customer, notes, todos, events, invoices, deals, activities, emails, followUps } = input
   const now = NOW()
   const since = new Date(now.getTime() - RECENT_DAYS * 86_400_000)
   const sinceIso = since.toISOString()
@@ -198,17 +197,14 @@ export function buildDossier(input: DossierInput): string {
   }
 
   // ── Notes (most recent, with content excerpts) ───────────────────────────
-  const bookById = new Map(noteBooks.map(b => [b.id, b]))
   const customerNotes = notes
-    .filter(n => n.customerId === customer.id)
+    .filter(n => n.accountId === customer.id)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 15)
   if (customerNotes.length) {
     lines.push('## Notizen')
     for (const n of customerNotes) {
-      const book = bookById.get(n.bookId)
-      const bookName = book ? book.name : 'Allgemein'
-      lines.push(`### ${bookName} · ${n.title || '(ohne Titel)'} · ${relDay(n.updatedAt)}`)
+      lines.push(`### ${n.title || '(ohne Titel)'} · ${relDay(n.updatedAt)}`)
       const excerpt = trimText(n.content, 500)
       if (excerpt) lines.push(excerpt)
     }

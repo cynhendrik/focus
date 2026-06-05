@@ -4,24 +4,23 @@ import { AtSign, Sparkles, X } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { usePrivateNotesStore } from '@/store/private-notes.store'
-import { useNotebookStore }     from '@/store/notebook.store'
-import { useAccountsStore }     from '@/store/accounts.store'
-import { useUiStore }           from '@/store/ui.store'
+import { usePrivateNotesStore }  from '@/store/private-notes.store'
+import { useNotesModuleStore }   from '@/store/notes-module.store'
+import { useAccountsStore }      from '@/store/accounts.store'
+import { useUiStore }            from '@/store/ui.store'
+import { useWorkspaceStore }     from '@/store/workspace.store'
+import { useAuthStore }          from '@/store/auth.store'
 import type { Account } from '@/types/account.types'
 
 export function QuickCaptureModal() {
   const open    = useUiStore(s => s.quickCaptureOpen)
   const setOpen = useUiStore(s => s.setQuickCaptureOpen)
 
-  const createPrivate = usePrivateNotesStore(s => s.create)
-  const updatePrivate = usePrivateNotesStore(s => s.update)
-
-  const books       = useNotebookStore(s => s.books)
-  const addBook     = useNotebookStore(s => s.addBook)
-  const addEntry    = useNotebookStore(s => s.addEntry)
-  const updateEntry = useNotebookStore(s => s.updateEntry)
-
+  const createPrivate   = usePrivateNotesStore(s => s.create)
+  const updatePrivate   = usePrivateNotesStore(s => s.update)
+  const createNoteEntry = useNotesModuleStore(s => s.createEntry)
+  const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const userId          = useAuthStore(s => s.user?.id) ?? ''
   const accounts = useAccountsStore(s => s.accounts)
 
   const [customer, setCustomer] = useState<Account | null>(null)
@@ -91,10 +90,13 @@ export function QuickCaptureModal() {
       new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
     if (customer) {
-      const existingBook = books.find(b => b.customerId === customer.id)
-      const bookId = existingBook ? existingBook.id : addBook(customer.id, 'Allgemein')
-      const entryId = addEntry(bookId, customer.id, title)
-      updateEntry(entryId, { content: html })
+      createNoteEntry({
+        workspaceId,
+        accountId: customer.id,
+        title,
+        content: html,
+        createdBy: userId,
+      }).catch(() => {})
     } else {
       const id = createPrivate()
       updatePrivate(id, { title, body: html })

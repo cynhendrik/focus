@@ -91,6 +91,7 @@ export type AppView =
   | 'settings'  | 'integrations'
   | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
   | 'journal'   | 'focus'      | 'corra'
+  | 'notes'
 
 interface UiState {
   theme: Theme

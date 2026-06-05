@@ -19,7 +19,7 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useMailStore } from '@/store/mail.store'
-import { useNotebookStore } from '@/store/notebook.store'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useFinanceStore } from '@/store/finance.store'
@@ -528,8 +528,7 @@ export function CockpitPane({ customerId }: Props) {
   const allTodos     = useTodosStore(s => s.allTodos)
   const allEvents    = useCalendarStore(s => s.events)
   const allInvoices  = useFinanceStore(s => s.invoices)
-  const notes        = useNotebookStore(s => s.entries)
-  const noteBooks    = useNotebookStore(s => s.books)
+  const notes        = useNotesModuleStore(s => s.entries)
   const emails       = useMailStore(s => s.emails)
   const followUps    = useCrmStore(s => s.allFollowUps)
   const [briefState, setBriefState] = useState<BriefingState>({ kind: 'idle' })
@@ -540,7 +539,7 @@ export function CockpitPane({ customerId }: Props) {
     setBriefState({ kind: 'loading' })
     try {
       const briefing = await generateBriefing({
-        customer, notes, noteBooks,
+        customer, notes,
         todos: allTodos, events: allEvents, invoices: allInvoices,
         deals, activities, emails, followUps,
       })

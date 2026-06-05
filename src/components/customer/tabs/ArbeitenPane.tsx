@@ -4,10 +4,9 @@ import { CheckSquare, FileText, FolderOpen } from 'lucide-react'
 
 import { WorkflowPane } from './WorkflowPane'
 import { DateienPane } from './DateienPane'
-import { NotizPane } from './NotizPane'
+import { CustomerNotesPane } from '@/components/notes/CustomerNotesPane'
 import { useTodosStore } from '@/store/todos.store'
 import { useFilesStore } from '@/store/files.store'
-import { useNotebookStore } from '@/store/notebook.store'
 
 type Sub = 'tasks' | 'notizen' | 'dateien'
 
@@ -39,11 +38,10 @@ export function ArbeitenPane({ customerId }: Props) {
 
   // Badge counts
   const taskCount = useTodosStore(s => s.todos.filter(t => t.status !== 'done').length)
-  const noteCount = useNotebookStore(s => s.entries.filter(n => n.customerId === customerId).length)
   const fileCount = useFilesStore(s => s.files.length)
   const badgeFor: Record<Sub, number> = {
     tasks:   taskCount,
-    notizen: noteCount,
+    notizen: 0,
     dateien: fileCount,
   }
 
@@ -63,7 +61,7 @@ export function ArbeitenPane({ customerId }: Props) {
   const renderPane = () => {
     switch (sub) {
       case 'tasks':   return <WorkflowPane customerId={customerId} />
-      case 'notizen': return <NotizPane customerId={customerId} />
+      case 'notizen': return <CustomerNotesPane accountId={customerId} />
       case 'dateien': return <DateienPane customerId={customerId} />
     }
   }
