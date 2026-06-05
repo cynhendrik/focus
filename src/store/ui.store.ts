@@ -23,7 +23,8 @@ export type TasksTab = 'list' | 'board' | 'focus'
 
 /** Dashboard "Heute" hat zwei View-Modi:
  *  - workspace: alles auf einen Blick (Umsatz, Kunden, Tagesplan, Inbox)
- *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul) */
+ *  - sales: Pipeline-, Follow-Up- und Lead-Stats (nur bei aktivem Sales-Modul)
+ *  @deprecated Workspace/Sales-Tabs entfernt — Heute zeigt direkt die CORRA-Queue */
 export type DashboardView = 'workspace' | 'sales'
 
 /** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
@@ -87,11 +88,12 @@ export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'integrationen' 
 
 export type AppView =
   | 'dashboard' | 'profile'
-  | 'clients'   | 'sales'     | 'invoices'  | 'inbox'
+  | 'clients'   | 'akquise'   | 'invoices'
   | 'settings'  | 'integrations'
-  | 'pipeline'  | 'calendar'   | 'mail' | 'followups' | 'leads'
-  | 'journal'   | 'focus'      | 'corra'
-  | 'notes'
+  | 'posteingang'
+  | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
+  | 'journal'   | 'focus'     | 'corra'
+  | 'notes'     | 'inbox'     | 'sales'
 
 interface UiState {
   theme: Theme
