@@ -162,17 +162,7 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* Inbox — ganz oben */}
-      <InboxSection
-        appView={appView}
-        setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
-        unreadMails={unreadMails}
-        sidebarCollapsed={collapsed}
-      />
-
-      <NavDivider />
-
-      {/* CORRA */}
+      {/* CORRA — ganz oben */}
       <div
         className="corra-nav-button"
         data-active={appView === 'corra' ? 'true' : 'false'}
@@ -189,6 +179,16 @@ export function NavSidebar() {
       <NavItem
         icon={Home} label="Heute" active={appView === 'dashboard'}
         onClick={() => setAppView('dashboard')} kbd="H"
+      />
+
+      <NavDivider />
+
+      {/* Inbox */}
+      <InboxSection
+        appView={appView}
+        setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
+        unreadMails={unreadMails}
+        sidebarCollapsed={collapsed}
       />
 
       <NavDivider />
