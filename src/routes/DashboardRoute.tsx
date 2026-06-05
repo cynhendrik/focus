@@ -346,14 +346,18 @@ function WorkspaceView() {
         />
       </div>
 
-      {/* Heute-Cockpit — Header mit Toggle */}
-      {!queueLoading && queueItems.length > 0 && queueIndex < queueItems.length && (
+      {/* Heute-Cockpit — Header mit Toggle (immer sichtbar nach Laden) */}
+      {!queueLoading && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <span style={{
             fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
             textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600,
           }}>
-            Dein Tag · {queueItems.length - queueIndex} offen
+            {queueItems.length === 0
+              ? 'Dein Tag · alles erledigt'
+              : queueIndex >= queueItems.length
+                ? 'Dein Tag · alles erledigt'
+                : `Dein Tag · ${queueItems.length - queueIndex} offen`}
           </span>
           <div style={{
             display: 'inline-flex', padding: 2, gap: 2,
