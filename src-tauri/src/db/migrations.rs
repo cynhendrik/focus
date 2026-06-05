@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 20;
+const CURRENT_VERSION: u32 = 21;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -611,6 +611,43 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             if table_exists(conn, "deals") && !column_exists(conn, "deals", "notes") {
                 conn.execute_batch("ALTER TABLE deals ADD COLUMN notes TEXT;")?;
             }
+            Ok(())
+        }
+        21 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS note_entries (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    title        TEXT,
+                    content      TEXT NOT NULL DEFAULT '',
+                    tags         TEXT NOT NULL DEFAULT '[]',
+                    created_by   TEXT NOT NULL,
+                    updated_by   TEXT,
+                    pending_sync INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_note_entries_account
+                    ON note_entries(account_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_note_entries_workspace
+                    ON note_entries(workspace_id, created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS note_docs (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    title        TEXT NOT NULL DEFAULT 'Unbenanntes Dokument',
+                    content      TEXT NOT NULL DEFAULT '',
+                    created_by   TEXT NOT NULL,
+                    updated_by   TEXT,
+                    pending_sync INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_note_docs_account
+                    ON note_docs(account_id, created_at DESC);
+            "#)?;
             Ok(())
         }
         _ => Ok(()),
@@ -1332,5 +1369,44 @@ mod tests {
             [], |r| r.get(0),
         ).unwrap();
         assert_eq!(count, 0, "invoice_items sollten per CASCADE gelöscht werden");
+    }
+
+    #[test]
+    fn migration_v21_creates_note_tables() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        for table in ["note_entries", "note_docs"] {
+            assert!(
+                table_exists_helper(&conn, table),
+                "{table} fehlt nach v21"
+            );
+        }
+        // note_entries: account_id FK cascade
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('acc-n1','ws-1','u1','Test AG',?1,?1)",
+            [&now],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO note_entries (id, workspace_id, account_id, created_by, created_at, updated_at)
+             VALUES ('ne1','ws-1','acc-n1','u1',?1,?1)",
+            [&now],
+        ).unwrap();
+        conn.execute("DELETE FROM accounts WHERE id='acc-n1'", []).unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM note_entries WHERE id='ne1'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 0, "note_entries should CASCADE on account delete");
+    }
+
+    #[test]
+    fn migration_v21_runs_idempotently() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        run(&conn).unwrap();
+        assert_eq!(get_version(&conn).unwrap(), CURRENT_VERSION);
     }
 }
