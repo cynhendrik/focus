@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import { motion, useMotionValue } from 'framer-motion'
-import { CorraSuggestedPrompts } from './CorraSuggestedPrompts'
 import { useUiStore } from '@/store/ui.store'
 
 interface Props {
@@ -175,8 +174,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
           </button>
         </div>
 
-        {/* Suggested prompts */}
-        <CorraSuggestedPrompts onSelect={text => { setInput(''); onSend(text) }} />
       </div>
     </div>
   )
