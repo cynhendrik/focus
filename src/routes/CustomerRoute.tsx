@@ -36,7 +36,7 @@ import { PrimaryContact } from '@/components/customer/PrimaryContact'
 
 const TAB_DEFS: { id: CustomerTab; label: string; icon: LucideIcon }[] = [
   { id: 'cockpit',       label: 'Cockpit',       icon: Target      },
-  { id: 'tasks',         label: 'Tasks',         icon: CheckCircle },
+  { id: 'tasks',         label: 'Aufgaben',      icon: CheckCircle },
   { id: 'notizen',       label: 'Notizen',       icon: FileText    },
   { id: 'dokumente',     label: 'Dokumente',     icon: File        },
   { id: 'kommunikation', label: 'Kommunikation', icon: Mail        },

@@ -1,17 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DashboardRoute "Heute" — drei View-Modi: Workspace / Sales / Client.
-// Headerbereich ist gemeinsam (Greeting + Datum + Tab-Switcher),
-// die Inhalte unterscheiden sich pro Tab.
+// DashboardRoute "Heute" — Workspace-View (KPI-Kacheln + CORRA-Queue).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Home, TrendingUp, ArrowRight, Reply, Target,
+  ArrowRight, Reply, Target,
 } from 'lucide-react'
 
 import { useCustomersStore } from '@/store/customers.store'
-import { useUiStore, type DashboardView } from '@/store/ui.store'
+import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -22,7 +20,6 @@ import { useCrmStore } from '@/store/crm.store'
 import { useDealsStore } from '@/store/deals.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useLeadsStore } from '@/store/leads.store'
-import { useCompanyStore } from '@/store/company.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { HeuteTile } from '@/components/heute/HeuteTile'
@@ -78,13 +75,9 @@ function pct(delta: number, base: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Hero + Tab-Switcher
+// Hero
 
 function DashboardHero({ name }: { name: string }) {
-  const view             = useUiStore(s => s.dashboardView)
-  const setDashboardView = useUiStore(s => s.setDashboardView)
-  const salesEnabled     = useCompanyStore(s => s.modules.sales !== false)
-
   const now = new Date()
   const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
 
@@ -107,64 +100,8 @@ function DashboardHero({ name }: { name: string }) {
           color: 'var(--fg-dim)', fontWeight: 600,
         }}>
           <span>{dateLine}</span>
-          <span style={{
-            padding: '4px 9px', borderRadius: 99,
-            background: 'var(--surface-2)', border: '1px solid var(--border)',
-            color: 'var(--fg-muted)',
-          }}>
-            Alles. Jeder Kunde.
-          </span>
         </div>
       </div>
-
-      <DashboardTabs view={view} onChange={setDashboardView} salesEnabled={salesEnabled} />
-    </div>
-  )
-}
-
-function DashboardTabs({
-  view, onChange, salesEnabled,
-}: {
-  view: DashboardView
-  onChange: (v: DashboardView) => void
-  salesEnabled: boolean
-}) {
-  // Wenn Sales-Modul aus ist, hat der Tab-Switcher nur einen Eintrag — dann
-  // gibt's nichts zu schalten und wir blenden ihn ganz aus (weniger Noise).
-  if (!salesEnabled) return null
-
-  const tab = (id: DashboardView, label: string, Icon: typeof Home) => {
-    const active = view === id
-    return (
-      <button
-        key={id}
-        onClick={() => onChange(id)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 7,
-          padding: '8px 14px', borderRadius: 999,
-          background: active ? 'var(--accent)' : 'transparent',
-          color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
-          border: 'none', cursor: 'pointer',
-          fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
-          transition: 'background 140ms, color 140ms',
-        }}
-        onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg)' }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
-      >
-        <Icon size={13} />
-        {label}
-      </button>
-    )
-  }
-
-  return (
-    <div style={{
-      display: 'inline-flex', padding: 3, gap: 0,
-      background: 'var(--surface-2)', border: '1px solid var(--border)',
-      borderRadius: 999, flexShrink: 0,
-    }}>
-      {tab('workspace', 'Workspace', Home)}
-      {tab('sales',     'Sales',     TrendingUp)}
     </div>
   )
 }
@@ -391,7 +328,7 @@ function WorkspaceView() {
               <span>diese Woche</span>
             </>
           }
-          action={{ label: 'Zu Clients', onClick: () => setAppView('clients') }}
+          action={{ label: 'Zu Kunden', onClick: () => setAppView('clients') }}
         />
 
         <KpiCard

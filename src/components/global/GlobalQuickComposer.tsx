@@ -34,7 +34,7 @@ const PRIO_LABEL: Record<string, string> = {
 
 const APP_VIEW_LABEL: Partial<Record<string, { label: string; icon: typeof Home }>> = {
   dashboard: { label: 'Heute',    icon: Home       },
-  clients:   { label: 'Clients',  icon: Users      },
+  clients:   { label: 'Kunden',   icon: Users      },
   calendar:  { label: 'Kalender', icon: Calendar   },
   mail:      { label: 'Mail',     icon: Mail       },
   pipeline:  { label: 'Pipeline', icon: TrendingUp },
