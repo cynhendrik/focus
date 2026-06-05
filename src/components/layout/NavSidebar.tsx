@@ -11,14 +11,14 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 function NavItem({
-  icon: Ic, label, active, onClick, badge, kbd, iconColor,
+  icon: Ic, label, active, onClick, badge, kbd,
 }: {
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
-  badge?: number; kbd?: string; iconColor?: string
+  badge?: number; kbd?: string
 }) {
   return (
     <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
-      <Ic size={16} style={{ flexShrink: 0, color: iconColor }} />
+      <Ic size={16} />
       <span>{label}</span>
       {badge ? <span className="nav-badge">{badge}</span> : null}
       {kbd && !badge ? <span className="nav-kbd">{kbd}</span> : null}
@@ -66,53 +66,48 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA */}
+      {/* CORRA — featured, kein Section-Label */}
       <div
         className="nav-item nav-item--featured"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <Sparkles size={16} style={{ flexShrink: 0 }} />
+        <Sparkles size={16} />
         <span>CORRA</span>
         {!collapsed && <span className="nav-kbd">⌘K</span>}
       </div>
 
-      {/* HEUTE — kein Section-Label, steht für sich */}
+      {/* HEUTE */}
+      {!collapsed && <SectionLabel>Heute</SectionLabel>}
       <div
         className="nav-item nav-item--primary"
         data-active={appView === 'dashboard' ? 'true' : 'false'}
         onClick={() => setAppView('dashboard')}
         title="Heute (H)"
       >
-        <Home size={16} style={{ flexShrink: 0, color: '#818cf8' }} />
+        <Home size={16} />
         <span>Heute</span>
         {!collapsed && <span className="nav-kbd">H</span>}
       </div>
 
-      {/* INBOX */}
+      {/* INBOX — flat, kein Accordion */}
       {!collapsed && <SectionLabel>Inbox</SectionLabel>}
       <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
-        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
-        iconColor="#60a5fa" />
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
       <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
-        onClick={() => setAppView('calendar')}
-        iconColor="#f472b6" />
+        onClick={() => setAppView('calendar')} />
       <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
-        onClick={() => setAppView('zeitmanagement')} kbd="Z"
-        iconColor="#fb923c" />
+        onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 
       {/* WORKSPACE */}
       {!collapsed && <SectionLabel>Workspace</SectionLabel>}
       <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
-        onClick={() => setAppView('clients')} kbd="C"
-        iconColor="#34d399" />
+        onClick={() => setAppView('clients')} kbd="C" />
       <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
-        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A"
-        iconColor="#f59e0b" />
+        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A" />
       <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
-        onClick={() => setAppView('invoices')} kbd="F"
-        iconColor="#a78bfa" />
+        onClick={() => setAppView('invoices')} kbd="F" />
 
       <div style={{ flex: 1 }} />
 
