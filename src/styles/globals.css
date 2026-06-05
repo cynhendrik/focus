@@ -296,31 +296,22 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .sidebar[data-collapsed="true"] .nav-section { display: none; }
 .sidebar[data-collapsed="true"] .nav-capture { padding: 10px 6px; justify-content: center; }
 .sidebar[data-collapsed="true"] .nav-capture span { display: none; }
-.sidebar[data-collapsed="true"] .sidebar-user { justify-content: center; padding: 8px; }
-.sidebar[data-collapsed="true"] .sidebar-user-text { display: none; }
+.sidebar[data-collapsed="true"] .sidebar-bottom { flex-direction: column; gap: 2px; }
+.sidebar[data-collapsed="true"] .sidebar-profile { justify-content: center; padding: 6px 4px; }
+.sidebar[data-collapsed="true"] .sidebar-user-name { display: none; }
 
 /* Toggle-Button — klein, dezent, rechts-aligned (im expanded Mode).
    Im collapsed Mode zentriert sich der Button mit. */
 .sidebar-collapse-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px;
-  align-self: flex-end;
-  margin: 2px 4px 10px;
+  width: 28px; height: 28px; flex-shrink: 0;
   background: transparent; border: none;
   border-radius: 7px; cursor: pointer;
-  color: var(--fg-dim);
-  opacity: 0.55;
+  color: var(--fg-dim); opacity: 0.55;
   transition: background 140ms, color 140ms, opacity 140ms;
 }
-.sidebar-collapse-btn:hover {
-  background: var(--surface-2);
-  color: var(--fg);
-  opacity: 1;
-}
-.sidebar[data-collapsed="true"] .sidebar-collapse-btn {
-  align-self: center;
-  margin: 2px 0 10px;
-}
+.sidebar-collapse-btn:hover { background: oklch(100% 0 0 / 0.06); color: var(--fg); opacity: 1; }
+[data-theme="light"] .sidebar-collapse-btn:hover { background: oklch(0% 0 0 / 0.05); }
 
 /* ========== Privater Raum ===================================================
    Eigenes Layout, warm-getoenter Hintergrund, eigene Farbpalette.
@@ -497,22 +488,30 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .smart-list-item:hover .smart-list-actions { opacity: 1; }
 .smart-list-item[data-active="true"] .smart-list-actions { opacity: 1; }
 
-.sidebar-user {
-  margin-top: auto; display: flex; align-items: center; gap: 10px;
-  padding: 10px; border-radius: 12px;
-  background: var(--surface); border: 1px solid var(--border);
-  cursor: pointer; transition: background 180ms ease;
+/* Profil + Einklappen — gemeinsame Zeile am Ende der Sidebar */
+.sidebar-bottom {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 0 0;
 }
-.sidebar-user:hover { background: var(--surface-2); }
+.sidebar-profile {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  padding: 6px 6px; border-radius: 9px;
+  cursor: pointer; min-width: 0;
+  transition: background 140ms ease;
+}
+.sidebar-profile:hover { background: oklch(100% 0 0 / 0.06); }
+[data-theme="light"] .sidebar-profile:hover { background: oklch(0% 0 0 / 0.05); }
+
 .sidebar-user-avatar {
-  width: 30px; height: 30px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), oklch(80% 0.16 165));
-  color: var(--accent-ink); font-weight: 700; font-size: 12px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+  background: oklch(28% 0 0);
+  color: oklch(65% 0 0); font-weight: 700; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
 }
-.sidebar-user-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.sidebar-user-text strong { font-size: 13px; font-weight: 600; }
-.sidebar-user-text span { font-size: 11px; color: var(--fg-muted); }
+.sidebar-user-name {
+  font-size: 12.5px; font-weight: 500; color: var(--fg-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 /* ========== Topbar ========== */
 

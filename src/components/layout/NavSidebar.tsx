@@ -122,30 +122,29 @@ export function NavSidebar() {
         {!collapsed && <span>Quick Capture</span>}
       </button>
 
-      <button type="button" className="sidebar-collapse-btn" onClick={toggleSidebar}
-        title={collapsed ? 'Ausklappen' : 'Einklappen'}>
-        {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-      </button>
-
       <NavItem icon={Plug}     label="Integrationen" active={appView === 'integrations'}
         onClick={() => setAppView('integrations')} />
       <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings'}
         onClick={() => setAppView('settings')} />
 
-      {/* Profil */}
-      <div
-        className="sidebar-user"
-        onClick={() => setAppView('profile')}
-        title="Profil & Workspace"
-        style={{ cursor: 'pointer' }}
-      >
-        <div className="sidebar-user-avatar">{initials}</div>
-        {!collapsed && (
-          <div className="sidebar-user-text">
-            <strong>{displayName}</strong>
-            <span>Profil & Workspace</span>
-          </div>
-        )}
+      {/* Profil + Einklappen */}
+      <div className="sidebar-bottom">
+        <div
+          className="sidebar-profile"
+          onClick={() => setAppView('profile')}
+          title="Profil & Workspace"
+        >
+          <div className="sidebar-user-avatar">{initials}</div>
+          {!collapsed && <span className="sidebar-user-name">{displayName}</span>}
+        </div>
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={toggleSidebar}
+          title={collapsed ? 'Ausklappen' : 'Einklappen'}
+        >
+          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        </button>
       </div>
 
     </aside>
