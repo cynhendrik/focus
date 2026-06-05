@@ -4,13 +4,12 @@ import { useAuthStore } from '@/store/auth.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
-import { useCompanyStore } from '@/store/company.store'
 import { useMailStore } from '@/store/mail.store'
 import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
   Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
-  ChevronRight, Inbox,
+  ChevronRight, Inbox, UserCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -51,33 +50,28 @@ function NavDivider() {
 // ── Inbox-Sektion: aufklappbar ────────────────────────────────────────────────
 
 function InboxSection({
-  appView, setAppView, unreadMails, collapsed: sidebarCollapsed,
+  appView, setAppView, unreadMails, sidebarCollapsed,
 }: {
   appView: string
   setAppView: (v: string) => void
   unreadMails: number
-  collapsed: boolean
+  sidebarCollapsed: boolean
 }) {
   const [open, setOpen] = useState(true)
-
-  const inboxViews = ['posteingang', 'calendar', 'zeitmanagement']
-  const inboxActive = inboxViews.includes(appView)
-  const totalBadge = unreadMails || undefined
+  const inboxActive = ['posteingang', 'calendar', 'zeitmanagement'].includes(appView)
 
   if (sidebarCollapsed) {
-    // Collapsed mode: show single inbox icon
     return (
       <NavItem
         icon={Inbox} label="Posteingang" active={inboxActive}
         onClick={() => setAppView('posteingang')}
-        badge={totalBadge}
+        badge={unreadMails || undefined}
       />
     )
   }
 
   return (
     <>
-      {/* Inbox-Header */}
       <div
         className="nav-item"
         data-active={String(inboxActive && !open)}
@@ -87,7 +81,7 @@ function InboxSection({
       >
         <Inbox size={17} />
         <span style={{ flex: 1 }}>Inbox</span>
-        {totalBadge && !open ? <span className="nav-badge">{totalBadge}</span> : null}
+        {unreadMails > 0 && !open && <span className="nav-badge">{unreadMails}</span>}
         <ChevronRight
           size={11}
           style={{
@@ -99,12 +93,12 @@ function InboxSection({
         />
       </div>
 
-      {/* Sub-Items */}
       {open && (
         <>
           <NavItem
             icon={Mail} label="Posteingang" active={appView === 'posteingang'}
-            onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
+            onClick={() => setAppView('posteingang')}
+            badge={unreadMails || undefined}
             indent
           />
           <NavItem
@@ -131,10 +125,7 @@ export function NavSidebar() {
   const collapsed       = useUiStore(s => s.sidebarCollapsed)
   const setQuickCapture = useUiStore(s => s.setQuickCaptureOpen)
   const toggleSidebar   = useUiStore(s => s.toggleSidebar)
-  const enterPrivate    = useUiStore(s => s.enterPrivate)
   const user            = useAuthStore(s => s.user)
-  const modules         = useCompanyStore(s => s.modules)
-  const isAdmin         = useCompanyStore(s => s.isAdmin)
 
   const clientsCount  = useCustomersStore(s => s.customers.length)
   const openDealCount = useDealsStore(s =>
@@ -143,25 +134,16 @@ export function NavSidebar() {
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
 
-  const mod = (key: keyof typeof modules, defaultOn = true) =>
-    modules[key] === undefined ? defaultOn : !!modules[key]
-
-  // Redirects: alte Views auf neue umleiten
-  useEffect(() => {
-    if (appView === 'leads' || appView === 'pipeline' || appView === 'followups') {
-      setAppView('akquise')
-    }
-    if (appView === 'mail') setAppView('posteingang')
-    if (!mod('crm') && (appView === 'clients' || appView === 'akquise')) {
-      setAppView('dashboard')
-    }
-    if (!mod('finanzen') && appView === 'invoices') setAppView('dashboard')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modules, appView, setAppView])
-
   const akquiseBadge = (newLeadsCount + openDealCount) || undefined
-  const initials     = user?.email ? user.email.slice(0, 2).toUpperCase() : 'CY'
-  const displayName  = user?.email?.split('@')[0] ?? 'Nutzer'
+
+  const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
+  const initials    = displayName.slice(0, 2).toUpperCase()
+
+  // Redirects: alte Views umleiten
+  useEffect(() => {
+    if (['leads', 'pipeline', 'followups'].includes(appView)) setAppView('akquise')
+    if (appView === 'mail') setAppView('posteingang')
+  }, [appView, setAppView])
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
@@ -185,7 +167,7 @@ export function NavSidebar() {
         appView={appView}
         setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
         unreadMails={unreadMails}
-        collapsed={collapsed}
+        sidebarCollapsed={collapsed}
       />
 
       <NavDivider />
@@ -197,9 +179,7 @@ export function NavSidebar() {
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <div className="corra-nav-orb">
-          <Sparkles size={12} />
-        </div>
+        <div className="corra-nav-orb"><Sparkles size={12} /></div>
         <div className="corra-nav-text">
           <span>CORRA</span>
           <small>Intelligence</small>
@@ -213,26 +193,20 @@ export function NavSidebar() {
 
       <NavDivider />
 
-      {mod('crm') && (
-        <NavItem
-          icon={Users} label="Kunden" active={appView === 'clients'}
-          onClick={() => setAppView('clients')} kbd="K"
-          badge={clientsCount || undefined}
-        />
-      )}
-      {mod('crm') && (
-        <NavItem
-          icon={Target} label="Akquise" active={appView === 'akquise'}
-          onClick={() => setAppView('akquise')} kbd="A"
-          badge={akquiseBadge}
-        />
-      )}
-      {mod('finanzen') && isAdmin && (
-        <NavItem
-          icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
-          onClick={() => setAppView('invoices')} kbd="F"
-        />
-      )}
+      <NavItem
+        icon={Users} label="Kunden" active={appView === 'clients'}
+        onClick={() => setAppView('clients')} kbd="K"
+        badge={clientsCount || undefined}
+      />
+      <NavItem
+        icon={Target} label="Akquise" active={appView === 'akquise'}
+        onClick={() => setAppView('akquise')} kbd="A"
+        badge={akquiseBadge}
+      />
+      <NavItem
+        icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
+        onClick={() => setAppView('invoices')} kbd="F"
+      />
 
       <div style={{ flex: 1 }} />
 
@@ -249,17 +223,10 @@ export function NavSidebar() {
           borderRadius: 10, border: '1px dashed var(--border)',
           background: 'transparent', cursor: 'pointer',
           color: 'var(--fg-dim)', fontSize: 12,
-          transition: 'all 140ms',
-          width: 'calc(100% - 16px)',
+          transition: 'all 140ms', width: 'calc(100% - 16px)',
         }}
-        onMouseEnter={e => {
-          e.currentTarget.style.borderColor = 'var(--accent)'
-          e.currentTarget.style.color = 'var(--accent)'
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.borderColor = 'var(--border)'
-          e.currentTarget.style.color = 'var(--fg-dim)'
-        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-dim)' }}
       >
         <PenLine size={14} style={{ flexShrink: 0 }} />
         {!collapsed && <span>Quick Capture</span>}
@@ -273,26 +240,20 @@ export function NavSidebar() {
         {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
-      <NavItem
-        icon={Plug} label="Integrationen" active={appView === 'integrations'}
-        onClick={() => setAppView('integrations')}
-      />
-      <NavItem
-        icon={Settings} label="Einstellungen" active={appView === 'settings'}
-        onClick={() => setAppView('settings')}
-      />
+      <NavItem icon={Plug}        label="Integrationen" active={appView === 'integrations'} onClick={() => setAppView('integrations')} />
+      <NavItem icon={Settings}    label="Einstellungen" active={appView === 'settings'}     onClick={() => setAppView('settings')} />
 
-      {/* Privater Raum */}
+      {/* Profil — ersetzt Privater Raum */}
       <div
         className="sidebar-user"
-        onClick={() => enterPrivate()}
-        title="Privater Raum öffnen"
+        onClick={() => setAppView('profile')}
+        title="Profil & Workspace"
         style={{ cursor: 'pointer' }}
       >
         <div className="sidebar-user-avatar">{initials}</div>
         <div className="sidebar-user-text">
           <strong>{displayName}</strong>
-          <span>Privater Raum</span>
+          <span>Profil & Workspace</span>
         </div>
       </div>
     </aside>
