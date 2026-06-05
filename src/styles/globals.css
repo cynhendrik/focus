@@ -226,7 +226,6 @@ input:focus, textarea:focus, button:focus { outline: none; }
   backdrop-filter: blur(24px);
 }
 
-[data-theme="light"] .topbar { background: transparent; }
 
 /* Hover-States: Dark-Mode verwendet weißes Alpha — auf Weiß unsichtbar */
 [data-theme="light"] .nav-item:hover { background: oklch(0% 0 0 / 0.05); }
@@ -511,14 +510,13 @@ input:focus, textarea:focus, button:focus { outline: none; }
 /* ========== Topbar ========== */
 
 .topbar {
-  position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 12px;
-  padding: 18px 48px 14px;
+  position: absolute; top: 18px; right: 44px;
+  z-index: 20;
+  display: flex; align-items: center; gap: 8px;
   background: transparent;
   pointer-events: none;
 }
 .topbar > * { pointer-events: auto; }
-[data-density="compact"] .topbar { padding: 14px 32px 12px; }
 
 .glass {
   background: oklch(100% 0 0 / 0.04);
