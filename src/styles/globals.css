@@ -109,33 +109,43 @@
 }
 
 [data-theme="light"] {
-  --bg: oklch(98% 0.003 90);
-  --bg-2: oklch(96% 0.004 90);
-  --surface: oklch(100% 0 0);
-  --surface-2: oklch(97% 0.004 90);
-  --surface-3: oklch(94% 0.005 90);
-  --border: oklch(89% 0.005 90);
-  --border-strong: oklch(80% 0.006 90);
-  --fg: oklch(18% 0.005 270);
-  --fg-2: oklch(28% 0.006 270);
-  --fg-muted: oklch(46% 0.008 270);
-  --fg-dim: oklch(60% 0.008 270);
-  /* Light Mode: kein Lime — reines Schwarz/Weiß/Grau */
+  /* Hintergründe — neutrales macOS-Grau (#f2f2f7), kein warmes Off-White */
+  --bg:        oklch(96% 0.002 270);
+  --bg-2:      oklch(94% 0.003 270);
+  --surface:   oklch(100% 0 0);
+  --surface-2: oklch(98% 0.001 270);
+  --surface-3: oklch(92% 0.003 270);
+
+  /* Borders */
+  --border:        oklch(88% 0.003 270);
+  --border-strong: oklch(78% 0.004 270);
+
+  /* Text — neutrales Schwarz, kein Blau-Stich */
+  --fg:       oklch(12% 0 0);
+  --fg-2:     oklch(23% 0 0);
+  --fg-muted: oklch(40% 0 0);
+  --fg-dim:   oklch(56% 0 0);
+
+  /* Accent = near-black, kein Lime */
   --accent:      oklch(14% 0 0);
   --accent-2:    oklch(24% 0 0);
   --accent-soft: oklch(14% 0 0 / 0.07);
   --accent-glow: oklch(14% 0 0 / 0.12);
   --accent-text: oklch(14% 0 0);
   --accent-ink:  oklch(98% 0 0);
-  /* Status-Farben dunkel genug für Weiß-Hintergrund */
+
+  /* Status-Farben — dunkel für Weiß-Hintergrund */
   --danger: oklch(48% 0.18 25);
   --warn:   oklch(44% 0.16 70);
   --ok:     oklch(40% 0.18 155);
   --info:   oklch(44% 0.15 235);
-  /* Schatten für Light Mode */
-  --shadow-1: 0 1px 0 0 oklch(0% 0 0 / 0.03) inset, 0 0 0 1px oklch(0% 0 0 / 0.07);
-  --shadow-glass: 0 1px 0 0 oklch(100% 0 0 / 0.9) inset, 0 0 0 1px oklch(0% 0 0 / 0.06), 0 30px 80px -20px oklch(0% 0 0 / 0.18);
-  --shadow-2: 0 30px 60px -25px oklch(0% 0 0 / 0.25), 0 0 0 1px oklch(0% 0 0 / 0.04);
+
+  /* Schatten — dark-on-light */
+  --shadow-1: 0 1px 3px oklch(0% 0 0 / 0.08), 0 0 0 1px oklch(0% 0 0 / 0.06);
+  --shadow-2: 0 4px 16px oklch(0% 0 0 / 0.08), 0 0 0 1px oklch(0% 0 0 / 0.05);
+  --shadow-glass: 0 1px 0 oklch(100% 0 0 / 0.9) inset, 0 0 0 1px oklch(0% 0 0 / 0.06), 0 24px 64px oklch(0% 0 0 / 0.14);
+
+  /* Backward-compat aliases */
   --text: var(--fg);
   --text2: var(--fg-muted);
   --text3: var(--fg-dim);
@@ -209,6 +219,32 @@ input:focus, textarea:focus, button:focus { outline: none; }
   transition: grid-template-columns 280ms cubic-bezier(.2,.7,.1,1);
 }
 [data-theme="light"] .app { background: var(--bg); }
+
+[data-theme="light"] .sidebar {
+  background: rgba(242, 242, 247, 0.92);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, 0.85);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+}
+
+/* Hover-States: Dark-Mode verwendet weißes Alpha — auf Weiß unsichtbar */
+[data-theme="light"] .nav-item:hover { background: oklch(0% 0 0 / 0.05); }
+[data-theme="light"] .tl-row:hover { background: oklch(0% 0 0 / 0.04); }
+[data-theme="light"] .client-row:hover { background: oklch(0% 0 0 / 0.04); }
+[data-theme="light"] .mail-item:hover { background: oklch(0% 0 0 / 0.04); }
+[data-theme="light"] .invoice-row:hover { background: oklch(0% 0 0 / 0.04); }
+[data-theme="light"] .search-pill:hover { background: oklch(0% 0 0 / 0.06); }
+[data-theme="light"] .command-item:hover { background: oklch(0% 0 0 / 0.05); }
+[data-theme="light"] .nav-item .nav-kbd { background: oklch(0% 0 0 / 0.06); color: var(--fg-dim); }
+[data-theme="light"] .chip { background: oklch(0% 0 0 / 0.05); }
+[data-theme="light"] .priv-btn-ghost:hover { background: oklch(0% 0 0 / 0.05); border-color: oklch(0% 0 0 / 0.15); }
+
 .app[data-sidebar-collapsed="true"] {
   grid-template-columns: 68px 1fr;
 }
