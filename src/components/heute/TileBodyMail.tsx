@@ -3,6 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Send, Sparkles, Loader } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useMailStore } from '@/store/mail.store'
 import { useToastStore } from '@/store/toast.store'
@@ -11,6 +12,7 @@ import { generateCorraDraft } from '@/lib/ai/corra'
 import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Invoice } from '@/types/finance.types'
+import type { Contact } from '@/types/contact.types'
 
 interface BaseProps {
   onDone: () => Promise<void>
@@ -58,11 +60,22 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
     },
   })
 
-  // Set To/Subject based on mode
+  // Set To/Subject based on mode — für invoice_reminder E-Mail aus Account oder Primärkontakt
   useEffect(() => {
     if (mode === 'invoice_reminder') {
-      setTo('')
       setSubject(`Zahlungserinnerung ${invoice!.number ?? ''}`.trim())
+      // 1. Direkte Account-E-Mail
+      if (account?.email) {
+        setTo(account.email)
+      } else if (invoice!.accountId) {
+        // 2. Primärkontakt des Kunden laden
+        invoke<Contact[]>('get_contacts', { accountId: invoice!.accountId })
+          .then(contacts => {
+            const primary = contacts.find(c => c.isPrimary && c.email) ?? contacts.find(c => c.email)
+            if (primary?.email) setTo(primary.email)
+          })
+          .catch((e: unknown) => log.warn('Konnte Kontakt für Zahlungserinnerung nicht laden', { e }))
+      }
     } else if (mode === 'reply_mail' && todo) {
       const notes = todo.notes ?? ''
       const fromAddr = /^fromAddr: (.+)$/m.exec(notes)?.[1]?.trim() ?? ''

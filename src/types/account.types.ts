@@ -29,6 +29,7 @@ export interface Account extends TimestampedEntity {
   country?: string
   pipelinePhase?: string
   pipelinePhaseLabel?: string
+  email?: string
 }
 
 export interface UpsertAccountPayload {
