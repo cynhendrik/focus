@@ -1,20 +1,107 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, useMotionValue } from 'framer-motion'
 import { useUiStore } from '@/store/ui.store'
+import { useMailStore } from '@/store/mail.store'
+import { useTodosStore } from '@/store/todos.store'
 
 interface Props {
   onSend: (text: string) => void
   loading: boolean
 }
 
+const HEADLINES = [
+  'Was möchtest du wissen?',
+  'Welche Rechnungen sind überfällig?',
+  'Was steht heute an?',
+  'Wer hat sich zuletzt gemeldet?',
+  'Wie läuft die Pipeline?',
+]
+
+const CONSTELLATION_LINES = [
+  { x1: '12%', y1: '22%', x2: '26%', y2: '38%' },
+  { x1: '26%', y1: '38%', x2: '44%', y2: '30%' },
+  { x1: '68%', y1: '16%', x2: '80%', y2: '30%' },
+  { x1: '80%', y1: '30%', x2: '72%', y2: '50%' },
+  { x1: '18%', y1: '68%', x2: '34%', y2: '60%' },
+  { x1: '34%', y1: '60%', x2: '52%', y2: '72%' },
+  { x1: '74%', y1: '68%', x2: '86%', y2: '56%' },
+  { x1: '44%', y1: '30%', x2: '52%', y2: '16%' },
+]
+
+function Constellation({ isDark }: { isDark: boolean }) {
+  const [visible, setVisible] = useState<number[]>([0, 3, 6])
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setVisible(prev => {
+        const next = [...prev]
+        const removeIdx = Math.floor(Math.random() * next.length)
+        next.splice(removeIdx, 1)
+        const candidates = CONSTELLATION_LINES.map((_, i) => i).filter(i => !next.includes(i))
+        if (candidates.length > 0) next.push(candidates[Math.floor(Math.random() * candidates.length)])
+        return next
+      })
+    }, 2400)
+    return () => clearInterval(tick)
+  }, [])
+
+  return (
+    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
+      {CONSTELLATION_LINES.map((line, i) => (
+        <line
+          key={i}
+          x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
+          stroke={isDark
+            ? `rgba(163,230,53,${visible.includes(i) ? 0.22 : 0})`
+            : `rgba(0,0,0,${visible.includes(i) ? 0.09 : 0})`}
+          strokeWidth={1}
+          strokeLinecap="round"
+          style={{ transition: 'stroke 1.8s ease' }}
+        />
+      ))}
+    </svg>
+  )
+}
+
 export function CorraIdleView({ onSend, loading }: Props) {
-  const [input, setInput] = useState('')
+  const [input, setInput]               = useState('')
+  const [isFocused, setIsFocused]       = useState(false)
+  const [headlineIdx, setHeadlineIdx]   = useState(0)
+  const [headlineShow, setHeadlineShow] = useState(true)
+  const [time, setTime]                 = useState(() =>
+    new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })
+  )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const theme = useUiStore(s => s.theme)
-  const isDark = theme === 'dark'
+  const theme    = useUiStore(s => s.theme)
+  const isDark   = theme === 'dark'
+  const unread   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
+  const today    = new Date().toISOString().slice(0, 10)
+  const tasks    = useTodosStore(s =>
+    s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.scheduledAt?.slice(0, 10) === today)).length
+  )
 
   const glowX = useMotionValue(-9999)
   const glowY = useMotionValue(-9999)
+
+  // Rotating headline
+  useEffect(() => {
+    const id = setInterval(() => {
+      setHeadlineShow(false)
+      setTimeout(() => {
+        setHeadlineIdx(i => (i + 1) % HEADLINES.length)
+        setHeadlineShow(true)
+      }, 380)
+    }, 3800)
+    return () => clearInterval(id)
+  }, [])
+
+  // Live clock
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTime(new Date().toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' }))
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -35,6 +122,12 @@ export function CorraIdleView({ onSend, loading }: Props) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  const contextItems = [
+    tasks > 0   ? `${tasks} AUFGABEN`  : null,
+    unread > 0  ? `${unread} UNGELESEN` : null,
+    time,
+  ].filter(Boolean) as string[]
+
   return (
     <div
       onMouseMove={handleMouseMove}
@@ -43,21 +136,32 @@ export function CorraIdleView({ onSend, loading }: Props) {
         position: 'absolute', inset: 0,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)',
-        overflow: 'hidden',
+        background: 'var(--bg)', overflow: 'hidden',
       }}
     >
-      {/* Ambient glow — nur Dark Mode */}
+      {/* Constellation */}
+      <Constellation isDark={isDark} />
+
+      {/* Ambient glow — Dark Mode only */}
       {isDark && (
         <div style={{
-          position: 'absolute',
-          top: '50%', left: '50%',
+          position: 'absolute', top: '50%', left: '50%',
           transform: 'translate(-50%, -60%)',
-          width: 700, height: 700,
-          borderRadius: '50%',
+          width: 700, height: 700, borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(163,230,53,0.08) 0%, rgba(163,230,53,0.03) 45%, transparent 70%)',
-          filter: 'blur(60px)',
-          pointerEvents: 'none', zIndex: 0,
+          filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0,
+        }} />
+      )}
+
+      {/* Focus glow */}
+      {isDark && isFocused && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 600, height: 600, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(163,230,53,0.05) 0%, transparent 70%)',
+          filter: 'blur(40px)', pointerEvents: 'none', zIndex: 0,
+          transition: 'opacity 600ms',
         }} />
       )}
 
@@ -65,8 +169,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
       <motion.div
         style={{
           position: 'absolute', top: 0, left: 0,
-          width: 520, height: 520,
-          borderRadius: '50%',
+          width: 520, height: 520, borderRadius: '50%',
           background: isDark
             ? 'radial-gradient(circle, rgba(163,230,53,0.18) 0%, rgba(163,230,53,0.06) 40%, transparent 70%)'
             : 'radial-gradient(circle, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, transparent 70%)',
@@ -82,27 +185,33 @@ export function CorraIdleView({ onSend, loading }: Props) {
         backgroundImage: isDark
           ? 'radial-gradient(circle, rgba(163,230,53,0.1) 1px, transparent 1px)'
           : 'radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)',
-        backgroundSize: '22px 22px',
-        zIndex: 0,
+        backgroundSize: '22px 22px', zIndex: 0,
       }} />
 
       {/* Content */}
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 560, padding: '0 24px' }}>
+
         {/* Orb + title */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 36 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 32 }}>
           {loading ? (
             <div className="corra-spinner" />
           ) : (
-            <div className="corra-dots">
-              <div className="cd cd-center" />
-              <div className="cd cd-1" />
-              <div className="cd cd-2" />
-              <div className="cd cd-3" />
-              <div className="cd cd-4" />
-              <div className="cd cd-5" />
-              <div className="cd cd-6" />
-            </div>
+            <motion.div
+              animate={{ scale: isFocused ? 1.1 : 1 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+            >
+              <div className="corra-dots" data-focused={isFocused ? 'true' : 'false'}>
+                <div className="cd cd-center" />
+                <div className="cd cd-1" />
+                <div className="cd cd-2" />
+                <div className="cd cd-3" />
+                <div className="cd cd-4" />
+                <div className="cd cd-5" />
+                <div className="cd cd-6" />
+              </div>
+            </motion.div>
           )}
+
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 9,
@@ -116,33 +225,67 @@ export function CorraIdleView({ onSend, loading }: Props) {
               fontSize: 26, fontWeight: 700,
               color: isDark ? '#fff' : 'var(--fg)',
               letterSpacing: '-0.025em', lineHeight: 1.2,
+              transition: 'opacity 380ms ease, transform 380ms ease',
+              opacity: headlineShow ? 1 : 0,
+              transform: headlineShow ? 'translateY(0)' : 'translateY(-10px)',
             }}>
-              Was möchtest du wissen?
+              {HEADLINES[headlineIdx]}
             </div>
           </div>
         </div>
 
+        {/* Context bar */}
+        {contextItems.length > 0 && (
+          <div style={{
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            gap: 0, marginBottom: 14,
+          }}>
+            {contextItems.map((item, i) => (
+              <span key={item} style={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && (
+                  <span style={{
+                    margin: '0 10px',
+                    fontSize: 9, fontFamily: 'var(--font-mono)',
+                    color: isDark ? 'rgba(163,230,53,0.25)' : 'var(--fg-dim)',
+                    opacity: 0.5,
+                  }}>·</span>
+                )}
+                <span style={{
+                  fontSize: 9, fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.12em',
+                  color: isDark ? 'rgba(163,230,53,0.6)' : 'var(--fg-dim)',
+                }}>
+                  {item}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Input */}
-        <div style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-          border: isDark ? '1px solid rgba(163,230,53,0.2)' : '1px solid var(--border)',
-          borderRadius: 16, padding: '14px 16px',
-          display: 'flex', alignItems: 'flex-end', gap: 10,
-        }}>
+        <div
+          className="corra-input-wrap"
+          data-focused={isFocused ? 'true' : 'false'}
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+            borderRadius: 16, padding: '14px 16px',
+            display: 'flex', alignItems: 'flex-end', gap: 10,
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             placeholder="Frag CORRA — Umsatz, Todos, Mails, Deals…"
             rows={1}
             style={{
               flex: 1, background: 'transparent', border: 'none',
-              fontSize: 14,
-              color: isDark ? '#fff' : 'var(--fg)',
-              outline: 'none',
-              resize: 'none', lineHeight: 1.5, fontFamily: 'inherit',
-              maxHeight: 140, overflowY: 'auto',
+              fontSize: 14, color: isDark ? '#fff' : 'var(--fg)',
+              outline: 'none', resize: 'none', lineHeight: 1.5,
+              fontFamily: 'inherit', maxHeight: 140, overflowY: 'auto',
               caretColor: 'var(--accent)',
             }}
             onInput={e => {
@@ -173,7 +316,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
             ↑
           </button>
         </div>
-
       </div>
     </div>
   )

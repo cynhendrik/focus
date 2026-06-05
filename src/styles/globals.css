@@ -1688,3 +1688,34 @@ div:hover > .file-delete-btn {
   animation: corraSpin 0.75s linear infinite;
 }
 @keyframes corraSpin { to { transform: rotate(360deg); } }
+
+/* Input-Glow-Border: pulsiert im Idle, leuchtet beim Focus */
+.corra-input-wrap {
+  transition: box-shadow 400ms ease;
+  animation: corraInputIdle 4s ease-in-out infinite;
+}
+.corra-input-wrap[data-focused="true"] {
+  animation: none;
+  box-shadow: 0 0 0 1.5px rgba(163,230,53,0.55), 0 0 28px rgba(163,230,53,0.1);
+}
+@keyframes corraInputIdle {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(163,230,53,0.18); }
+  50%       { box-shadow: 0 0 0 1px rgba(163,230,53,0.4), 0 0 18px rgba(163,230,53,0.07); }
+}
+[data-theme="light"] .corra-input-wrap {
+  animation: corraInputIdleLight 4s ease-in-out infinite;
+}
+[data-theme="light"] .corra-input-wrap[data-focused="true"] {
+  animation: none;
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,0.28);
+}
+@keyframes corraInputIdleLight {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.1); }
+  50%       { box-shadow: 0 0 0 1px rgba(0,0,0,0.22); }
+}
+
+/* Dots focus-state: center dot reagiert */
+.corra-dots[data-focused="true"] .cd-center {
+  animation-duration: 1.4s;
+  box-shadow: 0 0 24px var(--accent-glow);
+}
