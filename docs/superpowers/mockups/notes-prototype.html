@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notizen — Prototyp</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0d12;
+    --bg2:      #131318;
+    --bg3:      #1a1a21;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.12);
+    --fg:       #e8e8f0;
+    --fg-muted: #888896;
+    --fg-dim:   #484858;
+    --accent:   #b5f023;
+    --accent-ink: #0d1200;
+    --accent-soft: rgba(181,240,35,0.08);
+    --accent-glow: rgba(181,240,35,0.15);
+    --red: oklch(65% 0.2 25);
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Fake Sidebar ─────────────────────────────────────────── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 12px;
+    gap: 4px;
+  }
+  .sidebar-logo {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    padding: 0 8px;
+    margin-bottom: 24px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 10px; border-radius: 8px;
+    font-size: 12.5px; font-weight: 500;
+    color: var(--fg-muted); cursor: pointer;
+    transition: all 140ms;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
+  .nav-item.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .nav-icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+
+  .sidebar-section {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--fg-dim);
+    padding: 16px 10px 6px; font-family: var(--font-mono);
+  }
+
+  /* ── Main area ─────────────────────────────────────────────── */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* ── Customer list panel ──────────────────────────────────── */
+  .customer-panel {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 16px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--fg-dim);
+    font-family: var(--font-mono);
+  }
+  .search-input {
+    margin-top: 10px;
+    width: 100%; padding: 7px 10px; border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg3); color: var(--fg);
+    font-size: 12px; outline: none; font-family: inherit;
+  }
+  .search-input::placeholder { color: var(--fg-dim); }
+  .search-input:focus { border-color: rgba(181,240,35,0.3); }
+
+  .customer-list { flex: 1; overflow-y: auto; padding: 8px 8px; }
+  .customer-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px; cursor: pointer;
+    transition: all 120ms; margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .customer-item:hover { background: rgba(255,255,255,0.03); }
+  .customer-item.active {
+    background: var(--accent-soft);
+    border-color: rgba(181,240,35,0.15);
+  }
+  .customer-avatar {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; flex-shrink: 0;
+    letter-spacing: -0.02em;
+  }
+  .customer-info { min-width: 0; flex: 1; }
+  .customer-name {
+    font-size: 12.5px; font-weight: 600;
+    color: var(--fg); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .customer-item.active .customer-name { color: var(--accent); }
+  .customer-meta {
+    font-size: 10px; color: var(--fg-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .note-count {
+    font-size: 10px; font-family: var(--font-mono);
+    color: var(--fg-dim); flex-shrink: 0;
+    background: rgba(255,255,255,0.05);
+    padding: 1px 6px; border-radius: 99px;
+  }
+  .customer-item.active .note-count {
+    background: rgba(181,240,35,0.12); color: var(--accent);
+  }
+
+  /* ── Notes view ───────────────────────────────────────────── */
+  .notes-view {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg);
+  }
+
+  .notes-header {
+    padding: 20px 32px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .customer-heading { display: flex; align-items: center; gap: 12px; }
+  .heading-avatar {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+  }
+  .heading-name {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.025em;
+    color: var(--fg);
+  }
+  .heading-sub {
+    font-size: 11px; color: var(--fg-dim); margin-top: 1px;
+  }
+
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: all 160ms;
+  }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-ink);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost {
+    background: rgba(255,255,255,0.05); color: var(--fg-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); color: var(--fg); }
+
+  .notes-body { flex: 1; overflow-y: auto; padding: 24px 32px 48px; }
+
+  /* ── Pinned docs ──────────────────────────────────────────── */
+  .pinned-section { margin-bottom: 32px; }
+  .section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--fg-dim);
+    font-family: var(--font-mono); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  .pinned-grid {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .pinned-doc {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--bg2); cursor: pointer;
+    transition: all 140ms;
+  }
+  .pinned-doc:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+  .pinned-doc-icon { font-size: 13px; }
+  .pinned-doc-name {
+    font-size: 12px; font-weight: 600; color: var(--fg);
+  }
+  .pinned-doc-meta {
+    font-size: 10px; color: var(--fg-dim);
+    font-family: var(--font-mono);
+  }
+
+  .add-doc-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; border-radius: 9px;
+    border: 1px dashed rgba(255,255,255,0.1);
+    background: transparent; cursor: pointer; color: var(--fg-dim);
+    font-size: 12px; font-family: inherit; transition: all 140ms;
+  }
+  .add-doc-btn:hover {
+    border-color: rgba(181,240,35,0.3); color: var(--accent);
+  }
+
+  /* ── Timeline ─────────────────────────────────────────────── */
+  .timeline-section {}
+  .day-group { margin-bottom: 28px; }
+  .day-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--fg-dim);
+    font-family: var(--font-mono); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .day-label span { flex-shrink: 0; }
+  .day-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  .note-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 160ms;
+    cursor: pointer;
+  }
+  .note-card:hover { border-color: var(--border2); }
+  .note-card.expanded { border-color: rgba(181,240,35,0.2); }
+
+  .note-card-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+  }
+  .note-author-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .note-card-meta { flex: 1; min-width: 0; }
+  .note-card-title {
+    font-size: 13px; font-weight: 600; color: var(--fg);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .note-card-title.untitled { color: var(--fg-dim); font-style: italic; }
+  .note-card-info {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 2px;
+  }
+  .note-author-name {
+    font-size: 10px; color: var(--fg-dim);
+    font-family: var(--font-mono);
+  }
+  .note-time {
+    font-size: 10px; color: var(--fg-dim);
+    font-family: var(--font-mono);
+  }
+  .dot-sep { width: 2px; height: 2px; border-radius: 50%; background: var(--fg-dim); }
+
+  .note-card-actions {
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0; transition: opacity 140ms;
+  }
+  .note-card:hover .note-card-actions { opacity: 1; }
+  .icon-btn {
+    width: 26px; height: 26px; border-radius: 6px;
+    border: none; background: transparent; color: var(--fg-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 12px; transition: all 120ms;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.07); color: var(--fg); }
+  .icon-btn.pin-active { color: var(--accent); }
+
+  .note-card-preview {
+    padding: 0 16px 12px 52px;
+    font-size: 12.5px; color: var(--fg-muted);
+    line-height: 1.6;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .note-card-body {
+    padding: 0 16px 16px 52px;
+    display: none;
+  }
+  .note-card.expanded .note-card-preview { display: none; }
+  .note-card.expanded .note-card-body { display: block; }
+
+  .note-editor {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    min-height: 80px;
+    font-size: 13px; color: var(--fg);
+    line-height: 1.7;
+    outline: none;
+    font-family: inherit;
+  }
+  .note-editor[contenteditable]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--fg-dim); pointer-events: none;
+  }
+
+  .note-editor-toolbar {
+    display: flex; align-items: center; gap: 2px;
+    margin-bottom: 8px;
+  }
+  .toolbar-btn {
+    padding: 3px 7px; border-radius: 5px; border: none;
+    background: transparent; color: var(--fg-dim);
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all 120ms; font-family: inherit;
+  }
+  .toolbar-btn:hover { background: rgba(255,255,255,0.07); color: var(--fg); }
+  .toolbar-sep { width: 1px; height: 14px; background: var(--border); margin: 0 4px; }
+
+  .note-editor-footer {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 8px; margin-top: 10px;
+  }
+
+  /* ── New note inline form ─────────────────────────────────── */
+  .new-note-card {
+    background: var(--bg2);
+    border: 1px solid rgba(181,240,35,0.25);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 0 0 3px rgba(181,240,35,0.04);
+  }
+  .new-note-top {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+  }
+  .new-note-title-input {
+    flex: 1; border: none; background: transparent;
+    font-size: 13px; font-weight: 600; color: var(--fg);
+    outline: none; font-family: inherit;
+  }
+  .new-note-title-input::placeholder { color: var(--fg-dim); font-weight: 400; }
+
+  /* ── Empty state ─────────────────────────────────────────── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; padding: 60px;
+    text-align: center; color: var(--fg-dim);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 16px; opacity: 0.3; }
+  .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--fg-muted); }
+  .empty-sub { font-size: 12px; }
+
+  /* ── Doc modal ───────────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px;
+    display: none;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    width: 100%; max-width: 700px; max-height: 85vh;
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 16px; display: flex; flex-direction: column;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+  .modal-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .modal-title-input {
+    flex: 1; border: none; background: transparent;
+    font-size: 16px; font-weight: 700; color: var(--fg);
+    outline: none; font-family: inherit; letter-spacing: -0.02em;
+  }
+  .modal-title-input::placeholder { color: var(--fg-dim); font-weight: 400; }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 7px;
+    border: none; background: transparent; color: var(--fg-dim);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 15px;
+  }
+  .modal-close:hover { background: rgba(255,255,255,0.07); color: var(--fg); }
+  .modal-toolbar {
+    padding: 8px 18px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 2px; flex-shrink: 0;
+  }
+  .modal-body {
+    flex: 1; padding: 20px 22px; overflow-y: auto;
+    font-size: 13.5px; color: var(--fg); line-height: 1.75;
+    outline: none; min-height: 200px;
+  }
+  .modal-body[contenteditable]:empty::before {
+    content: attr(data-placeholder); color: var(--fg-dim);
+  }
+  .modal-footer {
+    padding: 12px 18px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+  }
+  .modal-meta { font-size: 10px; color: var(--fg-dim); font-family: var(--font-mono); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+  .tag {
+    display: inline-flex; align-items: center;
+    padding: 1px 7px; border-radius: 99px;
+    font-size: 10px; font-weight: 600;
+    font-family: var(--font-mono); letter-spacing: 0.04em;
+  }
+  .tag-lime { background: rgba(181,240,35,0.12); color: var(--accent); }
+  .tag-blue { background: rgba(96,165,250,0.12); color: #93c5fd; }
+  .tag-amber { background: rgba(251,191,36,0.12); color: #fcd34d; }
+</style>
+</head>
+<body>
+
+<!-- Fake Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">CYNERA</div>
+  <button class="nav-item"><span class="nav-icon">⊞</span> Dashboard</button>
+  <button class="nav-item"><span class="nav-icon">◎</span> CORRA</button>
+  <div class="sidebar-section">CRM</div>
+  <button class="nav-item"><span class="nav-icon">♦</span> Kunden</button>
+  <button class="nav-item"><span class="nav-icon">⤷</span> Deals</button>
+  <button class="nav-item active"><span class="nav-icon">✎</span> Notizen</button>
+  <div class="sidebar-section">Finanzen</div>
+  <button class="nav-item"><span class="nav-icon">◈</span> Rechnungen</button>
+  <button class="nav-item"><span class="nav-icon">✉</span> Mails</button>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Customer list -->
+  <div class="customer-panel">
+    <div class="panel-header">
+      <div class="panel-title">Kunden</div>
+      <input class="search-input" placeholder="Suchen…" type="text">
+    </div>
+    <div class="customer-list">
+      <div class="customer-item active" onclick="selectCustomer(this, 'Müller GmbH', 'MG', '#6366f1')">
+        <div class="customer-avatar" style="background:rgba(99,102,241,0.15);color:#818cf8">MG</div>
+        <div class="customer-info">
+          <div class="customer-name">Müller GmbH</div>
+          <div class="customer-meta">4 Notizen · Heute aktiv</div>
+        </div>
+        <div class="note-count">4</div>
+      </div>
+      <div class="customer-item" onclick="selectCustomer(this, 'Schmidt & Partner', 'SP', '#f59e0b')">
+        <div class="customer-avatar" style="background:rgba(245,158,11,0.15);color:#fbbf24">SP</div>
+        <div class="customer-info">
+          <div class="customer-name">Schmidt & Partner</div>
+          <div class="customer-meta">2 Notizen · vor 3 Tagen</div>
+        </div>
+        <div class="note-count">2</div>
+      </div>
+      <div class="customer-item" onclick="selectCustomer(this, 'TechVentures AG', 'TV', '#10b981')">
+        <div class="customer-avatar" style="background:rgba(16,185,129,0.15);color:#34d399">TV</div>
+        <div class="customer-info">
+          <div class="customer-name">TechVentures AG</div>
+          <div class="customer-meta">7 Notizen · vor 1 Woche</div>
+        </div>
+        <div class="note-count">7</div>
+      </div>
+      <div class="customer-item" onclick="selectCustomer(this, 'Bergmann KG', 'BK', '#ef4444')">
+        <div class="customer-avatar" style="background:rgba(239,68,68,0.15);color:#f87171">BK</div>
+        <div class="customer-info">
+          <div class="customer-name">Bergmann KG</div>
+          <div class="customer-meta">1 Notiz · vor 2 Wochen</div>
+        </div>
+        <div class="note-count">1</div>
+      </div>
+      <div class="customer-item" onclick="selectCustomer(this, 'Krause Consulting', 'KC', '#8b5cf6')">
+        <div class="customer-avatar" style="background:rgba(139,92,246,0.15);color:#a78bfa">KC</div>
+        <div class="customer-info">
+          <div class="customer-name">Krause Consulting</div>
+          <div class="customer-meta">0 Notizen</div>
+        </div>
+        <div class="note-count">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notes view -->
+  <div class="notes-view">
+    <div class="notes-header">
+      <div class="customer-heading">
+        <div class="heading-avatar" id="heading-avatar" style="background:rgba(99,102,241,0.15);color:#818cf8;font-weight:800;font-size:13px">MG</div>
+        <div>
+          <div class="heading-name" id="heading-name">Müller GmbH</div>
+          <div class="heading-sub">4 Notizen · 2 angeheftete Dokumente</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" onclick="openDoc(null)">📄 Dokument</button>
+        <button class="btn btn-primary" onclick="addNote()">+ Notiz</button>
+      </div>
+    </div>
+
+    <div class="notes-body" id="notes-body">
+
+      <!-- Pinned docs -->
+      <div class="pinned-section">
+        <div class="section-label"><span>📌 Angeheftet</span></div>
+        <div class="pinned-grid">
+          <div class="pinned-doc" onclick="openDoc('Onboarding-Checkliste')">
+            <div class="pinned-doc-icon">📋</div>
+            <div>
+              <div class="pinned-doc-name">Onboarding-Checkliste</div>
+              <div class="pinned-doc-meta">zuletzt 02.06</div>
+            </div>
+          </div>
+          <div class="pinned-doc" onclick="openDoc('Angebot Q3 2026')">
+            <div class="pinned-doc-icon">📊</div>
+            <div>
+              <div class="pinned-doc-name">Angebot Q3 2026</div>
+              <div class="pinned-doc-meta">zuletzt 28.05</div>
+            </div>
+          </div>
+          <button class="add-doc-btn" onclick="openDoc(null)">
+            + Dokument hinzufügen
+          </button>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline-section" id="timeline">
+
+        <!-- Today -->
+        <div class="day-group">
+          <div class="day-label"><span>Heute · 5. Juni</span></div>
+
+          <!-- New note form (hidden by default, shown by addNote()) -->
+          <div class="new-note-card" id="new-note-form" style="display:none">
+            <div class="new-note-top">
+              <div class="note-author-avatar" style="background:rgba(181,240,35,0.15);color:var(--accent);font-size:10px;font-weight:700;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">HW</div>
+              <input class="new-note-title-input" placeholder="Titel (optional)…" id="new-note-title">
+            </div>
+            <div class="note-editor-toolbar">
+              <button class="toolbar-btn" style="font-weight:700">B</button>
+              <button class="toolbar-btn" style="font-style:italic">I</button>
+              <button class="toolbar-btn" style="text-decoration:line-through">S</button>
+              <div class="toolbar-sep"></div>
+              <button class="toolbar-btn">H1</button>
+              <button class="toolbar-btn">H2</button>
+              <div class="toolbar-sep"></div>
+              <button class="toolbar-btn">•</button>
+              <button class="toolbar-btn">☐</button>
+            </div>
+            <div class="note-editor" contenteditable="true" data-placeholder="Was wurde besprochen? Was ist wichtig?…" id="new-note-body"></div>
+            <div class="note-editor-footer">
+              <button class="btn btn-ghost" style="padding:5px 12px;font-size:11px" onclick="cancelNote()">Abbrechen</button>
+              <button class="btn btn-primary" style="padding:5px 14px;font-size:11px" onclick="saveNote()">Speichern</button>
+            </div>
+          </div>
+
+          <div class="note-card expanded" onclick="toggleNote(this)">
+            <div class="note-card-header">
+              <div class="note-author-avatar" style="background:rgba(181,240,35,0.15);color:var(--accent)">HW</div>
+              <div class="note-card-meta">
+                <div class="note-card-title">Preise besprochen — Entscheidung bis 15.06</div>
+                <div class="note-card-info">
+                  <span class="note-author-name">Hendr W.</span>
+                  <div class="dot-sep"></div>
+                  <span class="note-time">14:32</span>
+                  <div class="dot-sep"></div>
+                  <span class="tag tag-lime">Follow-up</span>
+                </div>
+              </div>
+              <div class="note-card-actions">
+                <button class="icon-btn pin-active" title="Anheften" onclick="event.stopPropagation()">📌</button>
+                <button class="icon-btn" title="Bearbeiten" onclick="event.stopPropagation()">✎</button>
+                <button class="icon-btn" title="Löschen" onclick="event.stopPropagation()">🗑</button>
+              </div>
+            </div>
+            <div class="note-card-preview">
+              Preisvorstellung: 2.400 €/Monat. Müller meinte das ist zu viel, wollte bei 1.800 € bleiben. Ich hab ihm das Starter-Paket vorgeschlagen...
+            </div>
+            <div class="note-card-body">
+              <div class="note-editor-toolbar">
+                <button class="toolbar-btn" style="font-weight:700">B</button>
+                <button class="toolbar-btn" style="font-style:italic">I</button>
+                <button class="toolbar-btn" style="text-decoration:line-through">S</button>
+                <div class="toolbar-sep"></div>
+                <button class="toolbar-btn">H1</button>
+                <button class="toolbar-btn">H2</button>
+                <div class="toolbar-sep"></div>
+                <button class="toolbar-btn">•</button>
+                <button class="toolbar-btn">☐</button>
+              </div>
+              <div class="note-editor" contenteditable="true">Preisvorstellung: 2.400 €/Monat. Müller meinte das ist zu viel, wollte bei 1.800 € bleiben. Ich hab ihm das Starter-Paket für 1.950 € vorgeschlagen — er überlegt bis Mitte des Monats.<br><br>→ Follow-up am 15.06 eintragen!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Juni -->
+        <div class="day-group">
+          <div class="day-label"><span>3. Juni</span></div>
+          <div class="note-card" onclick="toggleNote(this)">
+            <div class="note-card-header">
+              <div class="note-author-avatar" style="background:rgba(99,102,241,0.15);color:#818cf8">SK</div>
+              <div class="note-card-meta">
+                <div class="note-card-title">Erstgespräch — sehr interessiert</div>
+                <div class="note-card-info">
+                  <span class="note-author-name">Sarah K.</span>
+                  <div class="dot-sep"></div>
+                  <span class="note-time">10:15</span>
+                  <div class="dot-sep"></div>
+                  <span class="tag tag-blue">Erstgespräch</span>
+                </div>
+              </div>
+              <div class="note-card-actions">
+                <button class="icon-btn" title="Anheften" onclick="event.stopPropagation()">📌</button>
+                <button class="icon-btn" title="Bearbeiten" onclick="event.stopPropagation()">✎</button>
+                <button class="icon-btn" title="Löschen" onclick="event.stopPropagation()">🗑</button>
+              </div>
+            </div>
+            <div class="note-card-preview">
+              Thomas Müller (GF) + Anna Bauer (Head of Ops) im Call. Beide sehr aufgeschlossen gegenüber Automatisierung. Hauptschmerzpunkt: manuelle Rechnungsstellung...</div>
+            <div class="note-card-body">
+              <div class="note-editor-toolbar">
+                <button class="toolbar-btn" style="font-weight:700">B</button>
+                <button class="toolbar-btn" style="font-style:italic">I</button>
+                <div class="toolbar-sep"></div>
+                <button class="toolbar-btn">•</button>
+                <button class="toolbar-btn">☐</button>
+              </div>
+              <div class="note-editor" contenteditable="true">Thomas Müller (GF) + Anna Bauer (Head of Ops) im Call. Beide sehr aufgeschlossen gegenüber Automatisierung.<br><br><strong>Hauptschmerzpunkt:</strong> manuelle Rechnungsstellung, kostet 3h/Woche.<br><strong>Budget:</strong> offen, "muss sich rechnen"<br><strong>Entscheider:</strong> Thomas allein<br><br>Nächster Schritt: Angebot schicken.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 28. Mai -->
+        <div class="day-group">
+          <div class="day-label"><span>28. Mai</span></div>
+          <div class="note-card" onclick="toggleNote(this)">
+            <div class="note-card-header">
+              <div class="note-author-avatar" style="background:rgba(181,240,35,0.15);color:var(--accent)">HW</div>
+              <div class="note-card-meta">
+                <div class="note-card-title untitled">Ohne Titel</div>
+                <div class="note-card-info">
+                  <span class="note-author-name">Hendr W.</span>
+                  <div class="dot-sep"></div>
+                  <span class="note-time">09:02</span>
+                  <div class="dot-sep"></div>
+                  <span class="tag tag-amber">Recherche</span>
+                </div>
+              </div>
+              <div class="note-card-actions">
+                <button class="icon-btn" title="Anheften" onclick="event.stopPropagation()">📌</button>
+                <button class="icon-btn" title="Bearbeiten" onclick="event.stopPropagation()">✎</button>
+                <button class="icon-btn" title="Löschen" onclick="event.stopPropagation()">🗑</button>
+              </div>
+            </div>
+            <div class="note-card-preview">
+              LinkedIn angeschaut: 45 Mitarbeiter, Wachstum +30% YoY. Hauptprodukt: SaaS für Logistik. Interessant: suchen aktiv nach Tools für Finance-Ops...
+            </div>
+            <div class="note-card-body">
+              <div class="note-editor" contenteditable="true">LinkedIn angeschaut: 45 Mitarbeiter, Wachstum +30% YoY. Hauptprodukt: SaaS für Logistik.<br><br>Interessant: suchen aktiv nach Tools für Finance-Ops laut Stellenanzeigen.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Doc Modal -->
+<div class="modal-overlay" id="doc-modal" onclick="closeDoc(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div style="font-size:13px;margin-right:4px">📋</div>
+      <input class="modal-title-input" placeholder="Dokumenttitel…" id="modal-title" value="Onboarding-Checkliste">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-toolbar">
+      <button class="toolbar-btn" style="font-weight:700">B</button>
+      <button class="toolbar-btn" style="font-style:italic">I</button>
+      <button class="toolbar-btn" style="text-decoration:line-through">S</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn">H1</button>
+      <button class="toolbar-btn">H2</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn">•</button>
+      <button class="toolbar-btn">1.</button>
+      <button class="toolbar-btn">☐</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn">&lt;&gt;</button>
+      <button class="toolbar-btn">"</button>
+    </div>
+    <div class="modal-body" contenteditable="true" data-placeholder="Schreib los…"><h2 style="font-size:16px;font-weight:700;margin-bottom:12px;color:var(--fg)">Onboarding-Schritte</h2><p style="margin-bottom:8px">☑ Zugangsdaten verschickt</p><p style="margin-bottom:8px">☑ Intro-Call gemacht (03.06)</p><p style="margin-bottom:8px">☐ Daten-Import abgeschlossen</p><p style="margin-bottom:8px">☐ Erste Rechnung in System</p><p style="margin-bottom:8px">☐ Review-Call nach 4 Wochen</p></div>
+    <div class="modal-footer">
+      <div class="modal-meta">📌 Angeheftet · zuletzt 02.06.2026 · von Hendr W.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 12px" onclick="closeModal()">Schließen</button>
+        <button class="btn btn-primary" style="font-size:11px;padding:5px 14px">Speichern</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleNote(card) {
+  const isExpanded = card.classList.contains('expanded');
+  // collapse all
+  document.querySelectorAll('.note-card.expanded').forEach(c => c.classList.remove('expanded'));
+  if (!isExpanded) card.classList.add('expanded');
+}
+
+function addNote() {
+  const form = document.getElementById('new-note-form');
+  form.style.display = 'block';
+  document.getElementById('new-note-body').focus();
+}
+
+function cancelNote() {
+  const form = document.getElementById('new-note-form');
+  form.style.display = 'none';
+  document.getElementById('new-note-title').value = '';
+  document.getElementById('new-note-body').innerHTML = '';
+}
+
+function saveNote() {
+  const title = document.getElementById('new-note-title').value.trim();
+  const body = document.getElementById('new-note-body').innerHTML.trim();
+  if (!body && !title) { cancelNote(); return; }
+
+  const timeline = document.getElementById('timeline');
+  const todayGroup = timeline.querySelector('.day-group');
+
+  const card = document.createElement('div');
+  card.className = 'note-card';
+  card.onclick = function() { toggleNote(this); };
+  card.innerHTML = `
+    <div class="note-card-header">
+      <div class="note-author-avatar" style="background:rgba(181,240,35,0.15);color:var(--accent);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">HW</div>
+      <div class="note-card-meta">
+        <div class="note-card-title ${title ? '' : 'untitled'}">${title || 'Ohne Titel'}</div>
+        <div class="note-card-info">
+          <span class="note-author-name">Hendr W.</span>
+          <div class="dot-sep"></div>
+          <span class="note-time">Jetzt</span>
+        </div>
+      </div>
+      <div class="note-card-actions">
+        <button class="icon-btn" onclick="event.stopPropagation()">📌</button>
+        <button class="icon-btn" onclick="event.stopPropagation()">✎</button>
+        <button class="icon-btn" onclick="event.stopPropagation()">🗑</button>
+      </div>
+    </div>
+    <div class="note-card-preview">${body.replace(/<[^>]+>/g,'').slice(0,120)}…</div>
+    <div class="note-card-body">
+      <div class="note-editor" contenteditable="true">${body}</div>
+    </div>
+  `;
+
+  // insert after new-note-form
+  const form = document.getElementById('new-note-form');
+  form.parentNode.insertBefore(card, form.nextSibling);
+  cancelNote();
+}
+
+function openDoc(title) {
+  if (title) document.getElementById('modal-title').value = title;
+  else document.getElementById('modal-title').value = '';
+  document.getElementById('doc-modal').classList.add('open');
+}
+
+function closeDoc(e) {
+  if (e.target === document.getElementById('doc-modal')) closeModal();
+}
+
+function closeModal() {
+  document.getElementById('doc-modal').classList.remove('open');
+}
+
+function selectCustomer(el, name, initials, color) {
+  document.querySelectorAll('.customer-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('heading-name').textContent = name;
+  document.getElementById('heading-avatar').textContent = initials;
+}
+
+// close modal on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+</body>
+</html>
