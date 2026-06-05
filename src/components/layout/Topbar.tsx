@@ -1,12 +1,12 @@
 import { useUiStore } from '@/store/ui.store'
 import {
-  Sun, Bell, Users, CreditCard, Target,
+  Sun, Bell, Sunrise, Users, CreditCard, Target,
   Mail, Calendar, Clock, Settings, Plug, Sparkles, User,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: LucideIcon }>> = {
-  dashboard:      { label: 'Heute',          tag: 'DEIN TAG',      Icon: Sun        },
+  dashboard:      { label: 'Heute',          tag: 'DEIN TAG',      Icon: Sunrise    },
   corra:          { label: 'CORRA',          tag: 'KI-ASSISTENT',  Icon: Sparkles   },
   clients:        { label: 'Kunden',         tag: 'CRM',           Icon: Users      },
   invoices:       { label: 'Finanzen',       tag: 'BUCHHALTUNG',   Icon: CreditCard },

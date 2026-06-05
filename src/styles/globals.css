@@ -527,6 +527,11 @@ input:focus, textarea:focus, button:focus { outline: none; }
   padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
 }
 
+/* Light mode — darken lime so it pops on the light sidebar */
+[data-theme="light"] .nav-corra-card {
+  background: oklch(72% 0.26 125);
+}
+
 /* Collapsed */
 .sidebar[data-collapsed="true"] .nav-corra-card {
   padding: 10px 6px; justify-content: center;
