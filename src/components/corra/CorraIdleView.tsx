@@ -18,7 +18,6 @@ export function CorraIdleView({ onSend, loading }: Props) {
   const glowY = useMotionValue(-9999)
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDark) return
     const rect = e.currentTarget.getBoundingClientRect()
     glowX.set(e.clientX - rect.left - 260)
     glowY.set(e.clientY - rect.top - 260)
@@ -63,20 +62,20 @@ export function CorraIdleView({ onSend, loading }: Props) {
         }} />
       )}
 
-      {/* Mouse-following glow — nur Dark Mode */}
-      {isDark && (
-        <motion.div
-          style={{
-            position: 'absolute', top: 0, left: 0,
-            width: 520, height: 520,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(163,230,53,0.18) 0%, rgba(163,230,53,0.06) 40%, transparent 70%)',
-            filter: 'blur(52px)',
-            x: glowX, y: glowY,
-            pointerEvents: 'none', zIndex: 0,
-          }}
-        />
-      )}
+      {/* Mouse-following glow */}
+      <motion.div
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          width: 520, height: 520,
+          borderRadius: '50%',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(163,230,53,0.18) 0%, rgba(163,230,53,0.06) 40%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, transparent 70%)',
+          filter: 'blur(52px)',
+          x: glowX, y: glowY,
+          pointerEvents: 'none', zIndex: 0,
+        }}
+      />
 
       {/* Dot grid */}
       <div style={{
