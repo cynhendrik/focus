@@ -226,12 +226,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
   backdrop-filter: blur(24px);
 }
 
-[data-theme="light"] .topbar {
-  background: rgba(255, 255, 255, 0.85);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-}
+[data-theme="light"] .topbar { background: transparent; }
 
 /* Hover-States: Dark-Mode verwendet weißes Alpha — auf Weiß unsichtbar */
 [data-theme="light"] .nav-item:hover { background: oklch(0% 0 0 / 0.05); }
@@ -519,8 +514,10 @@ input:focus, textarea:focus, button:focus { outline: none; }
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; gap: 12px;
   padding: 18px 48px 14px;
-  background: linear-gradient(180deg, var(--bg) 60%, oklch(0% 0 0 / 0) 100%);
+  background: transparent;
+  pointer-events: none;
 }
+.topbar > * { pointer-events: auto; }
 [data-density="compact"] .topbar { padding: 14px 32px 12px; }
 
 .glass {
