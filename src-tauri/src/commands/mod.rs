@@ -18,3 +18,4 @@ pub mod workspace_ablage;
 pub mod follow_up;
 pub mod campaign;
 pub mod ai;
+pub mod notes;

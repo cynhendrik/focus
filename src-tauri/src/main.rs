@@ -261,6 +261,14 @@ fn main() {
             commands::campaign::cmd_create_campaign,
             commands::campaign::cmd_send_campaign,
             commands::ai::cmd_anthropic_messages,
+            commands::notes::get_note_entries,
+            commands::notes::create_note_entry,
+            commands::notes::update_note_entry,
+            commands::notes::delete_note_entry,
+            commands::notes::get_note_docs,
+            commands::notes::create_note_doc,
+            commands::notes::update_note_doc,
+            commands::notes::delete_note_doc,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
