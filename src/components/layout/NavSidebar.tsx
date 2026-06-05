@@ -9,92 +9,96 @@ import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
   Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
-  ChevronRight, Inbox,
+  ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+// Standard nav item
 function NavItem({
-  icon: Ic, label, active, onClick, badge, kbd, bold,
+  icon: Ic, label, active, onClick, badge, kbd,
 }: {
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
-  badge?: number; kbd?: string; bold?: boolean
+  badge?: number; kbd?: string
 }) {
   return (
     <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
-      <Ic size={17} />
-      <span style={bold ? { fontWeight: 700 } : undefined}>{label}</span>
+      <Ic size={16} />
+      <span>{label}</span>
       {badge ? <span className="nav-badge">{badge}</span> : null}
       {kbd && !badge ? <span className="nav-kbd">{kbd}</span> : null}
     </div>
   )
 }
 
-function NavDivider() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 10px' }} />
+// Inbox sub-item
+function SubItem({
+  icon: Ic, label, active, onClick, badge,
+}: {
+  icon: LucideIcon; label: string; active: boolean; onClick: () => void; badge?: number
+}) {
+  return (
+    <div className="nav-item-sub" data-active={String(active)} onClick={onClick} title={label}>
+      <Ic size={14} />
+      <span>{label}</span>
+      {badge ? <span className="nav-badge">{badge}</span> : null}
+    </div>
+  )
 }
 
-// Aufklappbare Inbox-Gruppe
-function InboxGroup({
-  appView, setAppView, unreadMails, sidebarCollapsed,
+// Section label
+function SectionLabel({ children }: { children: string }) {
+  return <div className="nav-section-label">{children}</div>
+}
+
+// Aufklappbarer Inbox-Bereich
+function InboxSection({
+  appView, setAppView, unreadMails, collapsed,
 }: {
-  appView: string
-  setAppView: (v: string) => void
-  unreadMails: number
-  sidebarCollapsed: boolean
+  appView: string; setAppView: (v: string) => void
+  unreadMails: number; collapsed: boolean
 }) {
   const [open, setOpen] = useState(true)
   const inboxActive = ['posteingang', 'calendar'].includes(appView)
 
-  if (sidebarCollapsed) {
+  if (collapsed) {
     return (
-      <NavItem
-        icon={Inbox} label="Posteingang" active={inboxActive}
-        onClick={() => setAppView('posteingang')}
-        badge={unreadMails || undefined}
+      <NavItem icon={Mail} label="Posteingang" active={inboxActive}
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
       />
     )
   }
 
   return (
     <div>
-      {/* Header */}
       <div
-        className="nav-item"
-        data-active="false"
+        className="nav-inbox-header"
         onClick={() => setOpen(o => !o)}
-        title="Inbox"
-        style={{ userSelect: 'none' }}
       >
-        <Inbox size={17} />
+        <Mail size={16} style={{ flexShrink: 0 }} />
         <span style={{ flex: 1 }}>Inbox</span>
         {unreadMails > 0 && !open && (
-          <span className="nav-badge">{unreadMails}</span>
+          <span className="nav-badge" style={{ marginLeft: 'auto' }}>{unreadMails}</span>
         )}
         <ChevronRight
-          size={10}
+          size={11}
           style={{
             color: 'var(--fg-dim)',
-            transition: 'transform 180ms',
+            transition: 'transform 200ms',
             transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
             flexShrink: 0,
-            marginLeft: 'auto',
+            marginLeft: open || unreadMails === 0 ? 'auto' : 4,
           }}
         />
       </div>
-
-      {/* Sub-Items */}
       {open && (
-        <div style={{ paddingLeft: 8 }}>
-          <NavItem
-            icon={Mail}     label="Posteingang" active={appView === 'posteingang'}
-            onClick={() => setAppView('posteingang')}
-            badge={unreadMails || undefined}
+        <>
+          <SubItem icon={Mail}     label="Posteingang" active={appView === 'posteingang'}
+            onClick={() => setAppView('posteingang')} badge={unreadMails || undefined}
           />
-          <NavItem
-            icon={Calendar} label="Kalender" active={appView === 'calendar'}
+          <SubItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
             onClick={() => setAppView('calendar')}
           />
-        </div>
+        </>
       )}
     </div>
   )
@@ -142,50 +146,54 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA — ganz oben */}
+      {/* CORRA — gleiche Form wie alle anderen, aber Lime-Sparkle-Icon */}
       <div
-        className="corra-nav-button"
+        className="corra-nav-item"
         data-active={appView === 'corra' ? 'true' : 'false'}
         onClick={() => setAppView('corra')}
         title="CORRA Intelligence (⌘K)"
       >
-        <div className="corra-nav-orb"><Sparkles size={12} /></div>
-        <div className="corra-nav-text">
-          <span>CORRA</span>
-          <small>Intelligence</small>
-        </div>
+        <Sparkles size={16} className="corra-icon" />
+        <span className="corra-label">CORRA</span>
+        {!collapsed && <span className="corra-kbd">⌘K</span>}
       </div>
 
-      {/* Heute — bold */}
-      <NavItem
-        icon={Home} label="Heute" bold
-        active={appView === 'dashboard'}
-        onClick={() => setAppView('dashboard')} kbd="H"
-      />
+      {/* HEUTE — bold, Primär-Destination */}
+      <div
+        className="nav-item-heute"
+        data-active={appView === 'dashboard' ? 'true' : 'false'}
+        onClick={() => setAppView('dashboard')}
+        title="Heute (H)"
+      >
+        <Home size={16} />
+        <span>Heute</span>
+        {!collapsed && <span className="nav-kbd">H</span>}
+      </div>
 
-      <NavDivider />
+      {/* ── INBOX ── */}
+      {!collapsed && <SectionLabel>Inbox</SectionLabel>}
 
-      {/* Inbox aufklappbar */}
-      <InboxGroup
+      <InboxSection
         appView={appView}
         setAppView={v => setAppView(v as Parameters<typeof setAppView>[0])}
         unreadMails={unreadMails}
-        sidebarCollapsed={collapsed}
+        collapsed={collapsed}
       />
 
-      {/* Zeitmanagement flach */}
-      <NavItem
-        icon={Clock} label="Zeitmanagement"
+      <NavItem icon={Clock} label="Zeitmanagement"
         active={appView === 'zeitmanagement'}
         onClick={() => setAppView('zeitmanagement')} kbd="Z"
       />
 
-      <NavDivider />
+      {/* ── WORKSPACE ── */}
+      {!collapsed && <SectionLabel>Workspace</SectionLabel>}
 
-      {/* Kunden & Business */}
-      <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}   onClick={() => setAppView('clients')}   badge={clientsCount || undefined} kbd="C" />
-      <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}   onClick={() => setAppView('akquise')}  badge={akquiseBadge}              kbd="A" />
-      <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}  onClick={() => setAppView('invoices')}                                    kbd="F" />
+      <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
+        onClick={() => setAppView('clients')}   badge={clientsCount || undefined} kbd="C" />
+      <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
+        onClick={() => setAppView('akquise')}  badge={akquiseBadge}              kbd="A" />
+      <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
+        onClick={() => setAppView('invoices')}                                    kbd="F" />
 
       <div style={{ flex: 1 }} />
 
@@ -196,22 +204,23 @@ export function NavSidebar() {
         title="Quick Capture (⌘⇧N)"
         style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: collapsed ? '10px 0' : '10px 14px',
+          padding: collapsed ? '10px 0' : '9px 10px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          margin: '0 8px 4px',
-          borderRadius: 10, border: '1px dashed var(--border)',
+          margin: '0 0 2px',
+          borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)',
           background: 'transparent', cursor: 'pointer',
-          color: 'var(--fg-dim)', fontSize: 12,
-          transition: 'all 140ms', width: 'calc(100% - 16px)',
+          color: 'var(--fg-dim)', fontSize: 13,
+          transition: 'all 140ms', width: '100%',
         }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-dim)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--fg-dim)' }}
       >
-        <PenLine size={14} style={{ flexShrink: 0 }} />
+        <PenLine size={15} style={{ flexShrink: 0 }} />
         {!collapsed && <span>Quick Capture</span>}
       </button>
 
-      <button className="sidebar-collapse-btn" onClick={toggleSidebar} title={collapsed ? 'Ausklappen' : 'Einklappen'}>
+      <button className="sidebar-collapse-btn" onClick={toggleSidebar}
+        title={collapsed ? 'Ausklappen' : 'Einklappen'}>
         {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
       </button>
 
@@ -226,10 +235,12 @@ export function NavSidebar() {
         style={{ cursor: 'pointer' }}
       >
         <div className="sidebar-user-avatar">{initials}</div>
-        <div className="sidebar-user-text">
-          <strong>{displayName}</strong>
-          <span>Profil & Workspace</span>
-        </div>
+        {!collapsed && (
+          <div className="sidebar-user-text">
+            <strong>{displayName}</strong>
+            <span>Profil & Workspace</span>
+          </div>
+        )}
       </div>
 
     </aside>
