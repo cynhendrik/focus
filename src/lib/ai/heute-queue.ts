@@ -17,7 +17,7 @@ export interface HeuteQueueItem {
 export const CORRA_HEUTE_SYSTEM = `Du bist CORRA, persönlicher Assistent in Cynera (CRM für Berater).
 
 Erstelle eine priorisierte Aufgabenliste für heute. Reihenfolge:
-1. Mahnwesen — überfällige Rechnungen (nach Betrag × Tage überfällig)
+1. Mahnwesen — Rechnungen deren Fälligkeitsdatum vergangen ist UND nicht bezahlt/storniert (status != paid/cancelled/draft), sortiert nach Betrag × Tage überfällig
 2. Kunden-Mails — nach Wartezeit
 3. Todos — nach Priorität (p1 zuerst)
 
@@ -57,11 +57,16 @@ export function parseHeuteQueue(raw: string): HeuteQueueItem[] {
 export function staticHeuteQueue(input: CorraContextInput): HeuteQueueItem[] {
   const items: HeuteQueueItem[] = []
 
-  // 1. Overdue invoices — sort by total * daysOverdue descending
+  // 1. Überfällige Rechnungen — status='overdue' ODER Fälligkeitsdatum vergangen + nicht bezahlt/storniert
+  const today = Date.now()
   const overdueInvoices = input.invoices
-    .filter((i: Invoice) => i.status === 'overdue')
+    .filter((i: Invoice) => {
+      if (i.status === 'paid' || i.status === 'cancelled' || i.status === 'draft') return false
+      const isPastDue = new Date(i.dueDate).getTime() < today
+      return i.status === 'overdue' || isPastDue
+    })
     .map((i: Invoice) => {
-      const days = Math.max(0, Math.floor((Date.now() - new Date(i.dueDate).getTime()) / 86_400_000))
+      const days = Math.max(0, Math.floor((today - new Date(i.dueDate).getTime()) / 86_400_000))
       return { invoice: i, score: i.total * days, days }
     })
     .sort((a, b) => b.score - a.score)
