@@ -465,42 +465,49 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .nav-item--featured {
   color: var(--accent);
   font-weight: 700;
-  background: radial-gradient(ellipse at 10% 50%, oklch(92% 0.2 125 / 0.12) 0%, transparent 72%);
+  background: linear-gradient(to right, oklch(92% 0.2 125 / 0.18) 0%, oklch(92% 0.2 125 / 0.04) 55%, transparent);
   border: 1px solid oklch(92% 0.2 125 / 0.28);
-  box-shadow: 0 0 10px oklch(92% 0.2 125 / 0.07);
-  animation: corraGlow 3s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+}
+.nav-item--featured::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    oklch(99% 0.05 125 / 0.45) 50%,
+    transparent 75%
+  );
+  transform: translateX(-150%);
+  animation: corraShimmer 5s ease-in-out infinite;
+  pointer-events: none;
 }
 .nav-item--featured svg { color: var(--accent); }
 .nav-item--featured .nav-kbd {
   background: oklch(92% 0.2 125 / 0.1);
   color: var(--accent);
-  opacity: 0.65;
+  opacity: 0.6;
 }
 .nav-item--featured:hover {
-  background: radial-gradient(ellipse at 10% 50%, oklch(92% 0.2 125 / 0.18) 0%, transparent 72%);
-  border-color: oklch(92% 0.2 125 / 0.5);
-  box-shadow: 0 0 16px oklch(92% 0.2 125 / 0.14);
+  background: linear-gradient(to right, oklch(92% 0.2 125 / 0.26) 0%, oklch(92% 0.2 125 / 0.06) 55%, transparent);
+  border-color: oklch(92% 0.2 125 / 0.45);
   color: var(--accent);
 }
 .nav-item--featured[data-active="true"] {
-  background: radial-gradient(ellipse at 10% 50%, oklch(92% 0.2 125 / 0.2) 0%, transparent 72%);
-  border-color: oklch(92% 0.2 125 / 0.55);
-  box-shadow: 0 0 20px oklch(92% 0.2 125 / 0.18);
+  background: linear-gradient(to right, oklch(92% 0.2 125 / 0.28) 0%, oklch(92% 0.2 125 / 0.07) 55%, transparent);
+  border-color: oklch(92% 0.2 125 / 0.5);
   color: var(--accent);
-  animation: none;
+  box-shadow: none;
 }
 .nav-item--featured[data-active="true"] svg { color: var(--accent); }
 .nav-item--featured[data-active="true"]::before { background: var(--accent); }
 
-@keyframes corraGlow {
-  0%, 100% {
-    box-shadow: 0 0 8px oklch(92% 0.2 125 / 0.07);
-    border-color: oklch(92% 0.2 125 / 0.22);
-  }
-  50% {
-    box-shadow: 0 0 18px oklch(92% 0.2 125 / 0.18);
-    border-color: oklch(92% 0.2 125 / 0.48);
-  }
+@keyframes corraShimmer {
+  0%      { transform: translateX(-150%); }
+  35%     { transform: translateX(200%); }
+  100%    { transform: translateX(200%); }
 }
 
 .nav-capture {
