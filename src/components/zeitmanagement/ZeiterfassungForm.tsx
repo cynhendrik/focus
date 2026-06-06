@@ -20,31 +20,29 @@ export function ZeiterfassungForm({ auftraege }: Props) {
   const addZeiteintrag = useAuftraege(s => s.addZeiteintrag)
   const accounts       = useAccountsStore(s => s.accounts.filter(a => !a.isPrivate))
 
-  const [accountId,   setAccountId]   = useState('')
-  const [auftragId,   setAuftragId]   = useState('')
-  const [date,        setDate]        = useState(todayISO())
-  const [description, setDescription] = useState('')
-  const [hours,       setHours]       = useState('')
-  const [mins,        setMins]        = useState('')
+  const [accountId,    setAccountId]    = useState('')
+  const [auftragId,    setAuftragId]    = useState('')
+  const [date,         setDate]         = useState(todayISO())
+  const [hours,        setHours]        = useState('')
+  const [mins,         setMins]         = useState('')
   const [rateOverride, setRateOverride] = useState('')
 
   const selectedAuftrag = auftraege.find(a => a.id === auftragId)
   const defaultRate     = selectedAuftrag?.defaultHourlyRate
 
   const totalMins = (parseInt(hours || '0', 10) * 60) + parseInt(mins || '0', 10)
-  const canAdd    = description.trim() && totalMins > 0
+  const canAdd    = totalMins > 0
 
   const handleAdd = () => {
     if (!canAdd) return
     addZeiteintrag({
-      auftragId:  auftragId  || null,
-      accountId:  accountId  || null,
+      auftragId:   auftragId || null,
+      accountId:   accountId || null,
       date,
-      minutes:    totalMins,
-      description: description.trim(),
-      hourlyRate: rateOverride ? parseFloat(rateOverride) : null,
+      minutes:     totalMins,
+      description: selectedAuftrag?.title ?? '',
+      hourlyRate:  rateOverride ? parseFloat(rateOverride) : null,
     })
-    setDescription('')
     setHours('')
     setMins('')
     setRateOverride('')
@@ -80,14 +78,8 @@ export function ZeiterfassungForm({ auftraege }: Props) {
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
       </div>
 
-      {/* Zeile 2: Beschreibung + Zeit + Rate + Button */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 100px auto', gap: 8 }}>
-        <input
-          value={description} onChange={e => setDescription(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          placeholder="Was wurde gemacht?"
-          style={inputStyle}
-        />
+      {/* Zeile 2: Zeit + Rate + Button */}
+      <div style={{ display: 'grid', gridTemplateColumns: '64px 64px 100px auto', gap: 8 }}>
         <input type="number" value={hours} onChange={e => setHours(e.target.value)}
           placeholder="Std" min="0" max="23"
           style={{ ...inputStyle, textAlign: 'center' }} />
