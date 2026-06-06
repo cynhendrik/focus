@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useAuftraege } from '@/store/auftraege.store'
+import { useAccountsStore } from '@/store/accounts.store'
 import type { Auftrag } from '@/types/auftrag.types'
 
 interface Props {
@@ -17,35 +18,36 @@ const inputStyle: React.CSSProperties = {
 
 export function ZeiterfassungForm({ auftraege }: Props) {
   const addZeiteintrag = useAuftraege(s => s.addZeiteintrag)
+  const accounts       = useAccountsStore(s => s.accounts.filter(a => !a.isPrivate))
 
+  const [accountId,   setAccountId]   = useState('')
   const [auftragId,   setAuftragId]   = useState('')
   const [date,        setDate]        = useState(todayISO())
   const [description, setDescription] = useState('')
   const [hours,       setHours]       = useState('')
   const [mins,        setMins]        = useState('')
+  const [rateOverride, setRateOverride] = useState('')
+
+  const selectedAuftrag = auftraege.find(a => a.id === auftragId)
+  const defaultRate     = selectedAuftrag?.defaultHourlyRate
 
   const totalMins = (parseInt(hours || '0', 10) * 60) + parseInt(mins || '0', 10)
-  const canAdd    = auftragId && description.trim() && totalMins > 0
+  const canAdd    = description.trim() && totalMins > 0
 
   const handleAdd = () => {
     if (!canAdd) return
-    addZeiteintrag({ auftragId, date, minutes: totalMins, description: description.trim() })
+    addZeiteintrag({
+      auftragId:  auftragId  || null,
+      accountId:  accountId  || null,
+      date,
+      minutes:    totalMins,
+      description: description.trim(),
+      hourlyRate: rateOverride ? parseFloat(rateOverride) : null,
+    })
     setDescription('')
     setHours('')
     setMins('')
-  }
-
-  if (auftraege.length === 0) {
-    return (
-      <div style={{
-        padding: '16px 20px', borderRadius: 12,
-        border: '1px solid rgba(255,255,255,0.07)',
-        background: 'rgba(255,255,255,0.02)',
-        fontSize: 13, color: 'var(--fg-dim)', textAlign: 'center',
-      }}>
-        Lege zuerst einen Auftrag an, um Zeit zu erfassen.
-      </div>
-    )
+    setRateOverride('')
   }
 
   return (
@@ -61,15 +63,25 @@ export function ZeiterfassungForm({ auftraege }: Props) {
         Zeit erfassen
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 8, marginBottom: 8 }}>
-        <select value={auftragId} onChange={e => setAuftragId(e.target.value)} style={inputStyle}>
-          <option value="">Auftrag wählen…</option>
-          {auftraege.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+      {/* Zeile 1: Kunde + Auftrag + Datum */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: 8, marginBottom: 8 }}>
+        <select value={accountId} onChange={e => setAccountId(e.target.value)} style={inputStyle}>
+          <option value="">Kunde (optional)</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={auftragId} onChange={e => { setAuftragId(e.target.value); setRateOverride('') }} style={inputStyle}>
+          <option value="">Auftrag (optional)</option>
+          {auftraege.map(a => (
+            <option key={a.id} value={a.id}>
+              {a.title}{a.defaultHourlyRate ? ` · ${a.defaultHourlyRate}€/h` : ''}
+            </option>
+          ))}
         </select>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inputStyle} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 72px auto', gap: 8 }}>
+      {/* Zeile 2: Beschreibung + Zeit + Rate + Button */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 100px auto', gap: 8 }}>
         <input
           value={description} onChange={e => setDescription(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -82,12 +94,26 @@ export function ZeiterfassungForm({ auftraege }: Props) {
         <input type="number" value={mins} onChange={e => setMins(e.target.value)}
           placeholder="Min" min="0" max="59" step="15"
           style={{ ...inputStyle, textAlign: 'center' }} />
+        <div style={{ position: 'relative' }}>
+          <input
+            type="number"
+            value={rateOverride}
+            onChange={e => setRateOverride(e.target.value)}
+            placeholder={defaultRate ? `${defaultRate}` : '€/h'}
+            min="0"
+            style={{ ...inputStyle, paddingRight: 24, width: '100%' }}
+          />
+          <span style={{
+            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 11, color: 'var(--fg-dim)', pointerEvents: 'none',
+          }}>€</span>
+        </div>
         <button onClick={handleAdd} disabled={!canAdd} style={{
-          padding: '8px 16px', borderRadius: 8, border: 'none',
+          padding: '8px 14px', borderRadius: 8, border: 'none',
           background: canAdd ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
           color: canAdd ? 'var(--accent-ink)' : 'var(--fg-dim)',
           fontSize: 12, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed',
-          display: 'flex', alignItems: 'center', gap: 6,
+          display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
         }}>
           <Plus size={13} /> Erfassen
         </button>

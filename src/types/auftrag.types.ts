@@ -1,40 +1,37 @@
-export type AuftragStatus = 'active' | 'completed' | 'billed'
-export type AuftragType   = 'hourly' | 'fixed'
+export type AuftragStatus = 'active' | 'archived'
 
 export interface Auftrag {
-  id:          string
-  accountId:   string
-  title:       string
-  type:        AuftragType
-  hourlyRate:  number | null
-  fixedAmount: number | null
-  status:      AuftragStatus
-  notes:       string
-  createdAt:   string
+  id:                string
+  title:             string
+  defaultHourlyRate: number | null  // Default-Stundensatz, überschreibbar per Eintrag
+  notes:             string
+  status:            AuftragStatus
+  createdAt:         string
 }
 
 export interface Zeiteintrag {
   id:          string
-  auftragId:   string
+  auftragId:   string | null  // welcher Auftrag (Service-Typ)
+  accountId:   string | null  // welcher Kunde
   date:        string
   minutes:     number
   description: string
+  hourlyRate:  number | null  // überschreibt Auftrag-Default; null = Auftrag-Rate nutzen
   billed:      boolean
   invoiceId:   string | null
 }
 
 export interface CreateAuftragPayload {
-  accountId:   string
-  title:       string
-  type:        AuftragType
-  hourlyRate:  number | null
-  fixedAmount: number | null
-  notes:       string
+  title:             string
+  defaultHourlyRate: number | null
+  notes:             string
 }
 
 export interface AddZeiteintragPayload {
-  auftragId:   string
+  auftragId:   string | null
+  accountId:   string | null
   date:        string
   minutes:     number
   description: string
+  hourlyRate:  number | null
 }

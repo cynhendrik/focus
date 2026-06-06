@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Trash2, Edit2, Receipt, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, Edit2, Receipt, Clock, ChevronDown, ChevronUp, Archive } from 'lucide-react'
 import { useAuftraege } from '@/store/auftraege.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { AuftragForm } from '@/components/zeitmanagement/AuftragForm'
@@ -19,150 +19,146 @@ function fmtEur(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
-function AuftragRow({ auftrag, onEdit, onAbrechnen }: {
-  auftrag: Auftrag
-  onEdit: () => void
-  onAbrechnen: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const zeiteintraege     = useAuftraege(s => s.zeiteintraege.filter(z => z.auftragId === auftrag.id))
-  const unbilledMins      = useAuftraege(s => s.unbilledMinutes(auftrag.id))
-  const unbilledAmount    = useAuftraege(s => s.unbilledAmount(auftrag.id))
-  const removeZeiteintrag = useAuftraege(s => s.removeZeiteintrag)
-  const deleteAuftrag     = useAuftraege(s => s.deleteAuftrag)
-  const accounts          = useAccountsStore(s => s.accounts)
-  const account           = accounts.find(a => a.id === auftrag.accountId)
+// ── Auftrags-Zeile ────────────────────────────────────────────────────────────
 
-  const hasUnbilled = unbilledMins > 0 || (auftrag.type === 'fixed' && auftrag.status !== 'billed')
-  const totalMins   = zeiteintraege.reduce((s, z) => s + z.minutes, 0)
-
-  const statusColor =
-    auftrag.status === 'billed'    ? 'oklch(60% 0.01 0)' :
-    auftrag.status === 'completed' ? 'oklch(72% 0.18 180)' :
-    'var(--accent)'
-
-  const statusLabel =
-    auftrag.status === 'billed'    ? 'Abgerechnet' :
-    auftrag.status === 'completed' ? 'Fertig' : 'Aktiv'
+function AuftragRow({ auftrag, onEdit }: { auftrag: Auftrag; onEdit: () => void }) {
+  const deleteAuftrag  = useAuftraege(s => s.deleteAuftrag)
+  const updateAuftrag  = useAuftraege(s => s.updateAuftrag)
+  const unbilledMins   = useAuftraege(s => s.unbilledMinutes(auftrag.id))
+  const isArchived     = auftrag.status === 'archived'
 
   return (
     <div style={{
-      borderRadius: 14, border: '1px solid var(--border)',
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '11px 16px', borderRadius: 10,
+      border: '1px solid var(--border)',
+      background: isArchived ? 'transparent' : 'var(--bg-2)',
+      opacity: isArchived ? 0.5 : 1,
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{auftrag.title}</span>
+        {auftrag.defaultHourlyRate != null && (
+          <span style={{ fontSize: 11, color: 'var(--fg-dim)', marginLeft: 10 }}>
+            {auftrag.defaultHourlyRate}€/h
+          </span>
+        )}
+      </div>
+      {unbilledMins > 0 && !isArchived && (
+        <span style={{
+          fontSize: 10, padding: '2px 7px', borderRadius: 99,
+          background: 'oklch(92% 0.2 125 / 0.12)', color: 'var(--accent)',
+          fontFamily: 'var(--font-mono)', fontWeight: 700,
+        }}>
+          {fmtMinutes(unbilledMins)} offen
+        </span>
+      )}
+      <button onClick={onEdit} style={{
+        width: 28, height: 28, borderRadius: 6, border: 'none',
+        background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Edit2 size={12} />
+      </button>
+      <button
+        onClick={() => updateAuftrag(auftrag.id, { status: isArchived ? 'active' : 'archived' })}
+        title={isArchived ? 'Reaktivieren' : 'Archivieren'}
+        style={{
+          width: 28, height: 28, borderRadius: 6, border: 'none',
+          background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <Archive size={12} />
+      </button>
+      <button onClick={() => {
+        if (confirm(`Auftrag "${auftrag.title}" löschen?`)) deleteAuftrag(auftrag.id)
+      }} style={{
+        width: 28, height: 28, borderRadius: 6, border: 'none',
+        background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Trash2 size={12} />
+      </button>
+    </div>
+  )
+}
+
+// ── Kunden-Gruppe (unbilled) ─────────────────────────────────────────────────
+
+function KundeUnbilledRow({
+  accountId, accountName, onAbrechnen,
+}: { accountId: string; accountName: string; onAbrechnen: () => void }) {
+  const [open, setOpen]       = useState(false)
+  const summary               = useAuftraege(s => s.unbilledForAccount(accountId))
+  const removeZeiteintrag     = useAuftraege(s => s.removeZeiteintrag)
+  const auftraege             = useAuftraege(s => s.auftraege)
+
+  if (summary.entries.length === 0) return null
+
+  return (
+    <div style={{
+      borderRadius: 12, border: '1px solid var(--border)',
       background: 'var(--bg-2)', overflow: 'hidden',
     }}>
-      <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
-              {auftrag.title}
-            </span>
-            {hasUnbilled && auftrag.status !== 'billed' && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
-                background: 'oklch(92% 0.2 125 / 0.15)', color: 'var(--accent)',
-                fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-              }}>
-                NICHT ABGERECHNET
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-dim)' }}>
-            <span>{account?.name ?? '—'}</span>
-            <span>·</span>
-            <span>{auftrag.type === 'hourly'
-              ? `${fmtEur(auftrag.hourlyRate ?? 0)}/Std`
-              : `Pauschal ${fmtEur(auftrag.fixedAmount ?? 0)}`}
-            </span>
-            {totalMins > 0 && <><span>·</span><span>{fmtMinutes(totalMins)} gesamt</span></>}
+      <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)' }}>{accountName}</div>
+          <div style={{ fontSize: 12, color: 'var(--fg-dim)', marginTop: 2 }}>
+            {summary.entries.length} {summary.entries.length === 1 ? 'Eintrag' : 'Einträge'} · {fmtMinutes(summary.totalMinutes)}
           </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {hasUnbilled && auftrag.status !== 'billed' && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{
-                fontSize: 18, fontWeight: 700, color: 'var(--accent)',
-                fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em',
-              }}>
-                {fmtEur(unbilledAmount)}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
-                offen
-              </div>
-            </div>
-          )}
-          <span style={{
-            fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 99,
-            background: `${statusColor}18`, color: statusColor,
-            fontFamily: 'var(--font-mono)',
+        <div style={{ textAlign: 'right' }}>
+          <div style={{
+            fontSize: 20, fontWeight: 700, color: 'var(--accent)',
+            fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em',
           }}>
-            {statusLabel}
-          </span>
-          {auftrag.status !== 'billed' && (
-            <button onClick={onAbrechnen} title="Abrechnen" style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
-              background: 'transparent', color: 'var(--accent)', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
-            }}>
-              <Receipt size={13} /> Abrechnen
-            </button>
-          )}
-          <button onClick={onEdit} style={{
-            width: 30, height: 30, borderRadius: 7, border: 'none',
-            background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Edit2 size={13} />
-          </button>
-          <button onClick={() => {
-            if (confirm(`Auftrag "${auftrag.title}" und alle Zeiteinträge löschen?`)) deleteAuftrag(auftrag.id)
-          }} style={{
-            width: 30, height: 30, borderRadius: 7, border: 'none',
-            background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Trash2 size={13} />
-          </button>
-          <button onClick={() => setOpen(o => !o)} style={{
-            width: 30, height: 30, borderRadius: 7, border: 'none',
-            background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
+            {summary.totalAmount > 0 ? fmtEur(summary.totalAmount) : '—'}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>offen</div>
         </div>
+        <button onClick={onAbrechnen} style={{
+          padding: '7px 14px', borderRadius: 8,
+          border: '1px solid var(--border)', background: 'transparent',
+          color: 'var(--accent)', cursor: 'pointer',
+          fontSize: 12, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          <Receipt size={13} /> Abrechnen
+        </button>
+        <button onClick={() => setOpen(o => !o)} style={{
+          width: 28, height: 28, borderRadius: 6, border: 'none',
+          background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
       </div>
 
       {open && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {zeiteintraege.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--fg-dim)', padding: '4px 0' }}>
-              Noch keine Zeiteinträge.
-            </div>
-          ) : zeiteintraege.map(z => (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '10px 18px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {summary.entries.map(z => (
             <div key={z.id} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '8px 12px', borderRadius: 8,
-              background: z.billed ? 'transparent' : 'rgba(255,255,255,0.02)',
-              border: `1px solid ${z.billed ? 'transparent' : 'rgba(255,255,255,0.06)'}`,
-              opacity: z.billed ? 0.5 : 1,
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '7px 10px', borderRadius: 7,
+              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{z.description}</div>
-                <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{z.date}{z.billed ? ' · abgerechnet' : ''}</div>
+                <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+                  {z.date}
+                  {z.auftragId && <span> · {auftraege.find(a => a.id === z.auftragId)?.title ?? '—'}</span>}
+                </div>
               </div>
               <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', flexShrink: 0 }}>
                 {fmtMinutes(z.minutes)}
               </div>
-              {!z.billed && (
-                <button onClick={() => removeZeiteintrag(z.id)} style={{
-                  width: 24, height: 24, borderRadius: 5, border: 'none',
-                  background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Trash2 size={11} />
-                </button>
-              )}
+              <button onClick={() => removeZeiteintrag(z.id)} style={{
+                width: 24, height: 24, borderRadius: 5, border: 'none',
+                background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Trash2 size={11} />
+              </button>
             </div>
           ))}
         </div>
@@ -171,38 +167,45 @@ function AuftragRow({ auftrag, onEdit, onAbrechnen }: {
   )
 }
 
+// ── Haupt-Route ──────────────────────────────────────────────────────────────
+
 export function ZeitmanagementRoute() {
   const auftraege     = useAuftraege(s => s.auftraege)
   const zeiteintraege = useAuftraege(s => s.zeiteintraege)
+  const accounts      = useAccountsStore(s => s.accounts.filter(a => !a.isPrivate))
 
-  const [showForm,       setShowForm]       = useState(false)
-  const [editAuftrag,    setEditAuftrag]    = useState<Auftrag | null>(null)
-  const [abrechnAuftrag, setAbrechnAuftrag] = useState<Auftrag | null>(null)
+  const [showForm,    setShowForm]    = useState(false)
+  const [editAuftrag, setEditAuftrag] = useState<Auftrag | null>(null)
+  const [abrechnAccount, setAbrechnAccount] = useState<{ id: string; name: string } | null>(null)
+  const [showArchived, setShowArchived]     = useState(false)
 
-  const aktiveAuftraege = useMemo(
-    () => auftraege.filter(a => a.status !== 'billed'),
-    [auftraege]
-  )
+  const aktiveAuftraege    = useMemo(() => auftraege.filter(a => a.status === 'active'),   [auftraege])
+  const archiviertAuftraege = useMemo(() => auftraege.filter(a => a.status === 'archived'), [auftraege])
 
-  const unbilledTotal = useMemo(() => {
-    const s = useAuftraege.getState()
-    return auftraege
-      .filter(a => a.status !== 'billed')
-      .reduce((acc, a) => acc + s.unbilledAmount(a.id), 0)
-  }, [auftraege, zeiteintraege])
+  // Welche Kunden haben unbilled Zeit?
+  const accountsWithUnbilled = useMemo(() => {
+    const ids = new Set(zeiteintraege.filter(z => !z.billed && z.accountId).map(z => z.accountId!))
+    return accounts.filter(a => ids.has(a.id))
+  }, [zeiteintraege, accounts])
 
+  // KPIs
   const weekMins = useMemo(() => {
     const mon = new Date()
     const day = mon.getDay()
     mon.setDate(mon.getDate() - (day === 0 ? 6 : day - 1))
     mon.setHours(0, 0, 0, 0)
-    return zeiteintraege
-      .filter(z => new Date(z.date) >= mon)
-      .reduce((s, z) => s + z.minutes, 0)
+    return zeiteintraege.filter(z => new Date(z.date) >= mon).reduce((s, z) => s + z.minutes, 0)
   }, [zeiteintraege])
+
+  const totalUnbilled = useMemo(() => {
+    const s = useAuftraege.getState()
+    return accountsWithUnbilled.reduce((acc, a) => acc + s.unbilledForAccount(a.id).totalAmount, 0)
+  }, [accountsWithUnbilled, zeiteintraege])
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 28px 64px' }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <div style={{
@@ -210,7 +213,7 @@ export function ZeitmanagementRoute() {
             textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 6,
           }}>Zeitmanagement</div>
           <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--fg)', margin: 0 }}>
-            Aufträge
+            Aufträge & Zeit
           </h1>
         </div>
         <button onClick={() => setShowForm(true)} style={{
@@ -222,10 +225,11 @@ export function ZeitmanagementRoute() {
         </button>
       </div>
 
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Nicht abgerechnet', value: fmtEur(unbilledTotal), accent: unbilledTotal > 0 },
-          { label: 'Diese Woche', value: fmtMinutes(weekMins), accent: false },
+          { label: 'Nicht abgerechnet', value: totalUnbilled > 0 ? fmtEur(totalUnbilled) : '—', accent: totalUnbilled > 0 },
+          { label: 'Diese Woche', value: weekMins > 0 ? fmtMinutes(weekMins) : '—', accent: false },
         ].map(k => (
           <div key={k.label} style={{
             padding: '16px 20px', borderRadius: 14,
@@ -239,43 +243,94 @@ export function ZeitmanagementRoute() {
             <div style={{
               fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em',
               color: k.accent ? 'var(--accent)' : 'var(--fg)',
-            }}>
-              {weekMins === 0 && !k.accent ? '—' : k.value}
-            </div>
+            }}>{k.value}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      {/* Zeiterfassung */}
+      <div style={{ marginBottom: 32 }}>
         <ZeiterfassungForm auftraege={aktiveAuftraege} />
       </div>
 
-      {auftraege.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--fg-dim)' }}>
-          <Clock size={36} style={{ opacity: 0.18, marginBottom: 14, display: 'block', margin: '0 auto 14px' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 6 }}>
-            Noch keine Aufträge
+      {/* Nicht abgerechnet — pro Kunde */}
+      {accountsWithUnbilled.length > 0 && (
+        <section style={{ marginBottom: 32 }}>
+          <div style={{
+            fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 10,
+          }}>
+            Nicht abgerechnet
           </div>
-          <div style={{ fontSize: 13 }}>
-            Lege einen Auftrag an um Zeit zu erfassen und abzurechnen.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {accountsWithUnbilled.map(a => (
+              <KundeUnbilledRow
+                key={a.id}
+                accountId={a.id}
+                accountName={a.name}
+                onAbrechnen={() => setAbrechnAccount({ id: a.id, name: a.name })}
+              />
+            ))}
           </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {auftraege.map(a => (
-            <AuftragRow
-              key={a.id}
-              auftrag={a}
-              onEdit={() => setEditAuftrag(a)}
-              onAbrechnen={() => setAbrechnAuftrag(a)}
-            />
-          ))}
-        </div>
+        </section>
       )}
 
-      {showForm && <AuftragForm onClose={() => setShowForm(false)} />}
+      {/* Aufträge — globale Liste */}
+      <section>
+        <div style={{
+          fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
+          textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 10,
+        }}>
+          Aufträge
+        </div>
+
+        {aktiveAuftraege.length === 0 && archiviertAuftraege.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-dim)' }}>
+            <Clock size={32} style={{ opacity: 0.18, display: 'block', margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 4 }}>
+              Noch keine Aufträge
+            </div>
+            <div style={{ fontSize: 12 }}>
+              Lege Aufträge an (z.B. "Beratung", "Webentwicklung") und wähle sie beim Zeiterfassen aus.
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {aktiveAuftraege.map(a => (
+              <AuftragRow key={a.id} auftrag={a} onEdit={() => setEditAuftrag(a)} />
+            ))}
+
+            {archiviertAuftraege.length > 0 && (
+              <button
+                onClick={() => setShowArchived(o => !o)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 11, color: 'var(--fg-dim)', padding: '6px 0',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {showArchived ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {archiviertAuftraege.length} archivierte Aufträge
+              </button>
+            )}
+
+            {showArchived && archiviertAuftraege.map(a => (
+              <AuftragRow key={a.id} auftrag={a} onEdit={() => setEditAuftrag(a)} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Modals */}
+      {showForm    && <AuftragForm onClose={() => setShowForm(false)} />}
       {editAuftrag && <AuftragForm auftrag={editAuftrag} onClose={() => setEditAuftrag(null)} />}
-      {abrechnAuftrag && <AuftragAbrechnen auftrag={abrechnAuftrag} onClose={() => setAbrechnAuftrag(null)} />}
+      {abrechnAccount && (
+        <AuftragAbrechnen
+          accountId={abrechnAccount.id}
+          accountName={abrechnAccount.name}
+          onClose={() => setAbrechnAccount(null)}
+        />
+      )}
     </div>
   )
 }

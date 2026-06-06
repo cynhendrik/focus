@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Auftrag, Zeiteintrag, CreateAuftragPayload, AddZeiteintragPayload, AuftragStatus } from '@/types/auftrag.types'
+import type { Auftrag, Zeiteintrag, CreateAuftragPayload, AddZeiteintragPayload } from '@/types/auftrag.types'
 
 const KEY_AUFTRAEGE     = 'cynera-auftraege-v1'
 const KEY_ZEITEINTRAEGE = 'cynera-zeiteintraege-v1'
@@ -16,18 +16,30 @@ function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
 
+function entryAmount(entry: Zeiteintrag, auftraege: Auftrag[]): number {
+  const rate = entry.hourlyRate ?? auftraege.find(a => a.id === entry.auftragId)?.defaultHourlyRate ?? 0
+  return Math.round((entry.minutes / 60) * rate * 100) / 100
+}
+
+export interface UnbilledSummary {
+  entries:      Zeiteintrag[]
+  totalMinutes: number
+  totalAmount:  number
+}
+
 interface AuftraegeState {
   auftraege:     Auftrag[]
   zeiteintraege: Zeiteintrag[]
 
-  createAuftrag:     (payload: CreateAuftragPayload) => void
-  updateAuftrag:     (id: string, partial: Partial<Pick<Auftrag, 'title' | 'type' | 'hourlyRate' | 'fixedAmount' | 'notes' | 'status'>>) => void
-  deleteAuftrag:     (id: string) => void
-  addZeiteintrag:    (payload: AddZeiteintragPayload) => void
-  removeZeiteintrag: (id: string) => void
-  markBilled:        (auftragId: string, invoiceId: string) => void
-  unbilledMinutes:   (auftragId: string) => number
-  unbilledAmount:    (auftragId: string) => number
+  createAuftrag:        (payload: CreateAuftragPayload) => void
+  updateAuftrag:        (id: string, partial: Partial<Pick<Auftrag, 'title' | 'defaultHourlyRate' | 'notes' | 'status'>>) => void
+  deleteAuftrag:        (id: string) => void
+  addZeiteintrag:       (payload: AddZeiteintragPayload) => void
+  removeZeiteintrag:    (id: string) => void
+  markBilledForAccount: (accountId: string, invoiceId: string) => void
+
+  unbilledForAccount: (accountId: string) => UnbilledSummary
+  unbilledMinutes:    (auftragId: string) => number
 }
 
 export const useAuftraege = create<AuftraegeState>()((set, get) => ({
@@ -52,8 +64,10 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
   },
 
   deleteAuftrag(id) {
-    const auftraege    = get().auftraege.filter(a => a.id !== id)
-    const zeiteintraege = get().zeiteintraege.filter(z => z.auftragId !== id)
+    const auftraege = get().auftraege.filter(a => a.id !== id)
+    const zeiteintraege = get().zeiteintraege.map(z =>
+      z.auftragId === id ? { ...z, auftragId: null } : z
+    )
     save(KEY_AUFTRAEGE, auftraege)
     save(KEY_ZEITEINTRAEGE, zeiteintraege)
     set({ auftraege, zeiteintraege })
@@ -75,31 +89,27 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
     set({ zeiteintraege: next })
   },
 
-  markBilled(auftragId, invoiceId) {
+  markBilledForAccount(accountId, invoiceId) {
     const zeiteintraege = get().zeiteintraege.map(z =>
-      z.auftragId === auftragId && !z.billed
+      z.accountId === accountId && !z.billed
         ? { ...z, billed: true, invoiceId }
         : z
     )
-    const auftraege = get().auftraege.map(a =>
-      a.id === auftragId ? { ...a, status: 'billed' as AuftragStatus } : a
-    )
     save(KEY_ZEITEINTRAEGE, zeiteintraege)
-    save(KEY_AUFTRAEGE, auftraege)
-    set({ zeiteintraege, auftraege })
+    set({ zeiteintraege })
+  },
+
+  unbilledForAccount(accountId) {
+    const { zeiteintraege, auftraege } = get()
+    const entries      = zeiteintraege.filter(z => z.accountId === accountId && !z.billed)
+    const totalMinutes = entries.reduce((s, z) => s + z.minutes, 0)
+    const totalAmount  = Math.round(entries.reduce((s, z) => s + entryAmount(z, auftraege), 0) * 100) / 100
+    return { entries, totalMinutes, totalAmount }
   },
 
   unbilledMinutes(auftragId) {
     return get().zeiteintraege
       .filter(z => z.auftragId === auftragId && !z.billed)
       .reduce((s, z) => s + z.minutes, 0)
-  },
-
-  unbilledAmount(auftragId) {
-    const auftrag = get().auftraege.find(a => a.id === auftragId)
-    if (!auftrag) return 0
-    if (auftrag.type === 'fixed') return auftrag.fixedAmount ?? 0
-    const hours = get().unbilledMinutes(auftragId) / 60
-    return Math.round(hours * (auftrag.hourlyRate ?? 0) * 100) / 100
   },
 }))
