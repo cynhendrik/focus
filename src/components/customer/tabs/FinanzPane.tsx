@@ -46,7 +46,7 @@ export function FinanzPane({ customerId }: Props) {
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ padding: '20px 24px 64px', display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Summary */}
       <div className="row-3" style={{ marginBottom: 0 }}>
         {[

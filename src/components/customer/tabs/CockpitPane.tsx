@@ -568,7 +568,7 @@ export function CockpitPane({ customerId }: Props) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 14,
-      padding: '20px 24px 40px', overflow: 'auto', height: '100%',
+      padding: '20px 24px 64px', overflow: 'auto', height: '100%',
       maxWidth: 1100, margin: '0 auto', width: '100%',
     }}>
       {/* ── KPI-Strip — eine Card, vier Zellen, dezente Trennlinien ──── */}

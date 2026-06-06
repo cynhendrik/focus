@@ -75,8 +75,8 @@ export function CustomerNotesPane({ accountId }: Props) {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-        padding: '14px 28px 10px', flexShrink: 0,
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        padding: '14px 24px 10px', flexShrink: 0,
+        borderBottom: '1px solid var(--border)',
       }}>
         <button
           onClick={() => setShowForm(true)}
@@ -90,7 +90,7 @@ export function CustomerNotesPane({ accountId }: Props) {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px 48px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 64px' }}>
         {/* Pinned docs */}
         <PinnedDocsRow
           docs={docs}

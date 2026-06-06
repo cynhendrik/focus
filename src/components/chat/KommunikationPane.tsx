@@ -26,9 +26,9 @@ export function KommunikationPane({ customerId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
+    <div className="flex flex-col h-full" style={{ minHeight: 0, padding: '0 24px' }}>
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-2 pb-4" style={{ minHeight: 0 }}>
+      <div className="flex-1 overflow-y-auto flex flex-col gap-2 py-5" style={{ minHeight: 0 }}>
         {messages.length === 0 && (
           <p className="text-sm text-[var(--text2)] text-center py-8">Noch keine Nachrichten</p>
         )}
@@ -61,7 +61,7 @@ export function KommunikationPane({ customerId }: Props) {
       </div>
 
       {/* Input */}
-      <div className="flex gap-2 pt-3 border-t border-[var(--border)]">
+      <div className="flex gap-2 py-3 border-t border-[var(--border)]">
         <select
           value={sender}
           onChange={e => setSender(e.target.value as ChatSender)}

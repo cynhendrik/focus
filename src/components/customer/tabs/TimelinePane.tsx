@@ -359,7 +359,7 @@ export function TimelinePane({ customerId }: Props) {
       display: 'grid',
       gridTemplateColumns: 'minmax(440px, 560px) 1fr',
       gap: 36,
-      padding: '4px 28px 96px',
+      padding: '20px 24px 64px',
       alignItems: 'start',
     }}>
       {/* ── LEFT RAIL — knowledge column, sticky during scroll ──────────── */}
