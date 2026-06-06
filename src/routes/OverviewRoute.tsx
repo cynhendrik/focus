@@ -1,6 +1,7 @@
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { CustomerModal } from '@/components/customer/CustomerModal'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { useState } from 'react'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -39,16 +40,16 @@ export function OverviewRoute() {
   }
 
   return (
-    <div className="p-6 flex flex-col gap-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-[var(--text)]">Übersicht</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-dark"
-        >
-          + Neuer Kunde
-        </button>
-      </div>
+    <div className="main-inner">
+      <PageHeader
+        title="Übersicht"
+        right={
+          <button className="btn-primary" onClick={() => setShowModal(true)}>
+            + Neuer Kunde
+          </button>
+        }
+      />
+      <div className="flex flex-col gap-6">
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -120,6 +121,7 @@ export function OverviewRoute() {
       </section>
 
       {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
+      </div>
     </div>
   )
 }

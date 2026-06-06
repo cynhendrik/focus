@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
 } from 'lucide-react'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
@@ -71,37 +72,6 @@ function pct(delta: number, base: number): string {
   return `${v > 0 ? '+' : ''}${v}%`
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Hero
-
-function DashboardHero({ name }: { name: string }) {
-  const now = new Date()
-  const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-      gap: 24, padding: '8px 4px 24px',
-    }}>
-      <div>
-        <h1 style={{
-          fontSize: 42, fontWeight: 700, letterSpacing: '-0.025em',
-          lineHeight: 1.05, color: 'var(--fg)', margin: 0,
-        }}>
-          {greeting()}, <span style={{ color: 'var(--accent)' }}>{name}.</span>
-        </h1>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, marginTop: 10,
-          fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--fg-dim)', fontWeight: 600,
-        }}>
-          <span>{dateLine}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI Card (gemeinsam fuer alle Views)
@@ -797,12 +767,19 @@ export function DashboardRoute() {
   }, [workspaceId, loadFinance, loadToday])
 
   const firstName = (user?.email?.split('@')[0] ?? 'User').replace(/^./, c => c.toUpperCase())
+  const now = new Date()
+  const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
 
   return (
-    <div className="main-inner" style={{
-      maxWidth: 1240, margin: '0 auto', padding: '24px 28px 64px',
-    }}>
-      <DashboardHero name={firstName} />
+    <div className="main-inner">
+      <PageHeader
+        title={<>{greeting()}, <span style={{ color: 'var(--accent)' }}>{firstName}</span></>}
+        right={
+          <div className="greeting-sub">
+            <span>{dateLine}</span>
+          </div>
+        }
+      />
       <WorkspaceView />
     </div>
   )

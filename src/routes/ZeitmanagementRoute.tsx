@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Plus, Trash2, Edit2, Receipt, Clock, ChevronDown, ChevronUp, Archive } from 'lucide-react'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { useAuftraege } from '@/store/auftraege.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { AuftragForm } from '@/components/zeitmanagement/AuftragForm'
@@ -203,27 +204,15 @@ export function ZeitmanagementRoute() {
   }, [accountsWithUnbilled, zeiteintraege])
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: '28px 28px 64px' }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <div style={{
-            fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
-            textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600, marginBottom: 6,
-          }}>Zeitmanagement</div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--fg)', margin: 0 }}>
-            Aufträge & Zeit
-          </h1>
-        </div>
-        <button onClick={() => setShowForm(true)} style={{
-          display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px',
-          borderRadius: 10, border: 'none', background: 'var(--accent)',
-          color: 'var(--accent-ink)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-        }}>
-          <Plus size={15} /> Neuer Auftrag
-        </button>
-      </div>
+    <div className="main-inner">
+      <PageHeader
+        title="Aufträge & Zeit"
+        right={
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            <Plus size={15} /> Neuer Auftrag
+          </button>
+        }
+      />
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
@@ -233,8 +222,8 @@ export function ZeitmanagementRoute() {
         ].map(k => (
           <div key={k.label} style={{
             padding: '16px 20px', borderRadius: 14,
-            border: '1px solid rgba(255,255,255,0.07)',
-            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
           }}>
             <div style={{
               fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
