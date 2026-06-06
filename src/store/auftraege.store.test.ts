@@ -17,8 +17,7 @@ describe('auftraege store', () => {
   it('createAuftrag legt Auftrag an', async () => {
     const { useAuftraege } = await import('./auftraege.store')
     useAuftraege.getState().createAuftrag({
-      accountId: 'acc1', title: 'Website', type: 'hourly',
-      hourlyRate: 90, fixedAmount: null, notes: '',
+      title: 'Website', defaultHourlyRate: 90, notes: '',
     })
     const { auftraege } = useAuftraege.getState()
     expect(auftraege).toHaveLength(1)
@@ -28,14 +27,11 @@ describe('auftraege store', () => {
 
   it('addZeiteintrag bucht Zeit auf Auftrag', async () => {
     const { useAuftraege } = await import('./auftraege.store')
-    useAuftraege.getState().createAuftrag({
-      accountId: 'acc1', title: 'Test', type: 'hourly',
-      hourlyRate: 100, fixedAmount: null, notes: '',
-    })
+    useAuftraege.getState().createAuftrag({ title: 'Test', defaultHourlyRate: 100, notes: '' })
     const { auftraege } = useAuftraege.getState()
     useAuftraege.getState().addZeiteintrag({
-      auftragId: auftraege[0].id, date: '2026-06-06',
-      minutes: 90, description: 'Setup',
+      auftragId: auftraege[0].id, accountId: 'acc1',
+      date: '2026-06-06', minutes: 90, description: 'Setup', hourlyRate: null,
     })
     const { zeiteintraege } = useAuftraege.getState()
     expect(zeiteintraege).toHaveLength(1)
@@ -43,32 +39,25 @@ describe('auftraege store', () => {
     expect(zeiteintraege[0].minutes).toBe(90)
   })
 
-  it('markBilled setzt alle Einträge des Auftrags auf billed', async () => {
+  it('markBilledForAccount setzt alle Einträge des Kunden auf billed', async () => {
     const { useAuftraege } = await import('./auftraege.store')
-    useAuftraege.getState().createAuftrag({
-      accountId: 'acc1', title: 'Test', type: 'hourly',
-      hourlyRate: 100, fixedAmount: null, notes: '',
-    })
+    useAuftraege.getState().createAuftrag({ title: 'Test', defaultHourlyRate: 100, notes: '' })
     const id = useAuftraege.getState().auftraege[0].id
-    useAuftraege.getState().addZeiteintrag({ auftragId: id, date: '2026-06-06', minutes: 60, description: 'A' })
-    useAuftraege.getState().addZeiteintrag({ auftragId: id, date: '2026-06-06', minutes: 30, description: 'B' })
-    useAuftraege.getState().markBilled(id, 'inv_123')
-    const { auftraege, zeiteintraege } = useAuftraege.getState()
-    expect(auftraege[0].status).toBe('billed')
+    useAuftraege.getState().addZeiteintrag({ auftragId: id, accountId: 'acc1', date: '2026-06-06', minutes: 60, description: 'A', hourlyRate: null })
+    useAuftraege.getState().addZeiteintrag({ auftragId: id, accountId: 'acc1', date: '2026-06-06', minutes: 30, description: 'B', hourlyRate: null })
+    useAuftraege.getState().markBilledForAccount('acc1', 'inv_123')
+    const { zeiteintraege } = useAuftraege.getState()
     expect(zeiteintraege.every(e => e.billed && e.invoiceId === 'inv_123')).toBe(true)
   })
 
   it('unbilledMinutes berechnet nur nicht-abgerechnete Minuten', async () => {
     const { useAuftraege } = await import('./auftraege.store')
-    useAuftraege.getState().createAuftrag({
-      accountId: 'acc1', title: 'Test', type: 'hourly',
-      hourlyRate: 100, fixedAmount: null, notes: '',
-    })
+    useAuftraege.getState().createAuftrag({ title: 'Test', defaultHourlyRate: 100, notes: '' })
     const id = useAuftraege.getState().auftraege[0].id
-    useAuftraege.getState().addZeiteintrag({ auftragId: id, date: '2026-06-06', minutes: 60, description: 'A' })
-    useAuftraege.getState().addZeiteintrag({ auftragId: id, date: '2026-06-06', minutes: 30, description: 'B' })
+    useAuftraege.getState().addZeiteintrag({ auftragId: id, accountId: 'acc1', date: '2026-06-06', minutes: 60, description: 'A', hourlyRate: null })
+    useAuftraege.getState().addZeiteintrag({ auftragId: id, accountId: 'acc1', date: '2026-06-06', minutes: 30, description: 'B', hourlyRate: null })
     expect(useAuftraege.getState().unbilledMinutes(id)).toBe(90)
-    useAuftraege.getState().markBilled(id, 'inv_1')
+    useAuftraege.getState().markBilledForAccount('acc1', 'inv_1')
     expect(useAuftraege.getState().unbilledMinutes(id)).toBe(0)
   })
 })
