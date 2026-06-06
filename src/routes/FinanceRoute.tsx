@@ -5,6 +5,9 @@ import { useCompanyStore } from '@/store/company.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useVertraege } from '@/store/vertraege.store'
+import { useToastStore } from '@/store/toast.store'
+import { VertraegeTab } from '@/components/finance/VertraegeTab'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { OfferForm } from '@/components/finance/OfferForm'
 import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
@@ -344,7 +347,11 @@ export function FinanceRoute() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user        = useAuthStore(s => s.user)
 
-  const [financeTab, setFinanceTab] = useState<'uebersicht' | 'mahnwesen'>('uebersicht')
+  const [financeTab, setFinanceTab] = useState<'uebersicht' | 'mahnwesen' | 'vertraege'>('uebersicht')
+  const checkAndCreate = useVertraege(s => s.checkAndCreateDueInvoices)
+  const vertraege      = useVertraege(s => s.vertraege)
+  const showToast      = useToastStore(s => s.show)
+  const userId         = useAuthStore(s => s.user?.id) ?? ''
   const [period,        setPeriod]        = useState<Period>('monat')
   const [customFrom,    setCustomFrom]    = useState('')
   const [customTo,      setCustomTo]      = useState('')
@@ -361,6 +368,19 @@ export function FinanceRoute() {
   const [animPct, setAnimPct] = useState(0)
 
   useEffect(() => { if (workspaceId) loadAll(workspaceId) }, [workspaceId, loadAll])
+
+  useEffect(() => {
+    if (!workspaceId || !userId) return
+    checkAndCreate(workspaceId, userId).then(count => {
+      if (count > 0) {
+        showToast({
+          message: `${count} Rechnung${count > 1 ? 'en' : ''} aus Vertrag${count > 1 ? 'rägen' : ''} erstellt (Entwurf).`,
+          variant: 'success',
+        })
+        loadAll(workspaceId)
+      }
+    }).catch(() => {})
+  }, [workspaceId, userId])
 
   const accountName    = (id: string) => accounts.find(a => a.id === id)?.name ?? '—'
   const realInvoices   = useMemo(() => invoices.filter(i => !i.isSuggestion), [invoices])
@@ -470,6 +490,7 @@ export function FinanceRoute() {
         {([
           { key: 'uebersicht', label: 'Übersicht' },
           { key: 'mahnwesen',  label: 'Mahnwesen', badge: overdueInvoices.length || undefined },
+          { key: 'vertraege',  label: 'Verträge',  badge: vertraege.filter(v => v.status === 'active').length || undefined },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -502,6 +523,7 @@ export function FinanceRoute() {
 
       {/* Mahnwesen Tab */}
       {financeTab === 'mahnwesen' && <MahnwesenPanel />}
+      {financeTab === 'vertraege' && <VertraegeTab />}
 
       {/* ── Umsatz (nur im Übersicht-Tab) ────────────────────────────────── */}
       {financeTab === 'uebersicht' && <>
