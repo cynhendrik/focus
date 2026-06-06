@@ -40,8 +40,6 @@ export function WorkflowPane({ customerId }: Props) {
 
   return (
     <div style={{
-      maxWidth: 760,
-      margin: '0 auto',
       padding: '20px 24px 64px',
       display: 'flex', flexDirection: 'column',
       gap: 24,
