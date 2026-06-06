@@ -20,9 +20,11 @@ const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: Luci
 }
 
 export function Topbar() {
-  const appView     = useUiStore(s => s.appView)
-  const setAppView  = useUiStore(s => s.setAppView)
-  const toggleTheme = useUiStore(s => s.toggleTheme)
+  const appView        = useUiStore(s => s.appView)
+  const setAppView     = useUiStore(s => s.setAppView)
+  const toggleTheme    = useUiStore(s => s.toggleTheme)
+  const zeitPanelOpen  = useUiStore(s => s.zeitPanelOpen)
+  const setZeitPanel   = useUiStore(s => s.setZeitPanelOpen)
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
   const { label, tag } = meta
@@ -50,9 +52,9 @@ export function Topbar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
           className="icon-btn"
-          onClick={() => setAppView('zeitmanagement')}
-          title="Zeitmanagement (Z)"
-          style={{ color: appView === 'zeitmanagement' ? 'var(--accent)' : undefined }}
+          onClick={() => setZeitPanel(!zeitPanelOpen)}
+          title="Zeit erfassen"
+          style={{ color: zeitPanelOpen ? 'var(--accent)' : undefined }}
         >
           <Timer size={16} />
         </button>

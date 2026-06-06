@@ -104,6 +104,7 @@ interface UiState {
   migrationDone: boolean
   cmdPaletteOpen: boolean
   quickCaptureOpen: boolean
+  zeitPanelOpen: boolean
   activeCustomerTab: CustomerTab
   tasksTab: TasksTab
   dashboardView: DashboardView
@@ -123,6 +124,7 @@ interface UiState {
   markMigrationDone: () => void
   setCmdPaletteOpen: (open: boolean) => void
   setQuickCaptureOpen: (open: boolean) => void
+  setZeitPanelOpen: (open: boolean) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
   setTasksTab: (tab: TasksTab) => void
   setDashboardView: (view: DashboardView) => void
@@ -144,6 +146,7 @@ export const useUiStore = create<UiState>()(
       migrationDone: false,
       cmdPaletteOpen: false,
       quickCaptureOpen: false,
+      zeitPanelOpen: false,
       activeCustomerTab: 'cockpit',
       tasksTab: 'list',
       dashboardView: 'workspace',
@@ -178,6 +181,9 @@ export const useUiStore = create<UiState>()(
 
       setQuickCaptureOpen: (open) =>
         set({ quickCaptureOpen: open }),
+
+      setZeitPanelOpen: (open) =>
+        set({ zeitPanelOpen: open }),
 
       setActiveCustomerTab: (tab) =>
         set({ activeCustomerTab: mapLegacyCustomerTab(tab) }),

@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { X, Plus, Trash2 } from 'lucide-react'
+import { X, Plus, Trash2, Clock } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useAuftraege } from '@/store/auftraege.store'
 import type { CompanyProfile } from '@/types/company.types'
 import type { InvoiceWithItems, UpsertInvoicePayload } from '@/types/finance.types'
 import {
@@ -63,6 +64,42 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
   const taxMode = getTaxMode(profile)
   const totals  = useMemo(() => calcTotals(items, kleinunternehmer), [items, kleinunternehmer])
   const account = accounts.find(a => a.id === accountId)
+
+  // Offene Zeiteinträge für diesen Kunden
+  const unbilled       = useAuftraege(s => accountId ? s.unbilledForAccount(accountId) : { entries: [], totalMinutes: 0, totalAmount: 0 })
+  const auftraege      = useAuftraege(s => s.auftraege)
+  const markBilled     = useAuftraege(s => s.markBilledForAccount)
+  const [selectedTime, setSelectedTime] = useState<Set<string>>(new Set())
+
+  const toggleTimeEntry = (id: string) =>
+    setSelectedTime(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+
+  const addTimeAsItems = () => {
+    const entries = unbilled.entries.filter(z => selectedTime.has(z.id))
+    const newItems: InvoiceItemDraft[] = entries.map((z, i) => {
+      const auftrag = auftraege.find(a => a.id === z.auftragId)
+      const rate    = z.hourlyRate ?? auftrag?.defaultHourlyRate ?? 0
+      const hours   = Math.round((z.minutes / 60) * 100) / 100
+      const amount  = Math.round(hours * rate * 100) / 100
+      return {
+        title:     auftrag ? `${auftrag.title} — ${hours.toLocaleString('de-DE')} Std` : z.description,
+        quantity:  1,
+        unitPrice: amount,
+        taxRate:   kleinunternehmer ? 0 : 19,
+        total:     kleinunternehmer ? amount : Math.round(amount * 1.19 * 100) / 100,
+        sortOrder: items.length + i,
+        itemDate:  z.date,
+      }
+    })
+    setItems(prev => [...prev, ...newItems])
+    setSelectedTime(new Set())
+  }
+
+  const fmtMin = (m: number) => {
+    const h = Math.floor(m / 60); const min = m % 60
+    if (h === 0) return `${min} Min`; if (min === 0) return `${h} Std`
+    return `${h} Std ${min} Min`
+  }
 
   const addItem = () => setItems(prev => [...prev, defaultItem(kleinunternehmer, prev.length, date)])
   const removeItem = (idx: number) =>
@@ -209,6 +246,75 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
 
           {/* Divider */}
           <div style={{ height: 1, background: '#e4e4e4', margin: '-2px 0' }} />
+
+          {/* Offene Zeiteinträge */}
+          {accountId && unbilled.entries.length > 0 && (
+            <div style={{
+              borderRadius: 10, border: '1px solid oklch(92% 0.2 125 / 0.25)',
+              background: 'oklch(92% 0.2 125 / 0.04)', padding: '12px 14px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Clock size={12} style={{ color: 'var(--accent)' }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    Offene Zeit ({unbilled.entries.length})
+                  </span>
+                </div>
+                {selectedTime.size > 0 && (
+                  <button onClick={addTimeAsItems} style={{
+                    padding: '4px 12px', borderRadius: 99, border: 'none',
+                    background: 'var(--accent)', color: 'var(--accent-ink)',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}>
+                    + Als Positionen hinzufügen ({selectedTime.size})
+                  </button>
+                )}
+              </div>
+              {unbilled.entries.map(z => {
+                const auftrag = auftraege.find(a => a.id === z.auftragId)
+                const rate    = z.hourlyRate ?? auftrag?.defaultHourlyRate ?? 0
+                const hours   = Math.round((z.minutes / 60) * 100) / 100
+                const amount  = Math.round(hours * rate * 100) / 100
+                const checked = selectedTime.has(z.id)
+                return (
+                  <div
+                    key={z.id}
+                    onClick={() => toggleTimeEntry(z.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+                      background: checked ? 'oklch(92% 0.2 125 / 0.1)' : 'transparent',
+                      border: `1px solid ${checked ? 'oklch(92% 0.2 125 / 0.35)' : 'transparent'}`,
+                      transition: 'all 150ms',
+                    }}
+                  >
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                      border: `1.5px solid ${checked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                      background: checked ? 'var(--accent)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {checked && <span style={{ fontSize: 9, color: 'var(--accent-ink)', fontWeight: 900 }}>✓</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>
+                        {auftrag?.title ?? z.description}
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--fg-dim)', marginLeft: 8 }}>
+                        {z.date} · {fmtMin(z.minutes)}
+                      </span>
+                    </div>
+                    {amount > 0 && (
+                      <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--accent)', flexShrink: 0 }}>
+                        {fmt(amount)}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Positionen */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

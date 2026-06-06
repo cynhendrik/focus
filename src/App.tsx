@@ -50,6 +50,7 @@ import { ToastViewport }       from '@/components/ui/Toast'
 import { SplashScreen }        from '@/components/ui/SplashScreen'
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
 import { QuickCaptureModal }   from '@/components/layout/QuickCaptureModal'
+import { ZeitPanel }           from '@/components/layout/ZeitPanel'
 import { OnboardingWizard, hasCompletedOnboarding } from '@/components/onboarding/OnboardingWizard'
 import { seedSampleAiSummaries } from '@/lib/seed-ai-summaries'
 
@@ -274,6 +275,7 @@ export default function App() {
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
       {pickerOpen && <ClientPicker />}
       <QuickCaptureModal />
+      <ZeitPanel />
       <DownloadToast />
       <ToastViewport />
       <GlobalQuickComposer />
