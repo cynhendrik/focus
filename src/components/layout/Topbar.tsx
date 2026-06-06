@@ -1,7 +1,7 @@
 import { useUiStore } from '@/store/ui.store'
 import {
   Sun, Bell, Sunrise, Users, CreditCard, Target,
-  Mail, Calendar, Clock, Settings, Plug, Sparkles, User,
+  Mail, Calendar, Clock, Settings, Plug, Sparkles, User, Timer,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -21,6 +21,7 @@ const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: Luci
 
 export function Topbar() {
   const appView     = useUiStore(s => s.appView)
+  const setAppView  = useUiStore(s => s.setAppView)
   const toggleTheme = useUiStore(s => s.toggleTheme)
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
@@ -47,6 +48,14 @@ export function Topbar() {
 
       {/* Right: controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          className="icon-btn"
+          onClick={() => setAppView('zeitmanagement')}
+          title="Zeitmanagement (Z)"
+          style={{ color: appView === 'zeitmanagement' ? 'var(--accent)' : undefined }}
+        >
+          <Timer size={16} />
+        </button>
         <button className="icon-btn" onClick={toggleTheme} title="Theme wechseln">
           <Sun size={16} />
         </button>
