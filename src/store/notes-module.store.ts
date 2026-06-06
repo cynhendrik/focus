@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { log } from '@/lib/logger'
 import type {
-  NoteEntry, NoteDoc,
+  NoteEntry, NoteDoc, NoteFolder,
   CreateNoteEntryPayload, UpdateNoteEntryPayload,
   CreateNoteDocPayload, UpdateNoteDocPayload,
+  CreateNoteFolderPayload, UpdateNoteFolderPayload,
 } from '@/types/notes-module.types'
 
 // Rust returns tags as a JSON string — parse it to string[]
@@ -17,6 +18,7 @@ function parseEntry(raw: Omit<NoteEntry, 'tags'> & { tags: string }): NoteEntry 
 interface NotesModuleState {
   entries:         NoteEntry[]
   docs:            NoteDoc[]
+  folders:         NoteFolder[]
   loadingEntries:  boolean
   loadingDocs:     boolean
   activeAccountId: string | null
@@ -30,24 +32,29 @@ interface NotesModuleState {
   createDoc:   (payload: CreateNoteDocPayload) => Promise<NoteDoc>
   updateDoc:   (id: string, patch: UpdateNoteDocPayload) => Promise<void>
   deleteDoc:   (id: string) => Promise<void>
+
+  createFolder: (payload: CreateNoteFolderPayload) => Promise<NoteFolder>
+  updateFolder: (id: string, patch: UpdateNoteFolderPayload) => Promise<void>
+  deleteFolder: (id: string) => Promise<void>
 }
 
 export const useNotesModuleStore = create<NotesModuleState>()((set, get) => ({
   entries:         [],
   docs:            [],
+  folders:         [],
   loadingEntries:  false,
   loadingDocs:     false,
   activeAccountId: null,
 
   loadForAccount: async (accountId) => {
-    if (get().activeAccountId === accountId) return
     set({ loadingEntries: true, loadingDocs: true, activeAccountId: accountId })
     try {
-      const [rawEntries, docs] = await Promise.all([
+      const [rawEntries, docs, folders] = await Promise.all([
         invoke<(Omit<NoteEntry, 'tags'> & { tags: string })[]>('get_note_entries', { accountId }),
         invoke<NoteDoc[]>('get_note_docs', { accountId }),
+        invoke<NoteFolder[]>('get_note_folders', { accountId }),
       ])
-      set({ entries: rawEntries.map(parseEntry), docs, loadingEntries: false, loadingDocs: false })
+      set({ entries: rawEntries.map(parseEntry), docs, folders, loadingEntries: false, loadingDocs: false })
     } catch (err) {
       log.error('Failed to load notes for account', { accountId, err })
       set({ loadingEntries: false, loadingDocs: false })
@@ -86,5 +93,24 @@ export const useNotesModuleStore = create<NotesModuleState>()((set, get) => ({
   deleteDoc: async (id) => {
     await invoke<void>('delete_note_doc', { id })
     set(s => ({ docs: s.docs.filter(d => d.id !== id) }))
+  },
+
+  createFolder: async (payload) => {
+    const folder = await invoke<NoteFolder>('create_note_folder', { payload })
+    set(s => ({ folders: [...s.folders, folder].sort((a, b) => a.name.localeCompare(b.name)) }))
+    return folder
+  },
+
+  updateFolder: async (id, patch) => {
+    const updated = await invoke<NoteFolder>('update_note_folder', { id, payload: patch })
+    set(s => ({ folders: s.folders.map(f => f.id === id ? updated : f) }))
+  },
+
+  deleteFolder: async (id) => {
+    await invoke<void>('delete_note_folder', { id })
+    set(s => ({
+      folders: s.folders.filter(f => f.id !== id),
+      entries: s.entries.map(e => e.folderId === id ? { ...e, folderId: null } : e),
+    }))
   },
 }))

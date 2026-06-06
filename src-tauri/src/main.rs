@@ -269,6 +269,10 @@ fn main() {
             commands::notes::create_note_doc,
             commands::notes::update_note_doc,
             commands::notes::delete_note_doc,
+            commands::notes::get_note_folders,
+            commands::notes::create_note_folder,
+            commands::notes::update_note_folder,
+            commands::notes::delete_note_folder,
         ])
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");

@@ -1,7 +1,18 @@
+export interface NoteFolder {
+  id:          string
+  workspaceId: string
+  accountId:   string
+  name:        string
+  createdBy:   string
+  createdAt:   string
+  updatedAt:   string
+}
+
 export interface NoteEntry {
   id:          string
   workspaceId: string
   accountId:   string
+  folderId:    string | null
   title:       string | null
   content:     string
   tags:        string[]   // parsed from JSON string returned by Rust
@@ -26,6 +37,7 @@ export interface NoteDoc {
 export interface CreateNoteEntryPayload {
   workspaceId: string
   accountId:   string
+  folderId?:   string | null
   title?:      string
   content?:    string
   tags?:       string   // JSON string e.g. '["Follow-up"]'
@@ -33,10 +45,22 @@ export interface CreateNoteEntryPayload {
 }
 
 export interface UpdateNoteEntryPayload {
+  folderId?:  string | null | undefined  // undefined = don't change, null = remove
   title?:     string | null
   content?:   string
   tags?:      string   // JSON string
   updatedBy?: string
+}
+
+export interface CreateNoteFolderPayload {
+  workspaceId: string
+  accountId:   string
+  name:        string
+  createdBy:   string
+}
+
+export interface UpdateNoteFolderPayload {
+  name: string
 }
 
 export interface CreateNoteDocPayload {

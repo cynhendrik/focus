@@ -37,12 +37,19 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
     return () => window.removeEventListener('keydown', handler, true)
   }, [onCancel])
 
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const content    = editor?.getHTML() ?? ''
+  const hasContent = content.replace(/<[^>]*>/g, '').trim().length > 0
+
   const handleSave = async () => {
-    const content = editor?.getHTML() ?? ''
-    if (!content || editor?.isEmpty) return
+    if (!hasContent) return
     setSaving(true)
+    setSaveError(null)
     try {
       await onSave(title.trim() || null, content)
+    } catch (err) {
+      setSaveError(String(err))
     } finally {
       setSaving(false)
     }
@@ -105,6 +112,15 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
         <EditorContent editor={editor} />
       </div>
 
+      {saveError && (
+        <div style={{
+          marginTop: 8, padding: '7px 10px', borderRadius: 7,
+          background: 'oklch(72% 0.18 25 / 0.12)', color: 'var(--danger)',
+          fontSize: 11, border: '1px solid oklch(72% 0.18 25 / 0.3)',
+        }}>
+          Fehler: {saveError}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
         <button
           onClick={onCancel}
@@ -117,13 +133,13 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
         >Abbrechen</button>
         <button
           onClick={handleSave}
-          disabled={saving || !editor || editor.isEmpty}
+          disabled={saving || !hasContent}
           style={{
             padding: '5px 14px', borderRadius: 8, border: 'none',
-            background: saving || !editor || editor.isEmpty ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
-            color: saving || !editor || editor.isEmpty ? 'var(--fg-dim)' : 'var(--accent-ink)',
+            background: saving || !hasContent ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
+            color: saving || !hasContent ? 'var(--fg-dim)' : 'var(--accent-ink)',
             fontSize: 11, fontWeight: 700,
-            cursor: saving || !editor || editor.isEmpty ? 'not-allowed' : 'pointer',
+            cursor: saving || !hasContent ? 'not-allowed' : 'pointer',
             fontFamily: 'inherit',
           }}
         >{saving ? 'Speichern…' : 'Speichern'}</button>

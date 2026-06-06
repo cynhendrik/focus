@@ -4,13 +4,15 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Trash2 } from 'lucide-react'
-import type { NoteEntry } from '@/types/notes-module.types'
+import { Trash2, FolderInput } from 'lucide-react'
+import type { NoteEntry, NoteFolder } from '@/types/notes-module.types'
 
 interface Props {
-  entry:    NoteEntry
-  onUpdate: (patch: { title?: string | null; content?: string; tags?: string }) => void
-  onDelete: () => void
+  entry:          NoteEntry
+  folders:        NoteFolder[]
+  onUpdate:       (patch: { title?: string | null; content?: string; tags?: string }) => void
+  onDelete:       () => void
+  onMoveToFolder: (folderId: string | null) => void
 }
 
 function fmtTime(iso: string): string {
@@ -27,10 +29,11 @@ function stripHtml(html: string): string {
 
 const AVAILABLE_TAGS = ['Follow-up', 'Erstgespräch', 'Recherche', 'Angebot', 'Wichtig']
 
-export function NoteCard({ entry, onUpdate, onDelete }: Props) {
-  const [expanded, setExpanded]   = useState(false)
-  const [title, setTitle]         = useState(entry.title ?? '')
-  const [showTags, setShowTags]   = useState(false)
+export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }: Props) {
+  const [expanded,    setExpanded]    = useState(false)
+  const [title,       setTitle]       = useState(entry.title ?? '')
+  const [showTags,    setShowTags]    = useState(false)
+  const [showFolders, setShowFolders] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
@@ -118,7 +121,45 @@ export function NoteCard({ entry, onUpdate, onDelete }: Props) {
         </div>
 
         {expanded && (
-          <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', gap: 4, position: 'relative' }} onClick={e => e.stopPropagation()}>
+            {folders.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowFolders(s => !s)}
+                  title="In Mappe verschieben"
+                  style={{
+                    width: 26, height: 26, borderRadius: 6, border: 'none',
+                    background: showFolders ? 'rgba(181,240,35,0.1)' : 'transparent',
+                    color: showFolders ? 'var(--accent)' : 'var(--fg-dim)',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                ><FolderInput size={13} /></button>
+                {showFolders && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: 4, minWidth: 160,
+                    boxShadow: 'var(--shadow-2)', zIndex: 50,
+                    display: 'flex', flexDirection: 'column', gap: 2,
+                  }}>
+                    <FolderDropItem
+                      label="Kein Ordner"
+                      active={entry.folderId === null}
+                      onClick={() => { onMoveToFolder(null); setShowFolders(false) }}
+                    />
+                    {folders.map(f => (
+                      <FolderDropItem
+                        key={f.id}
+                        label={f.name}
+                        active={entry.folderId === f.id}
+                        onClick={() => { onMoveToFolder(f.id); setShowFolders(false) }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={() => setShowTags(s => !s)}
               title="Tags"
@@ -217,5 +258,26 @@ export function NoteCard({ entry, onUpdate, onDelete }: Props) {
         </div>
       )}
     </div>
+  )
+}
+
+function FolderDropItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '6px 10px', borderRadius: 7, width: '100%', textAlign: 'left',
+        background: active ? 'var(--accent-soft)' : hover ? 'var(--surface-2)' : 'none',
+        border: 'none', cursor: 'pointer',
+        fontSize: 12.5, color: active ? 'var(--accent)' : 'var(--fg-2)',
+        fontFamily: 'inherit', transition: 'background 80ms',
+      }}
+    >
+      {label}
+    </button>
   )
 }

@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 21;
+const CURRENT_VERSION: u32 = 22;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -648,6 +648,27 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 CREATE INDEX IF NOT EXISTS idx_note_docs_account
                     ON note_docs(account_id, created_at DESC);
             "#)?;
+            Ok(())
+        }
+        22 => {
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS note_folders (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    account_id   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                    name         TEXT NOT NULL,
+                    created_by   TEXT NOT NULL,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_note_folders_account
+                    ON note_folders(account_id, name ASC);
+            "#)?;
+            if !column_exists(conn, "note_entries", "folder_id") {
+                conn.execute_batch(
+                    "ALTER TABLE note_entries ADD COLUMN folder_id TEXT REFERENCES note_folders(id) ON DELETE SET NULL;"
+                )?;
+            }
             Ok(())
         }
         _ => Ok(()),

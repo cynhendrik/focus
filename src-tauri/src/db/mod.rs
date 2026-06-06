@@ -21,3 +21,4 @@ pub mod follow_up_queue;
 pub mod campaign;
 pub mod note_entry;
 pub mod note_doc;
+pub mod note_folder;

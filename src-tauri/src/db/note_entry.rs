@@ -8,6 +8,7 @@ pub struct NoteEntry {
     pub id:           String,
     pub workspace_id: String,
     pub account_id:   String,
+    pub folder_id:    Option<String>,
     pub title:        Option<String>,
     pub content:      String,
     pub tags:         String,  // JSON array string
@@ -22,6 +23,7 @@ pub struct NoteEntry {
 pub struct CreateNoteEntryPayload {
     pub workspace_id: String,
     pub account_id:   String,
+    pub folder_id:    Option<String>,
     pub title:        Option<String>,
     pub content:      Option<String>,
     pub tags:         Option<String>,
@@ -31,6 +33,7 @@ pub struct CreateNoteEntryPayload {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateNoteEntryPayload {
+    pub folder_id:  Option<Option<String>>,
     pub title:      Option<String>,
     pub content:    Option<String>,
     pub tags:       Option<String>,
@@ -42,18 +45,19 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<NoteEntry> {
         id:           r.get(0)?,
         workspace_id: r.get(1)?,
         account_id:   r.get(2)?,
-        title:        r.get(3)?,
-        content:      r.get::<_, Option<String>>(4)?.unwrap_or_default(),
-        tags:         r.get::<_, Option<String>>(5)?.unwrap_or_else(|| "[]".into()),
-        created_by:   r.get(6)?,
-        updated_by:   r.get(7)?,
-        created_at:   r.get(8)?,
-        updated_at:   r.get(9)?,
+        folder_id:    r.get(3)?,
+        title:        r.get(4)?,
+        content:      r.get::<_, Option<String>>(5)?.unwrap_or_default(),
+        tags:         r.get::<_, Option<String>>(6)?.unwrap_or_else(|| "[]".into()),
+        created_by:   r.get(7)?,
+        updated_by:   r.get(8)?,
+        created_at:   r.get(9)?,
+        updated_at:   r.get(10)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, workspace_id, account_id, title, content, tags,
+    "id, workspace_id, account_id, folder_id, title, content, tags,
      created_by, updated_by, created_at, updated_at";
 
 pub fn insert(conn: &Connection, payload: CreateNoteEntryPayload) -> Result<NoteEntry, AppError> {
@@ -61,12 +65,13 @@ pub fn insert(conn: &Connection, payload: CreateNoteEntryPayload) -> Result<Note
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO note_entries
-         (id, workspace_id, account_id, title, content, tags, created_by, pending_sync, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,1,?8,?8)",
+         (id, workspace_id, account_id, folder_id, title, content, tags, created_by, pending_sync, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?9)",
         rusqlite::params![
             id,
             payload.workspace_id,
             payload.account_id,
+            payload.folder_id,
             payload.title,
             payload.content.unwrap_or_default(),
             payload.tags.unwrap_or_else(|| "[]".into()),
@@ -84,14 +89,17 @@ pub fn update(conn: &Connection, id: &str, payload: UpdateNoteEntryPayload) -> R
     let now = chrono::Utc::now().to_rfc3339();
     let n = conn.execute(
         "UPDATE note_entries SET
-           title      = COALESCE(?1, title),
-           content    = COALESCE(?2, content),
-           tags       = COALESCE(?3, tags),
-           updated_by = ?4,
+           folder_id  = CASE WHEN ?1 IS NOT NULL THEN ?2 ELSE folder_id END,
+           title      = COALESCE(?3, title),
+           content    = COALESCE(?4, content),
+           tags       = COALESCE(?5, tags),
+           updated_by = ?6,
            pending_sync = 1,
-           updated_at = ?5
-         WHERE id = ?6",
+           updated_at = ?7
+         WHERE id = ?8",
         rusqlite::params![
+            payload.folder_id.is_some(),
+            payload.folder_id.unwrap_or(None),
             payload.title, payload.content, payload.tags,
             payload.updated_by, now, id,
         ],
