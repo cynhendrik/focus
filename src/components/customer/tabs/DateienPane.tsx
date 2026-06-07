@@ -229,24 +229,22 @@ function FolderShape({
 
       {/* Body */}
       <div style={{
-        borderRadius: '0 10px 10px 10px',
+        borderRadius: '0 8px 8px 8px',
         background: creating ? 'var(--accent-soft)' : bodyBg,
         border: `1px solid ${borderColor}`,
-        height: 96,
-        padding: '14px 16px',
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        height: 64,
         transition: 'background 120ms, border-color 120ms',
-        boxShadow: hov ? '0 6px 24px oklch(0% 0 0 / 0.18)' : 'none',
+        boxShadow: hov ? '0 6px 20px oklch(0% 0 0 / 0.16)' : 'none',
         position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: creating ? 'flex-start' : 'center',
+        padding: creating ? '0 12px' : 0,
       }}>
-        {/* Subtle inner highlight at top */}
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-          background: 'oklch(100% 0 0 / 0.06)',
-          pointerEvents: 'none',
+          background: 'oklch(100% 0 0 / 0.06)', pointerEvents: 'none',
         }} />
 
-        {creating ? (
+        {creating && (
           <input
             ref={inputRef}
             value={inputValue}
@@ -255,30 +253,10 @@ function FolderShape({
             onBlur={onInputBlur}
             style={{
               background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
-              color: 'var(--fg)', fontFamily: 'inherit', width: '100%',
-              borderBottom: '1px solid var(--accent)', paddingBottom: 2,
+              fontSize: 12, fontWeight: 600, color: 'var(--fg)',
+              fontFamily: 'inherit', width: '100%',
             }}
           />
-        ) : (
-          <>
-            {meta && (
-              <div style={{
-                fontSize: 10.5, fontFamily: 'var(--font-mono)',
-                color: 'var(--fg-dim)', letterSpacing: '0.04em',
-                marginBottom: 4,
-              }}>
-                {meta}
-              </div>
-            )}
-            <div style={{
-              fontSize: 13, fontWeight: 600, color: 'var(--fg)',
-              letterSpacing: '-0.01em',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {name}
-            </div>
-          </>
         )}
       </div>
     </div>
@@ -294,7 +272,6 @@ function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   const [hov, setHov] = useState(false)
-  const meta = subfolderCount > 0 ? `${subfolderCount} Unterordner` : 'Leer'
 
   return (
     <div
@@ -308,7 +285,19 @@ function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
         transition: 'transform 160ms cubic-bezier(.2,.7,.1,1)',
       }}
     >
-      <FolderShape name={folder.name} meta={meta} hov={hov} />
+      <FolderShape hov={hov} />
+      <div style={{ marginTop: 7, padding: '0 2px' }}>
+        <div style={{
+          fontSize: 12.5, fontWeight: 600, color: 'var(--fg)',
+          letterSpacing: '-0.01em',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {folder.name}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>
+          {subfolderCount > 0 ? `${subfolderCount} Unterordner` : 'Leer'}
+        </div>
+      </div>
     </div>
   )
 }
