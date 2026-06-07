@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { useCompanyStore } from '@/store/company.store'
+import { useUiStore } from '@/store/ui.store'
 import type { CompanyProfile } from '@/types/company.types'
 
 function CopyField({ label, value }: { label: string; value: string }) {
@@ -64,6 +65,8 @@ export function WorkspaceSettings({ workspaceId }: Props) {
   const profile     = useCompanyStore(s => s.profile)
   const load        = useCompanyStore(s => s.load)
   const saveProfile = useCompanyStore(s => s.saveProfile)
+  const theme       = useUiStore(s => s.theme)
+  const toggleTheme = useUiStore(s => s.toggleTheme)
   const [form, setForm] = useState<CompanyProfile>(profile)
   const [saved, setSaved] = useState(false)
 
@@ -256,6 +259,37 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* Erscheinungsbild */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Erscheinungsbild</div>
+        </div>
+        <div
+          onClick={toggleTheme}
+          style={{
+            padding: '14px 20px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', cursor: 'pointer',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--fg)' }}>
+            {theme === 'dark' ? 'Dunkles Theme' : 'Helles Theme'}
+          </div>
+          <div style={{
+            width: 36, height: 20, borderRadius: 10,
+            background: theme === 'dark' ? 'var(--accent)' : 'var(--surface-3)',
+            position: 'relative', transition: 'background 180ms',
+          }}>
+            <div style={{
+              position: 'absolute', top: 2,
+              left: theme === 'dark' ? 18 : 2,
+              width: 16, height: 16, borderRadius: '50%',
+              background: theme === 'dark' ? 'var(--accent-ink)' : 'var(--fg-dim)',
+              transition: 'left 180ms',
+            }} />
+          </div>
         </div>
       </div>
 

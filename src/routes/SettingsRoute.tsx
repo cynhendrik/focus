@@ -2,8 +2,6 @@ import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar'
 import { WorkspaceSettings } from '@/components/settings/WorkspaceSettings'
-import { ProfilSettings } from '@/components/settings/ProfilSettings'
-import { AussehensSettings } from '@/components/settings/AussehensSettings'
 import { IntegrationenSettings } from '@/components/settings/IntegrationenSettings'
 import { DeveloperSettings } from '@/components/settings/DeveloperSettings'
 import { GefahrenzoneSettings } from '@/components/settings/GefahrenzoneSettings'
@@ -18,12 +16,11 @@ export function SettingsRoute() {
 
   function renderPanel() {
     switch (settingsTab) {
-      case 'workspace':    return <WorkspaceSettings workspaceId={workspaceId} />
-      case 'profil':       return <ProfilSettings />
-      case 'aussehen':        return <AussehensSettings />
-      case 'integrationen':   return <IntegrationenSettings />
-      case 'developer':       return showDeveloper ? <DeveloperSettings workspaceId={workspaceId} /> : <WorkspaceSettings workspaceId={workspaceId} />
-      case 'gefahrenzone':    return <GefahrenzoneSettings workspaceId={workspaceId} />
+      case 'workspace':     return <WorkspaceSettings workspaceId={workspaceId} />
+      case 'integrationen': return <IntegrationenSettings />
+      case 'developer':     return showDeveloper ? <DeveloperSettings workspaceId={workspaceId} /> : <WorkspaceSettings workspaceId={workspaceId} />
+      case 'gefahrenzone':  return <GefahrenzoneSettings workspaceId={workspaceId} />
+      default:              return <WorkspaceSettings workspaceId={workspaceId} />
     }
   }
 
