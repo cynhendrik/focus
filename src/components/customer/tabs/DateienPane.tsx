@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import {
   Folder, FolderOpen, File, FileText, Image, Film, Archive,
   Upload, FolderPlus, Trash2, ChevronRight, ChevronDown, Search, Plus, X,
+  FolderInput, Download, type LucideIcon,
 } from 'lucide-react'
 import { useFilesStore } from '@/store/files.store'
 import type { Folder as FolderType, FileEntry } from '@/types/file.types'
@@ -35,6 +36,87 @@ function relDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: '2-digit' })
 }
 
+
+// ── ContextMenu ───────────────────────────────────────────────────────────────
+
+interface ContextMenuItem {
+  icon:    LucideIcon
+  label:   string
+  danger?: boolean
+  onClick: () => void
+}
+
+interface ContextMenuState {
+  x:     number
+  y:     number
+  items: ContextMenuItem[]
+}
+
+function ContextMenu({ menu, onClose }: { menu: ContextMenuState; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose()
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown',   onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown',   onKey)
+    }
+  }, [onClose])
+
+  // Prevent menu from going off-screen
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top:  menu.y,
+    left: menu.x,
+    zIndex: 1000,
+  }
+
+  return (
+    <div ref={ref} style={style}>
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        padding: 4,
+        minWidth: 180,
+        boxShadow: 'var(--shadow-2)',
+        display: 'flex', flexDirection: 'column', gap: 1,
+      }}>
+        {menu.items.map((item, i) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={i}
+              onClick={() => { item.onClick(); onClose() }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '7px 10px', borderRadius: 7, border: 'none',
+                background: 'transparent', cursor: 'pointer', width: '100%',
+                fontSize: 13, color: item.danger ? 'var(--danger)' : 'var(--fg-2)',
+                textAlign: 'left', fontFamily: 'inherit',
+                transition: 'background 80ms',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = item.danger
+                  ? 'oklch(72% 0.18 25 / 0.1)'
+                  : 'var(--surface-2)'
+              }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+            >
+              <Icon size={14} style={{ opacity: item.danger ? 1 : 0.75 }} />
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 // ── SidebarNode ───────────────────────────────────────────────────────────────
 
@@ -112,11 +194,11 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
 
 // ── FolderCard ────────────────────────────────────────────────────────────────
 
-function FolderCard({ folder, subfolderCount, onOpen, onDelete }: {
+function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
   folder: FolderType
   subfolderCount: number
   onOpen: () => void
-  onDelete: () => void
+  onContextMenu: (e: React.MouseEvent) => void
 }) {
   const [hov, setHov] = useState(false)
 
@@ -125,46 +207,27 @@ function FolderCard({ folder, subfolderCount, onOpen, onDelete }: {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onClick={onOpen}
+      onContextMenu={e => { e.preventDefault(); onContextMenu(e) }}
       style={{
-        position: 'relative', cursor: 'pointer',
+        cursor: 'pointer',
         borderRadius: 12,
         background: hov ? 'var(--surface-2)' : 'var(--surface)',
-        border: '1px solid var(--border)',
+        border: `1px solid ${hov ? 'var(--border-strong)' : 'var(--border)'}`,
         transition: 'background 120ms, border-color 120ms, transform 120ms',
-        transform: hov ? 'translateY(-1px)' : 'none',
-        padding: '16px 14px 12px',
-        display: 'flex', flexDirection: 'column', gap: 10,
+        transform: hov ? 'translateY(-2px)' : 'none',
+        padding: '16px 14px 14px',
+        display: 'flex', flexDirection: 'column', gap: 12,
         userSelect: 'none',
       }}
     >
-      {/* Icon row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'var(--accent-soft)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Folder size={18} style={{ color: 'var(--accent-text)' }} />
-        </div>
-
-        {/* Delete — always visible, not hover-gated */}
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          title="Ordner löschen"
-          style={{
-            width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
-            background: hov ? 'oklch(72% 0.18 25 / 0.12)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: hov ? 'var(--danger)' : 'var(--fg-dim)',
-            opacity: hov ? 1 : 0.35,
-            transition: 'background 120ms, color 120ms, opacity 120ms',
-          }}
-        >
-          <Trash2 size={12} />
-        </button>
+      <div style={{
+        width: 40, height: 40, borderRadius: 11,
+        background: 'var(--accent-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Folder size={20} style={{ color: 'var(--accent-text)' }} />
       </div>
 
-      {/* Name + count */}
       <div>
         <div style={{
           fontSize: 13, fontWeight: 600, color: 'var(--fg)',
@@ -173,11 +236,9 @@ function FolderCard({ folder, subfolderCount, onOpen, onDelete }: {
         }}>
           {folder.name}
         </div>
-        {subfolderCount > 0 && (
-          <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>
-            {subfolderCount} Unterordner
-          </div>
-        )}
+        <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>
+          {subfolderCount > 0 ? `${subfolderCount} Unterordner` : 'Leer'}
+        </div>
       </div>
     </div>
   )
@@ -237,19 +298,25 @@ function NewFolderCard({ onSubmit, onCancel }: {
 
 // ── FileRow ───────────────────────────────────────────────────────────────────
 
-function FileRow({ file, onDelete }: { file: FileEntry; onDelete: () => void }) {
+function FileRow({ file, onDelete, onContextMenu }: {
+  file: FileEntry
+  onDelete: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+}) {
   const [hov, setHov] = useState(false)
 
   return (
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onContextMenu={e => { e.preventDefault(); onContextMenu(e) }}
       style={{
-        display: 'grid', gridTemplateColumns: '1fr 120px 72px 32px',
+        display: 'grid', gridTemplateColumns: '1fr 120px 72px',
         alignItems: 'center', gap: 8,
         padding: '8px 12px', borderRadius: 9,
         background: hov ? 'var(--surface-2)' : 'transparent',
         transition: 'background 80ms',
+        cursor: 'default',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
@@ -264,21 +331,6 @@ function FileRow({ file, onDelete }: { file: FileEntry; onDelete: () => void }) 
       <span style={{ fontSize: 12, color: 'var(--fg-dim)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
         {fmt(file.size)}
       </span>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        {hov && (
-          <button
-            onClick={onDelete}
-            style={{
-              width: 24, height: 24, borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: 'oklch(72% 0.18 25 / 0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--danger)',
-            }}
-          >
-            <Trash2 size={11} />
-          </button>
-        )}
-      </div>
     </div>
   )
 }
@@ -337,10 +389,30 @@ export function DateienPane({ customerId }: Props) {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [sidebarTab, setSidebarTab] = useState<'ordner' | 'tags'>('ordner')
-  const [search,     setSearch]     = useState('')
-  const [creating,   setCreating]   = useState(false)  // shows NewFolderCard in grid
-  const [delTarget,  setDelTarget]  = useState<FolderType | null>(null)
+  const [sidebarTab,  setSidebarTab]  = useState<'ordner' | 'tags'>('ordner')
+  const [search,      setSearch]      = useState('')
+  const [creating,    setCreating]    = useState(false)
+  const [delTarget,   setDelTarget]   = useState<FolderType | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
+  const openFolderMenu = useCallback((e: React.MouseEvent, folder: FolderType) => {
+    setContextMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { icon: FolderInput, label: 'Öffnen',  onClick: () => navigate(folder.id) },
+        { icon: Trash2,      label: 'Löschen', danger: true, onClick: () => setDelTarget(folder) },
+      ],
+    })
+  }, [])
+
+  const openFileMenu = useCallback((e: React.MouseEvent, file: FileEntry) => {
+    setContextMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { icon: Trash2, label: 'Löschen', danger: true, onClick: () => removeFile(file.id) },
+      ],
+    })
+  }, [removeFile])
 
   // ── navigation ─────────────────────────────────────────────────────────────
   const navigate = async (id: string | null) => {
@@ -549,7 +621,7 @@ export function DateienPane({ customerId }: Props) {
                     folder={f}
                     subfolderCount={folders.filter(c => c.parentId === f.id).length}
                     onOpen={() => navigate(f.id)}
-                    onDelete={() => setDelTarget(f)}
+                    onContextMenu={e => openFolderMenu(e, f)}
                   />
                 ))}
                 {/* Inline new folder card */}
@@ -579,7 +651,14 @@ export function DateienPane({ customerId }: Props) {
               {isLoading ? (
                 <div style={{ fontSize: 13, color: 'var(--fg-muted)', padding: '14px 12px' }}>Lädt…</div>
               ) : (
-                files.map(f => <FileRow key={f.id} file={f} onDelete={() => removeFile(f.id)} />)
+                files.map(f => (
+                  <FileRow
+                    key={f.id}
+                    file={f}
+                    onDelete={() => removeFile(f.id)}
+                    onContextMenu={e => openFileMenu(e, f)}
+                  />
+                ))
               )}
             </div>
           )}
@@ -607,7 +686,10 @@ export function DateienPane({ customerId }: Props) {
         </div>
       </div>
 
-      {/* Delete confirm */}
+      {contextMenu && (
+        <ContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
+      )}
+
       {delTarget && (
         <ConfirmModal name={delTarget.name} onConfirm={confirmDelete} onCancel={() => setDelTarget(null)} />
       )}
