@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -11,14 +11,19 @@ interface Props {
 }
 
 export function NewNoteForm({ onSave, onCancel }: Props) {
-  const [title,     setTitle]     = useState('')
-  const [saving,    setSaving]    = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [title,  setTitle]  = useState('')
+  const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
+
+  const titleRef   = useRef(title)
+  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedRef   = useRef(false)
+
+  useEffect(() => { titleRef.current = title }, [title])
 
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: 'Was wurde besprochen? Was ist wichtig?…' }),
+      Placeholder.configure({ placeholder: 'Notiz tippen — wird automatisch gespeichert…' }),
       TaskList,
       TaskItem.configure({ nested: true }),
     ],
@@ -28,6 +33,26 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
       },
     },
     autofocus: true,
+    onUpdate({ editor }) {
+      if (savedRef.current) return
+      const content = editor.getHTML()
+      const hasContent = content.replace(/<[^>]*>/g, '').trim().length > 0
+      if (!hasContent) return
+
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(async () => {
+        if (savedRef.current) return
+        savedRef.current = true
+        setStatus('saving')
+        try {
+          await onSave(titleRef.current.trim() || null, editor.getHTML())
+          // onSave calls setShowForm(false) in parent — form closes
+        } catch {
+          savedRef.current = false
+          setStatus('error')
+        }
+      }, 900)
+    },
   })
 
   useEffect(() => {
@@ -35,24 +60,11 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
       if (e.key === 'Escape') { e.stopPropagation(); onCancel() }
     }
     window.addEventListener('keydown', handler, true)
-    return () => window.removeEventListener('keydown', handler, true)
-  }, [onCancel])
-
-  const content    = editor?.getHTML() ?? ''
-  const hasContent = content.replace(/<[^>]*>/g, '').trim().length > 0
-
-  const handleSave = async () => {
-    if (!hasContent) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await onSave(title.trim() || null, content)
-    } catch (err) {
-      setSaveError(String(err))
-    } finally {
-      setSaving(false)
+    return () => {
+      window.removeEventListener('keydown', handler, true)
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }
+  }, [onCancel])
 
   return (
     <div style={{
@@ -93,36 +105,19 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
 
       <div style={{
         background: 'var(--bg)', border: '1px solid var(--border)',
-        borderRadius: 8, padding: '8px 10px', marginBottom: 10,
+        borderRadius: 8, padding: '8px 10px',
       }}>
         <EditorContent editor={editor} />
       </div>
 
-      {saveError && (
-        <div style={{
-          marginBottom: 8, padding: '6px 10px', borderRadius: 7,
-          background: 'oklch(72% 0.18 25 / 0.12)', color: 'var(--danger)',
-          fontSize: 11, border: '1px solid oklch(72% 0.18 25 / 0.3)',
-        }}>
-          {saveError}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button onClick={onCancel} className="btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+        <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+          {status === 'saving' && 'Speichert…'}
+          {status === 'error'  && <span style={{ color: 'var(--danger)' }}>Fehler beim Speichern</span>}
+          {status === 'idle'   && 'Wird automatisch gespeichert'}
+        </span>
+        <button onClick={onCancel} className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }}>
           Abbrechen
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving || !hasContent}
-          className={saving || !hasContent ? undefined : 'btn-primary'}
-          style={saving || !hasContent ? {
-            padding: '6px 14px', borderRadius: 99, border: 'none',
-            background: 'var(--surface-2)', color: 'var(--fg-dim)',
-            fontSize: 12, fontWeight: 600, cursor: 'not-allowed', fontFamily: 'inherit',
-          } : { fontSize: 12, padding: '6px 14px' }}
-        >
-          {saving ? 'Speichern…' : 'Speichern'}
         </button>
       </div>
     </div>
