@@ -430,10 +430,13 @@ pub async fn move_email(
         .collect::<Vec<_>>()
         .await;
 
+    // NOTE: expunge() removes ALL \Deleted messages in the mailbox.
+    // TODO: Use uid_expunge(&uid_set) (RFC 4315/UIDPLUS) when server supports it
+    // to avoid accidentally expunging other clients' \Deleted messages.
     session
         .expunge()
         .await
-        .map_err(|e| format!("EXPUNGE fehlgeschlagen: {}", e))?
+        .map_err(|e| format!("EXPUNGE fehlgeschlagen (E-Mail ggf. doppelt vorhanden — bitte neu synchronisieren): {}", e))?
         .collect::<Vec<_>>()
         .await;
 
