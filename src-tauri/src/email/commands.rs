@@ -237,6 +237,95 @@ pub async fn email_list_folders(
     db::get_folders(&conn, &account_id).map_err(|e| e.to_string())
 }
 
+// ── Folder management ─────────────────────────────────────────────────────────
+
+const SYSTEM_PATH_SEGMENTS: &[&str] = &[
+    "inbox", "sent", "sent messages", "drafts", "draft",
+    "trash", "deleted messages", "deleted", "spam", "junk",
+    "junk e-mail", "archive", "archiv",
+];
+
+const SYSTEM_FLAGS: &[&str] = &[
+    "\\Sent", "\\Drafts", "\\Trash", "\\Junk", "\\All", "\\Archive",
+];
+
+#[tauri::command]
+pub async fn email_create_folder(
+    account_id: String,
+    folder_path: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<(), String> {
+    let (email, imap_host, imap_port) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let account = db::get_account(&conn, &account_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Konto nicht gefunden".to_string())?;
+        (account.email, account.imap_host, account.imap_port)
+    };
+    let password = keychain::get(&email)?;
+    crate::email::folders::create_imap_folder(&email, &password, &imap_host, imap_port, &folder_path).await
+}
+
+#[tauri::command]
+pub async fn email_delete_folder(
+    account_id: String,
+    folder_path: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<(), String> {
+    // Systemordner schützen
+    let path_lc = folder_path.to_lowercase();
+    let last_seg = path_lc.split('.').last().unwrap_or(&path_lc);
+    if path_lc == "inbox" || SYSTEM_PATH_SEGMENTS.contains(&last_seg) {
+        return Err("Systemordner können nicht gelöscht werden.".to_string());
+    }
+
+    let (email, imap_host, imap_port) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        // Flags aus DB-Cache prüfen
+        let flags = db::get_folder_flags(&conn, &account_id, &folder_path)
+            .map_err(|e| e.to_string())?;
+        let flags_lc: Vec<String> = flags.iter().map(|f| f.to_lowercase()).collect();
+        if SYSTEM_FLAGS.iter().any(|sf| flags_lc.iter().any(|f| f == &sf.to_lowercase())) {
+            return Err("Systemordner können nicht gelöscht werden.".to_string());
+        }
+        let account = db::get_account(&conn, &account_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Konto nicht gefunden".to_string())?;
+        (account.email, account.imap_host, account.imap_port)
+    };
+    let password = keychain::get(&email)?;
+    crate::email::folders::delete_imap_folder(&email, &password, &imap_host, imap_port, &folder_path).await?;
+    // Cache bereinigen
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::delete_folder(&conn, &account_id, &folder_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn email_move_to_folder(
+    account_id: String,
+    email_id: String,
+    target_folder: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<(), String> {
+    let (uid, source_folder, email_addr, imap_host, imap_port) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let (uid, folder, _acc_id) = db::get_email_uid_and_folder(&conn, &email_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "E-Mail nicht gefunden".to_string())?;
+        let account = db::get_account(&conn, &account_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Konto nicht gefunden".to_string())?;
+        (uid, folder, account.email, account.imap_host, account.imap_port)
+    };
+    let password = keychain::get(&email_addr)?;
+    crate::email::imap::move_email(
+        &email_addr, &password, &imap_host, imap_port,
+        uid, &source_folder, &target_folder,
+    ).await?;
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::update_email_folder(&conn, &email_id, &target_folder).map_err(|e| e.to_string())
+}
+
 // ── Email CRUD ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -260,6 +349,44 @@ pub fn email_get_body(
 ) -> Result<Option<EmailBody>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     db::get_email_body(&conn, &email_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn email_fetch_body_imap(
+    email_id: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<EmailBody, String> {
+    // 1. Look up uid, folder, account_id
+    let (uid, folder, account_id) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        db::get_email_uid_and_folder(&conn, &email_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "E-Mail nicht gefunden".to_string())?
+    };
+
+    // 2. Load account credentials
+    let (imap_email, password, imap_host, imap_port) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let acc = db::get_account(&conn, &account_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Konto nicht gefunden".to_string())?;
+        let pw = crate::email::keychain::get(&acc.email).map_err(|e| e)?;
+        (acc.email, pw, acc.imap_host, acc.imap_port)
+    };
+
+    // 3. Fetch from IMAP
+    let (body_text, body_html) = crate::email::imap::fetch_single_body(
+        &imap_email, &password, &imap_host, imap_port, &folder, uid,
+    ).await?;
+
+    // 4. Update DB
+    {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        db::update_email_body(&conn, &email_id, &body_text, &body_html)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(EmailBody { id: email_id, body_text, body_html })
 }
 
 #[tauri::command]
