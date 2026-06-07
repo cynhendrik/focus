@@ -1,6 +1,7 @@
+// src/components/corra/CorraChatPanel.tsx
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Loader, Sparkles, X } from 'lucide-react'
+import { AnimatePresence } from 'framer-motion'
+import { RotateCcw } from 'lucide-react'
 import { CorraMessage } from './CorraMessage'
 import type { CorraMessage as CorraMessageType, CorraActionItem } from '@/lib/ai/corra-intelligence'
 
@@ -13,9 +14,9 @@ interface Props {
 }
 
 export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }: Props) {
-  const [input, setInput] = useState('')
-  const [expanded, setExpanded] = useState(true)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [input, setInput]   = useState('')
+  const bottomRef           = useRef<HTMLDivElement>(null)
+  const textareaRef         = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -25,118 +26,178 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
     const text = input.trim()
     if (!text || loading) return
     setInput('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+    }
     onSend(text)
   }
 
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') { e.preventDefault(); handleSend() }
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  const openCount = messages.filter(
+    m => m.role === 'assistant' && m.actions && m.actions.length > 0
+  ).reduce((s, m) => s + (m.actions?.length ?? 0), 0)
+
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 40, y: 20 }}
-      animate={{ opacity: 1, x: 0, y: 0 }}
-      exit={{ opacity: 0, x: 40, y: 20 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      style={{
-        position: 'absolute', bottom: 24, right: 24, zIndex: 10,
-        width: 280,
-      }}
-    >
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', flexDirection: 'column',
+      background: 'var(--bg)',
+    }}>
+      {/* Dot grid background */}
       <div style={{
-        background: 'rgba(10,10,10,0.95)',
-        border: '1px solid rgba(163,230,53,0.18)',
-        borderRadius: 16,
-        backdropFilter: 'blur(12px)',
-        overflow: 'hidden',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)',
+        backgroundSize: '22px 22px',
+      }} />
+
+      {/* Topbar */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 24px',
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0,
       }}>
-        {/* Header */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 14px', borderBottom: '1px solid rgba(163,230,53,0.1)',
-        }}>
-          <div style={{
-            width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 8px rgba(163,230,53,0.4)',
-          }}>
-            <Sparkles size={10} style={{ color: 'var(--accent-ink)' }} />
-          </div>
-          <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}>
-            CORRA
-          </span>
-          <button type="button" onClick={() => setExpanded(e => !e)}
-            style={{ background: 'none', border: 'none', color: 'rgba(163,230,53,0.4)', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>
-            {expanded ? '−' : '+'}
-          </button>
-          <button type="button" onClick={onClear}
-            style={{ background: 'none', border: 'none', color: 'rgba(163,230,53,0.4)', cursor: 'pointer', display: 'flex' }}>
-            <X size={13} />
+          width: 8, height: 8, borderRadius: '50%',
+          background: 'var(--accent)',
+          boxShadow: '0 0 8px oklch(92% 0.2 125 / 0.4)',
+        }} />
+        <span style={{
+          fontSize: 10, fontWeight: 700, color: 'var(--accent)',
+          fontFamily: 'var(--font-mono)', letterSpacing: '0.12em',
+        }}>KORA INTELLIGENCE</span>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {openCount > 0 && (
+            <span style={{
+              fontSize: 9, fontFamily: 'var(--font-mono)',
+              color: 'var(--accent)', letterSpacing: '0.1em',
+              background: 'oklch(92% 0.2 125 / 0.1)',
+              padding: '2px 8px', borderRadius: 99,
+            }}>
+              {openCount} OFFEN
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onClear}
+            title="Neue Unterhaltung"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--fg-dim)', display: 'flex', alignItems: 'center',
+              gap: 5, fontSize: 11, padding: '4px 8px', borderRadius: 6,
+            }}
+          >
+            <RotateCcw size={12} /> Neu
           </button>
         </div>
-
-        <AnimatePresence>
-          {expanded && (
-            <motion.div
-              initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
-              style={{ overflow: 'hidden' }}
-            >
-              {/* Messages */}
-              <div style={{ maxHeight: 220, overflowY: 'auto', padding: '10px 0' }}>
-                <AnimatePresence initial={false}>
-                  {messages.map((msg, i) => (
-                    <CorraMessage key={msg.id ?? String(i)} message={msg} onExecute={onExecute} />
-                  ))}
-                </AnimatePresence>
-                {loading && (
-                  <div style={{ display: 'flex', padding: '6px 14px', gap: 8, alignItems: 'center' }}>
-                    <Loader size={10} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
-                    <span style={{ fontSize: 11, color: 'rgba(163,230,53,0.4)' }}>KORA denkt…</span>
-                  </div>
-                )}
-                <div ref={bottomRef} />
-              </div>
-
-              {/* Input */}
-              <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(163,230,53,0.08)' }}>
-                <div style={{
-                  display: 'flex', gap: 8, alignItems: 'center',
-                  background: 'rgba(163,230,53,0.04)', border: '1px solid rgba(163,230,53,0.12)',
-                  borderRadius: 10, padding: '7px 10px',
-                }}>
-                  <input
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={handleKey}
-                    placeholder="Weiterfragen…"
-                    style={{
-                      flex: 1, background: 'transparent', border: 'none',
-                      fontSize: 12, color: '#ddd', outline: 'none', fontFamily: 'inherit',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={!input.trim() || loading}
-                    style={{
-                      width: 24, height: 24, borderRadius: '50%', border: 'none', flexShrink: 0,
-                      background: input.trim() && !loading ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                      color: input.trim() && !loading ? 'var(--accent-ink)' : 'rgba(255,255,255,0.2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-                      fontSize: 12,
-                    }}
-                  >
-                    ↑
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </motion.div>
+
+      {/* Messages */}
+      <div style={{
+        flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1,
+        padding: '24px 0',
+      }}>
+        <div style={{
+          maxWidth: 760, margin: '0 auto',
+          padding: '0 24px',
+          display: 'flex', flexDirection: 'column', gap: 20,
+        }}>
+          <AnimatePresence initial={false}>
+            {messages.map((msg, i) => (
+              <CorraMessage
+                key={msg.id ?? String(i)}
+                message={msg}
+                onExecute={onExecute}
+              />
+            ))}
+          </AnimatePresence>
+
+          {loading && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: 'var(--accent)', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12,
+              }}>✦</div>
+              <div style={{ paddingTop: 6, display: 'flex', gap: 5, alignItems: 'center' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: 'var(--accent)',
+                    animation: `koraPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                    opacity: 0.6,
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* Input */}
+      <div style={{
+        position: 'relative', zIndex: 1,
+        padding: '16px 24px',
+        borderTop: '1px solid var(--border)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          maxWidth: 760, margin: '0 auto',
+          background: 'var(--surface-1, #111)',
+          border: '1px solid var(--border)',
+          borderRadius: 14, padding: '12px 16px',
+          display: 'flex', gap: 10, alignItems: 'flex-end',
+        }}>
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Frag KORA — Umsatz, offene Rechnungen, was heute ansteht…"
+            rows={1}
+            style={{
+              flex: 1, background: 'transparent', border: 'none',
+              fontSize: 13, color: 'var(--fg)', outline: 'none',
+              resize: 'none', lineHeight: 1.5, fontFamily: 'inherit',
+              maxHeight: 120, overflowY: 'auto',
+              caretColor: 'var(--accent)',
+            }}
+            onInput={e => {
+              const el = e.currentTarget
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!input.trim() || loading}
+            style={{
+              width: 34, height: 34, borderRadius: '50%', border: 'none', flexShrink: 0,
+              background: input.trim() && !loading ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              color: input.trim() && !loading ? 'var(--accent-ink)' : 'var(--fg-dim)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
+              fontSize: 15, transition: 'all 160ms',
+            }}
+          >↑</button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes koraPulse {
+          0%, 100% { transform: scale(1); opacity: 0.4; }
+          50%       { transform: scale(1.4); opacity: 1; }
+        }
+      `}</style>
+    </div>
   )
 }
