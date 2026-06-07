@@ -215,4 +215,10 @@ Wenn deine Antwort Todos/Aufgaben zeigt → "widget": "todos"
 Wenn deine Antwort Mails/Nachrichten zeigt → "widget": "mails"
 Wenn deine Antwort Kalender/Termine/Woche zeigt → "widget": "week"
 Wenn deine Antwort einen Tagesüberblick gibt (mehrere Kategorien) → "widget": "heute"
-Bei reinen Text-Antworten (Erklärungen, Fragen) → kein "widget" Feld`
+Bei reinen Text-Antworten (Erklärungen, Fragen) → kein "widget" Feld
+
+ERSTER TURN:
+Wenn der Kontext "[ERSTER_TURN]" enthält: Beginne deine Antwort IMMER mit einer kurzen Triage.
+Zeige max. 3 der wichtigsten offenen Punkte als actions-Array.
+Dann beantworte die eigentliche Frage des Nutzers.
+Format: JSON mit text + actions (+ optional widget).`
