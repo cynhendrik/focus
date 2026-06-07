@@ -7,6 +7,7 @@ import { ModuleSettings } from '@/components/settings/ModuleSettings'
 import { IntegrationenSettings } from '@/components/settings/IntegrationenSettings'
 import { DeveloperSettings } from '@/components/settings/DeveloperSettings'
 import { GefahrenzoneSettings } from '@/components/settings/GefahrenzoneSettings'
+import { AuftraegeSettings } from '@/components/settings/AuftraegeSettings'
 
 export function SettingsRoute() {
   const settingsTab    = useUiStore(s => s.settingsTab)
@@ -16,7 +17,7 @@ export function SettingsRoute() {
   const showDeveloper = import.meta.env.DEV ||
     localStorage.getItem('cynera:dev-mode') === '1'
 
-  const VALID_TABS = ['workspace', 'module', 'integrationen', 'developer', 'gefahrenzone']
+  const VALID_TABS = ['workspace', 'module', 'integrationen', 'developer', 'gefahrenzone', 'auftraege']
   useEffect(() => {
     if (!VALID_TABS.includes(settingsTab)) setSettingsTab('workspace')
   }, [])
@@ -28,6 +29,7 @@ export function SettingsRoute() {
       case 'integrationen': return <IntegrationenSettings />
       case 'developer':     return showDeveloper ? <DeveloperSettings workspaceId={workspaceId} /> : <WorkspaceSettings workspaceId={workspaceId} />
       case 'gefahrenzone':  return <GefahrenzoneSettings workspaceId={workspaceId} />
+      case 'auftraege':     return <AuftraegeSettings />
       default:              return <WorkspaceSettings workspaceId={workspaceId} />
     }
   }
