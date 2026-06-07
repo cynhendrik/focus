@@ -1,16 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AtSign, Sparkles, X } from 'lucide-react'
+import { AtSign, CheckSquare, FileText, Sparkles, X } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { usePrivateNotesStore }  from '@/store/private-notes.store'
 import { useNotesModuleStore }   from '@/store/notes-module.store'
 import { useAccountsStore }      from '@/store/accounts.store'
+import { useTodosStore }         from '@/store/todos.store'
 import { useUiStore }            from '@/store/ui.store'
 import { useWorkspaceStore }     from '@/store/workspace.store'
 import { useAuthStore }          from '@/store/auth.store'
 import type { Account } from '@/types/account.types'
+
+type CaptureMode = 'note' | 'task' | 'task-urgent'
+
+// ── Mode chip ─────────────────────────────────────────────────────────────────
+
+const MODE_CONFIG: Record<CaptureMode, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  note:         { label: 'NOTIZ',    color: 'var(--fg-dim)',  bg: 'transparent',         icon: <FileText size={10} /> },
+  task:         { label: 'AUFGABE',  color: 'var(--warn)',    bg: 'oklch(82% 0.16 70 / 0.12)', icon: <CheckSquare size={10} /> },
+  'task-urgent':{ label: 'DRINGEND', color: 'var(--danger)',  bg: 'oklch(72% 0.18 25 / 0.12)', icon: <CheckSquare size={10} /> },
+}
 
 export function QuickCaptureModal() {
   const open    = useUiStore(s => s.quickCaptureOpen)
@@ -19,12 +30,23 @@ export function QuickCaptureModal() {
   const createPrivate   = usePrivateNotesStore(s => s.create)
   const updatePrivate   = usePrivateNotesStore(s => s.update)
   const createNoteEntry = useNotesModuleStore(s => s.createEntry)
+  const upsertTodo      = useTodosStore(s => s.upsert)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const userId          = useAuthStore(s => s.user?.id) ?? ''
-  const accounts = useAccountsStore(s => s.accounts)
+  const accounts        = useAccountsStore(s => s.accounts)
 
-  const [customer, setCustomer] = useState<Account | null>(null)
-  const [atQuery, setAtQuery]   = useState<string | null>(null)
+  const [customer,     setCustomer]     = useState<Account | null>(null)
+  const [atQuery,      setAtQuery]      = useState<string | null>(null)
+  const [captureMode,  setCaptureMode]  = useState<CaptureMode>('note')
+
+  // Ref so the Placeholder function always reads the latest mode without
+  // recreating the editor.
+  const captureModeRef = useRef<CaptureMode>('note')
+
+  const setMode = (mode: CaptureMode) => {
+    captureModeRef.current = mode
+    setCaptureMode(mode)
+  }
 
   // Customer search dropdown
   const suggestions = useMemo(() => {
@@ -36,7 +58,13 @@ export function QuickCaptureModal() {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: 'Gedanke, Idee, Erinnerung… · @ für Kunde' }),
+      Placeholder.configure({
+        placeholder: () => {
+          if (captureModeRef.current === 'task-urgent') return 'Dringende Aufgabe… · @ für Kunde'
+          if (captureModeRef.current === 'task')        return 'Aufgabe… · @ für Kunde'
+          return 'Gedanke, Idee, Erinnerung… · @ Kunde · ! Aufgabe · !! Dringend'
+        },
+      }),
     ],
     editorProps: {
       attributes: {
@@ -44,6 +72,16 @@ export function QuickCaptureModal() {
       },
     },
     onUpdate: ({ editor: ed }) => {
+      const rawText = ed.getText()
+
+      // Mode detection — prefix must be at the very start of the text
+      let mode: CaptureMode = 'note'
+      if (/^!!\s/.test(rawText) || rawText.trimEnd() === '!!') mode = 'task-urgent'
+      else if (/^!\s/.test(rawText) || rawText.trimEnd() === '!')  mode = 'task'
+
+      if (mode !== captureModeRef.current) setMode(mode)
+
+      // @ customer detection
       const { from } = ed.state.selection
       const before = ed.state.doc.textBetween(0, from, '\n', '\n')
       const match = /@([^\s@]*)$/.exec(before)
@@ -56,6 +94,7 @@ export function QuickCaptureModal() {
     if (open) {
       setCustomer(null)
       setAtQuery(null)
+      setMode('note')
       setTimeout(() => { editor?.commands.clearContent(); editor?.commands.focus() }, 60)
     }
   }, [open, editor])
@@ -74,7 +113,7 @@ export function QuickCaptureModal() {
   const pickCustomer = (acc: Account) => {
     if (!editor) return
     const { from } = editor.state.selection
-    const len = (atQuery?.length ?? 0) + 1 // +1 for @
+    const len = (atQuery?.length ?? 0) + 1
     editor.chain().focus().deleteRange({ from: from - len, to: from }).run()
     setCustomer(acc)
     setAtQuery(null)
@@ -82,28 +121,46 @@ export function QuickCaptureModal() {
 
   const save = () => {
     if (!editor) return
-    const html = editor.getHTML()
-    const text = editor.getText().trim()
-    if (!text) { setOpen(false); return }
+    const rawText = editor.getText().trim()
+    // Empty or only the prefix marker — just close
+    if (!rawText || rawText === '!' || rawText === '!!') { setOpen(false); return }
 
-    const title = text.split('\n')[0].slice(0, 60) ||
-      new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-
-    if (customer) {
-      createNoteEntry({
-        workspaceId,
-        accountId: customer.id,
+    if (captureMode !== 'note') {
+      // Strip the ! / !! prefix and leading space
+      const stripped = rawText.replace(/^!!\s*/, '').replace(/^!\s*/, '').trim()
+      if (!stripped) { setOpen(false); return }
+      const title = stripped.split('\n')[0].slice(0, 120)
+      upsertTodo({
         title,
-        content: html,
-        createdBy: userId,
+        customerId: customer?.id,
+        priority:   captureMode === 'task-urgent' ? 'p1' : 'p2',
+        bucket:     'today',
+        source:     'manual',
       }).catch(() => {})
     } else {
-      const id = createPrivate()
-      updatePrivate(id, { title, body: html })
+      const html = editor.getHTML()
+      const text = rawText
+      const title = text.split('\n')[0].slice(0, 60) ||
+        new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+      if (customer) {
+        createNoteEntry({
+          workspaceId,
+          accountId: customer.id,
+          title,
+          content: html,
+          createdBy: userId,
+        }).catch(() => {})
+      } else {
+        const id = createPrivate()
+        updatePrivate(id, { title, body: html })
+      }
     }
 
     setOpen(false)
   }
+
+  const modeConf = MODE_CONFIG[captureMode]
 
   return (
     <AnimatePresence>
@@ -134,9 +191,28 @@ export function QuickCaptureModal() {
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px 0' }}>
                 <Sparkles size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--accent)' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--accent)' }}>
                   QUICK CAPTURE
                 </span>
+
+                {/* Mode chip — animates between note/task/task-urgent */}
+                <AnimatePresence mode="wait">
+                  {captureMode !== 'note' && (
+                    <motion.div
+                      key={captureMode}
+                      initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ duration: 0.12 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, background: modeConf.bg, border: `1px solid ${modeConf.color}`, borderRadius: 99, padding: '2px 7px', marginLeft: 2 }}
+                    >
+                      <span style={{ color: modeConf.color, display: 'flex' }}>{modeConf.icon}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)', color: modeConf.color, letterSpacing: '0.08em' }}>
+                        {modeConf.label}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div style={{ flex: 1 }} />
 
                 {/* Customer chip */}
                 {customer && (
@@ -196,14 +272,23 @@ export function QuickCaptureModal() {
               {/* Footer */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 14px', borderTop: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
-                  {customer ? `→ ${customer.name} · Notizen` : '→ Privat'} · ⌘↵
+                  {captureMode !== 'note'
+                    ? `→ Aufgaben${customer ? ` · ${customer.name}` : ''} · ⌘↵`
+                    : `${customer ? `→ ${customer.name} · Notizen` : '→ Privat'} · ⌘↵`}
                 </span>
                 <button
                   type="button"
                   onClick={save}
-                  style={{ padding: '7px 16px', borderRadius: 99, border: 'none', background: 'var(--accent)', color: 'var(--accent-ink)', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 0 12px var(--accent-glow)', transition: 'all 150ms' }}
+                  style={{
+                    padding: '7px 16px', borderRadius: 99, border: 'none',
+                    background: captureMode === 'task-urgent' ? 'var(--danger)' : captureMode === 'task' ? 'var(--warn)' : 'var(--accent)',
+                    color: 'var(--accent-ink)',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    boxShadow: captureMode === 'task-urgent' ? '0 0 12px oklch(72% 0.18 25 / 0.4)' : captureMode === 'task' ? '0 0 12px oklch(82% 0.16 70 / 0.4)' : '0 0 12px var(--accent-glow)',
+                    transition: 'all 150ms',
+                  }}
                 >
-                  Speichern
+                  {captureMode !== 'note' ? 'Als Aufgabe' : 'Speichern'}
                 </button>
               </div>
             </div>
