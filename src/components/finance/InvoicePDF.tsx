@@ -79,6 +79,7 @@ const s = StyleSheet.create({
 
 function InvoicePDFDoc({ data, profile, account }: Props) {
   const { invoice, items } = data
+  const accent = profile.invoiceAccentColor ?? '#111111'
   const noTax = invoice.taxMode === 'reverse_charge' || invoice.taxMode === 'kleinunternehmer'
 
   // Bank info: per-invoice JSON first, then profile defaults
@@ -136,12 +137,12 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
               ? <Image src={profile.logoBase64} style={{ width: 48, height: 48, objectFit: 'contain' as const }} />
               : <InitialsBadge name={profile.name} />
             }
-            <Text style={s.docTitle}>RECHNUNG</Text>
+            <Text style={[s.docTitle, { color: accent }]}>RECHNUNG</Text>
             <Text style={s.docNumber}>{invoice.number ?? 'Entwurf'}</Text>
           </View>
         </View>
 
-        <View style={s.rule} />
+        <View style={[s.rule, { backgroundColor: accent }]} />
 
         {/* Recipient + Meta */}
         <View style={s.twoCol}>

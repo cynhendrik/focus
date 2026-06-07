@@ -20,6 +20,7 @@ export interface CompanyProfile {
   zahlungszielTage?: number
   leistungszeitpunkt?: 'rechnungsdatum' | 'monatsende'
   logoBase64?: string
+  invoiceAccentColor?: string
 }
 
 export interface CompanyModules {

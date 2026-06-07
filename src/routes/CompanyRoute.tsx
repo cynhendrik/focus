@@ -1,21 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useCompanyStore } from '@/store/company.store'
-import type { CompanyProfile, CompanyModules } from '@/types/company.types'
-
-const MODULE_LABELS: Partial<Record<keyof CompanyModules, string>> = {
-  crm: 'CRM System', finanzen: 'Finanzen', focus: 'Focus-Modus',
-  mail: 'Mail-Client', kalender: 'Kalender',
-  leads: 'Leads', kampagnen: 'Kampagnen', corra: 'KORA KI',
-  sales: 'Sales', instagram: 'Instagram', focusAi: 'FOCUS AI',
-  zeiterfassung: 'Zeiterfassung', pro: 'Pro-Modus',
-}
+import type { CompanyProfile } from '@/types/company.types'
 
 export function CompanyRoute() {
   const profile      = useCompanyStore(s => s.profile)
-  const modules      = useCompanyStore(s => s.modules)
   const load         = useCompanyStore(s => s.load)
   const saveProfile  = useCompanyStore(s => s.saveProfile)
-  const saveModules  = useCompanyStore(s => s.saveModules)
   const [form, setForm] = useState<CompanyProfile>({})
   const [saved, setSaved] = useState(false)
 
@@ -26,10 +16,6 @@ export function CompanyRoute() {
     await saveProfile(form)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
-  }
-
-  const toggleModule = (key: keyof CompanyModules) => {
-    saveModules({ ...modules, [key]: !modules[key] })
   }
 
   return (
@@ -61,23 +47,6 @@ export function CompanyRoute() {
         </div>
       </section>
 
-      {/* Modules */}
-      <section className="flex flex-col gap-4">
-        <h2 className="text-xs font-semibold text-[var(--text2)] uppercase tracking-wider">Module</h2>
-        <div className="flex flex-col gap-2">
-          {(Object.keys(MODULE_LABELS) as (keyof CompanyModules)[]).map(key => (
-            <label key={key} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg1)] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!modules[key]}
-                onChange={() => toggleModule(key)}
-                className="accent-primary w-4 h-4"
-              />
-              <span className="text-sm text-[var(--text)]">{MODULE_LABELS[key]}</span>
-            </label>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }

@@ -134,6 +134,115 @@ export function WorkspaceSettings({ workspaceId }: Props) {
         </div>
       </div>
 
+      {/* Rechnungsdesign */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Rechnungsdesign</div>
+          <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Logo und Farbe für Rechnungen &amp; Angebote</div>
+        </div>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Logo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Logo
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {form.logoBase64 ? (
+                <div style={{
+                  width: 56, height: 56, borderRadius: 10, overflow: 'hidden',
+                  border: '1px solid var(--border)', background: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <img src={form.logoBase64} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+              ) : (
+                <div style={{
+                  width: 56, height: 56, borderRadius: 10,
+                  border: '1px dashed var(--border)', background: 'var(--surface-2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  fontSize: 20, color: 'var(--fg-dim)',
+                }}>
+                  🏢
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <label style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  border: '1px solid var(--border)', background: 'var(--surface-2)',
+                  color: 'var(--fg)', cursor: 'pointer',
+                }}>
+                  {form.logoBase64 ? 'Ersetzen' : 'Hochladen'}
+                  <input
+                    type="file" accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const reader = new FileReader()
+                      reader.onload = ev => setForm(p => ({ ...p, logoBase64: ev.target?.result as string }))
+                      reader.readAsDataURL(file)
+                    }}
+                  />
+                </label>
+                {form.logoBase64 && (
+                  <button
+                    onClick={() => setForm(p => ({ ...p, logoBase64: undefined }))}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, fontSize: 12,
+                      border: '1px solid var(--border)', background: 'transparent',
+                      color: 'var(--fg-dim)', cursor: 'pointer',
+                    }}
+                  >
+                    Entfernen
+                  </button>
+                )}
+              </div>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--fg-dim)', margin: 0 }}>PNG oder SVG empfohlen, max. 1 MB</p>
+          </div>
+
+          {/* Akzentfarbe */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Akzentfarbe
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {['#111111', '#1e40af', '#065f46', '#7c3aed', '#b45309', '#be123c'].map(color => (
+                <button
+                  key={color}
+                  onClick={() => setForm(p => ({ ...p, invoiceAccentColor: color }))}
+                  style={{
+                    width: 28, height: 28, borderRadius: '50%', border: 'none',
+                    background: color, cursor: 'pointer', flexShrink: 0,
+                    outline: (form.invoiceAccentColor ?? '#111111') === color
+                      ? '2px solid var(--accent)' : '2px solid transparent',
+                    outlineOffset: 2,
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={form.invoiceAccentColor ?? '#111111'}
+                onChange={e => setForm(p => ({ ...p, invoiceAccentColor: e.target.value }))}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%', border: '1px solid var(--border)',
+                  padding: 0, cursor: 'pointer', background: 'transparent',
+                }}
+                title="Eigene Farbe"
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+              <div style={{ width: 32, height: 3, borderRadius: 2, background: form.invoiceAccentColor ?? '#111111' }} />
+              <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+                {form.invoiceAccentColor ?? '#111111'}
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       {/* Save */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={handleSave} className="btn-primary" style={{ fontSize: 12, padding: '7px 18px' }}>

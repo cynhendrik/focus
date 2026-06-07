@@ -564,29 +564,38 @@ function InvoiceA4Preview({ profile, account, date, dueDate, leistungsdatum, ite
       display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 5 }}>
-            {profile.name || <span style={{ color: '#ccc' }}>Firmenname</span>}
-          </div>
-          <div style={{ fontSize: 11, color: '#555', lineHeight: 1.7 }}>
-            {profile.address && <div>{profile.address}</div>}
-            {profile.email   && <div>{profile.email}{profile.phone ? ` · ${profile.phone}` : ''}</div>}
-            {(profile.taxId || profile.steuernummer) && (
-              <div>
-                {profile.taxId        ? `USt-IdNr.: ${profile.taxId}` : ''}
-                {profile.taxId && profile.steuernummer ? ' · ' : ''}
-                {profile.steuernummer ? `StNr.: ${profile.steuernummer}` : ''}
-              </div>
-            )}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          {profile.logoBase64 && (
+            <img
+              src={profile.logoBase64}
+              alt="Logo"
+              style={{ width: 44, height: 44, objectFit: 'contain', flexShrink: 0 }}
+            />
+          )}
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 5 }}>
+              {profile.name || <span style={{ color: '#ccc' }}>Firmenname</span>}
+            </div>
+            <div style={{ fontSize: 11, color: '#555', lineHeight: 1.7 }}>
+              {profile.address && <div>{profile.address}</div>}
+              {profile.email   && <div>{profile.email}{profile.phone ? ` · ${profile.phone}` : ''}</div>}
+              {(profile.taxId || profile.steuernummer) && (
+                <div>
+                  {profile.taxId        ? `USt-IdNr.: ${profile.taxId}` : ''}
+                  {profile.taxId && profile.steuernummer ? ' · ' : ''}
+                  {profile.steuernummer ? `StNr.: ${profile.steuernummer}` : ''}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.04em', color: '#111' }}>RECHNUNG</div>
+          <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: '-0.04em', color: profile.invoiceAccentColor ?? '#111' }}>RECHNUNG</div>
           <div style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', marginTop: 3 }}>Nummer wird automatisch vergeben</div>
         </div>
       </div>
 
-      <div style={{ height: 1, background: '#e0e0e0', margin: '14px 0 22px' }} />
+      <div style={{ height: 2, background: profile.invoiceAccentColor ?? '#111', margin: '14px 0 22px', opacity: 0.8 }} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 28, gap: 40 }}>
         <div>
