@@ -263,7 +263,7 @@ export function CustomerRoute({ customerId }: Props) {
           no y, no will-change. Any of those would create a containing block
           for `position: fixed` descendants, trapping every modal/sheet/
           confirm-dialog inside the tab area instead of the viewport. */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden" style={{ display: 'flex', flexDirection: 'column' }}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={activeTab}
@@ -271,6 +271,7 @@ export function CustomerRoute({ customerId }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: [0.2, 0.7, 0.1, 1] }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           >
             {renderPane()}
           </motion.div>

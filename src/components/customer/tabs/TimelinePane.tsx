@@ -361,6 +361,7 @@ export function TimelinePane({ customerId }: Props) {
       gap: 36,
       padding: '20px 24px 64px',
       alignItems: 'start',
+      overflowY: 'auto', flex: 1,
     }}>
       {/* ── LEFT RAIL — knowledge column, sticky during scroll ──────────── */}
       <aside style={{

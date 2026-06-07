@@ -42,7 +42,7 @@ export function WorkflowPane({ customerId }: Props) {
     <div style={{
       padding: '20px 24px 64px',
       display: 'flex', flexDirection: 'column',
-      gap: 24,
+      gap: 24, overflowY: 'auto', flex: 1,
     }}>
       <TasksHeader
         compact

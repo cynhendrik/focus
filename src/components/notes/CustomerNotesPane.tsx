@@ -436,7 +436,7 @@ export function CustomerNotesPane({ accountId }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
       {/* ── Mappe-Tabs ──────────────────────────────────────────────────── */}
       <div style={{
