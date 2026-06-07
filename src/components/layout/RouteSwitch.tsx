@@ -42,7 +42,10 @@ export function RouteSwitch({ viewKey, children }: Props) {
     <div
       key={renderKey}
       style={{
-        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
         opacity: phase === 'in' ? 1 : 0,
         transition: 'opacity 160ms cubic-bezier(.2,.7,.1,1)',
       }}

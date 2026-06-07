@@ -109,16 +109,16 @@
 }
 
 [data-theme="light"] {
-  /* Hintergründe — neutrales macOS-Grau (#f2f2f7), kein warmes Off-White */
-  --bg:        oklch(96% 0.002 270);
-  --bg-2:      oklch(94% 0.003 270);
-  --surface:   oklch(100% 0 0);
-  --surface-2: oklch(98% 0.001 270);
-  --surface-3: oklch(92% 0.003 270);
+  /* Hintergründe — #f2f2f7 Lila-Grau */
+  --bg:        #f2f2f7;
+  --bg-2:      #e8e8ef;
+  --surface:   #ffffff;
+  --surface-2: #f8f8fc;
+  --surface-3: #ebebf2;
 
   /* Borders */
-  --border:        oklch(88% 0.003 270);
-  --border-strong: oklch(78% 0.004 270);
+  --border:        #dcdce5;
+  --border-strong: #c8c8d4;
 
   /* Text — neutrales Schwarz, kein Blau-Stich */
   --fg:       oklch(12% 0 0);
@@ -220,8 +220,11 @@ input:focus, textarea:focus, button:focus { outline: none; }
 }
 [data-theme="light"] .app { background: var(--bg); }
 
+[data-theme="light"] .main,
+[data-theme="light"] .main-content { background: var(--bg); }
+
 [data-theme="light"] .sidebar {
-  background: rgba(242, 242, 247, 0.92);
+  background: var(--bg);
   -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
 }
@@ -247,6 +250,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
+  min-height: 0;
 }
 
 .main-content {
@@ -254,12 +259,17 @@ input:focus, textarea:focus, button:focus { outline: none; }
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .main-inner {
   padding: 32px 48px 80px;
+  width: 100%;
   max-width: 1380px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 [data-density="compact"] .main-inner { padding: 24px 32px 64px; }
@@ -473,8 +483,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
   margin: 2px 0 6px;
   padding: 13px 14px;
   border-radius: 14px;
-  background: var(--surface-2);
-  border: 1px solid oklch(92% 0.2 125 / 0.25);
+  background: oklch(92% 0.2 125);
+  border: 1px solid oklch(92% 0.2 125);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -489,47 +499,36 @@ input:focus, textarea:focus, button:focus { outline: none; }
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 25%,
-    oklch(92% 0.2 125 / 0.18) 50%,
-    transparent 75%
-  );
+  background: linear-gradient(105deg, transparent 25%, oklch(100% 0 0 / 0.2) 50%, transparent 75%);
   transform: translateX(-150%);
   animation: corraShimmer 5s ease-in-out infinite;
   pointer-events: none;
 }
 .nav-corra-card:hover {
-  background: var(--surface-3);
-  border-color: oklch(92% 0.2 125 / 0.4);
+  background: oklch(86% 0.21 125);
+  border-color: oklch(86% 0.21 125);
 }
 .nav-corra-card[data-active="true"] {
-  background: var(--surface-3);
-  border-color: oklch(92% 0.2 125 / 0.5);
+  background: oklch(86% 0.21 125);
+  border-color: oklch(86% 0.21 125);
 }
 
-.nav-corra-card__icon {
-  width: 30px; height: 30px; border-radius: 8px;
-  background: oklch(92% 0.2 125 / 0.12);
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  color: var(--accent);
-}
+.nav-corra-card__icon { display: none; }
 .nav-corra-card__body {
   display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1;
 }
 .nav-corra-card__title {
-  font-size: 13.5px; font-weight: 700; color: var(--accent);
+  font-size: 13.5px; font-weight: 700; color: oklch(10% 0 0);
   letter-spacing: -0.01em; line-height: 1.2;
 }
 .nav-corra-card__sub {
-  font-size: 10px; color: var(--fg-dim);
+  font-size: 10px; color: oklch(20% 0 0 / 0.6);
   font-family: var(--font-mono); letter-spacing: 0.05em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .nav-corra-card__badge {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-  color: var(--accent); background: oklch(92% 0.2 125 / 0.12);
+  color: oklch(10% 0 0); background: oklch(0% 0 0 / 0.15);
   padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
 }
 
@@ -537,8 +536,9 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .sidebar[data-collapsed="true"] .nav-corra-card {
   padding: 10px 6px; justify-content: center;
 }
-.sidebar[data-collapsed="true"] .nav-corra-card__body,
+.sidebar[data-collapsed="true"] .nav-corra-card__sub,
 .sidebar[data-collapsed="true"] .nav-corra-card__badge { display: none; }
+.sidebar[data-collapsed="true"] .nav-corra-card__title { font-size: 11px; }
 
 @keyframes corraShimmer {
   0%      { transform: translateX(-150%); }
