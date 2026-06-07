@@ -6,7 +6,8 @@ import { WidgetHeute }   from './widgets/WidgetHeute'
 import type { CorraWidgetType } from '@/lib/ai/corra-intelligence'
 
 interface Props {
-  type: CorraWidgetType
+  type:      CorraWidgetType
+  compact?:  boolean
 }
 
 export function CorraWidget({ type }: Props) {

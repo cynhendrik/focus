@@ -5,14 +5,14 @@ import { CorraMessage } from './CorraMessage'
 import type { CorraMessage as CorraMessageType, CorraActionItem } from '@/lib/ai/corra-intelligence'
 
 interface Props {
-  messages: CorraMessageType[]
-  loading: boolean
-  onSend: (text: string) => void
-  onFocusActions: (actions: CorraActionItem[]) => void
-  onClear: () => void
+  messages:  CorraMessageType[]
+  loading:   boolean
+  onSend:    (text: string) => void
+  onExecute: (action: CorraActionItem) => Promise<void>
+  onClear:   () => void
 }
 
-export function CorraChatPanel({ messages, loading, onSend, onFocusActions, onClear }: Props) {
+export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }: Props) {
   const [input, setInput] = useState('')
   const [expanded, setExpanded] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -86,7 +86,7 @@ export function CorraChatPanel({ messages, loading, onSend, onFocusActions, onCl
               <div style={{ maxHeight: 220, overflowY: 'auto', padding: '10px 0' }}>
                 <AnimatePresence initial={false}>
                   {messages.map((msg, i) => (
-                    <CorraMessage key={msg.id ?? String(i)} message={msg} onFocusActions={onFocusActions} />
+                    <CorraMessage key={msg.id ?? String(i)} message={msg} onExecute={onExecute} />
                   ))}
                 </AnimatePresence>
                 {loading && (

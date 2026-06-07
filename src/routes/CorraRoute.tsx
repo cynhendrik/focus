@@ -110,24 +110,22 @@ export function CorraRoute() {
     }
   }, [phase, messages, todos, invoices, emails, deals, calendarEvents, accounts])
 
-  const handleFocusActions = useCallback(async (actions: CorraActionItem[]) => {
+  const handleExecute = useCallback(async (action: CorraActionItem) => {
     try {
-      for (const action of actions) {
-        if (action.type === 'invoice') {
-          const inv = invoices.find(i => i.id === action.id)
-          await upsertTodo({
-            title: `Mahnung: ${action.label}`, actionType: 'send_reminder',
-            sourceRef: action.id, customerId: inv?.accountId,
-            bucket: 'today', priority: 'p1', checklist: [], tags: [],
-          })
-        } else if (action.type === 'mail') {
-          const mail = emails.find(e => e.id === action.id)
-          await upsertTodo({
-            title: `${action.label} beantworten`, actionType: 'reply_mail',
-            sourceRef: action.id, customerId: mail?.customerId ?? undefined,
-            bucket: 'today', priority: 'p1', checklist: [], tags: [],
-          })
-        }
+      if (action.type === 'invoice') {
+        const inv = invoices.find(i => i.id === action.id)
+        await upsertTodo({
+          title: `Mahnung: ${action.label}`, actionType: 'send_reminder',
+          sourceRef: action.id, customerId: inv?.accountId,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
+      } else if (action.type === 'mail') {
+        const mail = emails.find(e => e.id === action.id)
+        await upsertTodo({
+          title: `${action.label} beantworten`, actionType: 'reply_mail',
+          sourceRef: action.id, customerId: mail?.customerId ?? undefined,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
       }
       setAppView('focus')
     } catch {
@@ -222,7 +220,7 @@ export function CorraRoute() {
             messages={messages}
             loading={loading}
             onSend={handleSend}
-            onFocusActions={handleFocusActions}
+            onExecute={handleExecute}
             onClear={handleClear}
           />
         )}
