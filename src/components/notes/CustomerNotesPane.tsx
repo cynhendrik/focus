@@ -1,10 +1,12 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import {
+  useEffect, useState, useRef, useCallback, useMemo, type KeyboardEvent,
+} from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Plus, Trash2, Search } from 'lucide-react'
+import { Plus, Trash2, Search, X, Bold, Italic, List, CheckSquare, Heading2 } from 'lucide-react'
 import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useWorkspaceStore }   from '@/store/workspace.store'
 import { useAuthStore }        from '@/store/auth.store'
@@ -14,86 +16,91 @@ interface Props { accountId: string }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
-  const d    = new Date(iso)
-  const diff = Date.now() - d.getTime()
-  if (diff < 60_000)         return 'Gerade eben'
-  if (diff < 3_600_000)      return `vor ${Math.floor(diff / 60_000)} Min`
-  if (diff < 86_400_000)     return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-  if (diff < 7 * 86_400_000) return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
-}
-
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-// ── NoteListRow ───────────────────────────────────────────────────────────────
+function fmtMeta(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('de-DE', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  }) + ' · ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+}
 
-function NoteListRow({
-  note, active, onClick, onDelete,
-}: {
-  note: NoteEntry; active: boolean; onClick: () => void; onDelete: () => void
-}) {
-  const [hover, setHover] = useState(false)
-  const preview = stripHtml(note.content).slice(0, 80)
+function fmtListTime(iso: string): string {
+  const d    = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000)         return 'Gerade eben'
+  if (diff < 3_600_000)      return `${Math.floor(diff / 60_000)}m`
+  if (diff < 86_400_000)     return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  if (diff < 7 * 86_400_000) return ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]
+  return `${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}`
+}
+
+// Gruppen: Heute / Diese Woche / Dieser Monat / Älter
+function groupEntries(entries: NoteEntry[]) {
+  const now   = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const groups: { label: string; entries: NoteEntry[] }[] = [
+    { label: 'Heute',        entries: [] },
+    { label: 'Diese Woche',  entries: [] },
+    { label: 'Dieser Monat', entries: [] },
+    { label: 'Älter',        entries: [] },
+  ]
+
+  for (const e of entries) {
+    const d = new Date(e.updatedAt)
+    if (d >= today)        groups[0].entries.push(e)
+    else if (d >= weekStart)  groups[1].entries.push(e)
+    else if (d >= monthStart) groups[2].entries.push(e)
+    else                      groups[3].entries.push(e)
+  }
+  return groups.filter(g => g.entries.length > 0)
+}
+
+// ── Editor toolbar ────────────────────────────────────────────────────────────
+
+function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null
+
+  const btn = (
+    active: boolean,
+    icon: React.ReactNode,
+    action: () => void,
+    title: string,
+  ) => (
+    <button
+      onMouseDown={e => { e.preventDefault(); action() }}
+      title={title}
+      style={{
+        width: 28, height: 28, borderRadius: 6, border: 'none',
+        background: active ? 'var(--surface-3)' : 'transparent',
+        color: active ? 'var(--fg)' : 'var(--fg-dim)',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 100ms, color 100ms',
+      }}
+    >{icon}</button>
+  )
 
   return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-        background: active ? 'var(--accent)' : hover ? 'var(--surface-2)' : 'transparent',
-        transition: 'background 120ms',
-        position: 'relative',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
-          fontSize: 13, fontWeight: 600,
-          color: active ? 'var(--accent-ink)' : 'var(--fg)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-        }}>
-          {note.title || 'Ohne Titel'}
-        </span>
-        <span style={{
-          fontSize: 10, flexShrink: 0,
-          fontFamily: 'var(--font-mono)',
-          color: active ? 'oklch(15% 0 0 / 0.5)' : 'var(--fg-dim)',
-        }}>
-          {fmtDate(note.updatedAt)}
-        </span>
-      </div>
-
-      {preview && (
-        <div style={{
-          fontSize: 12, marginTop: 2, lineHeight: 1.4,
-          color: active ? 'oklch(15% 0 0 / 0.6)' : 'var(--fg-muted)',
-          overflow: 'hidden', display: '-webkit-box',
-          WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
-        }}>
-          {preview}
-        </div>
-      )}
-
-      {hover && !active && (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          style={{
-            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-            width: 22, height: 22, borderRadius: 6, border: 'none',
-            background: 'var(--surface-3)', color: 'var(--fg-muted)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        ><Trash2 size={11} /></button>
-      )}
+    <div style={{
+      display: 'flex', gap: 2, padding: '6px 0', marginBottom: 4,
+      borderBottom: '1px solid var(--border)',
+    }}>
+      {btn(editor.isActive('bold'),         <Bold size={13} />,          () => editor.chain().focus().toggleBold().run(),             'Fett')}
+      {btn(editor.isActive('italic'),       <Italic size={13} />,        () => editor.chain().focus().toggleItalic().run(),           'Kursiv')}
+      {btn(editor.isActive('heading',{level:2}), <Heading2 size={13} />, () => editor.chain().focus().toggleHeading({level:2}).run(), 'Überschrift')}
+      <div style={{ width: 1, background: 'var(--border)', margin: '2px 4px' }} />
+      {btn(editor.isActive('bulletList'),   <List size={13} />,          () => editor.chain().focus().toggleBulletList().run(),       'Liste')}
+      {btn(editor.isActive('taskList'),     <CheckSquare size={13} />,   () => editor.chain().focus().toggleTaskList().run(),         'Checkliste')}
     </div>
   )
 }
 
-// ── NoteEditor ────────────────────────────────────────────────────────────────
+// ── NoteEditor (right panel) ──────────────────────────────────────────────────
 
 function NoteEditor({
   note, folders, onUpdate,
@@ -102,22 +109,23 @@ function NoteEditor({
   folders: NoteFolder[]
   onUpdate: (patch: { title?: string | null; content?: string }) => Promise<void>
 }) {
-  const [title,   setTitle]   = useState(note.title ?? '')
-  const [status,  setStatus]  = useState<'saved' | 'saving' | ''>('saved')
+  const [title,  setTitle]  = useState(note.title ?? '')
+  const [status, setStatus] = useState<'saved' | 'saving' | ''>('')
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const statusTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [editorFocused, setEditorFocused] = useState(false)
 
-  const showSaved = useCallback(() => {
+  const flashSaved = useCallback(() => {
     setStatus('saved')
     if (statusTimer.current) clearTimeout(statusTimer.current)
-    statusTimer.current = setTimeout(() => setStatus(''), 1800)
+    statusTimer.current = setTimeout(() => setStatus(''), 2000)
   }, [])
 
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: 'Schreib drauf los…' }),
+      Placeholder.configure({ placeholder: 'Schreib hier deine Notiz…' }),
       TaskList,
       TaskItem.configure({ nested: true }),
     ],
@@ -125,30 +133,29 @@ function NoteEditor({
       attributes: {
         style: [
           'outline:none',
-          'font-size:14.5px',
-          'line-height:1.75',
+          'font-size:15px',
+          'line-height:1.8',
           'color:var(--fg)',
           'font-family:inherit',
           'min-height:200px',
-          'max-width:680px',
+          'caret-color:var(--accent)',
         ].join(';'),
       },
     },
     content: note.content || '',
+    onFocus() { setEditorFocused(true) },
+    onBlur()  { setEditorFocused(false) },
     onUpdate({ editor }) {
       setStatus('saving')
       if (contentTimer.current) clearTimeout(contentTimer.current)
       contentTimer.current = setTimeout(async () => {
         await onUpdate({ content: editor.getHTML() })
-        showSaved()
+        flashSaved()
       }, 600)
     },
   }, [note.id])
 
-  // Sync title when note changes
-  useEffect(() => {
-    setTitle(note.title ?? '')
-  }, [note.id])
+  useEffect(() => { setTitle(note.title ?? '') }, [note.id, note.title])
 
   useEffect(() => () => {
     if (titleTimer.current)   clearTimeout(titleTimer.current)
@@ -162,75 +169,168 @@ function NoteEditor({
     if (titleTimer.current) clearTimeout(titleTimer.current)
     titleTimer.current = setTimeout(async () => {
       await onUpdate({ title: val.trim() || null })
-      showSaved()
+      flashSaved()
     }, 600)
   }
 
+  const handleTitleKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus() }
+  }
+
   const folder = folders.find(f => f.id === note.folderId)
-  const dateStr = new Date(note.createdAt).toLocaleDateString('de-DE', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-  })
 
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
-      overflow: 'auto', padding: '40px 56px 80px',
+      overflow: 'hidden', background: 'var(--bg)',
     }}>
-      {/* Metadata */}
+      {/* Editor header */}
       <div style={{
-        fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.04em', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center',
+        padding: '32px 56px 0',
+        flexShrink: 0,
       }}>
-        <span>{dateStr}</span>
-        {folder && (
-          <>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span style={{ color: 'var(--accent-text)' }}>{folder.name}</span>
-          </>
-        )}
-        <span style={{ marginLeft: 'auto', opacity: status === '' ? 0 : 1, transition: 'opacity 400ms' }}>
-          {status === 'saving' ? 'Speichert…' : status === 'saved' ? 'Gespeichert' : ''}
-        </span>
+        {/* Metadata row */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+          fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.04em',
+        }}>
+          <span>{fmtMeta(note.createdAt)}</span>
+          {folder && (
+            <>
+              <span style={{ opacity: 0.35 }}>·</span>
+              <span style={{
+                background: 'var(--accent-soft)', color: 'var(--accent-text)',
+                padding: '1px 8px', borderRadius: 99, fontWeight: 600,
+              }}>
+                {folder.name}
+              </span>
+            </>
+          )}
+          <span style={{
+            marginLeft: 'auto',
+            opacity: status === '' ? 0 : 1,
+            transition: 'opacity 300ms',
+            color: status === 'saving' ? 'var(--fg-dim)' : 'var(--ok)',
+          }}>
+            {status === 'saving' ? 'Speichert…' : 'Gespeichert ✓'}
+          </span>
+        </div>
+
+        {/* Title */}
+        <input
+          value={title}
+          onChange={e => handleTitleChange(e.target.value)}
+          onKeyDown={handleTitleKey}
+          placeholder="Titel…"
+          style={{
+            border: 'none', background: 'transparent', outline: 'none',
+            fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.2,
+            color: 'var(--fg)', fontFamily: 'inherit', width: '100%',
+            caretColor: 'var(--accent)', marginBottom: 16,
+          }}
+        />
+
+        {/* Toolbar — visible when editor focused */}
+        {(editorFocused || true) && <Toolbar editor={editor} />}
       </div>
 
-      {/* Title */}
-      <input
-        value={title}
-        onChange={e => handleTitleChange(e.target.value)}
-        placeholder="Titel…"
-        style={{
-          border: 'none', background: 'transparent', outline: 'none',
-          fontSize: 28, fontWeight: 700, letterSpacing: '-0.025em',
-          color: 'var(--fg)', fontFamily: 'inherit',
-          width: '100%', maxWidth: 680, marginBottom: 20,
-          caretColor: 'var(--accent)',
-        }}
-      />
-
-      {/* Editor */}
-      <div style={{ maxWidth: 680 }}>
-        <EditorContent editor={editor} />
+      {/* Editor scroll area */}
+      <div
+        style={{ flex: 1, overflowY: 'auto', padding: '20px 56px 80px' }}
+        onClick={() => editor?.commands.focus()}
+      >
+        <div style={{ maxWidth: 720 }}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   )
 }
 
-// ── EmptyState ────────────────────────────────────────────────────────────────
+// ── NoteListRow ───────────────────────────────────────────────────────────────
 
-function EmptyState({ onNew }: { onNew: () => void }) {
+function NoteListRow({
+  note, active, onClick, onDelete,
+}: {
+  note: NoteEntry; active: boolean; onClick: () => void; onDelete: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const preview = stripHtml(note.content).slice(0, 100)
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
+        background: active
+          ? 'var(--accent)'
+          : hover ? 'oklch(100% 0 0 / 0.04)' : 'transparent',
+        borderLeft: active ? 'none' : '2px solid transparent',
+        transition: 'background 120ms',
+        position: 'relative', marginBottom: 1,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 6 }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600, lineHeight: 1.3,
+          color: active ? 'var(--accent-ink)' : 'var(--fg)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+        }}>
+          {note.title || 'Ohne Titel'}
+        </span>
+        <span style={{
+          fontSize: 10, flexShrink: 0, fontFamily: 'var(--font-mono)',
+          color: active ? 'oklch(15% 0 0 / 0.45)' : 'var(--fg-dim)',
+        }}>
+          {fmtListTime(note.updatedAt)}
+        </span>
+      </div>
+
+      {preview && (
+        <div style={{
+          fontSize: 12, marginTop: 2, lineHeight: 1.45,
+          color: active ? 'oklch(15% 0 0 / 0.55)' : 'var(--fg-muted)',
+          overflow: 'hidden', display: '-webkit-box',
+          WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+        }}>
+          {preview}
+        </div>
+      )}
+
+      {hover && !active && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          style={{
+            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+            width: 20, height: 20, borderRadius: 5, border: 'none',
+            background: 'var(--surface-3)', color: 'var(--fg-muted)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        ><Trash2 size={10} /></button>
+      )}
+    </div>
+  )
+}
+
+// ── EmptyEditor ───────────────────────────────────────────────────────────────
+
+function EmptyEditor({ onNew }: { onNew: () => void }) {
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: 16,
-      color: 'var(--fg-dim)',
+      alignItems: 'center', justifyContent: 'center', gap: 14,
+      background: 'var(--bg)',
     }}>
-      <div style={{ fontSize: 40, opacity: 0.15 }}>✎</div>
+      <div style={{ fontSize: 48, opacity: 0.08, lineHeight: 1 }}>✎</div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 6 }}>
-          Keine Notiz ausgewählt
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>
+          Notiz auswählen oder neu anlegen
         </div>
         <button onClick={onNew} className="btn-primary" style={{ fontSize: 12 }}>
-          + Neue Notiz
+          <Plus size={13} /> Neue Notiz
         </button>
       </div>
     </div>
@@ -253,18 +353,21 @@ export function CustomerNotesPane({ accountId }: Props) {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const userId      = useAuthStore(s => s.user?.id) ?? ''
 
-  const [selectedId,     setSelectedId]     = useState<string | null>(null)
-  const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
-  const [search,         setSearch]         = useState('')
-  const [newFolderMode,  setNewFolderMode]  = useState(false)
-  const [newFolderName,  setNewFolderName]  = useState('')
+  const [selectedId,      setSelectedId]      = useState<string | null>(null)
+  const [activeFolderId,  setActiveFolderId]  = useState<string | null>(null)
+  const [search,          setSearch]          = useState('')
+  const [quickNote,       setQuickNote]       = useState('')
+  const [newFolderMode,   setNewFolderMode]   = useState(false)
+  const [newFolderName,   setNewFolderName]   = useState('')
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
+  const [editingName,     setEditingName]     = useState('')
 
   useEffect(() => { loadForAccount(accountId) }, [accountId, loadForAccount])
 
-  // Auto-select first note after load
+  // Auto-select first note
   useEffect(() => {
     if (!selectedId && entries.length > 0) setSelectedId(entries[0].id)
-  }, [entries.length])
+  }, [entries.length]) // eslint-disable-line
 
   const filteredEntries = useMemo(() => {
     let list = activeFolderId === null
@@ -280,18 +383,28 @@ export function CustomerNotesPane({ accountId }: Props) {
     return list
   }, [entries, activeFolderId, search])
 
-  const selectedNote = useMemo(
-    () => entries.find(e => e.id === selectedId) ?? null,
-    [entries, selectedId],
-  )
+  const groups     = useMemo(() => groupEntries(filteredEntries), [filteredEntries])
+  const selectedNote = useMemo(() => entries.find(e => e.id === selectedId) ?? null, [entries, selectedId])
 
-  const handleNewNote = async () => {
+  const handleNew = async (title?: string, content?: string) => {
     const note = await createEntry({
       workspaceId, accountId,
       folderId: activeFolderId,
-      content: '', createdBy: userId,
+      title: title?.trim() || undefined,
+      content: content || '',
+      createdBy: userId,
     })
     setSelectedId(note.id)
+    return note
+  }
+
+  const handleQuickNote = async (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey) return
+    e.preventDefault()
+    const text = quickNote.trim()
+    if (!text) return
+    setQuickNote('')
+    await handleNew(undefined, `<p>${text}</p>`)
   }
 
   const handleDelete = async (id: string) => {
@@ -317,24 +430,126 @@ export function CustomerNotesPane({ accountId }: Props) {
     setNewFolderMode(false)
   }
 
-  return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+  const handleRenameFolder = async () => {
+    if (!editingFolderId || !editingName.trim()) return
+    // updateFolder via store
+    const { updateFolder } = useNotesModuleStore.getState()
+    await updateFolder(editingFolderId, { name: editingName.trim() })
+    setEditingFolderId(null)
+  }
 
-      {/* ── Left panel ────────────────────────────────────────────────────── */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+
+      {/* ── Mappe-Tabs ──────────────────────────────────────────────────── */}
       <div style={{
-        width: 248, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        borderRight: '1px solid var(--border)', background: 'var(--surface)',
+        display: 'flex', alignItems: 'center', gap: 2,
+        padding: '0 16px',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+        flexShrink: 0, overflowX: 'auto',
+        scrollbarWidth: 'none',
       }}>
-        {/* Top bar */}
+        {/* "Alle" tab */}
+        <FolderTab
+          label="Alle"
+          count={entries.length}
+          active={activeFolderId === null}
+          onClick={() => setActiveFolderId(null)}
+        />
+
+        {folders.map(folder =>
+          editingFolderId === folder.id ? (
+            <div key={folder.id} style={{ display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+              <input
+                autoFocus
+                value={editingName}
+                onChange={e => setEditingName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter')  handleRenameFolder()
+                  if (e.key === 'Escape') setEditingFolderId(null)
+                }}
+                onBlur={handleRenameFolder}
+                style={{
+                  fontSize: 13, padding: '4px 8px', borderRadius: 6,
+                  border: '1px solid var(--accent)', background: 'var(--surface-2)',
+                  color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                  width: Math.max(80, editingName.length * 9),
+                }}
+              />
+            </div>
+          ) : (
+            <FolderTab
+              key={folder.id}
+              label={folder.name}
+              count={entries.filter(e => e.folderId === folder.id).length}
+              active={activeFolderId === folder.id}
+              onClick={() => setActiveFolderId(folder.id)}
+              onRename={() => { setEditingFolderId(folder.id); setEditingName(folder.name) }}
+              onDelete={() => { deleteFolder(folder.id); if (activeFolderId === folder.id) setActiveFolderId(null) }}
+            />
+          )
+        )}
+
+        {/* New folder */}
+        {newFolderMode ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 6px' }}>
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  handleCreateFolder()
+                if (e.key === 'Escape') { setNewFolderMode(false); setNewFolderName('') }
+              }}
+              onBlur={() => newFolderName.trim() ? handleCreateFolder() : setNewFolderMode(false)}
+              placeholder="Mappenname…"
+              style={{
+                fontSize: 13, padding: '4px 10px', borderRadius: 6,
+                border: '1px solid var(--accent)', background: 'var(--surface-2)',
+                color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', minWidth: 120,
+              }}
+            />
+            <button onClick={() => { setNewFolderMode(false); setNewFolderName('') }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 4 }}>
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setNewFolderMode(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '8px 10px', border: 'none', background: 'transparent',
+              color: 'var(--fg-dim)', cursor: 'pointer', fontSize: 12.5,
+              transition: 'color 140ms', whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-dim)')}
+          >
+            <Plus size={13} /> Mappe
+          </button>
+        )}
+      </div>
+
+      {/* ── Body: list + editor ──────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+        {/* Left: notes list */}
         <div style={{
-          padding: '12px 12px 8px', flexShrink: 0,
-          borderBottom: '1px solid var(--border)',
+          width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          borderRight: '1px solid var(--border)',
+          background: 'var(--surface)',
         }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          {/* Search + new button */}
+          <div style={{
+            display: 'flex', gap: 6, padding: '10px 10px 8px',
+            borderBottom: '1px solid var(--border)', flexShrink: 0,
+          }}>
             <div style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--surface-2)', borderRadius: 8,
-              padding: '5px 10px', border: '1px solid var(--border)',
+              padding: '6px 10px', border: '1px solid var(--border)',
             }}>
               <Search size={12} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />
               <input
@@ -342,158 +557,183 @@ export function CustomerNotesPane({ accountId }: Props) {
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Suchen…"
                 style={{
-                  flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                  fontSize: 12, color: 'var(--fg)',
+                  flex: 1, background: 'transparent', border: 'none',
+                  outline: 'none', fontSize: 12.5, color: 'var(--fg)',
                 }}
               />
-            </div>
-            <button
-              onClick={handleNewNote}
-              className="btn-primary"
-              title="Neue Notiz"
-              style={{ padding: '5px 10px', fontSize: 13, borderRadius: 8 }}
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {/* Folder pills */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <FolderPill
-              label="Alle"
-              active={activeFolderId === null}
-              count={entries.length}
-              onClick={() => setActiveFolderId(null)}
-            />
-            {folders.map(f => (
-              <FolderPill
-                key={f.id}
-                label={f.name}
-                active={activeFolderId === f.id}
-                count={entries.filter(e => e.folderId === f.id).length}
-                onClick={() => setActiveFolderId(f.id)}
-                onDelete={() => { deleteFolder(f.id); if (activeFolderId === f.id) setActiveFolderId(null) }}
-              />
-            ))}
-            {newFolderMode ? (
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter')  handleCreateFolder()
-                  if (e.key === 'Escape') { setNewFolderMode(false); setNewFolderName('') }
-                }}
-                onBlur={() => { if (newFolderName.trim()) handleCreateFolder(); else setNewFolderMode(false) }}
-                placeholder="Mappenname…"
-                style={{
-                  fontSize: 11, padding: '2px 8px', borderRadius: 99,
-                  border: '1px solid var(--accent)', background: 'var(--surface-2)',
-                  color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                  minWidth: 80,
-                }}
-              />
-            ) : (
-              <button
-                onClick={() => setNewFolderMode(true)}
-                style={{
-                  fontSize: 11, padding: '2px 7px', borderRadius: 99,
-                  border: '1px dashed var(--border)', background: 'transparent',
-                  color: 'var(--fg-dim)', cursor: 'pointer',
-                }}
-                title="Neue Mappe"
-              >+</button>
-            )}
-          </div>
-        </div>
-
-        {/* Notes list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
-          {loadingEntries ? (
-            <div style={{ padding: '20px 8px', fontSize: 12, color: 'var(--fg-dim)', textAlign: 'center' }}>
-              Lädt…
-            </div>
-          ) : filteredEntries.length === 0 ? (
-            <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--fg-dim)' }}>
-              <div style={{ fontSize: 12, marginBottom: 10 }}>
-                {search ? 'Keine Treffer' : 'Noch keine Notizen'}
-              </div>
-              {!search && (
-                <button onClick={handleNewNote} className="btn-ghost" style={{ fontSize: 11 }}>
-                  + Erste Notiz
+              {search && (
+                <button onClick={() => setSearch('')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 0, display: 'flex' }}>
+                  <X size={11} />
                 </button>
               )}
             </div>
-          ) : (
-            filteredEntries.map(note => (
-              <NoteListRow
-                key={note.id}
-                note={note}
-                active={note.id === selectedId}
-                onClick={() => setSelectedId(note.id)}
-                onDelete={() => handleDelete(note.id)}
-              />
-            ))
-          )}
-        </div>
-      </div>
+            <button
+              onClick={() => handleNew()}
+              title="Neue Notiz (Strg+N)"
+              style={{
+                width: 34, height: 34, borderRadius: 8, border: 'none',
+                background: 'var(--accent)', color: 'var(--accent-ink)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
 
-      {/* ── Editor panel ──────────────────────────────────────────────────── */}
-      {selectedNote ? (
-        <NoteEditor
-          key={selectedNote.id}
-          note={selectedNote}
-          folders={folders}
-          onUpdate={patch => handleUpdate(selectedNote.id, patch)}
-        />
-      ) : (
-        <EmptyState onNew={handleNewNote} />
-      )}
+          {/* Notes list — grouped by time */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
+            {loadingEntries ? (
+              <div style={{ padding: '24px 8px', textAlign: 'center', fontSize: 12, color: 'var(--fg-dim)' }}>
+                Lädt…
+              </div>
+            ) : groups.length === 0 ? (
+              <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--fg-dim)' }}>
+                <div style={{ fontSize: 12, marginBottom: 10 }}>
+                  {search ? 'Keine Treffer' : 'Noch keine Notizen'}
+                </div>
+                {!search && (
+                  <button onClick={() => handleNew()} className="btn-ghost" style={{ fontSize: 11 }}>
+                    + Erste Notiz
+                  </button>
+                )}
+              </div>
+            ) : (
+              groups.map(group => (
+                <div key={group.label} style={{ marginBottom: 8 }}>
+                  <div style={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
+                    textTransform: 'uppercase', color: 'var(--fg-dim)',
+                    fontFamily: 'var(--font-mono)',
+                    padding: '8px 12px 4px',
+                  }}>
+                    {group.label}
+                  </div>
+                  {group.entries.map(note => (
+                    <NoteListRow
+                      key={note.id}
+                      note={note}
+                      active={note.id === selectedId}
+                      onClick={() => setSelectedId(note.id)}
+                      onDelete={() => handleDelete(note.id)}
+                    />
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Quick Capture */}
+          <div style={{
+            padding: '8px 10px', borderTop: '1px solid var(--border)',
+            flexShrink: 0,
+          }}>
+            <textarea
+              value={quickNote}
+              onChange={e => setQuickNote(e.target.value)}
+              onKeyDown={handleQuickNote}
+              placeholder="Schnellnotiz… ↵"
+              rows={2}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                borderRadius: 8, padding: '7px 10px',
+                fontSize: 12, color: 'var(--fg)', resize: 'none',
+                outline: 'none', fontFamily: 'inherit', lineHeight: 1.5,
+                transition: 'border-color 140ms',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            />
+            <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
+              ↵ speichern · ⇧↵ neue Zeile
+            </div>
+          </div>
+        </div>
+
+        {/* Right: editor */}
+        {selectedNote ? (
+          <NoteEditor
+            key={selectedNote.id}
+            note={selectedNote}
+            folders={folders}
+            onUpdate={patch => handleUpdate(selectedNote.id, patch)}
+          />
+        ) : (
+          <EmptyEditor onNew={() => handleNew()} />
+        )}
+      </div>
     </div>
   )
 }
 
-// ── FolderPill ────────────────────────────────────────────────────────────────
+// ── FolderTab ─────────────────────────────────────────────────────────────────
 
-function FolderPill({
-  label, count, active, onClick, onDelete,
+function FolderTab({
+  label, count, active, onClick, onRename, onDelete,
 }: {
   label: string; count: number; active: boolean
-  onClick: () => void; onDelete?: () => void
+  onClick: () => void; onRename?: () => void; onDelete?: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
   return (
     <div
-      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+      style={{ position: 'relative', flexShrink: 0 }}
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseLeave={() => { setHover(false); setMenuOpen(false) }}
     >
       <button
         onClick={onClick}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '2px 8px', borderRadius: 99, cursor: 'pointer',
-          border: active ? 'none' : '1px solid var(--border)',
-          background: active ? 'var(--accent)' : 'transparent',
-          color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
-          fontSize: 11, fontWeight: active ? 600 : 400,
-          transition: 'background 120ms',
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '11px 14px', border: 'none', background: 'transparent',
+          cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 400,
+          color: active ? 'var(--fg)' : 'var(--fg-muted)',
+          borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+          marginBottom: -1,
+          transition: 'color 140ms',
+          whiteSpace: 'nowrap',
         }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg-2)' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
       >
         {label}
-        <span style={{ opacity: 0.65, fontSize: 10, fontFamily: 'var(--font-mono)' }}>{count}</span>
+        <span style={{
+          fontSize: 10.5, fontFamily: 'var(--font-mono)',
+          color: active ? 'var(--fg-dim)' : 'var(--fg-dim)', opacity: 0.7,
+        }}>{count}</span>
       </button>
+
+      {/* Hover context menu for folder tabs */}
       {hover && onDelete && (
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          style={{
-            position: 'absolute', right: -6, top: -5,
-            width: 14, height: 14, borderRadius: '50%', border: 'none',
-            background: 'var(--danger)', color: '#fff',
-            cursor: 'pointer', fontSize: 9, lineHeight: 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >×</button>
+        <div style={{
+          position: 'absolute', top: 4, right: 4,
+          display: 'flex', gap: 2,
+        }}>
+          {onRename && (
+            <button
+              onClick={e => { e.stopPropagation(); onRename() }}
+              style={{
+                width: 16, height: 16, borderRadius: 4, border: 'none',
+                background: 'var(--surface-3)', color: 'var(--fg-dim)',
+                cursor: 'pointer', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              title="Umbenennen"
+            >✎</button>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); onDelete() }}
+            style={{
+              width: 16, height: 16, borderRadius: 4, border: 'none',
+              background: 'var(--surface-3)', color: 'var(--fg-dim)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="Löschen"
+          ><X size={9} /></button>
+        </div>
       )}
     </div>
   )
