@@ -293,6 +293,22 @@ pub fn get_email_body(conn: &Connection, id: &str) -> rusqlite::Result<Option<Em
     Ok(rows.next().transpose()?)
 }
 
+pub fn get_email_uid_and_folder(conn: &Connection, id: &str) -> rusqlite::Result<Option<(u32, String, String)>> {
+    let mut stmt = conn.prepare("SELECT uid, folder, account_id FROM emails WHERE id = ?1")?;
+    let mut rows = stmt.query_map(params![id], |row| {
+        Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+    })?;
+    Ok(rows.next().transpose()?)
+}
+
+pub fn update_email_body(conn: &Connection, id: &str, body_text: &str, body_html: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE emails SET body_text = ?1, body_html = ?2 WHERE id = ?3",
+        params![body_text, body_html, id],
+    )?;
+    Ok(())
+}
+
 pub fn set_read(conn: &Connection, id: &str, is_read: bool) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE emails SET is_read = ?1 WHERE id = ?2",
@@ -385,6 +401,47 @@ pub fn get_folder_last_uid(
         params![account_id, folder],
         |row| row.get::<_, u32>(0),
     )
+}
+
+/// Entfernt Ordner-Eintrag und alle zugehörigen E-Mails aus dem lokalen Cache.
+pub fn delete_folder(conn: &Connection, account_id: &str, path: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "DELETE FROM emails WHERE account_id = ?1 AND folder = ?2",
+        params![account_id, path],
+    )?;
+    conn.execute(
+        "DELETE FROM folders WHERE account_id = ?1 AND path = ?2",
+        params![account_id, path],
+    )?;
+    Ok(())
+}
+
+/// Aktualisiert den Ordner einer E-Mail im lokalen Cache.
+/// Verwendet OR IGNORE um UID-Konflikte zu ignorieren (UID ist nach Move stale).
+pub fn update_email_folder(conn: &Connection, email_id: &str, target_folder: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE OR IGNORE emails SET folder = ?1 WHERE id = ?2",
+        params![target_folder, email_id],
+    )?;
+    Ok(())
+}
+
+/// Gibt die IMAP-Flags eines gecachten Ordners zurück (für Systemordner-Prüfung).
+pub fn get_folder_flags(
+    conn: &Connection,
+    account_id: &str,
+    path: &str,
+) -> rusqlite::Result<Vec<String>> {
+    let result = conn.query_row(
+        "SELECT flags FROM folders WHERE account_id = ?1 AND path = ?2",
+        params![account_id, path],
+        |row| row.get::<_, String>(0),
+    );
+    match result {
+        Ok(flags_json) => Ok(serde_json::from_str(&flags_json).unwrap_or_default()),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(vec![]),
+        Err(e) => Err(e),
+    }
 }
 
 // ── Attachment CRUD ───────────────────────────────────────────────────────────
@@ -526,5 +583,48 @@ mod tests {
         let conn = in_memory_db();
         let uid = get_folder_last_uid(&conn, "acc1", "INBOX").unwrap();
         assert_eq!(uid, 0);
+    }
+
+    #[test]
+    fn delete_folder_removes_emails_and_folder() {
+        let conn = in_memory_db();
+        conn.execute_batch(
+            "INSERT INTO folders (id, account_id, path, delimiter, display_name, is_selectable, sort_order)
+             VALUES ('f1','acc1','INBOX.Test','.','Test',1,0)"
+        ).unwrap();
+        conn.execute_batch(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, sent_at)
+             VALUES ('e1','acc1',1,'INBOX.Test','x@x.de','2026-01-01')"
+        ).unwrap();
+        delete_folder(&conn, "acc1", "INBOX.Test").unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM emails WHERE folder='INBOX.Test'", [], |r| r.get(0)
+        ).unwrap();
+        assert_eq!(count, 0);
+        let count2: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM folders WHERE path='INBOX.Test'", [], |r| r.get(0)
+        ).unwrap();
+        assert_eq!(count2, 0);
+    }
+
+    #[test]
+    fn update_email_folder_changes_folder() {
+        let conn = in_memory_db();
+        conn.execute_batch(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, sent_at)
+             VALUES ('e1','acc1',1,'INBOX','x@x.de','2026-01-01')"
+        ).unwrap();
+        update_email_folder(&conn, "e1", "INBOX.Archiv").unwrap();
+        let folder: String = conn.query_row(
+            "SELECT folder FROM emails WHERE id='e1'", [], |r| r.get(0)
+        ).unwrap();
+        assert_eq!(folder, "INBOX.Archiv");
+    }
+
+    #[test]
+    fn get_folder_flags_returns_empty_when_not_cached() {
+        let conn = in_memory_db();
+        let flags = get_folder_flags(&conn, "acc1", "INBOX.Unknown").unwrap();
+        assert!(flags.is_empty());
     }
 }
