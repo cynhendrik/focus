@@ -37,6 +37,7 @@ interface AuftraegeState {
   addZeiteintrag:       (payload: AddZeiteintragPayload) => void
   removeZeiteintrag:    (id: string) => void
   markBilledForAccount: (accountId: string, invoiceId: string) => void
+  markBilledEntries:    (entryIds: string[], invoiceId: string) => void
 
   unbilledForAccount: (accountId: string) => UnbilledSummary
   unbilledMinutes:    (auftragId: string) => number
@@ -94,6 +95,15 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
       z.accountId === accountId && !z.billed
         ? { ...z, billed: true, invoiceId }
         : z
+    )
+    save(KEY_ZEITEINTRAEGE, zeiteintraege)
+    set({ zeiteintraege })
+  },
+
+  markBilledEntries(entryIds, invoiceId) {
+    const idSet = new Set(entryIds)
+    const zeiteintraege = get().zeiteintraege.map(z =>
+      idSet.has(z.id) ? { ...z, billed: true, invoiceId } : z
     )
     save(KEY_ZEITEINTRAEGE, zeiteintraege)
     set({ zeiteintraege })
