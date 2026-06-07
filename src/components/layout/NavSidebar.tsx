@@ -8,7 +8,7 @@ import { useTodosStore } from '@/store/todos.store'
 import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock, Plug,
-  Settings, PanelLeftClose, PanelLeftOpen, PenLine, Sparkles,
+  Settings, PanelLeftClose, PanelLeftOpen, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -36,7 +36,6 @@ export function NavSidebar() {
   const appView         = useUiStore(s => s.appView)
   const setAppView      = useUiStore(s => s.setAppView)
   const collapsed       = useUiStore(s => s.sidebarCollapsed)
-  const setQuickCapture = useUiStore(s => s.setQuickCaptureOpen)
   const toggleSidebar   = useUiStore(s => s.toggleSidebar)
   const user            = useAuthStore(s => s.user)
 
@@ -99,7 +98,6 @@ export function NavSidebar() {
       </button>
 
       {/* HEUTE */}
-      {!collapsed && <SectionLabel>Heute</SectionLabel>}
       <div
         className="nav-item nav-item--primary"
         data-active={appView === 'dashboard' ? 'true' : 'false'}
@@ -111,15 +109,6 @@ export function NavSidebar() {
         {!collapsed && <span className="nav-kbd">H</span>}
       </div>
 
-      {/* KOMMUNIKATION */}
-      {!collapsed && <SectionLabel>Kommunikation</SectionLabel>}
-      <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
-        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
-      <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
-        onClick={() => setAppView('calendar')} />
-      <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
-        onClick={() => setAppView('zeitmanagement')} kbd="Z" />
-
       {/* WORKSPACE */}
       {!collapsed && <SectionLabel>Workspace</SectionLabel>}
       <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
@@ -129,18 +118,16 @@ export function NavSidebar() {
       <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" />
 
-      <div style={{ flex: 1 }} />
+      {/* KOMMUNIKATION */}
+      {!collapsed && <SectionLabel>Kommunikation</SectionLabel>}
+      <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
+      <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
+        onClick={() => setAppView('calendar')} />
+      <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
+        onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 
-      {/* Quick Capture */}
-      <button
-        type="button"
-        className="nav-capture"
-        onClick={() => setQuickCapture(true)}
-        title="Quick Capture (⌘⇧N)"
-      >
-        <PenLine size={15} style={{ flexShrink: 0 }} />
-        {!collapsed && <span>Quick Capture</span>}
-      </button>
+      <div style={{ flex: 1 }} />
 
       <NavItem icon={Plug}     label="Integrationen" active={appView === 'integrations'}
         onClick={() => setAppView('integrations')} />
