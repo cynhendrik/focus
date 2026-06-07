@@ -58,7 +58,8 @@ export function ArbeitsraumPane({ customerId }: Props) {
       TaskList,
       TaskItem.configure({ nested: true }),
       CharacterCount,
-      SlashCommands,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      SlashCommands as any,
     ],
     editorProps: {
       attributes: {

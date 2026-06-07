@@ -55,7 +55,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: List,
     keywords: ['bullet', 'liste', 'punkte'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleBulletList().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).toggleBulletList().run(),
   },
   {
     title: 'Nummerierte Liste',
@@ -63,7 +64,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: ListOrdered,
     keywords: ['ordered', 'numbered', 'liste', 'reihenfolge', 'schritte'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).toggleOrderedList().run(),
   },
   {
     title: 'Aufgaben',
@@ -71,7 +73,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: ListChecks,
     keywords: ['task', 'aufgabe', 'todo', 'checkbox', 'haken'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleTaskList().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).toggleList('taskList', 'taskItem').run(),
   },
   {
     title: 'Zitat',
@@ -79,7 +82,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: Quote,
     keywords: ['quote', 'zitat', 'callout'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).toggleBlockquote().run(),
   },
   {
     title: 'Codeblock',
@@ -87,7 +91,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: Code,
     keywords: ['code', 'codeblock', 'block'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).toggleCodeBlock().run(),
   },
   {
     title: 'Trennlinie',
@@ -95,7 +100,8 @@ export const SLASH_ITEMS: SlashCommandItem[] = [
     icon: Minus,
     keywords: ['divider', 'hr', 'linie', 'trenner'],
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (editor.chain().focus().deleteRange(range) as any).setHorizontalRule().run(),
   },
 ]
 
