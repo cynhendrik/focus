@@ -79,3 +79,22 @@ pub fn get_finance_kpis(
 ) -> Result<FinanceKpis, AppError> {
     db::invoice::get_finance_kpis(&db.conn(), &workspace_id)
 }
+
+#[tauri::command]
+pub fn get_invoice_sequence(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<(i64, i64), AppError> {
+    db::invoice::get_invoice_sequence(&db.conn(), &workspace_id)
+        .map_err(|e| AppError::Db(e.to_string()))
+}
+
+#[tauri::command]
+pub fn set_invoice_start_number(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+    start_number: i64,
+) -> Result<(), AppError> {
+    db::invoice::set_invoice_start_number(&db.conn(), &workspace_id, start_number)
+        .map_err(|e| AppError::Db(e.to_string()))
+}

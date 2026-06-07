@@ -238,6 +238,8 @@ fn main() {
             commands::invoice::get_invoice_suggestions,
             commands::invoice::get_invoices_by_account,
             commands::invoice::get_finance_kpis,
+            commands::invoice::get_invoice_sequence,
+            commands::invoice::set_invoice_start_number,
             commands::offer::get_offers,
             commands::offer::get_offer,
             commands::offer::create_offer,

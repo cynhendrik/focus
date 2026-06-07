@@ -184,10 +184,15 @@ fn replace_items(conn: &Connection, invoice_id: &str, items: &[UpsertInvoiceItem
 }
 
 fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, AppError> {
-    conn.execute(
-        "INSERT INTO invoice_sequences (workspace_id, next_number) VALUES (?1, 1)
-         ON CONFLICT(workspace_id) DO UPDATE SET next_number = next_number + 1",
+    let start: i64 = conn.query_row(
+        "SELECT COALESCE(start_number, 1) FROM invoice_sequences WHERE workspace_id = ?1",
         [workspace_id],
+        |r| r.get(0),
+    ).unwrap_or(1);
+    conn.execute(
+        "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) VALUES (?1, ?2, ?2)
+         ON CONFLICT(workspace_id) DO UPDATE SET next_number = next_number + 1",
+        rusqlite::params![workspace_id, start],
     )?;
     let n: i64 = conn.query_row(
         "SELECT next_number FROM invoice_sequences WHERE workspace_id = ?1",
@@ -196,6 +201,30 @@ fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, 
     )?;
     let year = chrono::Utc::now().format("%Y");
     Ok(format!("{year}-{n:05}"))
+}
+
+pub fn get_invoice_sequence(conn: &Connection, workspace_id: &str) -> rusqlite::Result<(i64, i64)> {
+    conn.query_row(
+        "SELECT next_number, COALESCE(start_number, 1) FROM invoice_sequences WHERE workspace_id = ?1",
+        [workspace_id],
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+    ).or(Ok((0, 1)))
+}
+
+pub fn set_invoice_start_number(conn: &Connection, workspace_id: &str, start: i64) -> rusqlite::Result<()> {
+    // Cannot go below already-issued numbers to prevent duplicates.
+    let current_next: i64 = conn.query_row(
+        "SELECT next_number FROM invoice_sequences WHERE workspace_id = ?1",
+        [workspace_id],
+        |r| r.get(0),
+    ).unwrap_or(0);
+    let effective_next = std::cmp::max(start - 1, current_next);
+    conn.execute(
+        "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) VALUES (?1, ?2, ?3)
+         ON CONFLICT(workspace_id) DO UPDATE SET start_number = ?3, next_number = ?2",
+        rusqlite::params![workspace_id, effective_next, start],
+    )?;
+    Ok(())
 }
 
 pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<InvoiceWithItems, AppError> {

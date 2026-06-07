@@ -37,6 +37,12 @@ export const FinanceService = {
   getFinanceKpis(workspaceId: string): Promise<FinanceKpis> {
     return invoke('get_finance_kpis', { workspaceId })
   },
+  getInvoiceSequence(workspaceId: string): Promise<[number, number]> {
+    return invoke('get_invoice_sequence', { workspaceId })
+  },
+  setInvoiceStartNumber(workspaceId: string, startNumber: number): Promise<void> {
+    return invoke('set_invoice_start_number', { workspaceId, startNumber })
+  },
 
   // ── Offers ────────────────────────────────────────────────────────────────
   getOffers(workspaceId: string): Promise<Offer[]> {

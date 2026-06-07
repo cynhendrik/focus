@@ -316,12 +316,14 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
 
         CREATE TABLE IF NOT EXISTS invoice_sequences (
             workspace_id TEXT PRIMARY KEY,
-            next_number  INTEGER NOT NULL DEFAULT 1
+            next_number  INTEGER NOT NULL DEFAULT 1,
+            start_number INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS offer_sequences (
             workspace_id TEXT PRIMARY KEY,
-            next_number  INTEGER NOT NULL DEFAULT 1
+            next_number  INTEGER NOT NULL DEFAULT 1,
+            start_number INTEGER NOT NULL DEFAULT 1
         );
 
         CREATE TABLE IF NOT EXISTS invoices (

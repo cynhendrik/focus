@@ -1,11 +1,43 @@
 import { create } from 'zustand'
+import { invoke } from '@tauri-apps/api/core'
 import { FinanceService } from '@/services/finance.service'
+import { getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
 import { log } from '@/lib/logger'
 import type {
   Invoice, InvoiceWithItems, UpsertInvoicePayload,
   Offer, OfferWithItems, UpsertOfferPayload,
   FinanceKpis, InvoiceStatus,
 } from '@/types/finance.types'
+
+async function tryAutoSaveToAblage(invoice: Invoice): Promise<void> {
+  try {
+    const { useWorkspaceStore } = await import('@/store/workspace.store')
+    const { useAccountsStore }  = await import('@/store/accounts.store')
+    const { useCompanyStore }   = await import('@/store/company.store')
+
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId
+    if (!workspaceId || !invoice.number) return
+
+    const account = useAccountsStore.getState().accounts.find(a => a.id === invoice.accountId)
+    if (!account) return
+
+    const full = await FinanceService.getInvoice(invoice.id)
+    const profile = useCompanyStore.getState().profile
+    const bytes = await getInvoicePdfBytes(full, profile, account)
+    const arr = Array.from(bytes)
+
+    await invoke('cmd_save_invoice_to_ablage', {
+      workspaceId,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.number,
+      accountName: account.name,
+      invoiceDate: invoice.date,
+      pdfData: arr,
+    })
+  } catch {
+    // Ablage-Fehler unterdrücken — Hauptoperation bleibt unberührt
+  }
+}
 
 type InvoiceFilter = InvoiceStatus | 'all' | 'suggestions'
 type ActiveTab = 'invoices' | 'offers' | 'kpis'
@@ -124,6 +156,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? approved : i),
     }))
+    // Neue Rechnung → automatisch in Kunden-Ablage speichern
+    tryAutoSaveToAblage(approved)
   },
 
   updateInvoiceStatus: async (id, status) => {
@@ -131,6 +165,10 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? updated : i),
     }))
+    // Bei "Bezahlt" oder "Offen (versendet)" → automatisch in Kunden-Ablage
+    if (status === 'paid' || status === 'open') {
+      tryAutoSaveToAblage(updated)
+    }
   },
 
   createOffer: async (payload) => {
