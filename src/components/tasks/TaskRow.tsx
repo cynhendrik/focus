@@ -1,5 +1,5 @@
 // src/components/tasks/TaskRow.tsx
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
@@ -18,8 +18,9 @@ const PRIO_LABEL: Record<TodoPriority, string> = {
 interface Props { todo: Todo }
 
 export function TaskRow({ todo }: Props) {
-  const [open, setOpen] = useState(false)
-  const accounts        = useAccountsStore(s => s.accounts)
+  const [open, setOpen]   = useState(false)
+  const [hover, setHover] = useState(false)
+  const accounts          = useAccountsStore(s => s.accounts)
   const complete        = useTodosStore(s => s.complete)
   const remove          = useTodosStore(s => s.remove)
   const toggleChecklist = useTodosStore(s => s.toggleChecklist)
@@ -50,18 +51,19 @@ export function TaskRow({ todo }: Props) {
   return (
     <div
       onClick={() => setOpen(o => !o)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
         position: 'relative',
         display: 'flex', flexDirection: 'column',
         padding: '12px 14px 12px 18px',
         background: 'var(--surface-2)',
-        border: '1px solid var(--border)', borderRadius: 12,
+        border: `1px solid ${hover ? 'var(--border-strong)' : 'var(--border)'}`,
+        borderRadius: 12,
         cursor: 'pointer',
         opacity: todo.status === 'done' ? 0.6 : 1,
         transition: 'border-color 180ms',
       }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
     >
       <div style={{
         position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,
@@ -138,6 +140,24 @@ export function TaskRow({ todo }: Props) {
           <span style={{ fontSize: 11.5, color: 'var(--fg-muted)' }}>
             {todo.plannedMinutes}m
           </span>
+        )}
+
+        {todo.status === 'done' && (
+          <button
+            onClick={e => { e.stopPropagation(); remove(todo.id) }}
+            title="Löschen"
+            style={{
+              width: 26, height: 26, borderRadius: 7, border: 'none',
+              background: hover ? 'oklch(72% 0.18 25 / 0.12)' : 'transparent',
+              color: hover ? 'var(--danger)' : 'var(--fg-dim)',
+              opacity: hover ? 1 : 0.4,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'background 120ms, color 120ms, opacity 120ms',
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
         )}
       </div>
 
