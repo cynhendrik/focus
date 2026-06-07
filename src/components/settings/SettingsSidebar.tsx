@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Building2, Plug, Code2, AlertTriangle } from 'lucide-react'
 
 const ITEMS: { key: SettingsTab; label: string; icon: LucideIcon; dividerBefore?: boolean }[] = [
-  { key: 'workspace',     label: 'Workspace',             icon: Building2                    },
+  { key: 'workspace',     label: 'Unternehmen',            icon: Building2                    },
   { key: 'integrationen', label: 'Module & Integrationen', icon: Plug, dividerBefore: true   },
   { key: 'developer',     label: 'Entwickler',             icon: Code2                       },
   { key: 'gefahrenzone',  label: 'Gefahrenzone',           icon: AlertTriangle               },

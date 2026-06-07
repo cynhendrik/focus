@@ -85,8 +85,8 @@ export function WorkspaceSettings({ workspaceId }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
       <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Workspace</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Workspace- und Unternehmenseinstellungen</p>
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Unternehmen</h2>
+        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Firmendaten, Rechnungsdesign und Erscheinungsbild</p>
       </div>
 
       {/* Workspace */}
