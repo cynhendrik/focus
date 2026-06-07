@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Plus, Trash2, Search, X, Bold, Italic, List, CheckSquare, Heading2 } from 'lucide-react'
+import { Plus, Trash2, Search, X, Bold, Italic, List, CheckSquare, Heading2, PenLine } from 'lucide-react'
 import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useWorkspaceStore }   from '@/store/workspace.store'
 import { useAuthStore }        from '@/store/auth.store'
@@ -321,7 +321,7 @@ function EmptyEditor({ onNew }: { onNew: () => void }) {
       alignItems: 'center', justifyContent: 'center', gap: 14,
       background: 'var(--bg)',
     }}>
-      <div style={{ fontSize: 48, opacity: 0.08, lineHeight: 1 }}>✎</div>
+      <PenLine size={40} style={{ opacity: 0.15, color: 'var(--fg-dim)' }} />
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>
           Notiz auswählen oder neu anlegen
