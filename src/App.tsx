@@ -45,7 +45,7 @@ import { PrivateShell }          from '@/routes/private/PrivateShell'
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
-import { GlobalQuickComposer } from '@/components/global/GlobalQuickComposer'
+import { QuickNotePanel }     from '@/components/global/QuickNotePanel'
 import { ToastViewport }       from '@/components/ui/Toast'
 import { SplashScreen }        from '@/components/ui/SplashScreen'
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
@@ -278,7 +278,7 @@ export default function App() {
       <ZeitPanel />
       <DownloadToast />
       <ToastViewport />
-      <GlobalQuickComposer />
+      <QuickNotePanel />
       {showOnboarding && (
         <OnboardingWizard onComplete={() => setOnboardingDismissed(true)} />
       )}
