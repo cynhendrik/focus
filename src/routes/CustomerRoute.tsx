@@ -135,7 +135,7 @@ export function CustomerRoute({ customerId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
       {/* Header */}
       <div className="detail-head">
         <button className="back" onClick={() => setSelected(null)}>
