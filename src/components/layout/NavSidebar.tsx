@@ -7,7 +7,7 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import {
   Home, Users, CreditCard, Target,
-  Mail, Calendar, Clock, Plug,
+  Mail, Calendar, Clock,
   Settings, PanelLeftClose, PanelLeftOpen, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -129,9 +129,7 @@ export function NavSidebar() {
 
       <div style={{ flex: 1 }} />
 
-      <NavItem icon={Plug}     label="Integrationen" active={appView === 'integrations'}
-        onClick={() => setAppView('integrations')} />
-      <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings'}
+      <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings' || appView === 'integrations'}
         onClick={() => setAppView('settings')} />
 
       {/* Profil + Einklappen */}
