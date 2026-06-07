@@ -34,6 +34,7 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
   const [title,       setTitle]       = useState(entry.title ?? '')
   const [showTags,    setShowTags]    = useState(false)
   const [showFolders, setShowFolders] = useState(false)
+  const [hover,       setHover]       = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const editor = useEditor({
@@ -71,153 +72,119 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
     onUpdate({ tags: JSON.stringify(next) })
   }
 
-  const preview = stripHtml(entry.content).slice(0, 140)
+  const preview = stripHtml(entry.content).slice(0, 160)
 
   return (
-    <div style={{
-      background: 'var(--bg2)',
-      border: `1px solid ${expanded ? 'rgba(181,240,35,0.2)' : 'rgba(255,255,255,0.07)'}`,
-      borderRadius: 12, marginBottom: 10,
-      transition: 'border-color 160ms',
-    }}>
-      {/* Header */}
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        borderRadius: 10,
+        background: expanded ? 'var(--surface)' : hover ? 'var(--surface)' : 'transparent',
+        border: expanded ? '1px solid var(--border)' : `1px solid ${hover ? 'var(--border)' : 'transparent'}`,
+        marginBottom: 2,
+        transition: 'background 140ms, border-color 140ms',
+      }}
+    >
+      {/* Header row */}
       <div
         onClick={() => setExpanded(e => !e)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '11px 14px', cursor: 'pointer',
-        }}
+        style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', cursor: 'pointer' }}
       >
-        <div style={{
-          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-          background: 'rgba(181,240,35,0.12)', color: 'var(--accent)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 700,
-        }}>
-          {entry.createdBy.slice(0, 2).toUpperCase()}
-        </div>
-
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: 13, fontWeight: 600,
-            color: entry.title ? 'var(--fg)' : 'var(--fg-dim)',
+            fontSize: 13, fontWeight: entry.title ? 600 : 400,
+            color: entry.title ? 'var(--fg)' : 'var(--fg-muted)',
             fontStyle: entry.title ? 'normal' : 'italic',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             {entry.title || 'Ohne Titel'}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-            <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
-              {fmtTime(entry.createdAt)}
-            </span>
-            {entry.tags.map(tag => (
-              <span key={tag} style={{
-                fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
-                background: 'rgba(181,240,35,0.1)', color: 'var(--accent)',
-                padding: '1px 6px', borderRadius: 99,
-              }}>{tag}</span>
-            ))}
-          </div>
+
+          {!expanded && preview && (
+            <div style={{
+              fontSize: 12, color: 'var(--fg-muted)', marginTop: 2,
+              overflow: 'hidden', display: '-webkit-box',
+              WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+              lineHeight: 1.5,
+            }}>
+              {preview}
+            </div>
+          )}
+
+          {(entry.tags.length > 0) && (
+            <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+              {entry.tags.map(tag => (
+                <span key={tag} style={{
+                  fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-mono)',
+                  background: 'var(--accent-soft)', color: 'var(--accent-text)',
+                  padding: '1px 6px', borderRadius: 99,
+                }}>{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
 
-        {expanded && (
-          <div style={{ display: 'flex', gap: 4, position: 'relative' }} onClick={e => e.stopPropagation()}>
-            {folders.length > 0 && (
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setShowFolders(s => !s)}
-                  title="In Mappe verschieben"
-                  style={{
-                    width: 26, height: 26, borderRadius: 6, border: 'none',
-                    background: showFolders ? 'rgba(181,240,35,0.1)' : 'transparent',
-                    color: showFolders ? 'var(--accent)' : 'var(--fg-dim)',
-                    cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                ><FolderInput size={13} /></button>
-                {showFolders && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', right: 0,
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 10, padding: 4, minWidth: 160,
-                    boxShadow: 'var(--shadow-2)', zIndex: 50,
-                    display: 'flex', flexDirection: 'column', gap: 2,
-                  }}>
-                    <FolderDropItem
-                      label="Kein Ordner"
-                      active={entry.folderId === null}
-                      onClick={() => { onMoveToFolder(null); setShowFolders(false) }}
-                    />
-                    {folders.map(f => (
-                      <FolderDropItem
-                        key={f.id}
-                        label={f.name}
-                        active={entry.folderId === f.id}
-                        onClick={() => { onMoveToFolder(f.id); setShowFolders(false) }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <button
-              onClick={() => setShowTags(s => !s)}
-              title="Tags"
-              style={{
-                width: 26, height: 26, borderRadius: 6, border: 'none',
-                background: showTags ? 'rgba(181,240,35,0.1)' : 'transparent',
-                color: showTags ? 'var(--accent)' : 'var(--fg-dim)',
-                cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >#</button>
-            <button
-              onClick={onDelete}
-              title="Löschen"
-              style={{
-                width: 26, height: 26, borderRadius: 6, border: 'none',
-                background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            ><Trash2 size={12} /></button>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+            {fmtTime(entry.createdAt)}
+          </span>
+
+          {(hover || expanded) && (
+            <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+              {folders.length > 0 && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setShowFolders(s => !s)}
+                    title="In Mappe verschieben"
+                    style={iconBtn(showFolders)}
+                  ><FolderInput size={12} /></button>
+                  {showFolders && (
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 10, padding: 4, minWidth: 160,
+                      boxShadow: 'var(--shadow-2)', zIndex: 50,
+                    }}>
+                      <FolderDropItem label="Kein Ordner" active={entry.folderId === null}
+                        onClick={() => { onMoveToFolder(null); setShowFolders(false) }} />
+                      {folders.map(f => (
+                        <FolderDropItem key={f.id} label={f.name} active={entry.folderId === f.id}
+                          onClick={() => { onMoveToFolder(f.id); setShowFolders(false) }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <button onClick={() => setShowTags(s => !s)} title="Tags" style={iconBtn(showTags)}>
+                <span style={{ fontSize: 10, fontWeight: 700 }}>#</span>
+              </button>
+              <button onClick={onDelete} title="Löschen" style={iconBtn(false)}>
+                <Trash2 size={11} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tag picker */}
       {expanded && showTags && (
-        <div style={{ padding: '6px 14px 10px 52px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ padding: '0 12px 10px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {AVAILABLE_TAGS.map(tag => (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              style={{
-                padding: '3px 9px', borderRadius: 99, cursor: 'pointer', border: '1px solid',
-                borderColor: entry.tags.includes(tag) ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                background: entry.tags.includes(tag) ? 'rgba(181,240,35,0.1)' : 'transparent',
-                color: entry.tags.includes(tag) ? 'var(--accent)' : 'var(--fg-dim)',
-                fontSize: 11, fontWeight: 600, fontFamily: 'inherit', transition: 'all 140ms',
-              }}
-            >{tag}</button>
+            <button key={tag} onClick={() => toggleTag(tag)} style={{
+              padding: '3px 9px', borderRadius: 99, cursor: 'pointer', border: '1px solid',
+              borderColor: entry.tags.includes(tag) ? 'var(--accent)' : 'var(--border)',
+              background: entry.tags.includes(tag) ? 'var(--accent-soft)' : 'transparent',
+              color: entry.tags.includes(tag) ? 'var(--accent-text)' : 'var(--fg-muted)',
+              fontSize: 11, fontWeight: 600, fontFamily: 'inherit', transition: 'all 140ms',
+            }}>{tag}</button>
           ))}
-        </div>
-      )}
-
-      {/* Preview (collapsed) */}
-      {!expanded && preview && (
-        <div style={{
-          padding: '0 14px 11px 52px', fontSize: 12.5,
-          color: 'var(--fg-muted)', lineHeight: 1.6,
-          overflow: 'hidden', display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-        }}>
-          {preview}
         </div>
       )}
 
       {/* Editor (expanded) */}
       {expanded && (
-        <div style={{ padding: '4px 14px 14px 52px' }}>
+        <div style={{ padding: '0 12px 12px' }}>
           <input
             value={title}
             onChange={e => { setTitle(e.target.value); saveTitle(e.target.value) }}
@@ -225,15 +192,15 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
             onClick={e => e.stopPropagation()}
             style={{
               display: 'block', width: '100%', border: 'none', background: 'transparent',
-              fontSize: 14, fontWeight: 700, color: 'var(--fg)', outline: 'none',
-              fontFamily: 'inherit', marginBottom: 8,
+              fontSize: 13.5, fontWeight: 700, color: 'var(--fg)', outline: 'none',
+              fontFamily: 'inherit', marginBottom: 6,
             }}
           />
           <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
             {([
-              ['B', () => editor?.chain().focus().toggleBold().run(), { fontWeight: 700 }],
-              ['I', () => editor?.chain().focus().toggleItalic().run(), { fontStyle: 'italic' }],
-              ['H1', () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), { fontWeight: 700, fontSize: 10 }],
+              ['B', () => editor?.chain().focus().toggleBold().run(),    { fontWeight: 700 }],
+              ['I', () => editor?.chain().focus().toggleItalic().run(),  { fontStyle: 'italic' }],
+              ['H1',() => editor?.chain().focus().toggleHeading({ level: 1 }).run(), { fontWeight: 700, fontSize: 10 }],
               ['•', () => editor?.chain().focus().toggleBulletList().run(), {}],
               ['☐', () => editor?.chain().focus().toggleTaskList().run(), {}],
             ] as const).map(([label, action, style]) => (
@@ -243,14 +210,14 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
                 style={{
                   padding: '2px 7px', borderRadius: 5, border: 'none',
                   background: 'transparent', color: 'var(--fg-dim)', cursor: 'pointer',
-                  fontSize: 11, fontFamily: 'inherit', transition: 'all 120ms',
+                  fontSize: 11, fontFamily: 'inherit',
                   ...(style as React.CSSProperties),
                 }}
               >{label as string}</button>
             ))}
           </div>
           <div style={{
-            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)',
+            background: 'var(--bg)', border: '1px solid var(--border)',
             borderRadius: 8, padding: '10px 12px',
           }}>
             <EditorContent editor={editor} />
@@ -259,6 +226,16 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
       )}
     </div>
   )
+}
+
+function iconBtn(active: boolean): React.CSSProperties {
+  return {
+    width: 24, height: 24, borderRadius: 6, border: 'none',
+    background: active ? 'var(--surface-2)' : 'transparent',
+    color: active ? 'var(--fg)' : 'var(--fg-dim)',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'background 120ms, color 120ms',
+  }
 }
 
 function FolderDropItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
@@ -273,7 +250,7 @@ function FolderDropItem({ label, active, onClick }: { label: string; active: boo
         padding: '6px 10px', borderRadius: 7, width: '100%', textAlign: 'left',
         background: active ? 'var(--accent-soft)' : hover ? 'var(--surface-2)' : 'none',
         border: 'none', cursor: 'pointer',
-        fontSize: 12.5, color: active ? 'var(--accent)' : 'var(--fg-2)',
+        fontSize: 12.5, color: active ? 'var(--accent-text)' : 'var(--fg-2)',
         fontFamily: 'inherit', transition: 'background 80ms',
       }}
     >
