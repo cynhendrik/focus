@@ -9,7 +9,7 @@ import { useCompanyStore } from '@/store/company.store'
 import {
   Home, Users, CreditCard,
   Target, TrendingUp, Reply,
-  Mail, Calendar, Clock,
+  Mail, Calendar,
   Settings, PanelLeftClose, PanelLeftOpen, Sparkles,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -129,12 +129,10 @@ export function NavSidebar() {
 
       {/* ── INBOX ─────────────────────────────────────────────────────── */}
       {!collapsed && <SectionLabel>Inbox</SectionLabel>}
-      {mod('mail')     && <NavItem icon={Mail}     label="Mail"      active={appView === 'posteingang' || appView === 'mail'}
+      {mod('mail')     && <NavItem icon={Mail}     label="Mail"     active={appView === 'posteingang' || appView === 'mail'}
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />}
-      {mod('kalender') && <NavItem icon={Calendar} label="Kalender"  active={appView === 'calendar'}
+      {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
-      <NavItem icon={Clock}    label="Zeit"      active={appView === 'zeitmanagement'}
-        onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 
       <div style={{ flex: 1 }} />
 
