@@ -106,32 +106,36 @@ export function CorraRoute() {
   }, [phase, messages, todos, invoices, emails, deals, calendarEvents, accounts])
 
   const handleExecuteAction = useCallback(async (action: CorraActionItem) => {
-    if (action.type === 'invoice') {
-      const inv = invoices.find(i => i.id === action.id)
-      await upsertTodo({
-        title: `Mahnung: ${action.label}`,
-        actionType: 'send_reminder',
-        sourceRef: action.id,
-        customerId: inv?.accountId,
-        bucket: 'today', priority: 'p1', checklist: [], tags: [],
-      })
-      showToast({ message: `Mahnung für ${action.label} angelegt.`, variant: 'success' })
-    } else if (action.type === 'mail') {
-      const mail = emails.find(e => e.id === action.id)
-      await upsertTodo({
-        title: `${action.label} beantworten`,
-        actionType: 'reply_mail',
-        sourceRef: action.id,
-        customerId: mail?.customerId ?? undefined,
-        bucket: 'today', priority: 'p1', checklist: [], tags: [],
-      })
-      showToast({ message: `Task für ${action.label} angelegt.`, variant: 'success' })
-    } else if (action.type === 'todo') {
-      await upsertTodo({
-        title: action.label,
-        bucket: 'today', priority: 'p1', checklist: [], tags: [],
-      })
-      showToast({ message: 'Task angelegt.', variant: 'success' })
+    try {
+      if (action.type === 'invoice') {
+        const inv = invoices.find(i => i.id === action.id)
+        await upsertTodo({
+          title: `Mahnung: ${action.label}`,
+          actionType: 'send_reminder',
+          sourceRef: action.id,
+          customerId: inv?.accountId,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
+        showToast({ message: `Mahnung für ${action.label} angelegt.`, variant: 'success' })
+      } else if (action.type === 'mail') {
+        const mail = emails.find(e => e.id === action.id)
+        await upsertTodo({
+          title: `${action.label} beantworten`,
+          actionType: 'reply_mail',
+          sourceRef: action.id,
+          customerId: mail?.customerId ?? undefined,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
+        showToast({ message: `Task für ${action.label} angelegt.`, variant: 'success' })
+      } else if (action.type === 'todo') {
+        await upsertTodo({
+          title: action.label,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
+        showToast({ message: 'Task angelegt.', variant: 'success' })
+      }
+    } catch {
+      showToast({ message: 'Aktion konnte nicht ausgeführt werden.', variant: 'error' })
     }
   }, [invoices, emails, upsertTodo, showToast])
 
