@@ -231,8 +231,11 @@ export default function App() {
 
   // Use selected customer ID as part of the key so opening different customers
   // also triggers the transition (CustomerRoute is rendered via appView='clients').
+  // Sales sub-views share one route key so AkquiseRoute isn't re-mounted on tab switch
+  const SALES_VIEWS = new Set<string>(['akquise', 'leads', 'pipeline', 'followups', 'sales'])
   const routeKey = appView === 'clients' && selectedCustomerId
     ? `clients:${selectedCustomerId}`
+    : SALES_VIEWS.has(appView) ? 'akquise'
     : appView
 
   // First-run onboarding: shown if user has never completed it AND there are

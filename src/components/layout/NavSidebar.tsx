@@ -7,7 +7,8 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCompanyStore } from '@/store/company.store'
 import {
-  Home, Users, CreditCard, Target,
+  Home, Users, CreditCard,
+  Target, TrendingUp, Reply,
   Mail, Calendar, Clock,
   Settings, PanelLeftClose, PanelLeftOpen, Sparkles,
 } from 'lucide-react'
@@ -60,10 +61,13 @@ export function NavSidebar() {
     const v = modules[key]; return v === undefined ? defaultOn : !!v
   }
 
-  const akquiseBadge  = (newLeadsCount + openDealCount) || undefined
-  const corraBadge    = overdueCount + unreadMails + todayTodos || undefined
-  const displayName   = user?.email?.split('@')[0] ?? 'Nutzer'
-  const initials      = displayName.slice(0, 2).toUpperCase()
+  const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
+  const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
+  const initials    = displayName.slice(0, 2).toUpperCase()
+
+  // Sales views — any of the three counts as "sales active"
+  const SALES_VIEWS = new Set(['akquise', 'leads', 'pipeline', 'followups', 'sales'])
+  const inSales = SALES_VIEWS.has(appView)
 
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
@@ -83,7 +87,7 @@ export function NavSidebar() {
         </div>
       </div>
 
-      {/* CORRA — prominent AI card */}
+      {/* KORA */}
       <button
         type="button"
         className="nav-corra-card"
@@ -98,39 +102,38 @@ export function NavSidebar() {
           <span className="nav-corra-card__title">KORA</span>
           <span className="nav-corra-card__sub">KI-ASSISTENT</span>
         </div>
-        {corraBadge ? (
-          <span className="nav-corra-card__badge">{corraBadge}</span>
-        ) : null}
+        {corraBadge ? <span className="nav-corra-card__badge">{corraBadge}</span> : null}
       </button>
 
-      {/* HEUTE */}
-      <div
-        className="nav-item nav-item--primary"
-        data-active={appView === 'dashboard' ? 'true' : 'false'}
-        onClick={() => setAppView('dashboard')}
-        title="Heute (H)"
-      >
-        <Home size={16} />
-        <span>Heute</span>
-        {!collapsed && <span className="nav-kbd">H</span>}
-      </div>
-
-      {/* WORKSPACE */}
+      {/* ── WORKSPACE ─────────────────────────────────────────────────── */}
       {!collapsed && <SectionLabel>Workspace</SectionLabel>}
+      <NavItem icon={Home}       label="Heute"    active={appView === 'dashboard'}
+        onClick={() => setAppView('dashboard')} kbd="H" />
       {mod('crm')      && <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
         onClick={() => setAppView('clients')} kbd="C" />}
-      {mod('crm')      && <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
-        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A" />}
       {mod('finanzen') && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
-        onClick={() => setAppView('invoices')} kbd="F" />}
+        onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
 
-      {/* KOMMUNIKATION */}
-      {!collapsed && <SectionLabel>Kommunikation</SectionLabel>}
-      {mod('mail')     && <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
+      {/* ── SALES ─────────────────────────────────────────────────────── */}
+      {mod('crm') && (
+        <>
+          {!collapsed && <SectionLabel>Sales</SectionLabel>}
+          <NavItem icon={Target}     label="Leads"      active={inSales && appView !== 'pipeline' && appView !== 'followups'}
+            onClick={() => setAppView('leads')} badge={newLeadsCount || undefined} kbd="L" />
+          <NavItem icon={Reply}      label="Follow-ups" active={appView === 'followups'}
+            onClick={() => setAppView('followups')} />
+          <NavItem icon={TrendingUp} label="Pipeline"   active={appView === 'pipeline'}
+            onClick={() => setAppView('pipeline')} badge={openDealCount || undefined} />
+        </>
+      )}
+
+      {/* ── INBOX ─────────────────────────────────────────────────────── */}
+      {!collapsed && <SectionLabel>Inbox</SectionLabel>}
+      {mod('mail')     && <NavItem icon={Mail}     label="Mail"      active={appView === 'posteingang' || appView === 'mail'}
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />}
-      {mod('kalender') && <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
+      {mod('kalender') && <NavItem icon={Calendar} label="Kalender"  active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
-      <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
+      <NavItem icon={Clock}    label="Zeit"      active={appView === 'zeitmanagement'}
         onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 
       <div style={{ flex: 1 }} />
