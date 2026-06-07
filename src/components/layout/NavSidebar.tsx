@@ -5,6 +5,7 @@ import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
+import { useCompanyStore } from '@/store/company.store'
 import {
   Home, Users, CreditCard, Target,
   Mail, Calendar, Clock,
@@ -53,6 +54,11 @@ export function NavSidebar() {
   const todayTodos = useTodosStore(s =>
     s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')).length
   )
+
+  const modules = useCompanyStore(s => s.modules)
+  const mod = (key: keyof typeof modules, defaultOn = true) => {
+    const v = modules[key]; return v === undefined ? defaultOn : !!v
+  }
 
   const akquiseBadge  = (newLeadsCount + openDealCount) || undefined
   const corraBadge    = overdueCount + unreadMails + todayTodos || undefined
@@ -111,19 +117,19 @@ export function NavSidebar() {
 
       {/* WORKSPACE */}
       {!collapsed && <SectionLabel>Workspace</SectionLabel>}
-      <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
-        onClick={() => setAppView('clients')} kbd="C" />
-      <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
-        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A" />
-      <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
-        onClick={() => setAppView('invoices')} kbd="F" />
+      {mod('crm')      && <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
+        onClick={() => setAppView('clients')} kbd="C" />}
+      {mod('crm')      && <NavItem icon={Target}     label="Akquise"  active={appView === 'akquise'}
+        onClick={() => setAppView('akquise')} badge={akquiseBadge} kbd="A" />}
+      {mod('finanzen') && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
+        onClick={() => setAppView('invoices')} kbd="F" />}
 
       {/* KOMMUNIKATION */}
       {!collapsed && <SectionLabel>Kommunikation</SectionLabel>}
-      <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
-        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />
-      <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
-        onClick={() => setAppView('calendar')} />
+      {mod('mail')     && <NavItem icon={Mail}     label="Posteingang"    active={appView === 'posteingang'}
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />}
+      {mod('kalender') && <NavItem icon={Calendar} label="Kalender"       active={appView === 'calendar'}
+        onClick={() => setAppView('calendar')} />}
       <NavItem icon={Clock}    label="Zeitmanagement" active={appView === 'zeitmanagement'}
         onClick={() => setAppView('zeitmanagement')} kbd="Z" />
 

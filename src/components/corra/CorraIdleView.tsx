@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion, useMotionValue } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useUiStore } from '@/store/ui.store'
 import { useMailStore } from '@/store/mail.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -35,8 +35,8 @@ export function CorraIdleView({ onSend, loading }: Props) {
     s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.scheduledAt?.slice(0, 10) === today)).length
   )
 
-  const glowX = useMotionValue(-9999)
-  const glowY = useMotionValue(-9999)
+  const mouseRef = useRef<{ x: number; y: number } | null>(null)
+
 
   // Rotating headline
   useEffect(() => {
@@ -58,13 +58,13 @@ export function CorraIdleView({ onSend, loading }: Props) {
     return () => clearInterval(id)
   }, [])
 
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    glowX.set(e.clientX - rect.left - 260)
-    glowY.set(e.clientY - rect.top - 260)
+    mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
   }
 
-  const handleMouseLeave = () => { glowX.set(-9999); glowY.set(-9999) }
+  const handleMouseLeave = () => { mouseRef.current = null }
 
   const handleSend = () => {
     const text = input.trim()
@@ -94,50 +94,13 @@ export function CorraIdleView({ onSend, loading }: Props) {
         background: 'var(--bg)', overflow: 'hidden',
       }}
     >
-      {/* Ambient glow — Dark Mode only */}
-      {isDark && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -60%)',
-          width: 700, height: 700, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(163,230,53,0.08) 0%, rgba(163,230,53,0.03) 45%, transparent 70%)',
-          filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0,
-        }} />
-      )}
-
-      {/* Focus glow */}
-      {isDark && isFocused && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 600, height: 600, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(163,230,53,0.05) 0%, transparent 70%)',
-          filter: 'blur(40px)', pointerEvents: 'none', zIndex: 0,
-          transition: 'opacity 600ms',
-        }} />
-      )}
-
-      {/* Mouse-following glow */}
-      <motion.div
-        style={{
-          position: 'absolute', top: 0, left: 0,
-          width: 520, height: 520, borderRadius: '50%',
-          background: isDark
-            ? 'radial-gradient(circle, rgba(163,230,53,0.18) 0%, rgba(163,230,53,0.06) 40%, transparent 70%)'
-            : 'radial-gradient(circle, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.02) 40%, transparent 70%)',
-          filter: 'blur(52px)',
-          x: glowX, y: glowY,
-          pointerEvents: 'none', zIndex: 0,
-        }}
-      />
-
       {/* Dot grid */}
       <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
         backgroundImage: isDark
-          ? 'radial-gradient(circle, rgba(163,230,53,0.1) 1px, transparent 1px)'
-          : 'radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)',
-        backgroundSize: '22px 22px', zIndex: 0,
+          ? 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)'
+          : 'radial-gradient(circle, rgba(0,0,0,0.14) 1px, transparent 1px)',
+        backgroundSize: '22px 22px',
       }} />
 
       {/* Content */}

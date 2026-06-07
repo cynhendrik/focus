@@ -2,6 +2,7 @@ import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar'
 import { WorkspaceSettings } from '@/components/settings/WorkspaceSettings'
+import { ModuleSettings } from '@/components/settings/ModuleSettings'
 import { IntegrationenSettings } from '@/components/settings/IntegrationenSettings'
 import { DeveloperSettings } from '@/components/settings/DeveloperSettings'
 import { GefahrenzoneSettings } from '@/components/settings/GefahrenzoneSettings'
@@ -17,6 +18,7 @@ export function SettingsRoute() {
   function renderPanel() {
     switch (settingsTab) {
       case 'workspace':     return <WorkspaceSettings workspaceId={workspaceId} />
+      case 'module':        return <ModuleSettings />
       case 'integrationen': return <IntegrationenSettings />
       case 'developer':     return showDeveloper ? <DeveloperSettings workspaceId={workspaceId} /> : <WorkspaceSettings workspaceId={workspaceId} />
       case 'gefahrenzone':  return <GefahrenzoneSettings workspaceId={workspaceId} />

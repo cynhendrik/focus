@@ -1,12 +1,13 @@
 import type { SettingsTab } from '@/store/ui.store'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, Plug, Code2, AlertTriangle } from 'lucide-react'
+import { Building2, LayoutGrid, Plug, Code2, AlertTriangle } from 'lucide-react'
 
 const ITEMS: { key: SettingsTab; label: string; icon: LucideIcon; dividerBefore?: boolean }[] = [
-  { key: 'workspace',     label: 'Unternehmen',            icon: Building2                    },
-  { key: 'integrationen', label: 'Module & Integrationen', icon: Plug, dividerBefore: true   },
-  { key: 'developer',     label: 'Entwickler',             icon: Code2                       },
-  { key: 'gefahrenzone',  label: 'Gefahrenzone',           icon: AlertTriangle               },
+  { key: 'workspace',     label: 'Unternehmen',   icon: Building2                      },
+  { key: 'module',        label: 'Module',         icon: LayoutGrid, dividerBefore: true },
+  { key: 'integrationen', label: 'Integrationen',  icon: Plug                           },
+  { key: 'developer',     label: 'Entwickler',     icon: Code2,      dividerBefore: true },
+  { key: 'gefahrenzone',  label: 'Gefahrenzone',   icon: AlertTriangle                  },
 ]
 
 interface Props {
