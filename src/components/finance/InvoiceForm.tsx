@@ -157,21 +157,21 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
       {/* ── LEFT: Form Panel ─────────────────────────────────────────────── */}
       <div style={{
         width: 'min(620px, 44vw)', flexShrink: 0, height: '100vh',
-        background: '#f6f6f6', display: 'flex', flexDirection: 'column',
-        borderRight: '1px solid #e8e8e8',
+        background: 'var(--bg-2)', display: 'flex', flexDirection: 'column',
+        borderRight: '1px solid var(--border)',
       }}>
 
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-          padding: '24px 28px 22px', background: '#fff',
-          borderBottom: '1px solid #ebebeb', flexShrink: 0,
+          padding: '24px 28px 22px', background: 'var(--bg)',
+          borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#bbb', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
               {initial ? 'Bearbeiten' : 'Neue Rechnung'}
             </div>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', color: '#111', lineHeight: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--fg)', lineHeight: 1 }}>
               {account?.name ?? <span style={{ color: '#ccc', fontWeight: 400, fontStyle: 'italic' }}>Kunden wählen…</span>}
             </h2>
             {kleinunternehmer && (
@@ -187,9 +187,9 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           </div>
           <button onClick={onClose} style={{
             width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-            background: '#f0f0f0', border: 'none', cursor: 'pointer',
+            background: 'var(--surface-2)', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#888', marginTop: 2,
+            color: 'var(--fg-dim)', marginTop: 2,
           }}>
             <X size={14} />
           </button>
@@ -224,9 +224,9 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '10px 14px', borderRadius: 10,
-            background: '#fff', border: '1px solid #ebebeb',
+            background: 'var(--surface)', border: '1px solid var(--border)',
           }}>
-            <span style={{ fontSize: 10, color: '#bbb', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
+            <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>
               Leistungsdatum
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -245,7 +245,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           </div>
 
           {/* Divider */}
-          <div style={{ height: 1, background: '#e4e4e4', margin: '-2px 0' }} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '-2px 0' }} />
 
           {/* Offene Zeiteinträge */}
           {accountId && unbilled.entries.length > 0 && (
@@ -291,7 +291,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                   >
                     <div style={{
                       width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                      border: `1.5px solid ${checked ? 'var(--accent)' : 'rgba(255,255,255,0.2)'}`,
+                      border: `1.5px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
                       background: checked ? 'var(--accent)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
@@ -319,10 +319,10 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           {/* Positionen */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#aaa', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                 Positionen
               </span>
-              <span style={{ fontSize: 10, color: '#ccc', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
                 {items.length} {items.length === 1 ? 'Pos.' : 'Pos.'}
               </span>
             </div>
@@ -331,7 +331,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 72px 100px 34px',
               gap: 6, padding: '0 14px',
-              fontSize: 9.5, color: '#ccc', fontFamily: 'var(--font-mono)',
+              fontSize: 9.5, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)',
               textTransform: 'uppercase', letterSpacing: '0.08em',
             }}>
               <span>Bezeichnung</span>
@@ -351,8 +351,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
             {/* Item cards */}
             {items.map((item, idx) => (
               <div key={idx} style={{
-                background: '#fff', borderRadius: 12, padding: '13px 14px',
-                border: '1.5px solid #ebebeb',
+                background: 'var(--surface)', borderRadius: 12, padding: '13px 14px',
+                border: '1.5px solid var(--border)',
                 display: 'flex', flexDirection: 'column', gap: 9,
               }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 100px 34px', gap: 6, alignItems: 'center' }}>
@@ -379,7 +379,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     onChange={e => updateItem(idx, { description: e.target.value || undefined })}
                     placeholder="Beschreibung (optional)"
                     className="inv-item-input"
-                    style={{ flex: 1, fontSize: 11.5, color: '#999' }}
+                    style={{ flex: 1, fontSize: 11.5, color: 'var(--fg-dim)' }}
                   />
                   {!kleinunternehmer && (
                     <select value={item.taxRate}
@@ -392,7 +392,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     </select>
                   )}
                   <span style={{
-                    fontSize: 13.5, fontWeight: 700, color: '#111',
+                    fontSize: 13.5, fontWeight: 700, color: 'var(--fg)',
                     fontVariantNumeric: 'tabular-nums', minWidth: 90,
                     textAlign: 'right', fontFamily: 'var(--font-mono)', flexShrink: 0,
                   }}>
@@ -406,7 +406,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     value={item.itemDate ?? date}
                     onChange={e => updateItem(idx, { itemDate: e.target.value || undefined })}
                     className="inv-item-input"
-                    style={{ width: 130, fontSize: 11.5, color: '#777' }}
+                    style={{ width: 130, fontSize: 11.5, color: 'var(--fg-dim)' }}
                   />
                   <input
                     value={item.unit ?? ''}
@@ -414,7 +414,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     placeholder="Einheit…"
                     list="cynera-units-inv"
                     className="inv-item-input"
-                    style={{ flex: 1, fontSize: 11.5, color: '#777' }}
+                    style={{ flex: 1, fontSize: 11.5, color: 'var(--fg-dim)' }}
                   />
                 </div>
               </div>
@@ -427,29 +427,29 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
 
           {/* Totals */}
           <div style={{
-            background: '#fff', borderRadius: 12, padding: '16px 18px',
-            border: '1.5px solid #ebebeb', display: 'flex', flexDirection: 'column',
+            background: 'var(--surface)', borderRadius: 12, padding: '16px 18px',
+            border: '1.5px solid var(--border)', display: 'flex', flexDirection: 'column',
           }}>
             <TotalsRow label="Nettobetrag" value={fmt(totals.subtotal)} />
             {kleinunternehmer
-              ? <div style={{ fontSize: 11, color: '#aaa', fontStyle: 'italic', padding: '5px 0' }}>
+              ? <div style={{ fontSize: 11, color: 'var(--fg-dim)', fontStyle: 'italic', padding: '5px 0' }}>
                   Kein USt-Ausweis gem. §19 UStG
                 </div>
               : totals.taxBreakdown.map(tb => (
                   <TotalsRow key={tb.rate} label={`MwSt ${tb.rate}%`} value={fmt(tb.tax)} />
                 ))
             }
-            <div style={{ height: 1, background: '#ebebeb', margin: '12px 0' }} />
+            <div style={{ height: 1, background: 'var(--border)', margin: '12px 0' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{
-                fontSize: 10, color: '#aaa', fontFamily: 'var(--font-mono)',
+                fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)',
                 textTransform: 'uppercase', letterSpacing: '0.1em',
               }}>
                 Rechnungsbetrag
               </span>
               <span style={{
                 fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em',
-                color: '#111', fontVariantNumeric: 'tabular-nums',
+                color: 'var(--fg)', fontVariantNumeric: 'tabular-nums',
               }}>
                 {fmt(totals.total)}
               </span>
@@ -467,8 +467,9 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
 
           {error && (
             <div style={{
-              color: '#c0392b', fontSize: 12.5, padding: '10px 14px',
-              background: '#fff5f5', borderRadius: 10, border: '1px solid #ffd5d5',
+              color: 'var(--danger)', fontSize: 12.5, padding: '10px 14px',
+              background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+              borderRadius: 10, border: '1px solid color-mix(in srgb, var(--danger) 25%, transparent)',
             }}>
               {error}
             </div>
@@ -478,8 +479,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
         {/* Footer */}
         <div style={{
           display: 'flex', gap: 8, justifyContent: 'flex-end',
-          padding: '16px 28px', borderTop: '1px solid #ebebeb',
-          background: '#fff', flexShrink: 0,
+          padding: '16px 28px', borderTop: '1px solid var(--border)',
+          background: 'var(--bg)', flexShrink: 0,
         }}>
           <button onClick={() => handleSave(true)} disabled={isSaving} className="inv-ghost-btn">
             Als Entwurf
@@ -744,7 +745,7 @@ function PreviewTotalRow({ label, value, bold }: { label: string; value: string;
 function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 10, fontWeight: 700, color: '#aaa', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
+      <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>
         {label}
       </label>
       {children}
@@ -755,8 +756,8 @@ function FieldBlock({ label, children }: { label: string; children: React.ReactN
 function TotalsRow({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12.5 }}>
-      <span style={{ color: '#999' }}>{label}</span>
-      <span style={{ color: '#333', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>{value}</span>
+      <span style={{ color: 'var(--fg-dim)' }}>{label}</span>
+      <span style={{ color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)' }}>{value}</span>
     </div>
   )
 }

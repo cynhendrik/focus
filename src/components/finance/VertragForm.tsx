@@ -13,7 +13,7 @@ interface Props {
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '8px 11px', borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+  border: '1px solid var(--border)', background: 'var(--surface-1)',
   color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
 }
 const lbl: React.CSSProperties = {
