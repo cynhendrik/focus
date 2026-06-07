@@ -274,7 +274,8 @@ pub async fn email_delete_folder(
 ) -> Result<(), String> {
     // Systemordner schützen
     let path_lc = folder_path.to_lowercase();
-    let last_seg = path_lc.split('.').last().unwrap_or(&path_lc);
+    let last_seg = path_lc.split(['.', '/']).last().unwrap_or(&path_lc);
+    // path_lc == "inbox" guards the root case explicitly (last_seg also catches it)
     if path_lc == "inbox" || SYSTEM_PATH_SEGMENTS.contains(&last_seg) {
         return Err("Systemordner können nicht gelöscht werden.".to_string());
     }
@@ -309,9 +310,12 @@ pub async fn email_move_to_folder(
 ) -> Result<(), String> {
     let (uid, source_folder, email_addr, imap_host, imap_port) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
-        let (uid, folder, _acc_id) = db::get_email_uid_and_folder(&conn, &email_id)
+        let (uid, folder, acc_id) = db::get_email_uid_and_folder(&conn, &email_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "E-Mail nicht gefunden".to_string())?;
+        if acc_id != account_id {
+            return Err("E-Mail gehört nicht zu diesem Konto.".to_string());
+        }
         let account = db::get_account(&conn, &account_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| "Konto nicht gefunden".to_string())?;
