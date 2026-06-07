@@ -114,7 +114,6 @@ function NoteEditor({
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const statusTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [editorFocused, setEditorFocused] = useState(false)
 
   const flashSaved = useCallback(() => {
     setStatus('saved')
@@ -143,8 +142,6 @@ function NoteEditor({
       },
     },
     content: note.content || '',
-    onFocus() { setEditorFocused(true) },
-    onBlur()  { setEditorFocused(false) },
     onUpdate({ editor }) {
       setStatus('saving')
       if (contentTimer.current) clearTimeout(contentTimer.current)
@@ -231,8 +228,7 @@ function NoteEditor({
           }}
         />
 
-        {/* Toolbar — visible when editor focused */}
-        {(editorFocused || true) && <Toolbar editor={editor} />}
+        <Toolbar editor={editor} />
       </div>
 
       {/* Editor scroll area */}
@@ -267,7 +263,7 @@ function NoteListRow({
         padding: '9px 12px', borderRadius: 8, cursor: 'pointer',
         background: active
           ? 'var(--accent)'
-          : hover ? 'oklch(100% 0 0 / 0.04)' : 'transparent',
+          : hover ? 'var(--surface-2)' : 'transparent',
         borderLeft: active ? 'none' : '2px solid transparent',
         transition: 'background 120ms',
         position: 'relative', marginBottom: 1,
@@ -306,8 +302,8 @@ function NoteListRow({
           style={{
             position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
             width: 20, height: 20, borderRadius: 5, border: 'none',
-            background: active ? 'oklch(15% 0 0 / 0.15)' : 'var(--surface-3)',
-            color: active ? 'oklch(15% 0 0 / 0.6)' : 'var(--fg-muted)',
+            background: active ? 'oklch(100% 0 0 / 0.18)' : 'var(--surface-3)',
+            color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         ><Trash2 size={10} /></button>
