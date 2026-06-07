@@ -119,17 +119,33 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             <Field label="USt-IdNr." value={val('taxId')} onChange={f('taxId')} placeholder="DE123456789" />
             <Field label="IBAN" value={val('iban')} onChange={f('iban')} placeholder="DE89 3704 0044 ..." />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <input
-              type="checkbox"
-              id="kleinunternehmer"
-              checked={!!form.kleinunternehmer}
-              onChange={e => setForm(p => ({ ...p, kleinunternehmer: e.target.checked }))}
-              style={{ cursor: 'pointer' }}
-            />
-            <label htmlFor="kleinunternehmer" style={{ fontSize: 13, color: 'var(--fg)', cursor: 'pointer' }}>
-              Kleinunternehmer (§19 UStG) — keine Mehrwertsteuer auf Rechnungen
-            </label>
+          <div
+            onClick={() => setForm(p => ({ ...p, kleinunternehmer: !p.kleinunternehmer }))}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+              border: `1px solid ${form.kleinunternehmer ? 'var(--accent)' : 'var(--border)'}`,
+              background: form.kleinunternehmer ? 'oklch(92% 0.2 125 / 0.06)' : 'var(--surface-2)',
+              transition: 'all 180ms',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>§19 UStG Kleinunternehmer</div>
+              <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>Keine Mehrwertsteuer auf Rechnungen ausweisen</div>
+            </div>
+            <div style={{
+              width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+              background: form.kleinunternehmer ? 'var(--accent)' : 'var(--surface-3)',
+              position: 'relative', transition: 'background 180ms',
+            }}>
+              <div style={{
+                position: 'absolute', top: 2,
+                left: form.kleinunternehmer ? 18 : 2,
+                width: 16, height: 16, borderRadius: '50%',
+                background: form.kleinunternehmer ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                transition: 'left 180ms',
+              }} />
+            </div>
           </div>
         </div>
       </div>
