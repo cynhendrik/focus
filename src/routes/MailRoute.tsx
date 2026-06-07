@@ -432,8 +432,12 @@ export function MailRoute() {
                       onChange={e => setNewFolderName(e.target.value)}
                       onKeyDown={async e => {
                         if (e.key === 'Enter' && newFolderName.trim()) {
-                          try { await createFolder(newFolderName.trim(), 'INBOX') } catch { /* ignore */ }
-                          setNewFolderName(''); setIsCreatingFolder(false)
+                          try {
+                            await createFolder(newFolderName.trim(), 'INBOX')
+                            setNewFolderName(''); setIsCreatingFolder(false)
+                          } catch (err) {
+                            showToast({ message: String(err), variant: 'error' })
+                          }
                         }
                         if (e.key === 'Escape') { setNewFolderName(''); setIsCreatingFolder(false) }
                       }}
@@ -458,7 +462,9 @@ export function MailRoute() {
                         e.preventDefault()
                         const emailId = e.dataTransfer.getData('emailId')
                         if (emailId) {
-                          try { await moveToFolder(emailId, f.path) } catch { /* ignore */ }
+                          try { await moveToFolder(emailId, f.path) } catch (err) {
+                            showToast({ message: String(err), variant: 'error' })
+                          }
                         }
                         setDragOverFolder(null)
                       }}

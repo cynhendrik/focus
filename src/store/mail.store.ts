@@ -273,8 +273,10 @@ export const useMailStore = create<MailState>()((set, get) => ({
     if (!selectedAccountId) return
     await MailService.deleteFolder(selectedAccountId, folderPath)
     if (selectedFolder === folderPath) {
-      set({ selectedFolder: 'INBOX', emails: [], selectedEmail: null, emailBody: null })
+      set({ selectedFolder: 'INBOX', emails: [], selectedEmail: null, emailBody: null, attachments: [] })
       await loadEmails()
+    } else if (get().selectedEmail?.folder === folderPath) {
+      set({ selectedEmail: null, emailBody: null, attachments: [] })
     }
     await loadFolders(selectedAccountId)
   },

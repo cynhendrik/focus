@@ -255,6 +255,13 @@ pub async fn email_create_folder(
     folder_path: String,
     db: tauri::State<'_, EmailDb>,
 ) -> Result<(), String> {
+    // Systemordner-Namen verbieten
+    let path_lc = folder_path.to_lowercase();
+    let last_seg = path_lc.split(['.', '/']).last().unwrap_or(&path_lc);
+    if path_lc == "inbox" || SYSTEM_PATH_SEGMENTS.contains(&last_seg) {
+        return Err("Systemordner-Namen sind nicht erlaubt.".to_string());
+    }
+
     let (email, imap_host, imap_port) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         let account = db::get_account(&conn, &account_id)
