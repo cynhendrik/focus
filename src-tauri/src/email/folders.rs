@@ -100,6 +100,50 @@ pub async fn fetch_folders(
     Ok(result)
 }
 
+/// Erstellt einen neuen Ordner auf dem IMAP-Server.
+pub async fn create_imap_folder(
+    email: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    folder_path: &str,
+) -> Result<(), String> {
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email, password)
+        .await
+        .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
+    session
+        .create(folder_path)
+        .await
+        .map_err(|e| format!("Ordner erstellen fehlgeschlagen: {}", e))?;
+    let _ = session.logout().await;
+    Ok(())
+}
+
+/// Löscht einen Ordner auf dem IMAP-Server.
+pub async fn delete_imap_folder(
+    email: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    folder_path: &str,
+) -> Result<(), String> {
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email, password)
+        .await
+        .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
+    session
+        .delete(folder_path)
+        .await
+        .map_err(|e| format!("Ordner löschen fehlgeschlagen: {}", e))?;
+    let _ = session.logout().await;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

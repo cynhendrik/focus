@@ -76,7 +76,11 @@ fn collect_parts(part: &mailparse::ParsedMail, out: &mut ExtractedParts) {
                 });
             }
         } else {
-            let body = part.get_body().unwrap_or_default();
+            let body = part.get_body().unwrap_or_else(|_| {
+                part.get_body_raw()
+                    .map(|b| String::from_utf8_lossy(&b).into_owned())
+                    .unwrap_or_default()
+            });
             match ct.as_str() {
                 "text/plain" => if out.body_text.is_empty() { out.body_text = body; },
                 "text/html"  => if out.body_html.is_empty() { out.body_html = body; },
@@ -186,6 +190,44 @@ pub struct SyncOutput {
     pub attachments: Vec<crate::email::types::RawAttachment>,
     pub max_uid: u32,
     pub inserted_count: usize,
+}
+
+/// Fetches body_text + body_html for a single email by UID directly from IMAP.
+pub async fn fetch_single_body(
+    email_addr: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    folder: &str,
+    uid: u32,
+) -> Result<(String, String), String> {
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email_addr, password)
+        .await
+        .map_err(|(e, _)| format!("Login fehlgeschlagen: {}", e))?;
+
+    session.select(folder).await.map_err(|e| format!("Ordner nicht gefunden: {}", e))?;
+
+    let fetch_stream = session
+        .uid_fetch(uid.to_string(), "(RFC822)")
+        .await
+        .map_err(|e| format!("Fetch fehlgeschlagen: {}", e))?;
+
+    let fetches: Vec<_> = fetch_stream
+        .filter_map(|r| async move { r.ok() })
+        .collect::<Vec<_>>()
+        .await;
+
+    let body_bytes = fetches
+        .first()
+        .and_then(|f| f.body())
+        .ok_or_else(|| "Kein Body gefunden".to_string())?;
+
+    let parts = extract_parts(body_bytes);
+    let _ = session.logout().await;
+    Ok((parts.body_text, parts.body_html))
 }
 
 pub async fn sync_account<F>(
@@ -350,6 +392,53 @@ where
     let _ = session.logout().await;
     let count = all_rows.len();
     Ok(SyncOutput { rows: all_rows, attachments: all_attachments, max_uid, inserted_count: count })
+}
+
+/// Verschiebt eine E-Mail per IMAP: COPY → \Deleted markieren → EXPUNGE.
+pub async fn move_email(
+    email: &str,
+    password: &str,
+    host: &str,
+    port: u16,
+    uid: u32,
+    source_folder: &str,
+    target_folder: &str,
+) -> Result<(), String> {
+    let tls_stream = tls_connect(host, port).await?;
+    let client = async_imap::Client::new(tls_stream);
+    let mut session = client
+        .login(email, password)
+        .await
+        .map_err(|(e, _)| format!("Authentifizierung fehlgeschlagen: {}", e))?;
+
+    session
+        .select(source_folder)
+        .await
+        .map_err(|e| format!("SELECT fehlgeschlagen: {}", e))?;
+
+    let uid_set = uid.to_string();
+
+    session
+        .uid_copy(&uid_set, target_folder)
+        .await
+        .map_err(|e| format!("UID COPY fehlgeschlagen: {}", e))?;
+
+    session
+        .uid_store(&uid_set, "+FLAGS (\\Deleted)")
+        .await
+        .map_err(|e| format!("UID STORE fehlgeschlagen: {}", e))?
+        .collect::<Vec<_>>()
+        .await;
+
+    session
+        .expunge()
+        .await
+        .map_err(|e| format!("EXPUNGE fehlgeschlagen: {}", e))?
+        .collect::<Vec<_>>()
+        .await;
+
+    let _ = session.logout().await;
+    Ok(())
 }
 
 #[cfg(test)]
