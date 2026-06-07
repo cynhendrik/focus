@@ -151,6 +151,7 @@ mod tests {
         CreateNoteEntryPayload {
             workspace_id: "ws-1".into(),
             account_id:   account_id.into(),
+            folder_id:    None,
             title:        Some("Testnotiz".into()),
             content:      Some("<p>Inhalt</p>".into()),
             tags:         None,
@@ -188,6 +189,7 @@ mod tests {
         seed_account(&conn, "a1");
         let e = insert(&conn, make_payload("a1")).unwrap();
         let updated = update(&conn, &e.id, UpdateNoteEntryPayload {
+            folder_id:  None,
             title:      None,
             content:    Some("<p>Geändert</p>".into()),
             tags:       Some(r#"["Follow-up"]"#.into()),
@@ -202,7 +204,7 @@ mod tests {
     fn update_returns_not_found() {
         let conn = setup();
         let result = update(&conn, "nonexistent", UpdateNoteEntryPayload {
-            title: None, content: Some("x".into()), tags: None, updated_by: None,
+            folder_id: None, title: None, content: Some("x".into()), tags: None, updated_by: None,
         });
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }

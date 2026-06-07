@@ -14,6 +14,7 @@ pub struct Campaign {
     pub body: String,
     pub sender_account_id: String,
     pub smart_list_id: Option<String>,
+    pub attachment_path: Option<String>,
     pub status: String,  // "draft" | "sending" | "sent" | "error"
     pub sent_at: Option<String>,
     pub created_at: String,
@@ -53,7 +54,8 @@ pub struct CreateCampaignPayload {
     pub body: String,
     pub sender_account_id: String,
     pub smart_list_id: Option<String>,
-    // Resolved lead IDs + emails (frontend resolves smart list before calling)
+    pub attachment_path: Option<String>,
+    // Resolved lead/account IDs + emails (frontend resolves before calling)
     pub lead_ids: Vec<String>,
     pub lead_emails: Vec<String>,
 }
@@ -62,7 +64,7 @@ pub struct CreateCampaignPayload {
 
 const SELECT_CAMPAIGN: &str =
     "SELECT id, workspace_id, name, subject, body, sender_account_id,
-            smart_list_id, status, sent_at, created_at, updated_at
+            smart_list_id, attachment_path, status, sent_at, created_at, updated_at
      FROM campaigns";
 
 fn map_campaign(r: &rusqlite::Row<'_>) -> rusqlite::Result<Campaign> {
@@ -74,10 +76,11 @@ fn map_campaign(r: &rusqlite::Row<'_>) -> rusqlite::Result<Campaign> {
         body: r.get(4)?,
         sender_account_id: r.get(5)?,
         smart_list_id: r.get(6)?,
-        status: r.get(7)?,
-        sent_at: r.get(8)?,
-        created_at: r.get(9)?,
-        updated_at: r.get(10)?,
+        attachment_path: r.get(7)?,
+        status: r.get(8)?,
+        sent_at: r.get(9)?,
+        created_at: r.get(10)?,
+        updated_at: r.get(11)?,
     })
 }
 
@@ -108,8 +111,8 @@ pub fn create(conn: &Connection, payload: CreateCampaignPayload) -> Result<Campa
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
         conn.execute(
-            "INSERT INTO campaigns (id, workspace_id, name, subject, body, sender_account_id, smart_list_id, status, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,'draft',?8,?8)",
-            rusqlite::params![id, payload.workspace_id, payload.name, payload.subject, payload.body, payload.sender_account_id, payload.smart_list_id, now],
+            "INSERT INTO campaigns (id, workspace_id, name, subject, body, sender_account_id, smart_list_id, attachment_path, status, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'draft',?9,?9)",
+            rusqlite::params![id, payload.workspace_id, payload.name, payload.subject, payload.body, payload.sender_account_id, payload.smart_list_id, payload.attachment_path, now],
         )?;
         for (lead_id, email) in payload.lead_ids.iter().zip(payload.lead_emails.iter()) {
             let rid = uuid::Uuid::new_v4().to_string();
@@ -241,6 +244,7 @@ mod tests {
             body: "Wie geht es dir, {{name}}?".into(),
             sender_account_id: "acc1".into(),
             smart_list_id: None,
+            attachment_path: None,
             lead_ids: vec!["lead1".into()],
             lead_emails: vec!["lead@example.com".into()],
         };
@@ -262,6 +266,7 @@ mod tests {
             body: "Body".into(),
             sender_account_id: "acc1".into(),
             smart_list_id: None,
+            attachment_path: None,
             lead_ids: vec!["l1".into(), "l2".into()],
             lead_emails: vec!["a@a.de".into(), "b@b.de".into()],
         };
@@ -288,6 +293,7 @@ mod tests {
             body: "B".into(),
             sender_account_id: "acc1".into(),
             smart_list_id: None,
+            attachment_path: None,
             lead_ids: vec!["l1".into()],
             lead_emails: vec!["err@example.com".into()],
         };
