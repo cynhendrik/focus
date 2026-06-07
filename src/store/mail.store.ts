@@ -49,6 +49,9 @@ interface MailState {
   sendEmail: (payload: SendEmailPayload) => Promise<void>
   getAttachments: (emailId: string) => Promise<void>
   downloadAttachment: (attachmentId: string) => Promise<void>
+  createFolder: (folderName: string, parentPath?: string) => Promise<void>
+  deleteFolder: (folderPath: string) => Promise<void>
+  moveToFolder: (emailId: string, targetFolder: string) => Promise<void>
 }
 
 function buildFolderTree(flat: MailFolder[]): MailFolder[] {
@@ -159,7 +162,17 @@ export const useMailStore = create<MailState>()((set, get) => ({
         MailService.getBody(email.id),
         MailService.getAttachments(email.id),
       ])
-      set({ emailBody: body, attachments })
+      // If body is empty (stored before charset-fix), fetch directly from IMAP
+      if (body && !body.bodyText && !body.bodyHtml) {
+        try {
+          const fresh = await MailService.fetchBodyFromImap(email.id)
+          set({ emailBody: fresh, attachments })
+        } catch {
+          set({ emailBody: body, attachments })
+        }
+      } else {
+        set({ emailBody: body, attachments })
+      }
     } catch (err) {
       log.error('Failed to load email body or attachments', { err })
     }
@@ -242,6 +255,38 @@ export const useMailStore = create<MailState>()((set, get) => ({
       log.error('Failed to download attachment', { err })
       throw err
     }
+  },
+
+  createFolder: async (folderName, parentPath) => {
+    const { selectedAccountId, folders, loadFolders } = get()
+    if (!selectedAccountId) return
+    const delimiter = folders[0]?.delimiter ?? '.'
+    const fullPath = parentPath
+      ? `${parentPath}${delimiter}${folderName}`
+      : folderName
+    await MailService.createFolder(selectedAccountId, fullPath)
+    await loadFolders(selectedAccountId)
+  },
+
+  deleteFolder: async (folderPath) => {
+    const { selectedAccountId, selectedFolder, loadFolders, loadEmails } = get()
+    if (!selectedAccountId) return
+    await MailService.deleteFolder(selectedAccountId, folderPath)
+    if (selectedFolder === folderPath) {
+      set({ selectedFolder: 'INBOX', emails: [], selectedEmail: null, emailBody: null })
+      await loadEmails()
+    }
+    await loadFolders(selectedAccountId)
+  },
+
+  moveToFolder: async (emailId, targetFolder) => {
+    const { selectedAccountId } = get()
+    if (!selectedAccountId) return
+    await MailService.moveToFolder(selectedAccountId, emailId, targetFolder)
+    set(s => ({
+      emails: s.emails.filter(e => e.id !== emailId),
+      selectedEmail: s.selectedEmail?.id === emailId ? null : s.selectedEmail,
+    }))
   },
 
   loadFolders: async (accountId) => {

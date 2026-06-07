@@ -61,10 +61,22 @@ export const MailService = {
   sendEmail(payload: SendEmailPayload): Promise<void> {
     return invoke<void>('email_send', { payload })
   },
+  fetchBodyFromImap(emailId: string): Promise<EmailBody> {
+    return invoke<EmailBody>('email_fetch_body_imap', { emailId })
+  },
   getAttachments(emailId: string): Promise<EmailAttachment[]> {
     return invoke<EmailAttachment[]>('email_get_attachments', { emailId })
   },
   downloadAttachment(attachmentId: string): Promise<string> {
     return invoke<string>('email_download_attachment', { attachmentId })
+  },
+  createFolder(accountId: string, folderPath: string): Promise<void> {
+    return invoke<void>('email_create_folder', { accountId, folderPath })
+  },
+  deleteFolder(accountId: string, folderPath: string): Promise<void> {
+    return invoke<void>('email_delete_folder', { accountId, folderPath })
+  },
+  moveToFolder(accountId: string, emailId: string, targetFolder: string): Promise<void> {
+    return invoke<void>('email_move_to_folder', { accountId, emailId, targetFolder })
   },
 }
