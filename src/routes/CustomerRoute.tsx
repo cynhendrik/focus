@@ -160,9 +160,6 @@ export function CustomerRoute({ customerId }: Props) {
         <button className="back" onClick={() => setSelected(null)}>
           <ChevronLeft size={16} />
         </button>
-        <div className="avatar" style={{ width: 56, height: 56, borderRadius: 16, fontSize: 18 }}>
-          {customer.name.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()}
-        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1>{customer.name}</h1>
           <PrimaryContact customerId={customerId} />
