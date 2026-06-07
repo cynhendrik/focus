@@ -12,7 +12,7 @@ function todayISO() { return new Date().toLocaleDateString('sv') }
 
 const inputStyle: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+  border: '1px solid var(--border)', background: 'var(--surface-2)',
   color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
 }
 
@@ -102,7 +102,7 @@ export function ZeiterfassungForm({ auftraege }: Props) {
         </div>
         <button onClick={handleAdd} disabled={!canAdd} style={{
           padding: '8px 14px', borderRadius: 8, border: 'none',
-          background: canAdd ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+          background: canAdd ? 'var(--accent)' : 'var(--surface-3)',
           color: canAdd ? 'var(--accent-ink)' : 'var(--fg-dim)',
           fontSize: 12, fontWeight: 700, cursor: canAdd ? 'pointer' : 'not-allowed',
           display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',

@@ -9,7 +9,7 @@ interface Props {
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 12px', borderRadius: 9,
-  border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+  border: '1px solid var(--border)', background: 'var(--surface-2)',
   color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
 }
 
@@ -95,7 +95,7 @@ export function AuftragForm({ auftrag, onClose }: Props) {
           }}>Abbrechen</button>
           <button onClick={handleSave} disabled={!canSave} style={{
             padding: '9px 24px', borderRadius: 99, border: 'none',
-            background: canSave ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+            background: canSave ? 'var(--accent)' : 'var(--surface-3)',
             color: canSave ? 'var(--accent-ink)' : 'var(--fg-dim)',
             fontSize: 13, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed',
           }}>

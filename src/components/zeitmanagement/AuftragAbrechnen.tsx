@@ -125,7 +125,7 @@ export function AuftragAbrechnen({ accountId, accountName, onClose }: Props) {
                 <div key={z.id} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '8px 12px', borderRadius: 8,
-                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
                 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{z.description}</div>
@@ -176,7 +176,7 @@ export function AuftragAbrechnen({ accountId, accountName, onClose }: Props) {
           </label>
           <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={{
             width: '100%', padding: '9px 12px', borderRadius: 9,
-            border: '1px solid rgba(255,255,255,0.09)', background: '#141419',
+            border: '1px solid var(--border)', background: 'var(--surface-2)',
             color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'inherit',
           }} />
         </div>
@@ -190,7 +190,7 @@ export function AuftragAbrechnen({ accountId, accountName, onClose }: Props) {
             disabled={saving || summary.entries.length === 0}
             style={{
               padding: '9px 24px', borderRadius: 99, border: 'none',
-              background: saving || summary.entries.length === 0 ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
+              background: saving || summary.entries.length === 0 ? 'var(--surface-3)' : 'var(--accent)',
               color: saving || summary.entries.length === 0 ? 'var(--fg-dim)' : 'var(--accent-ink)',
               fontSize: 13, fontWeight: 700,
               cursor: saving || summary.entries.length === 0 ? 'not-allowed' : 'pointer',

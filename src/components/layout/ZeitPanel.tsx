@@ -40,7 +40,7 @@ function AuftragTile({
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '7px 8px', borderRadius: 7, textAlign: 'center',
-    border: '1px solid rgba(255,255,255,0.09)', background: 'var(--bg)',
+    border: '1px solid var(--border)', background: 'var(--surface-2)',
     color: 'var(--fg)', fontSize: 13, outline: 'none', fontFamily: 'var(--font-mono)',
   }
 
@@ -80,7 +80,7 @@ function AuftragTile({
           disabled={!canAdd}
           style={{
             width: 34, height: 34, borderRadius: 8, border: 'none',
-            background: done ? 'var(--accent)' : canAdd ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+            background: done ? 'var(--accent)' : canAdd ? 'var(--accent)' : 'var(--surface-3)',
             color: canAdd ? 'var(--accent-ink)' : 'var(--fg-dim)',
             cursor: canAdd ? 'pointer' : 'not-allowed',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -153,7 +153,7 @@ export function ZeitPanel() {
               onChange={e => setAccountId(e.target.value)}
               style={{
                 padding: '7px 10px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.09)', background: 'var(--bg)',
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
                 color: accountId ? 'var(--fg)' : 'var(--fg-dim)', fontSize: 12,
                 outline: 'none', fontFamily: 'inherit',
               }}
@@ -165,7 +165,7 @@ export function ZeitPanel() {
               type="date" value={date} onChange={e => setDate(e.target.value)}
               style={{
                 padding: '7px 8px', borderRadius: 8,
-                border: '1px solid rgba(255,255,255,0.09)', background: 'var(--bg)',
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
                 color: 'var(--fg)', fontSize: 12, outline: 'none',
               }}
             />

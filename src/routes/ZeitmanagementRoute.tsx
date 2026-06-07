@@ -141,7 +141,7 @@ function KundeUnbilledRow({
             <div key={z.id} style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '7px 10px', borderRadius: 7,
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{z.description}</div>
