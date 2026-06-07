@@ -3,6 +3,7 @@ import { ArrowLeft, Send } from 'lucide-react'
 import { listen } from '@tauri-apps/api/event'
 import { useCampaignStore } from '@/store/campaign.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { CampaignRecipient, LeadRef, CampaignProgress } from '@/types/campaign.types'
 
@@ -45,6 +46,7 @@ export function CampaignDetail({ campaignId, onBack }: { campaignId: string; onB
   const setSendProgress = useCampaignStore(s => s.setSendProgress)
   const sendProgress    = useCampaignStore(s => s.sendProgress)
   const allLeads    = useLeadsStore(s => s.leads)
+  const allAccounts = useAccountsStore(s => s.accounts)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const campaign    = campaigns.find(c => c.id === campaignId)
   const [sending, setSending] = useState(false)
@@ -73,9 +75,17 @@ export function CampaignDetail({ campaignId, onBack }: { campaignId: string; onB
           .filter((l): l is typeof l & { email: string } => l.email != null && l.email !== '')
           .map(l => [l.email, l])
       )
+      const emailToAccount = new Map(
+        allAccounts
+          .filter(a => a.email)
+          .map(a => [a.email!, a])
+      )
       const leadRefs: LeadRef[] = recipients.map(r => {
         const lead = emailToLead.get(r.email)
-        return { id: r.leadId, email: r.email, name: lead?.name ?? r.email, company: lead?.companyName ?? undefined }
+        const account = emailToAccount.get(r.email)
+        const name = lead?.name ?? account?.name ?? r.email
+        const company = lead?.companyName ?? undefined
+        return { id: r.leadId, email: r.email, name, company }
       })
       await send(campaign.id, JSON.stringify(leadRefs), workspaceId)
       await loadRecipients(campaign.id)

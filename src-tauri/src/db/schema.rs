@@ -481,6 +481,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             body              TEXT NOT NULL,
             sender_account_id TEXT NOT NULL,
             smart_list_id     TEXT,
+            attachment_path   TEXT,
             status            TEXT NOT NULL DEFAULT 'draft',
             sent_at           TEXT,
             created_at        TEXT NOT NULL,

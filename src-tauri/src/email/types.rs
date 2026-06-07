@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
     pub id: String,
     pub email: String,
@@ -15,6 +16,7 @@ pub struct Account {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EmailHeader {
     pub id: String,
     pub account_id: String,
@@ -30,6 +32,7 @@ pub struct EmailHeader {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EmailBody {
     pub id: String,
     pub body_text: String,
@@ -38,6 +41,7 @@ pub struct EmailBody {
 
 /// Attachment metadata returned to frontend (no content bytes)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EmailAttachment {
     pub id: String,
     pub email_id: String,
@@ -56,6 +60,8 @@ pub struct SendEmailPayload {
     pub cc: Vec<String>,
     pub subject: String,
     pub body_text: String,
+    #[serde(default)]
+    pub body_html: Option<String>,
     #[serde(default)]
     pub attachment_paths: Vec<String>,
 }

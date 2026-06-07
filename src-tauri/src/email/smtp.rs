@@ -114,48 +114,46 @@ pub async fn send_email(
     }
 
     // Build message
-    let text_part = SinglePart::plain(payload.body_text.clone());
+    let mut builder = Message::builder()
+        .from(from_mailbox.clone())
+        .subject(&payload.subject);
+    for mb in to_mailboxes { builder = builder.to(mb); }
+    for mb in cc_mailboxes { builder = builder.cc(mb); }
 
-    let email_msg = if payload.attachment_paths.is_empty() {
-        let mut builder = Message::builder()
-            .from(from_mailbox.clone())
-            .subject(&payload.subject);
-        for mb in to_mailboxes {
-            builder = builder.to(mb);
-        }
-        for mb in cc_mailboxes {
-            builder = builder.cc(mb);
-        }
+    // Read attachment bytes upfront
+    let octet_stream = ContentType::parse("application/octet-stream").expect("valid mime type");
+    let mut attachment_parts: Vec<SinglePart> = Vec::new();
+    for path_str in &payload.attachment_paths {
+        let path = Path::new(path_str);
+        let content = tokio::fs::read(path).await.map_err(|e| {
+            format!("Anhang '{}' konnte nicht gelesen werden: {}", path_str, e)
+        })?;
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("anhang")
+            .to_string();
+        attachment_parts.push(Attachment::new(filename).body(content, octet_stream.clone()));
+    }
+
+    let email_msg = if payload.body_html.is_none() && attachment_parts.is_empty() {
         builder
-            .singlepart(text_part)
+            .singlepart(SinglePart::plain(payload.body_text.clone()))
             .map_err(|e| format!("Nachricht konnte nicht erstellt werden: {}", e))?
     } else {
-        let mut mp = MultiPart::mixed().singlepart(text_part);
-        let octet_stream =
-            ContentType::parse("application/octet-stream").expect("valid mime type");
-        for path_str in &payload.attachment_paths {
-            let path = Path::new(path_str);
-            let content = tokio::fs::read(path).await.map_err(|e| {
-                format!("Anhang '{}' konnte nicht gelesen werden: {}", path_str, e)
-            })?;
-            let filename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("anhang")
-                .to_string();
-            mp = mp.singlepart(
-                Attachment::new(filename).body(content, octet_stream.clone()),
-            );
-        }
-        let mut builder = Message::builder()
-            .from(from_mailbox.clone())
-            .subject(&payload.subject);
-        for mb in to_mailboxes {
-            builder = builder.to(mb);
-        }
-        for mb in cc_mailboxes {
-            builder = builder.cc(mb);
-        }
+        let mp = if let Some(html) = &payload.body_html {
+            let alt = MultiPart::alternative()
+                .singlepart(SinglePart::plain(payload.body_text.clone()))
+                .singlepart(SinglePart::html(html.clone()));
+            let mut mp = MultiPart::mixed().multipart(alt);
+            for att in attachment_parts { mp = mp.singlepart(att); }
+            mp
+        } else {
+            let mut mp = MultiPart::mixed()
+                .singlepart(SinglePart::plain(payload.body_text.clone()));
+            for att in attachment_parts { mp = mp.singlepart(att); }
+            mp
+        };
         builder
             .multipart(mp)
             .map_err(|e| format!("Nachricht konnte nicht erstellt werden: {}", e))?

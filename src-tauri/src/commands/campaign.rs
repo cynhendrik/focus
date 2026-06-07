@@ -1,4 +1,4 @@
-use tauri::{Emitter, WebviewWindow as Window};
+use tauri::{Emitter, Manager, WebviewWindow as Window};
 use serde::{Deserialize, Serialize};
 use crate::{AppError, db, email};
 use crate::db::pool::DbPool;
@@ -33,6 +33,7 @@ pub struct CreateCampaignCmd {
     pub body: String,
     pub sender_account_id: String,
     pub smart_list_id: Option<String>,
+    pub attachment_path: Option<String>,
     pub leads: Vec<LeadRef>,
 }
 
@@ -74,6 +75,7 @@ pub fn cmd_create_campaign(
         body: payload.body,
         sender_account_id: payload.sender_account_id,
         smart_list_id: payload.smart_list_id,
+        attachment_path: payload.attachment_path,
         lead_ids,
         lead_emails,
     };
@@ -132,13 +134,22 @@ pub async fn cmd_send_campaign(
             .replace("{{name}}", name)
             .replace("{{company}}", company);
 
+        let attachment_paths = campaign.attachment_path
+            .as_ref()
+            .map(|p| vec![p.clone()])
+            .unwrap_or_default();
+        let body_html = if body.trim_start().starts_with('<') { Some(body.clone()) } else { None };
+        let body_text = body_html.as_ref()
+            .map(|h| strip_html(h))
+            .unwrap_or_else(|| body.clone());
         let smtp_payload = SendEmailPayload {
             account_id: account.id.clone(),
             to: vec![recipient.email.clone()],
             cc: vec![],
             subject,
-            body_text: body,
-            attachment_paths: vec![],
+            body_text,
+            body_html,
+            attachment_paths,
         };
 
         let send_result = email::smtp::send_email(
@@ -181,4 +192,45 @@ pub async fn cmd_send_campaign(
     }));
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn cmd_store_campaign_attachment(
+    app: tauri::AppHandle,
+    bytes: Vec<u8>,
+    filename: String,
+) -> Result<String, AppError> {
+    let data_dir = app.path().app_data_dir()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let dest_dir = data_dir.join("cynera").join("campaign_attachments").join(&id);
+    std::fs::create_dir_all(&dest_dir)?;
+    let dest = dest_dir.join(&filename);
+    std::fs::write(&dest, &bytes)?;
+    Ok(dest.to_string_lossy().to_string())
+}
+
+fn strip_html(html: &str) -> String {
+    let mut text = html.to_string();
+    for tag in &["</p>", "</li>", "<br>", "<br/>", "<br />", "</h1>", "</h2>", "</h3>"] {
+        text = text.replace(tag, "\n");
+        text = text.replace(&tag.to_uppercase(), "\n");
+    }
+    let mut result = String::new();
+    let mut in_tag = false;
+    for ch in text.chars() {
+        match ch {
+            '<' => { in_tag = true; }
+            '>' => { in_tag = false; }
+            _ if !in_tag => { result.push(ch); }
+            _ => {}
+        }
+    }
+    result = result
+        .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+        .replace("&nbsp;", " ").replace("&#39;", "'").replace("&quot;", "\"");
+    while result.contains("\n\n\n") {
+        result = result.replace("\n\n\n", "\n\n");
+    }
+    result.trim().to_string()
 }

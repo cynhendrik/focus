@@ -8,6 +8,7 @@ export interface Campaign {
   body: string
   senderAccountId: string
   smartListId: string | null
+  attachmentPath: string | null
   status: CampaignStatus
   sentAt: string | null
   createdAt: string
@@ -46,6 +47,7 @@ export interface CreateCampaignPayload {
   body: string
   senderAccountId: string
   smartListId?: string
+  attachmentPath?: string
   leads: LeadRef[]
 }
 

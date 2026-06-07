@@ -23,4 +23,8 @@ export const CampaignService = {
   send(campaignId: string, leadsJson: string): Promise<void> {
     return invoke('cmd_send_campaign', { campaignId, leadsJson })
   },
+
+  storeAttachment(bytes: number[], filename: string): Promise<string> {
+    return invoke('cmd_store_campaign_attachment', { bytes, filename })
+  },
 }
