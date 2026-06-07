@@ -593,33 +593,29 @@ export function CustomerNotesPane({ accountId }: Props) {
               <div style={{ padding: '24px 8px', textAlign: 'center', fontSize: 12, color: 'var(--fg-dim)' }}>
                 Lädt…
               </div>
-            ) : groups.length === 0 ? (
-              <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--fg-dim)' }}>
-                <div style={{ fontSize: 12, marginBottom: 10 }}>
-                  {search ? 'Keine Treffer' : 'Noch keine Notizen'}
-                </div>
-                {!search && (
-                  <button onClick={() => handleNew()} className="btn-ghost" style={{ fontSize: 11 }}>
-                    + Erste Notiz
-                  </button>
-                )}
-              </div>
             ) : (
               <>
-                {/* Quick Capture section — oben */}
-                {quickCaptures.length > 0 && (
-                  <div style={{ marginBottom: 10 }}>
+                {/* Quick Capture section — immer sichtbar */}
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
+                    textTransform: 'uppercase', color: 'var(--accent-text)',
+                    fontFamily: 'var(--font-mono)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 12px 4px',
+                  }}>
+                    <PenLine size={10} />
+                    Quick Capture
+                  </div>
+                  {quickCaptures.length === 0 ? (
                     <div style={{
-                      fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
-                      textTransform: 'uppercase', color: 'var(--accent-text)',
-                      fontFamily: 'var(--font-mono)',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '8px 12px 4px',
+                      padding: '6px 12px 8px',
+                      fontSize: 11.5, color: 'var(--fg-dim)', fontStyle: 'italic',
                     }}>
-                      <PenLine size={10} />
-                      Quick Capture
+                      Gedanken via ✎ unten rechts erfassen…
                     </div>
-                    {quickCaptures.map(note => (
+                  ) : (
+                    quickCaptures.map(note => (
                       <NoteListRow
                         key={note.id}
                         note={note}
@@ -627,12 +623,12 @@ export function CustomerNotesPane({ accountId }: Props) {
                         onClick={() => setSelectedId(note.id)}
                         onDelete={() => handleDelete(note.id)}
                       />
-                    ))}
-                    {regularEntries.length > 0 && (
-                      <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px 4px' }} />
-                    )}
-                  </div>
-                )}
+                    ))
+                  )}
+                  {regularEntries.length > 0 && (
+                    <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px 4px' }} />
+                  )}
+                </div>
 
                 {/* Time groups */}
                 {groups.map(group => (
