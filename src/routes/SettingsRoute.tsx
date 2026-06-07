@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { SettingsSidebar } from '@/components/settings/SettingsSidebar'
@@ -14,6 +15,11 @@ export function SettingsRoute() {
 
   const showDeveloper = import.meta.env.DEV ||
     localStorage.getItem('cynera:dev-mode') === '1'
+
+  const VALID_TABS = ['workspace', 'module', 'integrationen', 'developer', 'gefahrenzone']
+  useEffect(() => {
+    if (!VALID_TABS.includes(settingsTab)) setSettingsTab('workspace')
+  }, [])
 
   function renderPanel() {
     switch (settingsTab) {
