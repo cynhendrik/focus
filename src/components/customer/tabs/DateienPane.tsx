@@ -35,29 +35,6 @@ function relDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: '2-digit' })
 }
 
-// ── FolderIllustration ────────────────────────────────────────────────────────
-// Apple-style: clean body + tab, no paper clutter
-// Color adapts via CSS vars: near-white in dark mode, dark gray in light mode
-
-function FolderIllustration() {
-  return (
-    <div style={{ position: 'relative', width: 58, height: 46, flexShrink: 0 }}>
-      {/* tab — top-left, connects flush to body */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0,
-        width: 22, height: 11,
-        borderRadius: '5px 5px 0 0',
-        background: 'var(--folder-tab)',
-      }} />
-      {/* body */}
-      <div style={{
-        position: 'absolute', top: 9, left: 0, right: 0, bottom: 0,
-        borderRadius: '0 6px 6px 6px',
-        background: 'var(--folder-body)',
-      }} />
-    </div>
-  )
-}
 
 // ── SidebarNode ───────────────────────────────────────────────────────────────
 
@@ -135,8 +112,9 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
 
 // ── FolderCard ────────────────────────────────────────────────────────────────
 
-function FolderCard({ folder, onOpen, onDelete }: {
+function FolderCard({ folder, subfolderCount, onOpen, onDelete }: {
   folder: FolderType
+  subfolderCount: number
   onOpen: () => void
   onDelete: () => void
 }) {
@@ -149,45 +127,63 @@ function FolderCard({ folder, onOpen, onDelete }: {
       onClick={onOpen}
       style={{
         position: 'relative', cursor: 'pointer',
-        borderRadius: 10,
-        background: hov ? 'var(--surface-2)' : 'transparent',
-        transition: 'background 100ms',
-        padding: '12px 8px 10px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+        borderRadius: 12,
+        background: hov ? 'var(--surface-2)' : 'var(--surface)',
+        border: '1px solid var(--border)',
+        transition: 'background 120ms, border-color 120ms, transform 120ms',
+        transform: hov ? 'translateY(-1px)' : 'none',
+        padding: '16px 14px 12px',
+        display: 'flex', flexDirection: 'column', gap: 10,
         userSelect: 'none',
       }}
     >
-      <FolderIllustration />
+      {/* Icon row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'var(--accent-soft)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Folder size={18} style={{ color: 'var(--accent-text)' }} />
+        </div>
 
-      <span style={{
-        fontSize: 12, fontWeight: 500, color: 'var(--fg)',
-        textAlign: 'center', width: '100%',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        padding: '0 4px',
-      }}>
-        {folder.name}
-      </span>
-
-      {hov && (
+        {/* Delete — always visible, not hover-gated */}
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
           title="Ordner löschen"
           style={{
-            position: 'absolute', top: 6, right: 6,
-            width: 22, height: 22, borderRadius: 6, border: 'none', cursor: 'pointer',
-            background: 'oklch(72% 0.18 25 / 0.15)',
+            width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+            background: hov ? 'oklch(72% 0.18 25 / 0.12)' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--danger)', zIndex: 1,
+            color: hov ? 'var(--danger)' : 'var(--fg-dim)',
+            opacity: hov ? 1 : 0.35,
+            transition: 'background 120ms, color 120ms, opacity 120ms',
           }}
         >
-          <Trash2 size={11} />
+          <Trash2 size={12} />
         </button>
-      )}
+      </div>
+
+      {/* Name + count */}
+      <div>
+        <div style={{
+          fontSize: 13, fontWeight: 600, color: 'var(--fg)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          letterSpacing: '-0.01em',
+        }}>
+          {folder.name}
+        </div>
+        {subfolderCount > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>
+            {subfolderCount} Unterordner
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-// ── NewFolderCard — appears inline in the grid, like desktop ──────────────────
+// ── NewFolderCard ─────────────────────────────────────────────────────────────
 
 function NewFolderCard({ onSubmit, onCancel }: {
   onSubmit: (name: string) => void
@@ -196,9 +192,7 @@ function NewFolderCard({ onSubmit, onCancel }: {
   const [name, setName] = useState('Neuer Ordner')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    inputRef.current?.select()
-  }, [])
+  useEffect(() => { inputRef.current?.select() }, [])
 
   const commit = () => {
     const n = name.trim()
@@ -208,15 +202,18 @@ function NewFolderCard({ onSubmit, onCancel }: {
 
   return (
     <div style={{
-      borderRadius: 10,
-      border: '1.5px solid var(--accent)',
-      background: 'var(--surface-2)',
-      padding: '12px 8px 10px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
-      userSelect: 'none',
+      borderRadius: 12, border: '1.5px solid var(--accent)',
+      background: 'var(--accent-soft)',
+      padding: '16px 14px 12px',
+      display: 'flex', flexDirection: 'column', gap: 10,
     }}>
-      <FolderIllustration />
-
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: 'var(--accent-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Folder size={18} style={{ color: 'var(--accent-text)' }} />
+      </div>
       <input
         ref={inputRef}
         value={name}
@@ -227,9 +224,10 @@ function NewFolderCard({ onSubmit, onCancel }: {
         }}
         onBlur={commit}
         style={{
-          fontSize: 12, fontWeight: 500, textAlign: 'center',
-          width: '100%', padding: '3px 6px', borderRadius: 5,
-          background: 'var(--surface)', border: '1px solid var(--accent)',
+          fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
+          width: '100%', padding: '3px 0', borderRadius: 0,
+          background: 'transparent', border: 'none',
+          borderBottom: '1.5px solid var(--accent)',
           color: 'var(--fg)', outline: 'none',
         }}
       />
@@ -544,11 +542,12 @@ export function DateienPane({ customerId }: Props) {
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 10 }}>
                 Ordner
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
                 {shownSubfolders.map(f => (
                   <FolderCard
                     key={f.id}
                     folder={f}
+                    subfolderCount={folders.filter(c => c.parentId === f.id).length}
                     onOpen={() => navigate(f.id)}
                     onDelete={() => setDelTarget(f)}
                   />
