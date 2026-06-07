@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronLeft, ChevronDown, Mail as MailIcon, Phone, Clock, X,
@@ -56,12 +56,21 @@ export function CustomerRoute({ customerId }: Props) {
   const [showTimeLog,     setShowTimeLog]     = useState(false)
   const [aktionenOpen,    setAktionenOpen]    = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [anrufenOpen,     setAnrufenOpen]     = useState(false)
 
   const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user           = useAuthStore(s => s.user)
   const createActivity = useActivitiesStore(s => s.create)
   const removeCustomer = useCustomersStore(s => s.remove)
   const aktionenRef    = useRef<HTMLDivElement>(null)
+  const anrufenRef     = useRef<HTMLDivElement>(null)
+  const contacts       = useContactsStore(s => s.contacts)
+
+  // Alle Kontakte mit Telefonnummer
+  const phoneContacts = useMemo(
+    () => contacts.filter(c => c.phone),
+    [contacts],
+  )
 
   useEffect(() => {
     if (!aktionenOpen) return
@@ -72,6 +81,16 @@ export function CustomerRoute({ customerId }: Props) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [aktionenOpen])
+
+  useEffect(() => {
+    if (!anrufenOpen) return
+    const handler = (e: MouseEvent) => {
+      if (anrufenRef.current && !anrufenRef.current.contains(e.target as Node))
+        setAnrufenOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [anrufenOpen])
 
   const handleDelete = async () => {
     await removeCustomer(customerId)
@@ -149,7 +168,98 @@ export function CustomerRoute({ customerId }: Props) {
           <PrimaryContact customerId={customerId} />
           <PulseBar customerId={customerId} />
         </div>
-        <button className="btn-ghost"><Phone size={13} /> Anrufen</button>
+        {/* Anrufen-Dropdown */}
+        <div ref={anrufenRef} style={{ position: 'relative' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setAnrufenOpen(v => !v)}
+          >
+            <Phone size={13} /> Anrufen
+          </button>
+
+          <AnimatePresence>
+            {anrufenOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0,  scale: 1     }}
+                exit   ={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.14, ease: [0.2, 0.7, 0.1, 1] }}
+                style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', left: 0,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 14, padding: 6, minWidth: 240,
+                  boxShadow: 'var(--shadow-2)', zIndex: 100,
+                  transformOrigin: 'top left',
+                }}
+              >
+                {phoneContacts.length === 0 ? (
+                  <div style={{
+                    padding: '12px 14px',
+                    fontSize: 13, color: 'var(--fg-muted)', textAlign: 'center',
+                  }}>
+                    Keine Telefonnummer hinterlegt
+                  </div>
+                ) : (
+                  phoneContacts.map(c => (
+                    <a
+                      key={c.id}
+                      href={`tel:${c.phone}`}
+                      onClick={() => setAnrufenOpen(false)}
+                      style={{ display: 'block', textDecoration: 'none' }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '9px 10px', borderRadius: 9,
+                          transition: 'background 100ms',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 99, flexShrink: 0,
+                          background: 'var(--accent-soft)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, fontWeight: 700, color: 'var(--accent-text)',
+                          fontFamily: 'var(--font-mono)',
+                        }}>
+                          {[c.firstName, c.lastName].filter(Boolean).map(n => n![0]).join('').toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
+                            {c.firstName}{c.lastName ? ` ${c.lastName}` : ''}
+                            {c.isPrimary && (
+                              <span style={{
+                                fontSize: 10, fontWeight: 600, marginLeft: 6,
+                                color: 'var(--accent-text)', background: 'var(--accent-soft)',
+                                padding: '1px 6px', borderRadius: 99,
+                              }}>Primär</span>
+                            )}
+                          </div>
+                          {c.role && (
+                            <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>
+                              {c.role}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <span style={{
+                            fontSize: 12.5, color: 'var(--fg)',
+                            fontFamily: 'var(--font-mono)', letterSpacing: '0.02em',
+                          }}>
+                            {c.phone}
+                          </span>
+                          <Phone size={12} style={{ color: 'var(--accent-text)', opacity: 0.7 }} />
+                        </div>
+                      </div>
+                    </a>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <button className="btn-ghost"><MailIcon size={13} /> Mail</button>
 
         {/* Aktionen-Menü */}
