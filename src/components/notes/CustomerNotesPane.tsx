@@ -300,13 +300,14 @@ function NoteListRow({
         </div>
       )}
 
-      {hover && !active && (
+      {hover && (
         <button
           onClick={e => { e.stopPropagation(); onDelete() }}
           style={{
             position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
             width: 20, height: 20, borderRadius: 5, border: 'none',
-            background: 'var(--surface-3)', color: 'var(--fg-muted)',
+            background: active ? 'oklch(15% 0 0 / 0.15)' : 'var(--surface-3)',
+            color: active ? 'oklch(15% 0 0 / 0.6)' : 'var(--fg-muted)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         ><Trash2 size={10} /></button>
