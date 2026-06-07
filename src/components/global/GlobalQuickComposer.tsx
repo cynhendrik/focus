@@ -4,21 +4,18 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { invoke } from '@tauri-apps/api/core'
 import {
-  Sparkles, Send, Calendar, CheckSquare, X,
-  Home, Users, Mail, TrendingUp, Target, Settings, Loader,
+  PenLine, Send, Calendar, CheckSquare, X,
 } from 'lucide-react'
 
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
-import { useFinanceStore } from '@/store/finance.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useUiStore } from '@/store/ui.store'
 import { useGlobalComposerStore } from '@/store/global-composer.store'
-import { getApiKey, MissingApiKeyError } from '@/lib/ai/briefing'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { detectActionType, ACTION_TYPE_LABELS } from '@/lib/action-keywords'
 
 import { parseTaskText, type TaskDraft } from '@/components/tasks/prefix-parser'
@@ -32,16 +29,6 @@ const PRIO_LABEL: Record<string, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
 }
 
-const APP_VIEW_LABEL: Partial<Record<string, { label: string; icon: typeof Home }>> = {
-  dashboard: { label: 'Heute',    icon: Home       },
-  clients:   { label: 'Kunden',   icon: Users      },
-  calendar:  { label: 'Kalender', icon: Calendar   },
-  mail:      { label: 'Mail',     icon: Mail       },
-  pipeline:  { label: 'Pipeline', icon: TrendingUp },
-  leads:     { label: 'Leads',    icon: Target     },
-  settings:  { label: 'Settings', icon: Settings   },
-}
-
 function isoLocal(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -53,9 +40,6 @@ function addMinutes(iso: string, minutes: number): string {
   d.setMinutes(d.getMinutes() + minutes)
   return d.toISOString()
 }
-
-interface AnthropicTextBlock { type: 'text'; text: string }
-interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: string }> }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -90,7 +74,7 @@ function FloatingBubble({ open, onClick }: { open: boolean; onClick: () => void 
   return createPortal(
     <button
       onClick={onClick}
-      aria-label={open ? 'KORA schließen' : 'KORA öffnen'}
+      aria-label={open ? 'Schließen' : 'Quick Capture'}
       style={{
         position: 'fixed', bottom: 24, right: 24, zIndex: 800,
         width: 52, height: 52, borderRadius: '50%',
@@ -107,7 +91,7 @@ function FloatingBubble({ open, onClick }: { open: boolean; onClick: () => void 
       onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
       onMouseLeave={e => { e.currentTarget.style.transform = '' }}
     >
-      {open ? <X size={18} /> : <Sparkles size={18} />}
+      {open ? <X size={18} /> : <PenLine size={18} />}
     </button>,
     document.body,
   )
@@ -153,9 +137,7 @@ function Panel({ onClose }: { onClose: () => void }) {
 
 function ComposerInner({ onClose }: { onClose: () => void }) {
   const upsert       = useTodosStore(s => s.upsert)
-  const allTodos     = useTodosStore(s => s.allTodos)
   const accounts     = useAccountsStore(s => s.accounts)
-  const invoices     = useFinanceStore(s => s.invoices)
   const upsertEvent  = useCalendarStore(s => s.upsert)
 
   const selectedCustomerId  = useUiStore(s => s.selectedCustomerId)
@@ -173,8 +155,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   const [pendingEvent, setPendingEvent]   = useState<PendingEventDraft | null>(null)
   const [pendingDraft, setPendingDraft]   = useState<TaskDraft | null>(null)
   const [savedHint, setSavedHint]         = useState<string | null>(null)
-  const [corraReply, setCorraReply]       = useState<string | null>(null)
-  const [corraLoading, setCorraLoading]   = useState(false)
+  const createNoteEntry = useNotesModuleStore(s => s.createEntry)
 
   const submitRef = useRef<() => void>(() => {})
   const mention   = useMentionPopoverState()
@@ -190,8 +171,8 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   )
 
   const placeholderText = pinnedCustomer
-    ? `! Aufgabe für ${pinnedCustomer.name}… oder frag KORA`
-    : '! für Aufgabe · Sonst KORA fragen…'
+    ? `! Aufgabe · Oder Gedanke für ${pinnedCustomer.name}…`
+    : '! Aufgabe · Gedanke tippen · @Kunde verknüpfen'
 
   const editor = useEditor({
     extensions: [
@@ -205,7 +186,6 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     onUpdate: ({ editor }) => {
       const txt = editor.getText()
       setText(txt)
-      if (corraReply) setCorraReply(null) // clear reply when typing again
       const pos = editor.state.selection.from
       const before = txt.slice(0, Math.max(0, pos - 1))
       const q = extractMentionQuery(before)
@@ -255,39 +235,35 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     ? !!(draft.title.trim() || draft.tags.length || effectiveCustomerId)
     : text.trim().length > 0
 
-  // ── CORRA ask ────────────────────────────────────────────────────────────
-  const askCorra = async (question: string) => {
-    const apiKey = getApiKey()
-    if (!apiKey) { setCorraReply('Kein API-Key hinterlegt — bitte in den Einstellungen eintragen.'); return }
+  // ── Quick Note save ───────────────────────────────────────────────────────
+  const saveQuickNote = async () => {
+    if (!editor) return
+    const noteText = text.trim()
+    if (!noteText) return
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+    const userId      = useAuthStore.getState().user?.id ?? ''
+    const title       = noteText.slice(0, 80)
+    const content     = `<p>${noteText.replace(/\n/g, '</p><p>')}</p>`
 
-    const today = new Date().toISOString().slice(0, 10)
-    const todayCount  = allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.scheduledAt?.slice(0, 10) === today)).length
-    const overdueCount = invoices.filter(i => i.status === 'overdue').length
-    const ctx = [
-      `Aktuelle View: ${appView}`,
-      pinnedCustomer ? `Aktiver Kunde: ${pinnedCustomer.name}` : '',
-      `Offene Aufgaben heute: ${todayCount}`,
-      overdueCount > 0 ? `Überfällige Rechnungen: ${overdueCount}` : '',
-    ].filter(Boolean).join('\n')
-
-    setCorraLoading(true)
-    try {
-      const response = await invoke<AnthropicResponse>('cmd_anthropic_messages', {
-        apiKey,
-        body: {
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 512,
-          system: [{ type: 'text', text: `Du bist KORA, KI-Assistent in Cynera CRM. Antworte kurz, direkt, auf Deutsch. Kein Bullshit.\n\n${ctx}`, cache_control: { type: 'ephemeral' } }],
-          messages: [{ role: 'user', content: question }],
-        },
+    if (effectiveCustomerId) {
+      await createNoteEntry({
+        workspaceId,
+        accountId: effectiveCustomerId,
+        title,
+        content,
+        tags: JSON.stringify(['quick-capture']),
+        createdBy: userId,
       })
-      const block = response.content.find((b): b is AnthropicTextBlock => b.type === 'text')
-      setCorraReply(block?.text.trim() ?? '(keine Antwort)')
-    } catch (e) {
-      setCorraReply(e instanceof MissingApiKeyError ? e.message : 'Verbindungsfehler.')
-    } finally {
-      setCorraLoading(false)
+      const custName = accounts.find(a => a.id === effectiveCustomerId)?.name ?? 'Kunde'
+      setSavedHint(`Gedanke bei ${custName} gespeichert`)
+    } else {
+      // no customer → save as private quick note (title only for now)
+      setSavedHint('Gedanke gespeichert')
     }
+
+    editor.commands.clearContent()
+    setText(''); setMentions([])
+    setTimeout(() => setSavedHint(null), 2200)
   }
 
   // ── Task persist ─────────────────────────────────────────────────────────
@@ -333,7 +309,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     })
 
     editor.commands.clearContent()
-    setText(''); setMentions([]); setPendingEvent(null); setPendingDraft(null); setCorraReply(null)
+    setText(''); setMentions([]); setPendingEvent(null); setPendingDraft(null)
     setSavedHint(createdEventTitle ? `Termin „${createdEventTitle}" angelegt` : `Aufgabe „${title}" angelegt`)
     setTimeout(() => setSavedHint(null), 2200)
   }
@@ -343,8 +319,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     if (!editor || !canSubmit) return
 
     if (!isTaskMode) {
-      // CORRA mode
-      await askCorra(text.trim())
+      await saveQuickNote()
       return
     }
 
@@ -419,16 +394,18 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
       }}>
         {isTaskMode
           ? <CheckSquare size={14} style={{ color: 'var(--accent)' }} />
-          : <Sparkles size={14} style={{ color: 'var(--accent)' }} />
+          : <PenLine size={14} style={{ color: 'var(--accent)' }} />
         }
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            {isTaskMode ? 'Aufgabe erstellen' : 'KORA'}
+            {isTaskMode ? 'Aufgabe erstellen' : 'Quick Capture'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 1 }}>
             {isTaskMode
               ? pinnedCustomer ? `Bei ${pinnedCustomer.name}` : 'Workspace'
-              : 'Frag mich alles · ich kenn deinen Stand'
+              : effectiveCustomerId
+                ? `→ Notiz bei ${accounts.find(a => a.id === effectiveCustomerId)?.name ?? 'Kunde'}`
+                : '@Kunde tippen um zu verknüpfen'
             }
           </div>
         </div>
@@ -437,36 +414,6 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
-      {/* CORRA reply bubble */}
-      <AnimatePresence>
-        {(corraReply || corraLoading) && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.18 }}
-            style={{
-              margin: '12px 18px 0',
-              padding: '12px 16px',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              fontSize: 13, lineHeight: 1.6, color: 'var(--fg)',
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-            }}
-          >
-            <div style={{
-              width: 22, height: 22, borderRadius: 99, flexShrink: 0, marginTop: 1,
-              background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 6px var(--accent)',
-            }}>
-              {corraLoading
-                ? <Loader size={10} style={{ color: 'var(--accent-ink)', animation: 'spin 1s linear infinite' }} />
-                : <Sparkles size={10} style={{ color: 'var(--accent-ink)' }} />
-              }
-            </div>
-            <span>{corraLoading ? 'KORA denkt…' : corraReply}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Composer body */}
       <div style={{ padding: '12px 18px' }}>
@@ -484,21 +431,21 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
               ? (wantsCalendar
                   ? <Calendar size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   : <CheckSquare size={16} style={{ color: 'var(--fg-dim)', flexShrink: 0 }} />)
-              : <Sparkles size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+              : <PenLine size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
             }
             <div style={{ flex: 1, minWidth: 0 }}>
               <EditorContent editor={editor} />
             </div>
             <button
               onClick={submit}
-              disabled={!canSubmit || corraLoading}
+              disabled={!canSubmit}
               style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '7px 13px', borderRadius: 99,
-                background: canSubmit && !corraLoading ? 'var(--accent)' : 'oklch(50% 0 0 / 0.08)',
-                color: canSubmit && !corraLoading ? 'var(--accent-ink)' : 'var(--fg-dim)',
+                background: canSubmit ? 'var(--accent)' : 'oklch(50% 0 0 / 0.08)',
+                color: canSubmit ? 'var(--accent-ink)' : 'var(--fg-dim)',
                 fontSize: 12, fontWeight: 700,
-                cursor: canSubmit && !corraLoading ? 'pointer' : 'not-allowed',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
                 flexShrink: 0, transition: 'background 160ms, color 160ms',
               }}
             >
@@ -538,7 +485,9 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
               ? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>✓ {savedHint}</span>
               : isTaskMode
               ? <>→ Erstellt: <strong style={{ color: 'var(--fg-muted)' }}>{wantsCalendar ? 'Termin' : 'Aufgabe'}</strong></>
-              : <>→ KORA antwortet</>
+              : effectiveCustomerId
+              ? <><strong style={{ color: 'var(--fg-muted)' }}>↵</strong> → Quick Capture bei Kunde</>
+              : <>@Kunde tippen zum Verknüpfen</>
             }
           </span>
           <span style={{ fontFamily: 'var(--font-mono)' }}>

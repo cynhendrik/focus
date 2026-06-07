@@ -380,7 +380,15 @@ export function CustomerNotesPane({ accountId }: Props) {
     return list
   }, [entries, activeFolderId, search])
 
-  const groups     = useMemo(() => groupEntries(filteredEntries), [filteredEntries])
+  const quickCaptures = useMemo(
+    () => filteredEntries.filter(e => e.tags.includes('quick-capture')),
+    [filteredEntries],
+  )
+  const regularEntries = useMemo(
+    () => filteredEntries.filter(e => !e.tags.includes('quick-capture')),
+    [filteredEntries],
+  )
+  const groups     = useMemo(() => groupEntries(regularEntries), [regularEntries])
   const selectedNote = useMemo(() => entries.find(e => e.id === selectedId) ?? null, [entries, selectedId])
 
   const handleNew = async (title?: string, content?: string) => {
@@ -597,27 +605,58 @@ export function CustomerNotesPane({ accountId }: Props) {
                 )}
               </div>
             ) : (
-              groups.map(group => (
-                <div key={group.label} style={{ marginBottom: 8 }}>
-                  <div style={{
-                    fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
-                    textTransform: 'uppercase', color: 'var(--fg-dim)',
-                    fontFamily: 'var(--font-mono)',
-                    padding: '8px 12px 4px',
-                  }}>
-                    {group.label}
+              <>
+                {/* Quick Capture section — oben */}
+                {quickCaptures.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
+                      textTransform: 'uppercase', color: 'var(--accent-text)',
+                      fontFamily: 'var(--font-mono)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 12px 4px',
+                    }}>
+                      <PenLine size={10} />
+                      Quick Capture
+                    </div>
+                    {quickCaptures.map(note => (
+                      <NoteListRow
+                        key={note.id}
+                        note={note}
+                        active={note.id === selectedId}
+                        onClick={() => setSelectedId(note.id)}
+                        onDelete={() => handleDelete(note.id)}
+                      />
+                    ))}
+                    {regularEntries.length > 0 && (
+                      <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px 4px' }} />
+                    )}
                   </div>
-                  {group.entries.map(note => (
-                    <NoteListRow
-                      key={note.id}
-                      note={note}
-                      active={note.id === selectedId}
-                      onClick={() => setSelectedId(note.id)}
-                      onDelete={() => handleDelete(note.id)}
-                    />
-                  ))}
-                </div>
-              ))
+                )}
+
+                {/* Time groups */}
+                {groups.map(group => (
+                  <div key={group.label} style={{ marginBottom: 8 }}>
+                    <div style={{
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em',
+                      textTransform: 'uppercase', color: 'var(--fg-dim)',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '8px 12px 4px',
+                    }}>
+                      {group.label}
+                    </div>
+                    {group.entries.map(note => (
+                      <NoteListRow
+                        key={note.id}
+                        note={note}
+                        active={note.id === selectedId}
+                        onClick={() => setSelectedId(note.id)}
+                        onDelete={() => handleDelete(note.id)}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </>
             )}
           </div>
 
