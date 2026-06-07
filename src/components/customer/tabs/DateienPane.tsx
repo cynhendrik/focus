@@ -192,6 +192,99 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
   )
 }
 
+// ── FolderShape ───────────────────────────────────────────────────────────────
+
+function FolderShape({
+  name, meta, hov, creating, inputRef, inputValue, onInputChange, onInputKeyDown, onInputBlur,
+}: {
+  name?: string
+  meta?: string
+  hov?: boolean
+  creating?: boolean
+  inputRef?: React.RefObject<HTMLInputElement>
+  inputValue?: string
+  onInputChange?: (v: string) => void
+  onInputKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
+  onInputBlur?: () => void
+}) {
+  const bodyBg = hov
+    ? 'linear-gradient(150deg, var(--surface-3) 0%, var(--surface-2) 100%)'
+    : 'linear-gradient(150deg, var(--surface-2) 0%, var(--surface-3) 100%)'
+
+  const borderColor = creating
+    ? 'var(--accent)'
+    : hov ? 'var(--border-strong)' : 'var(--border)'
+
+  return (
+    <div style={{ userSelect: 'none' }}>
+      {/* Tab */}
+      <div style={{
+        width: '42%', height: 13, marginLeft: 10,
+        borderRadius: '7px 7px 0 0',
+        background: creating ? 'var(--accent-soft)' : 'var(--surface-3)',
+        border: `1px solid ${borderColor}`,
+        borderBottom: 'none',
+        transition: 'background 120ms',
+      }} />
+
+      {/* Body */}
+      <div style={{
+        borderRadius: '0 10px 10px 10px',
+        background: creating ? 'var(--accent-soft)' : bodyBg,
+        border: `1px solid ${borderColor}`,
+        height: 96,
+        padding: '14px 16px',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        transition: 'background 120ms, border-color 120ms',
+        boxShadow: hov ? '0 6px 24px oklch(0% 0 0 / 0.18)' : 'none',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Subtle inner highlight at top */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+          background: 'oklch(100% 0 0 / 0.06)',
+          pointerEvents: 'none',
+        }} />
+
+        {creating ? (
+          <input
+            ref={inputRef}
+            value={inputValue}
+            onChange={e => onInputChange?.(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            onBlur={onInputBlur}
+            style={{
+              background: 'transparent', border: 'none', outline: 'none',
+              fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
+              color: 'var(--fg)', fontFamily: 'inherit', width: '100%',
+              borderBottom: '1px solid var(--accent)', paddingBottom: 2,
+            }}
+          />
+        ) : (
+          <>
+            {meta && (
+              <div style={{
+                fontSize: 10.5, fontFamily: 'var(--font-mono)',
+                color: 'var(--fg-dim)', letterSpacing: '0.04em',
+                marginBottom: 4,
+              }}>
+                {meta}
+              </div>
+            )}
+            <div style={{
+              fontSize: 13, fontWeight: 600, color: 'var(--fg)',
+              letterSpacing: '-0.01em',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {name}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── FolderCard ────────────────────────────────────────────────────────────────
 
 function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
@@ -201,6 +294,7 @@ function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   const [hov, setHov] = useState(false)
+  const meta = subfolderCount > 0 ? `${subfolderCount} Unterordner` : 'Leer'
 
   return (
     <div
@@ -210,36 +304,11 @@ function FolderCard({ folder, subfolderCount, onOpen, onContextMenu }: {
       onContextMenu={e => { e.preventDefault(); onContextMenu(e) }}
       style={{
         cursor: 'pointer',
-        borderRadius: 12,
-        background: hov ? 'var(--surface-2)' : 'var(--surface)',
-        border: `1px solid ${hov ? 'var(--border-strong)' : 'var(--border)'}`,
-        transition: 'background 120ms, border-color 120ms, transform 120ms',
-        transform: hov ? 'translateY(-2px)' : 'none',
-        padding: '16px 14px 14px',
-        display: 'flex', flexDirection: 'column', gap: 12,
-        userSelect: 'none',
+        transform: hov ? 'translateY(-3px)' : 'none',
+        transition: 'transform 160ms cubic-bezier(.2,.7,.1,1)',
       }}
     >
-      <div style={{
-        width: 40, height: 40, borderRadius: 11,
-        background: 'var(--accent-soft)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Folder size={20} style={{ color: 'var(--accent-text)' }} />
-      </div>
-
-      <div>
-        <div style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--fg)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          letterSpacing: '-0.01em',
-        }}>
-          {folder.name}
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>
-          {subfolderCount > 0 ? `${subfolderCount} Unterordner` : 'Leer'}
-        </div>
-      </div>
+      <FolderShape name={folder.name} meta={meta} hov={hov} />
     </div>
   )
 }
@@ -253,7 +322,9 @@ function NewFolderCard({ onSubmit, onCancel }: {
   const [name, setName] = useState('Neuer Ordner')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { inputRef.current?.select() }, [])
+  useEffect(() => {
+    inputRef.current?.select()
+  }, [])
 
   const commit = () => {
     const n = name.trim()
@@ -262,37 +333,17 @@ function NewFolderCard({ onSubmit, onCancel }: {
   }
 
   return (
-    <div style={{
-      borderRadius: 12, border: '1.5px solid var(--accent)',
-      background: 'var(--accent-soft)',
-      padding: '16px 14px 12px',
-      display: 'flex', flexDirection: 'column', gap: 10,
-    }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10,
-        background: 'var(--accent-soft)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Folder size={18} style={{ color: 'var(--accent-text)' }} />
-      </div>
-      <input
-        ref={inputRef}
-        value={name}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter')  commit()
-          if (e.key === 'Escape') onCancel()
-        }}
-        onBlur={commit}
-        style={{
-          fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em',
-          width: '100%', padding: '3px 0', borderRadius: 0,
-          background: 'transparent', border: 'none',
-          borderBottom: '1.5px solid var(--accent)',
-          color: 'var(--fg)', outline: 'none',
-        }}
-      />
-    </div>
+    <FolderShape
+      creating
+      inputRef={inputRef}
+      inputValue={name}
+      onInputChange={setName}
+      onInputKeyDown={e => {
+        if (e.key === 'Enter')  commit()
+        if (e.key === 'Escape') onCancel()
+      }}
+      onInputBlur={commit}
+    />
   )
 }
 
@@ -614,7 +665,7 @@ export function DateienPane({ customerId }: Props) {
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 10 }}>
                 Ordner
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 12 }}>
                 {shownSubfolders.map(f => (
                   <FolderCard
                     key={f.id}
@@ -641,9 +692,9 @@ export function DateienPane({ customerId }: Props) {
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 8 }}>
                 Dateien
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 72px 32px', alignItems: 'center', gap: 8, padding: '6px 12px', marginBottom: 2, borderBottom: '1px solid var(--border)' }}>
-                {['Name', 'Datum', 'Größe', ''].map((h, i) => (
-                  <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i === 2 ? 'right' : 'left' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 68px', alignItems: 'center', gap: 8, padding: '6px 12px 8px', borderBottom: '1px solid var(--border)' }}>
+                {['Name', 'Datum', 'Größe'].map((h, i) => (
+                  <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: i === 2 ? 'right' : 'left' }}>
                     {h}
                   </span>
                 ))}
