@@ -12,6 +12,7 @@ pub struct NoteEntry {
     pub title:        Option<String>,
     pub content:      String,
     pub tags:         String,  // JSON array string
+    pub stickies:     String,  // JSON array string
     pub created_by:   String,
     pub updated_by:   Option<String>,
     pub created_at:   String,
@@ -37,6 +38,7 @@ pub struct UpdateNoteEntryPayload {
     pub title:      Option<String>,
     pub content:    Option<String>,
     pub tags:       Option<String>,
+    pub stickies:   Option<String>,
     pub updated_by: Option<String>,
 }
 
@@ -49,15 +51,16 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<NoteEntry> {
         title:        r.get(4)?,
         content:      r.get::<_, Option<String>>(5)?.unwrap_or_default(),
         tags:         r.get::<_, Option<String>>(6)?.unwrap_or_else(|| "[]".into()),
-        created_by:   r.get(7)?,
-        updated_by:   r.get(8)?,
-        created_at:   r.get(9)?,
-        updated_at:   r.get(10)?,
+        stickies:     r.get::<_, Option<String>>(7)?.unwrap_or_else(|| "[]".into()),
+        created_by:   r.get(8)?,
+        updated_by:   r.get(9)?,
+        created_at:   r.get(10)?,
+        updated_at:   r.get(11)?,
     })
 }
 
 const SELECT_COLS: &str =
-    "id, workspace_id, account_id, folder_id, title, content, tags,
+    "id, workspace_id, account_id, folder_id, title, content, tags, stickies,
      created_by, updated_by, created_at, updated_at";
 
 pub fn insert(conn: &Connection, payload: CreateNoteEntryPayload) -> Result<NoteEntry, AppError> {
@@ -65,8 +68,8 @@ pub fn insert(conn: &Connection, payload: CreateNoteEntryPayload) -> Result<Note
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO note_entries
-         (id, workspace_id, account_id, folder_id, title, content, tags, created_by, pending_sync, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,1,?9,?9)",
+         (id, workspace_id, account_id, folder_id, title, content, tags, stickies, created_by, pending_sync, created_at, updated_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,'[]',?8,1,?9,?9)",
         rusqlite::params![
             id,
             payload.workspace_id,
@@ -93,14 +96,16 @@ pub fn update(conn: &Connection, id: &str, payload: UpdateNoteEntryPayload) -> R
            title      = COALESCE(?3, title),
            content    = COALESCE(?4, content),
            tags       = COALESCE(?5, tags),
-           updated_by = ?6,
+           stickies   = COALESCE(?6, stickies),
+           updated_by = ?7,
            pending_sync = 1,
-           updated_at = ?7
-         WHERE id = ?8",
+           updated_at = ?8
+         WHERE id = ?9",
         rusqlite::params![
             payload.folder_id.is_some(),
             payload.folder_id.unwrap_or(None),
             payload.title, payload.content, payload.tags,
+            payload.stickies,
             payload.updated_by, now, id,
         ],
     )?;
@@ -193,6 +198,7 @@ mod tests {
             title:      None,
             content:    Some("<p>Geändert</p>".into()),
             tags:       Some(r#"["Follow-up"]"#.into()),
+            stickies:   None,
             updated_by: Some("u-2".into()),
         }).unwrap();
         assert_eq!(updated.content, "<p>Geändert</p>");
@@ -204,7 +210,7 @@ mod tests {
     fn update_returns_not_found() {
         let conn = setup();
         let result = update(&conn, "nonexistent", UpdateNoteEntryPayload {
-            folder_id: None, title: None, content: Some("x".into()), tags: None, updated_by: None,
+            folder_id: None, title: None, content: Some("x".into()), tags: None, stickies: None, updated_by: None,
         });
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }
@@ -222,5 +228,27 @@ mod tests {
     fn delete_returns_not_found() {
         let conn = setup();
         assert!(matches!(delete(&conn, "nope"), Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn stickies_defaults_to_empty_array() {
+        let conn = setup();
+        seed_account(&conn, "a1");
+        let e = insert(&conn, make_payload("a1")).unwrap();
+        assert_eq!(e.stickies, "[]");
+    }
+
+    #[test]
+    fn update_stickies_persists() {
+        let conn = setup();
+        seed_account(&conn, "a1");
+        let e = insert(&conn, make_payload("a1")).unwrap();
+        let stickies_json = "[{\"id\":\"s1\",\"x\":10,\"y\":20,\"color\":\"#FFF176\",\"title\":\"Test\",\"text\":\"\",\"checks\":[]}]";
+        let updated = update(&conn, &e.id, UpdateNoteEntryPayload {
+            folder_id: None, title: None, content: None, tags: None,
+            stickies: Some(stickies_json.to_string()),
+            updated_by: None,
+        }).unwrap();
+        assert_eq!(updated.stickies, stickies_json);
     }
 }
