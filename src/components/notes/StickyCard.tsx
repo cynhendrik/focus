@@ -74,6 +74,7 @@ export function StickyCard({ note, onChange, onDelete }: Props) {
         cursor: dragging ? 'grabbing' : 'default',
         transition: 'box-shadow 120ms',
         userSelect: dragging ? 'none' : 'auto',
+        pointerEvents: 'auto',
       }}
     >
       {/* Header: drag handle + Farbpalette + löschen */}

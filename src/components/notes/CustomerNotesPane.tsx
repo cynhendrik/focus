@@ -106,7 +106,7 @@ function Toolbar({
       {btn(editor.isActive('taskList'),     <CheckSquare size={13} />,   () => editor.chain().focus().toggleTaskList().run(),         'Checkliste')}
       <div style={{ flex: 1 }} />
       <button
-        onClick={onAddSticky}
+        onMouseDown={e => { e.preventDefault(); onAddSticky() }}
         title="Zettel hinzufügen"
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
@@ -186,7 +186,7 @@ function NoteEditor({
   }, [note.id])
 
   useEffect(() => { setTitle(note.title ?? '') }, [note.id, note.title])
-  useEffect(() => { setStickies(note.stickies ?? []) }, [note.id])
+  useEffect(() => { setStickies(note.stickies ?? []) }, [note.id, note.stickies])
 
   useEffect(() => () => {
     if (titleTimer.current)    clearTimeout(titleTimer.current)
