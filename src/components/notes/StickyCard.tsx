@@ -15,6 +15,8 @@ interface Props {
 export function StickyCard({ note, onChange, onDelete }: Props) {
   const [dragging, setDragging] = useState(false)
   const offsetRef = useRef({ x: 0, y: 0 })
+  const noteRef = useRef(note)
+  noteRef.current = note
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -25,7 +27,7 @@ export function StickyCard({ note, onChange, onDelete }: Props) {
   useEffect(() => {
     if (!dragging) return
     const onMove = (e: MouseEvent) => {
-      onChange({ ...note, x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y })
+      onChange({ ...noteRef.current, x: e.clientX - offsetRef.current.x, y: e.clientY - offsetRef.current.y })
     }
     const onUp = () => setDragging(false)
     window.addEventListener('mousemove', onMove)
@@ -34,7 +36,7 @@ export function StickyCard({ note, onChange, onDelete }: Props) {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [dragging, note, onChange])
+  }, [dragging, onChange])
 
   const setField = <K extends keyof StickyNote>(key: K, value: StickyNote[K]) =>
     onChange({ ...note, [key]: value })
