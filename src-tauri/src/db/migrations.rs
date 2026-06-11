@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 24;
+const CURRENT_VERSION: u32 = 25;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -684,6 +684,13 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                     "ALTER TABLE note_entries ADD COLUMN folder_id TEXT REFERENCES note_folders(id) ON DELETE SET NULL;"
                 )?;
             }
+            Ok(())
+        }
+        25 => {
+            if column_exists(conn, "note_entries", "stickies") { return Ok(()); }
+            conn.execute_batch(
+                "ALTER TABLE note_entries ADD COLUMN stickies TEXT NOT NULL DEFAULT '[]';"
+            )?;
             Ok(())
         }
         _ => Ok(()),
