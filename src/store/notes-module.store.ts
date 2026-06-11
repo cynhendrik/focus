@@ -3,16 +3,19 @@ import { invoke } from '@tauri-apps/api/core'
 import { log } from '@/lib/logger'
 import type {
   NoteEntry, NoteDoc, NoteFolder,
+  StickyNote,
   CreateNoteEntryPayload, UpdateNoteEntryPayload,
   CreateNoteDocPayload, UpdateNoteDocPayload,
   CreateNoteFolderPayload, UpdateNoteFolderPayload,
 } from '@/types/notes-module.types'
 
-// Rust returns tags as a JSON string — parse it to string[]
-function parseEntry(raw: Omit<NoteEntry, 'tags'> & { tags: string }): NoteEntry {
+// Rust returns tags and stickies as JSON strings — parse them to string[] and StickyNote[]
+function parseEntry(raw: Omit<NoteEntry, 'tags' | 'stickies'> & { tags: string; stickies: string }): NoteEntry {
   let tags: string[] = []
+  let stickies: StickyNote[] = []
   try { tags = JSON.parse(raw.tags) } catch {}
-  return { ...raw, tags }
+  try { stickies = JSON.parse(raw.stickies) } catch {}
+  return { ...raw, tags, stickies }
 }
 
 interface NotesModuleState {
@@ -50,7 +53,7 @@ export const useNotesModuleStore = create<NotesModuleState>()((set, get) => ({
     set({ loadingEntries: true, loadingDocs: true, activeAccountId: accountId })
     try {
       const [rawEntries, docs, folders] = await Promise.all([
-        invoke<(Omit<NoteEntry, 'tags'> & { tags: string })[]>('get_note_entries', { accountId }),
+        invoke<(Omit<NoteEntry, 'tags' | 'stickies'> & { tags: string; stickies: string })[]>('get_note_entries', { accountId }),
         invoke<NoteDoc[]>('get_note_docs', { accountId }),
         invoke<NoteFolder[]>('get_note_folders', { accountId }),
       ])
@@ -62,14 +65,14 @@ export const useNotesModuleStore = create<NotesModuleState>()((set, get) => ({
   },
 
   createEntry: async (payload) => {
-    const raw = await invoke<Omit<NoteEntry, 'tags'> & { tags: string }>('create_note_entry', { payload })
+    const raw = await invoke<Omit<NoteEntry, 'tags' | 'stickies'> & { tags: string; stickies: string }>('create_note_entry', { payload })
     const entry = parseEntry(raw)
     set(s => ({ entries: [entry, ...s.entries] }))
     return entry
   },
 
   updateEntry: async (id, patch) => {
-    const raw = await invoke<Omit<NoteEntry, 'tags'> & { tags: string }>('update_note_entry', { id, payload: patch })
+    const raw = await invoke<Omit<NoteEntry, 'tags' | 'stickies'> & { tags: string; stickies: string }>('update_note_entry', { id, payload: patch })
     const updated = parseEntry(raw)
     set(s => ({ entries: s.entries.map(e => e.id === id ? updated : e) }))
   },
