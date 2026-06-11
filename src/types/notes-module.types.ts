@@ -15,7 +15,8 @@ export interface NoteEntry {
   folderId:    string | null
   title:       string | null
   content:     string
-  tags:        string[]   // parsed from JSON string returned by Rust
+  tags:        string[]       // parsed from JSON string returned by Rust
+  stickies:    StickyNote[]    // parsed from JSON string
   createdBy:   string
   updatedBy:   string | null
   createdAt:   string
@@ -49,6 +50,7 @@ export interface UpdateNoteEntryPayload {
   title?:     string | null
   content?:   string
   tags?:      string   // JSON string
+  stickies?:  string   // JSON.stringify(StickyNote[])
   updatedBy?: string
 }
 
@@ -75,4 +77,20 @@ export interface UpdateNoteDocPayload {
   title?:     string
   content?:   string
   updatedBy?: string
+}
+
+export interface StickyCheck {
+  id:    string
+  label: string
+  done:  boolean
+}
+
+export interface StickyNote {
+  id:     string
+  x:      number
+  y:      number
+  color:  string
+  title:  string
+  text:   string
+  checks: StickyCheck[]
 }
