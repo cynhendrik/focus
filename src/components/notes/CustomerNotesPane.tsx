@@ -6,11 +6,13 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import { Plus, Trash2, Search, X, Bold, Italic, List, CheckSquare, Heading2, PenLine } from 'lucide-react'
+import { Plus, Trash2, Search, X, Bold, Italic, List, CheckSquare, Heading2, PenLine, StickyNote as StickyIcon } from 'lucide-react'
 import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useWorkspaceStore }   from '@/store/workspace.store'
 import { useAuthStore }        from '@/store/auth.store'
 import type { NoteEntry, NoteFolder } from '@/types/notes-module.types'
+import { StickyCanvas, createSticky } from './StickyCanvas'
+import type { StickyNote } from '@/types/notes-module.types'
 
 interface Props { accountId: string }
 
@@ -63,7 +65,13 @@ function groupEntries(entries: NoteEntry[]) {
 
 // ── Editor toolbar ────────────────────────────────────────────────────────────
 
-function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function Toolbar({
+  editor,
+  onAddSticky,
+}: {
+  editor: ReturnType<typeof useEditor>
+  onAddSticky: () => void
+}) {
   if (!editor) return null
 
   const btn = (
@@ -88,7 +96,7 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   return (
     <div style={{
       display: 'flex', gap: 2, padding: '6px 0', marginBottom: 4,
-      borderBottom: '1px solid var(--border)',
+      borderBottom: '1px solid var(--border)', alignItems: 'center',
     }}>
       {btn(editor.isActive('bold'),         <Bold size={13} />,          () => editor.chain().focus().toggleBold().run(),             'Fett')}
       {btn(editor.isActive('italic'),       <Italic size={13} />,        () => editor.chain().focus().toggleItalic().run(),           'Kursiv')}
@@ -96,6 +104,29 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       <div style={{ width: 1, background: 'var(--border)', margin: '2px 4px' }} />
       {btn(editor.isActive('bulletList'),   <List size={13} />,          () => editor.chain().focus().toggleBulletList().run(),       'Liste')}
       {btn(editor.isActive('taskList'),     <CheckSquare size={13} />,   () => editor.chain().focus().toggleTaskList().run(),         'Checkliste')}
+      <div style={{ flex: 1 }} />
+      <button
+        onClick={onAddSticky}
+        title="Zettel hinzufügen"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '3px 8px', borderRadius: 6,
+          border: '1px solid var(--border)',
+          background: 'transparent', cursor: 'pointer',
+          fontSize: 11.5, color: 'var(--fg-muted)',
+          transition: 'color 120ms, border-color 120ms',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.color = 'var(--fg)'
+          e.currentTarget.style.borderColor = 'var(--accent)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.color = 'var(--fg-muted)'
+          e.currentTarget.style.borderColor = 'var(--border)'
+        }}
+      >
+        <StickyIcon size={12} /> Zettel
+      </button>
     </div>
   )
 }
@@ -107,13 +138,15 @@ function NoteEditor({
 }: {
   note: NoteEntry
   folders: NoteFolder[]
-  onUpdate: (patch: { title?: string | null; content?: string }) => Promise<void>
+  onUpdate: (patch: { title?: string | null; content?: string; stickies?: string }) => Promise<void>
 }) {
   const [title,  setTitle]  = useState(note.title ?? '')
   const [status, setStatus] = useState<'saved' | 'saving' | ''>('')
   const titleTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const contentTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const statusTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [stickies, setStickies] = useState<StickyNote[]>(note.stickies ?? [])
+  const stickiesTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const flashSaved = useCallback(() => {
     setStatus('saved')
@@ -153,11 +186,13 @@ function NoteEditor({
   }, [note.id])
 
   useEffect(() => { setTitle(note.title ?? '') }, [note.id, note.title])
+  useEffect(() => { setStickies(note.stickies ?? []) }, [note.id])
 
   useEffect(() => () => {
-    if (titleTimer.current)   clearTimeout(titleTimer.current)
-    if (contentTimer.current) clearTimeout(contentTimer.current)
-    if (statusTimer.current)  clearTimeout(statusTimer.current)
+    if (titleTimer.current)    clearTimeout(titleTimer.current)
+    if (contentTimer.current)  clearTimeout(contentTimer.current)
+    if (statusTimer.current)   clearTimeout(statusTimer.current)
+    if (stickiesTimer.current) clearTimeout(stickiesTimer.current)
   }, [])
 
   const handleTitleChange = (val: string) => {
@@ -173,6 +208,20 @@ function NoteEditor({
   const handleTitleKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') { e.preventDefault(); editor?.commands.focus() }
   }
+
+  const handleStickiesChange = useCallback((updated: StickyNote[]) => {
+    setStickies(updated)
+    if (stickiesTimer.current) clearTimeout(stickiesTimer.current)
+    stickiesTimer.current = setTimeout(() => {
+      onUpdate({ stickies: JSON.stringify(updated) })
+    }, 600)
+  }, [onUpdate])
+
+  const handleAddSticky = useCallback(() => {
+    const updated = [...stickies, createSticky(stickies.length)]
+    setStickies(updated)
+    onUpdate({ stickies: JSON.stringify(updated) })
+  }, [stickies, onUpdate])
 
   const folder = folders.find(f => f.id === note.folderId)
 
@@ -228,14 +277,15 @@ function NoteEditor({
           }}
         />
 
-        <Toolbar editor={editor} />
+        <Toolbar editor={editor} onAddSticky={handleAddSticky} />
       </div>
 
       {/* Editor scroll area */}
       <div
-        style={{ flex: 1, overflowY: 'auto', padding: '20px 56px 80px' }}
+        style={{ flex: 1, overflowY: 'auto', padding: '20px 56px 80px', position: 'relative' }}
         onClick={() => editor?.commands.focus()}
       >
+        <StickyCanvas stickies={stickies} onChange={handleStickiesChange} />
         <div style={{ maxWidth: 720 }}>
           <EditorContent editor={editor} />
         </div>
@@ -422,7 +472,7 @@ export function CustomerNotesPane({ accountId }: Props) {
 
   const handleUpdate = useCallback(async (
     id: string,
-    patch: { title?: string | null; content?: string },
+    patch: { title?: string | null; content?: string; stickies?: string },
   ) => {
     await updateEntry(id, { ...patch, updatedBy: userId })
   }, [updateEntry, userId])
