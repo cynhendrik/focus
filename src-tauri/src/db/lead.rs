@@ -9,6 +9,7 @@ pub struct Lead {
     pub workspace_id: String,
     pub name: String,
     pub email: Option<String>,
+    pub phone: Option<String>,
     pub account_type: String,
     pub lead_status: String,
     pub lead_source: String,
@@ -32,6 +33,7 @@ pub struct UpsertLeadPayload {
     pub workspace_id: String,
     pub name: String,
     pub email: Option<String>,
+    pub phone: Option<String>,
     pub lead_status: Option<String>,
     pub lead_source: String,
     pub lead_source_detail: Option<String>,
@@ -47,25 +49,26 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Lead> {
         workspace_id: r.get(1)?,
         name: r.get(2)?,
         email: r.get(3)?,
-        account_type: r.get(4)?,
-        lead_status: r.get::<_, Option<String>>(5)?.unwrap_or_default(),
-        lead_source: r.get::<_, Option<String>>(6)?.unwrap_or_default(),
-        lead_source_detail: r.get(7)?,
-        engagement_score: r.get::<_, Option<i64>>(8)?.unwrap_or(0),
-        re_engage_date: r.get(9)?,
-        converted_at: r.get(10)?,
-        pipeline_stage: r.get::<_, Option<String>>(11)?.unwrap_or_else(|| "inbox".into()),
-        company_name: r.get(12)?,
-        linkedin_url: r.get(13)?,
-        last_activity_at: r.get(14)?,
-        next_follow_up_at: r.get(15)?,
-        created_at: r.get(16)?,
-        updated_at: r.get(17)?,
+        phone: r.get(4)?,
+        account_type: r.get(5)?,
+        lead_status: r.get::<_, Option<String>>(6)?.unwrap_or_default(),
+        lead_source: r.get::<_, Option<String>>(7)?.unwrap_or_default(),
+        lead_source_detail: r.get(8)?,
+        engagement_score: r.get::<_, Option<i64>>(9)?.unwrap_or(0),
+        re_engage_date: r.get(10)?,
+        converted_at: r.get(11)?,
+        pipeline_stage: r.get::<_, Option<String>>(12)?.unwrap_or_else(|| "inbox".into()),
+        company_name: r.get(13)?,
+        linkedin_url: r.get(14)?,
+        last_activity_at: r.get(15)?,
+        next_follow_up_at: r.get(16)?,
+        created_at: r.get(17)?,
+        updated_at: r.get(18)?,
     })
 }
 
 const SELECT: &str =
-    "SELECT id, workspace_id, name, email, account_type, lead_status, lead_source,
+    "SELECT id, workspace_id, name, email, phone, account_type, lead_status, lead_source,
             lead_source_detail, engagement_score, re_engage_date, converted_at,
             pipeline_stage, company_name, linkedin_url, last_activity_at, next_follow_up_at,
             created_at, updated_at
@@ -86,12 +89,12 @@ pub fn upsert_lead(conn: &Connection, payload: UpsertLeadPayload) -> Result<Lead
     let stage = payload.pipeline_stage.unwrap_or_else(|| "inbox".into());
     conn.execute(
         "INSERT INTO accounts
-           (id, workspace_id, created_by, name, email, account_type, lead_status, lead_source,
+           (id, workspace_id, created_by, name, email, phone, account_type, lead_status, lead_source,
             lead_source_detail, engagement_score, re_engage_date, pipeline_stage, company_name,
             linkedin_url, created_at, updated_at)
-         VALUES (?1,?2,'',?3,?4,'lead',?5,?6,?7,0,?8,?9,?10,?11,?12,?12)
+         VALUES (?1,?2,'',?3,?4,?5,'lead',?6,?7,?8,0,?9,?10,?11,?12,?13,?13)
          ON CONFLICT(id) DO UPDATE SET
-           name=excluded.name, email=excluded.email,
+           name=excluded.name, email=excluded.email, phone=excluded.phone,
            lead_status=excluded.lead_status, lead_source=excluded.lead_source,
            lead_source_detail=excluded.lead_source_detail,
            re_engage_date=excluded.re_engage_date,
@@ -100,7 +103,7 @@ pub fn upsert_lead(conn: &Connection, payload: UpsertLeadPayload) -> Result<Lead
            linkedin_url=excluded.linkedin_url,
            updated_at=excluded.updated_at",
         rusqlite::params![
-            id, payload.workspace_id, payload.name, payload.email,
+            id, payload.workspace_id, payload.name, payload.email, payload.phone,
             status, payload.lead_source, payload.lead_source_detail,
             payload.re_engage_date, stage, payload.company_name, payload.linkedin_url, now,
         ],
@@ -178,6 +181,7 @@ mod tests {
             workspace_id: ws.into(),
             name: "Max Mustermann".into(),
             email: Some("max@example.com".into()),
+            phone: None,
             lead_status: None,
             lead_source: "zoom".into(),
             lead_source_detail: Some("Marketing Webinar".into()),
@@ -280,6 +284,16 @@ mod tests {
         let conn = setup();
         let result = update_pipeline_stage(&conn, "nonexistent-id", "contacted");
         assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn upsert_lead_stores_and_returns_phone() {
+        let conn = setup();
+        let lead = upsert_lead(&conn, UpsertLeadPayload {
+            phone: Some("+49 123 456789".into()),
+            ..lead_payload("ws-1")
+        }).unwrap();
+        assert_eq!(lead.phone.as_deref(), Some("+49 123 456789"));
     }
 
 }
