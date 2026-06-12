@@ -4,14 +4,14 @@
 // Layout:
 //   1) 4 KPI-Tiles  — Kunde seit / Worth / Im Spiel / Letzter Kontakt
 //   2) Alert-Strip  — nur wenn ueberfaellige Rechnungen
-//   3) Naechster-Zug-Card — KI-Vorschlag (generateBriefing), Action-Buttons
+//   3) Feed         — CustomerFeedPane
 //   4) Verlauf-Mini-Liste — letzte 4-5 Events + Link zum vollen Verlauf
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar, Wallet, TrendingUp, Phone, ArrowRight, AlertTriangle,
-  Sparkles, RefreshCw, EyeOff, Mail as MailIcon, Clock as ClockIcon,
+  Mail as MailIcon, Clock as ClockIcon,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -19,17 +19,11 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useMailStore } from '@/store/mail.store'
-import { useNotesModuleStore } from '@/store/notes-module.store'
-import { useTodosStore } from '@/store/todos.store'
-import { useCalendarStore } from '@/store/calendar.store'
-import { useFinanceStore } from '@/store/finance.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useUiStore } from '@/store/ui.store'
 import { FinanceService } from '@/services/finance.service'
 import type { Invoice } from '@/types/finance.types'
-import {
-  generateBriefing, MissingApiKeyError, type CustomerBriefing,
-} from '@/lib/ai/briefing'
+import { CustomerFeedPane } from '@/components/customer/tabs/CustomerFeedPane'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -164,179 +158,6 @@ function OverdueAlert({ count, total, onClick }: {
       </span>
     </button>
   )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Nächster Zug — KI
-
-type BriefingState =
-  | { kind: 'idle' }
-  | { kind: 'loading' }
-  | { kind: 'ready'; briefing: CustomerBriefing }
-  | { kind: 'error'; missingKey?: boolean; message: string }
-
-function NextMoveCard({
-  customerId,
-  state, onRegenerate, onSkip,
-}: {
-  customerId: string
-  state: BriefingState
-  onRegenerate: () => void
-  onSkip: () => void
-}) {
-  const customer = useCustomersStore(s => s.customers.find(c => c.id === customerId))
-  const setAppView = useUiStore(s => s.setAppView)
-
-  const card: React.CSSProperties = {
-    borderRadius: 16, border: '1px solid var(--accent-soft)',
-    background: 'linear-gradient(180deg, oklch(92% 0.2 125 / 0.04) 0%, var(--bg-2) 70%)',
-    padding: '18px 22px 20px',
-    boxShadow: '0 0 0 1px oklch(92% 0.2 125 / 0.08) inset',
-  }
-
-  const sectionLabel: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 8,
-    fontFamily: 'var(--font-mono)', fontSize: 10,
-    letterSpacing: '0.18em', textTransform: 'uppercase',
-    color: 'var(--accent)', fontWeight: 700,
-    marginBottom: 10,
-  }
-
-  if (state.kind === 'idle' || state.kind === 'loading') {
-    return (
-      <div style={card}>
-        <div style={sectionLabel}>
-          <Sparkles size={11} /> Dein nächster Zug
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fg-muted)', fontSize: 13 }}>
-          {state.kind === 'loading' ? (
-            <>
-              <RefreshCw size={13} className="animate-spin" style={{ animation: 'spin 1.4s linear infinite' }} />
-              Cy denkt nach …
-            </>
-          ) : (
-            <>
-              <Sparkles size={13} style={{ color: 'var(--accent)' }} />
-              Drueck auf „Cy fragen", damit ich dir einen Vorschlag mache.
-            </>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button
-            onClick={onRegenerate}
-            disabled={state.kind === 'loading' || !customer}
-            style={btnPrimaryStyle}
-          >
-            <Sparkles size={12} />
-            {state.kind === 'loading' ? 'Cy denkt …' : 'Cy fragen'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (state.kind === 'error') {
-    return (
-      <div style={{ ...card, borderColor: 'oklch(72% 0.18 25 / 0.30)' }}>
-        <div style={sectionLabel}>
-          <Sparkles size={11} /> Dein nächster Zug
-        </div>
-        <div style={{ fontSize: 13, color: 'oklch(80% 0.16 25)', marginBottom: 14 }}>
-          {state.missingKey ? 'Kein API-Key konfiguriert. ' : 'Cy konnte gerade nicht antworten: '}
-          <span style={{ color: 'var(--fg-muted)' }}>{state.message}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {state.missingKey ? (
-            <button onClick={() => setAppView('settings')} style={btnPrimaryStyle}>
-              Zu den Einstellungen
-            </button>
-          ) : (
-            <button onClick={onRegenerate} style={btnPrimaryStyle}>
-              <RefreshCw size={12} /> Nochmal versuchen
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // state.kind === 'ready'
-  const nextStep = state.briefing.nextSteps[0]
-  const supportSteps = state.briefing.nextSteps.slice(1, 3)
-  const headline = state.briefing.headline
-
-  return (
-    <div style={card}>
-      <div style={sectionLabel}>
-        <Sparkles size={11} /> Dein nächster Zug
-      </div>
-
-      {nextStep ? (
-        <>
-          <h2 style={{
-            margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--fg)',
-            letterSpacing: '-0.02em', lineHeight: 1.2,
-          }}>
-            {nextStep.action}
-          </h2>
-          {nextStep.reason && (
-            <p style={{
-              margin: '8px 0 0', fontSize: 13, color: 'var(--fg-muted)',
-              lineHeight: 1.55, maxWidth: 720,
-            }}>
-              {nextStep.reason}
-            </p>
-          )}
-
-          {supportSteps.length > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {supportSteps.map((s, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 8,
-                  fontSize: 12.5, color: 'var(--fg-muted)',
-                }}>
-                  <span style={{ color: 'var(--fg-dim)', marginTop: 2 }}>·</span>
-                  <span>{s.action}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <div style={{ fontSize: 14, color: 'var(--fg)' }}>
-          {headline || 'Aktuell keine konkrete Empfehlung — alles im grünen Bereich.'}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 18, alignItems: 'center' }}>
-        <button onClick={() => setAppView('mail')} style={btnPrimaryStyle}>
-          <MailIcon size={12} /> E-Mail schreiben
-        </button>
-        <button onClick={onRegenerate} style={btnGhostStyle}>
-          <RefreshCw size={11} /> Cy neu
-        </button>
-        <button onClick={onSkip} style={btnGhostStyle}>
-          <EyeOff size={11} /> Überspringen
-        </button>
-      </div>
-    </div>
-  )
-}
-
-const btnPrimaryStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 7,
-  padding: '9px 16px', borderRadius: 10,
-  background: 'var(--accent)', color: 'var(--accent-ink)',
-  border: 'none', cursor: 'pointer',
-  fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600,
-}
-
-const btnGhostStyle: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 6,
-  padding: '7px 12px', borderRadius: 10,
-  background: 'transparent', color: 'var(--fg-muted)',
-  border: '1px solid var(--border)', cursor: 'pointer',
-  fontFamily: 'inherit', fontSize: 11.5,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,43 +345,6 @@ export function CockpitPane({ customerId }: Props) {
     ? (ACTIVITY_LABEL[lastContact.channel] ?? '—')
     : '—'
 
-  // KI-Briefing — laed nur bei expliziter Anfrage
-  const allTodos     = useTodosStore(s => s.allTodos)
-  const allEvents    = useCalendarStore(s => s.events)
-  const allInvoices  = useFinanceStore(s => s.invoices)
-  const notes        = useNotesModuleStore(s => s.entries)
-  const emails       = useMailStore(s => s.emails)
-  const followUps    = useCrmStore(s => s.allFollowUps)
-  const [briefState, setBriefState] = useState<BriefingState>({ kind: 'idle' })
-  const [skipped, setSkipped] = useState(false)
-
-  const runBriefing = async () => {
-    if (!customer) return
-    setBriefState({ kind: 'loading' })
-    try {
-      const briefing = await generateBriefing({
-        customer, notes,
-        todos: allTodos, events: allEvents, invoices: allInvoices,
-        deals, activities, emails, followUps,
-      })
-      setBriefState({ kind: 'ready', briefing })
-      setSkipped(false)
-    } catch (err) {
-      const e = err as { message?: string }
-      if (err instanceof MissingApiKeyError) {
-        setBriefState({ kind: 'error', missingKey: true, message: e.message ?? 'Kein API-Key' })
-      } else {
-        setBriefState({ kind: 'error', message: e.message ?? String(err) })
-      }
-    }
-  }
-
-  // Bei Customer-Wechsel: Zustand zuruecksetzen
-  useEffect(() => {
-    setBriefState({ kind: 'idle' })
-    setSkipped(false)
-  }, [customerId])
-
   if (!customer) {
     return <div style={{ padding: 32, color: 'var(--fg-dim)' }}>Kunde nicht gefunden.</div>
   }
@@ -641,15 +425,8 @@ export function CockpitPane({ customerId }: Props) {
         />
       )}
 
-      {/* ── Naechster Zug ─────────────────────────────────────────────── */}
-      {!skipped && (
-        <NextMoveCard
-          customerId={customerId}
-          state={briefState}
-          onRegenerate={runBriefing}
-          onSkip={() => setSkipped(true)}
-        />
-      )}
+      {/* ── Feed ──────────────────────────────────────────────────────── */}
+      <CustomerFeedPane accountId={customerId} />
 
       {/* ── Posteingang ───────────────────────────────────────────────── */}
       <InboxMini customerId={customerId} />
