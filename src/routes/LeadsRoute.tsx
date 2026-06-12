@@ -779,6 +779,7 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
   const upsert = useLeadsStore(s => s.upsert)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [source, setSource] = useState<LeadSource>('manual')
   const [sourceDetail, setSourceDetail] = useState('')
   const [saving, setSaving] = useState(false)
@@ -790,6 +791,7 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
       workspaceId,
       name: name.trim(),
       email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
       leadSource: source,
       leadSourceDetail: sourceDetail.trim() || undefined,
       leadStatus: 'neu',
@@ -838,6 +840,16 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="max@beispiel.de"
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>Telefon</label>
+            <input
+              className="mock-input"
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+49 123 456789"
             />
           </div>
           <div>

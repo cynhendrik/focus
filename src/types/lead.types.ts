@@ -36,6 +36,7 @@ export interface Lead {
   workspaceId: string
   name: string
   email: string | null
+  phone: string | null
   accountType: 'lead'
   // Canonical pipeline stage
   pipelineStage: PipelineStage
@@ -59,6 +60,7 @@ export interface UpsertLeadPayload {
   workspaceId: string
   name: string
   email?: string
+  phone?: string
   pipelineStage?: PipelineStage
   leadStatus?: LeadStatus
   leadSource: LeadSource
