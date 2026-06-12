@@ -30,6 +30,7 @@ const typeIcon: Record<string, string> = {
 export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const user           = useAuthStore(s => s.user)
   const activities     = useActivitiesStore(s => s.activities)
+  const isLoading      = useActivitiesStore(s => s.isLoading)
   const loadActivities = useActivitiesStore(s => s.loadForCustomer)
   const createActivity = useActivitiesStore(s => s.create)
 
@@ -37,6 +38,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const [title, setTitle]       = useState('')
   const [dueAt, setDueAt]       = useState('')
   const [saving, setSaving]     = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     loadActivities(lead.id)
@@ -51,6 +53,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   async function handleSave() {
     if (!title.trim()) return
     setSaving(true)
+    setSaveError(null)
     try {
       await createActivity({
         workspaceId,
@@ -64,6 +67,8 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
       })
       setTitle('')
       setDueAt('')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Fehler beim Speichern')
     } finally {
       setSaving(false)
     }
@@ -97,6 +102,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
               )}
             </div>
             <button
+              aria-label="Schließen"
               onClick={onClose}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -197,6 +203,9 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
                 {saving ? 'Speichern…' : 'Speichern'}
               </button>
             </div>
+            {saveError && (
+              <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>{saveError}</div>
+            )}
           </div>
 
           {/* Activity history */}
@@ -204,7 +213,9 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--fg-dim)', marginBottom: 12 }}>
               Aktivitäten
             </div>
-            {activities.length === 0 ? (
+            {isLoading ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-dim)', padding: '12px 0' }}>Lade…</div>
+            ) : activities.length === 0 ? (
               <div style={{ fontSize: 12, color: 'var(--fg-dim)', padding: '12px 0' }}>
                 Noch keine Aktivitäten
               </div>
