@@ -46,12 +46,12 @@
   --fg-2: oklch(82% 0.005 270);
   --fg-muted: oklch(64% 0.008 270);
   --fg-dim: oklch(46% 0.008 270);
-  --accent: oklch(92% 0.2 125);
-  --accent-2: oklch(86% 0.21 125);
-  --accent-soft: oklch(92% 0.2 125 / 0.14);
-  --accent-glow: oklch(92% 0.2 125 / 0.5);
-  --accent-ink: oklch(15% 0 0);
-  --accent-text: oklch(92% 0.2 125);
+  --accent: oklch(70% 0.22 245);
+  --accent-2: oklch(62% 0.22 245);
+  --accent-soft: oklch(70% 0.22 245 / 0.14);
+  --accent-glow: oklch(70% 0.22 245 / 0.5);
+  --accent-ink: oklch(98% 0 0);
+  --accent-text: oklch(70% 0.22 245);
   --danger: oklch(72% 0.18 25);
   --warn: oklch(82% 0.16 70);
   --ok: oklch(82% 0.18 155);
@@ -126,12 +126,12 @@
   --fg-muted: oklch(40% 0 0);
   --fg-dim:   oklch(56% 0 0);
 
-  /* Accent = near-black, kein Lime */
-  --accent:      oklch(14% 0 0);
-  --accent-2:    oklch(24% 0 0);
-  --accent-soft: oklch(14% 0 0 / 0.07);
-  --accent-glow: oklch(14% 0 0 / 0.12);
-  --accent-text: oklch(14% 0 0);
+  /* Accent = Blau für Light-Mode */
+  --accent:      oklch(42% 0.22 245);
+  --accent-2:    oklch(34% 0.22 245);
+  --accent-soft: oklch(42% 0.22 245 / 0.10);
+  --accent-glow: oklch(42% 0.22 245 / 0.20);
+  --accent-text: oklch(42% 0.22 245);
   --accent-ink:  oklch(98% 0 0);
 
   /* Status-Farben — dunkel für Weiß-Hintergrund */
@@ -212,8 +212,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
      - unten-links: leiser blauer Counterpunkt
      Werte bewusst niedrig — soll nicht "Effekt" sein, nur Atmosphaere. */
   background:
-    radial-gradient(1300px 700px at 75% -12%, oklch(92% 0.20 125 / 0.13), transparent 62%),
-    radial-gradient(800px 240px at 50%  -6%, oklch(92% 0.20 125 / 0.07), transparent 70%),
+    radial-gradient(1300px 700px at 75% -12%, oklch(92% 0.20 245 / 0.13), transparent 62%),
+    radial-gradient(800px 240px at 50%  -6%, oklch(92% 0.20 245 / 0.07), transparent 70%),
     radial-gradient(900px  500px at -10% 100%, oklch(78% 0.13 235 / 0.07), transparent 60%),
     var(--bg);
   transition: grid-template-columns 280ms cubic-bezier(.2,.7,.1,1);
@@ -442,7 +442,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 8px 8px 18px; }
 .sidebar-brand-logo {
   width: 28px; height: 28px; border-radius: 8px;
-  background: oklch(92% 0.2 125);
+  background: var(--accent);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
@@ -483,8 +483,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
   margin: 2px 0 6px;
   padding: 13px 14px;
   border-radius: 14px;
-  background: oklch(92% 0.2 125);
-  border: 1px solid oklch(92% 0.2 125);
+  background: var(--accent);
+  border: 1px solid var(--accent);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -505,12 +505,12 @@ input:focus, textarea:focus, button:focus { outline: none; }
   pointer-events: none;
 }
 .nav-corra-card:hover {
-  background: oklch(86% 0.21 125);
-  border-color: oklch(86% 0.21 125);
+  background: var(--accent-2);
+  border-color: var(--accent-2);
 }
 .nav-corra-card[data-active="true"] {
-  background: oklch(86% 0.21 125);
-  border-color: oklch(86% 0.21 125);
+  background: var(--accent-2);
+  border-color: var(--accent-2);
 }
 
 .nav-corra-card__icon { display: none; }
@@ -518,17 +518,17 @@ input:focus, textarea:focus, button:focus { outline: none; }
   display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1;
 }
 .nav-corra-card__title {
-  font-size: 13.5px; font-weight: 700; color: oklch(10% 0 0);
+  font-size: 13.5px; font-weight: 700; color: var(--accent-ink);
   letter-spacing: -0.01em; line-height: 1.2;
 }
 .nav-corra-card__sub {
-  font-size: 10px; color: oklch(20% 0 0 / 0.6);
+  font-size: 10px; color: oklch(100% 0 0 / 0.65);
   font-family: var(--font-mono); letter-spacing: 0.05em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .nav-corra-card__badge {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-  color: oklch(10% 0 0); background: oklch(0% 0 0 / 0.15);
+  color: var(--accent-ink); background: oklch(100% 0 0 / 0.15);
   padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
 }
 
@@ -1187,7 +1187,7 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 
 .bar { display: flex; align-items: flex-end; height: 100px; gap: 6px; padding-top: 8px; }
 .bar-col {
-  flex: 1; background: linear-gradient(180deg, var(--accent), oklch(80% 0.18 125));
+  flex: 1; background: linear-gradient(180deg, var(--accent), oklch(55% 0.22 245));
   border-radius: 4px 4px 2px 2px; position: relative; min-height: 6px;
   transition: opacity 200ms ease;
 }

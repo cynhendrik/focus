@@ -83,7 +83,7 @@ function FloatingBubble({ open, onClick }: { open: boolean; onClick: () => void 
         border: `1px solid ${open ? 'var(--border)' : 'transparent'}`,
         boxShadow: open
           ? '0 6px 24px -8px oklch(0% 0 0 / 0.25)'
-          : '0 10px 30px -8px var(--accent-glow), 0 0 0 6px oklch(80% 0.2 125 / 0.08)',
+          : '0 10px 30px -8px var(--accent-glow), 0 0 0 6px oklch(80% 0.2 245 / 0.08)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer',
         transition: 'background 200ms, transform 180ms, box-shadow 220ms',

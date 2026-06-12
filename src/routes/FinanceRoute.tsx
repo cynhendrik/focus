@@ -165,7 +165,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
         <path
           d={GAUGE_PATH}
           fill="none"
-          stroke="oklch(96% 0.15 125)"
+          stroke="oklch(96% 0.15 245)"
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${GAUGE_LEN}`}
@@ -179,7 +179,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
               style={{ filter: 'url(#dot-glow)' }} />
             <circle cx={tipX} cy={tipY} r={5} fill="var(--accent)"
               style={{ filter: 'url(#dot-glow)' }} />
-            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(96% 0.15 125)" />
+            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(96% 0.15 245)" />
           </>
         )}
 
@@ -254,10 +254,10 @@ function RevenueBarChart({ bars, maxRevenue }: { bars: BarEntry[]; maxRevenue: n
                 background: bar.isCurrent
                   ? 'var(--accent)'
                   : 'var(--surface-2)',
-                border: `1px solid ${bar.isCurrent ? 'oklch(92% 0.2 125 / 0.5)' : 'var(--border)'}`,
+                border: `1px solid ${bar.isCurrent ? 'oklch(92% 0.2 245 / 0.5)' : 'var(--border)'}`,
                 borderRadius: '4px 4px 0 0',
                 transition: 'height 700ms cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: bar.isCurrent ? '0 0 12px oklch(92% 0.2 125 / 0.35)' : 'none',
+                boxShadow: bar.isCurrent ? '0 0 12px oklch(92% 0.2 245 / 0.35)' : 'none',
               }} />
             </div>
           )
@@ -532,7 +532,7 @@ export function FinanceRoute() {
         {/* Subtle background glow blob */}
         <div style={{
           position: 'absolute', top: -60, right: -40, width: 280, height: 280,
-          background: 'radial-gradient(circle, oklch(92% 0.2 125 / 0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, oklch(92% 0.2 245 / 0.06) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 

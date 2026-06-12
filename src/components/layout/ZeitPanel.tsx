@@ -52,8 +52,8 @@ function AuftragTile({
       onMouseLeave={() => setHover(false)}
       style={{
         padding: '12px 14px', borderRadius: 12,
-        border: `1px solid ${done ? 'oklch(92% 0.2 125 / 0.4)' : 'var(--border)'}`,
-        background: done ? 'oklch(92% 0.2 125 / 0.07)' : 'var(--surface)',
+        border: `1px solid ${done ? 'oklch(92% 0.2 245 / 0.4)' : 'var(--border)'}`,
+        background: done ? 'oklch(92% 0.2 245 / 0.07)' : 'var(--surface)',
         transition: 'all 300ms', position: 'relative',
       }}
     >
@@ -135,7 +135,7 @@ function NewAuftragForm({ onDone }: { onDone: () => void }) {
   return (
     <div style={{
       padding: '12px 14px', borderRadius: 12,
-      border: '1px solid var(--accent)', background: 'oklch(92% 0.2 125 / 0.06)',
+      border: '1px solid var(--accent)', background: 'oklch(92% 0.2 245 / 0.06)',
       display: 'flex', flexDirection: 'column', gap: 8,
     }}>
       <input

@@ -82,7 +82,7 @@ function KpiCard({
   label: string
   value: React.ReactNode
   hint?: React.ReactNode
-  accentValue?: boolean   // groesse Zahl in lime statt fg
+  accentValue?: boolean   // groesse Zahl in blau statt fg
   action?: { label?: string; onClick: () => void }
   children?: React.ReactNode  // Header-Toolbar (z.B. Woche/Monat-Toggle)
 }) {
@@ -592,7 +592,7 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           width: 10, height: 10, borderRadius: 99,
           background: isNow ? 'var(--accent)' : 'transparent',
           border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
-          boxShadow: isNow ? '0 0 0 4px oklch(92% 0.2 125 / 0.16)' : 'none',
+          boxShadow: isNow ? '0 0 0 4px oklch(92% 0.2 245 / 0.16)' : 'none',
         }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>

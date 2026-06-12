@@ -130,7 +130,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 9,
-              color: isDark ? 'oklch(92% 0.2 125 / 0.5)' : 'var(--fg-dim)',
+              color: isDark ? 'oklch(92% 0.2 245 / 0.5)' : 'var(--fg-dim)',
               fontFamily: 'var(--font-mono)', letterSpacing: '0.18em',
               textTransform: 'uppercase', marginBottom: 10,
             }}>

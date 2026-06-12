@@ -44,8 +44,8 @@ export function CorraMessage({ message, onExecute }: Props) {
         <div style={{
           padding: isUser ? '10px 14px' : undefined,
           borderRadius: isUser ? '12px 0 12px 12px' : undefined,
-          background: isUser ? 'oklch(92% 0.2 125 / 0.08)' : undefined,
-          border: isUser ? '1px solid oklch(92% 0.2 125 / 0.25)' : undefined,
+          background: isUser ? 'oklch(92% 0.2 245 / 0.08)' : undefined,
+          border: isUser ? '1px solid oklch(92% 0.2 245 / 0.25)' : undefined,
           fontSize: 13, lineHeight: 1.65, color: 'var(--fg)',
         }}>
           <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>

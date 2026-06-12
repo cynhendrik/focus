@@ -357,7 +357,7 @@ export function CustomerRoute({ customerId }: Props) {
                   position: 'absolute', left: 18, right: 18, bottom: -1,
                   height: 2, borderRadius: 2,
                   background: 'var(--accent)',
-                  boxShadow: '0 0 12px oklch(92% 0.2 125 / 0.5)',
+                  boxShadow: '0 0 12px oklch(92% 0.2 245 / 0.5)',
                 }} />
               )}
             </button>

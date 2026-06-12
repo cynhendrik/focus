@@ -207,7 +207,7 @@ export function FinanzPane({ customerId }: Props) {
                 <div
                   key={key}
                   onClick={() => toggleGroup(key)}
-                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'oklch(92% 0.2 125 / 0.05)' : 'transparent', transition: 'background 100ms' }}
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'oklch(92% 0.2 245 / 0.05)' : 'transparent', transition: 'background 100ms' }}
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleGroup(key)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
                   <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{g.auftragTitle}</span>

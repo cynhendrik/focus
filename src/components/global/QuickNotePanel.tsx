@@ -42,7 +42,7 @@ export function QuickNotePanel() {
           border: `1px solid ${open ? 'var(--border)' : 'transparent'}`,
           boxShadow: open
             ? '0 4px 16px oklch(0% 0 0 / 0.2)'
-            : '0 8px 24px -6px var(--accent-glow), 0 0 0 5px oklch(80% 0.2 125 / 0.08)',
+            : '0 8px 24px -6px var(--accent-glow), 0 0 0 5px oklch(80% 0.2 245 / 0.08)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer',
           transition: 'background 200ms, transform 160ms, box-shadow 200ms',
