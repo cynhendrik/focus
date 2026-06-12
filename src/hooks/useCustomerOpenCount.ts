@@ -23,7 +23,7 @@ export function computeOpenCount(
   ).length
 
   const followUpCount = followUps.filter(
-    f => f.customerId === customerId,
+    f => f.customerId === customerId && f.status === 'offen',
   ).length
 
   const invoiceCount = invoices.filter(

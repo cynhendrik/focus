@@ -70,13 +70,13 @@ describe('computeOpenCount', () => {
     expect(computeOpenCount('c1', [], emails, [], [])).toBe(1)
   })
 
-  it('counts all follow-ups for the customer regardless of status', () => {
+  it('counts only offen follow-ups, excludes erledigt', () => {
     const followUps = [
       makeFollowUp({ id: 'f1', customerId: 'c1', status: 'offen' }),
       makeFollowUp({ id: 'f2', customerId: 'c1', status: 'erledigt' }),
       makeFollowUp({ id: 'f3', customerId: 'c2', status: 'offen' }),
     ]
-    expect(computeOpenCount('c1', [], [], followUps, [])).toBe(2)
+    expect(computeOpenCount('c1', [], [], followUps, [])).toBe(1)
   })
 
   it('counts open and overdue invoices, excludes paid/draft/cancelled', () => {
