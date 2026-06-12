@@ -14,6 +14,7 @@ import { ActivitiesService } from '@/services/activities.service'
 import { LeadStagesManager } from '@/components/leads/LeadStagesManager'
 import { QualifyModal } from '@/components/leads/QualifyModal'
 import { DisqualifyModal } from '@/components/leads/DisqualifyModal'
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal'
 import type { Lead, LeadSource, UpsertLeadPayload } from '@/types/lead.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -280,10 +281,11 @@ function CtxItem({ label, color, onClick }: { label: string; color?: string; onC
 
 // ── Lead Card ─────────────────────────────────────────────────────────────────
 
-function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
+function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragging }: {
   lead: Lead
   selected?: boolean
   onToggle?: () => void
+  onOpen?: (lead: Lead) => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
   onWarm?: () => void
   isDragging?: boolean
@@ -295,10 +297,10 @@ function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
     <div
       className="task-card"
       data-dragging={isDragging ? 'true' : undefined}
-      onClick={e => { e.stopPropagation(); onToggle?.() }}
+      onClick={e => { e.stopPropagation(); onOpen?.(lead) }}
       onContextMenu={e => { e.preventDefault(); onContext(e, lead) }}
       style={{
-        marginBottom: 6, cursor: 'grab', userSelect: 'none',
+        marginBottom: 6, cursor: 'pointer', userSelect: 'none',
         outline: selected ? '2px solid var(--accent)' : undefined,
         outlineOffset: selected ? 1 : undefined,
       }}
@@ -314,16 +316,26 @@ function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
             </div>
           )}
         </div>
-        {selected && (
-          <div style={{
+        <div
+          onClick={e => { e.stopPropagation(); onToggle?.() }}
+          title="Auswählen"
+          style={{
             width: 14, height: 14, borderRadius: 4, flexShrink: 0,
-            background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+            border: selected ? 'none' : '1.5px solid var(--border-strong)',
+            background: selected ? 'var(--accent)' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', opacity: selected ? 1 : 0.4,
+            transition: 'opacity 120ms',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+          onMouseLeave={e => (e.currentTarget.style.opacity = selected ? '1' : '0.4')}
+        >
+          {selected && (
             <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
               <path d="M1 3L3 5L7 1" stroke="var(--accent-ink)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -361,17 +373,18 @@ function LeadCard({ lead, selected, onToggle, onContext, onWarm, isDragging }: {
 
 // ── Draggable wrapper ─────────────────────────────────────────────────────────
 
-function DraggableLeadCard({ lead, selected, onToggle, onContext, onWarm }: {
+function DraggableLeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm }: {
   lead: Lead
   selected: boolean
   onToggle: () => void
+  onOpen: (lead: Lead) => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
   onWarm?: () => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id })
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} style={{ opacity: isDragging ? 0.35 : 1 }}>
-      <LeadCard lead={lead} selected={selected} onToggle={onToggle} onContext={onContext} onWarm={onWarm} isDragging={isDragging} />
+      <LeadCard lead={lead} selected={selected} onToggle={onToggle} onContext={onContext} onOpen={onOpen} onWarm={onWarm} isDragging={isDragging} />
     </div>
   )
 }
@@ -380,12 +393,13 @@ function DraggableLeadCard({ lead, selected, onToggle, onContext, onWarm }: {
 
 type ColDef = { id: string; label: string; hoverBg: string; dot: string }
 
-function LeadColumn({ col, leads, selected, onToggle, onContext, onWarm }: {
+function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm }: {
   col: ColDef
   leads: Lead[]
   selected: Set<string>
   onToggle: (id: string) => void
   onContext: (e: React.MouseEvent, lead: Lead) => void
+  onOpen: (lead: Lead) => void
   onWarm: (id: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id })
@@ -419,6 +433,7 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onWarm }: {
             selected={selected.has(lead.id)}
             onToggle={() => onToggle(lead.id)}
             onContext={onContext}
+            onOpen={() => onOpen(lead)}
             onWarm={() => onWarm(lead.id)}
           />
         ))}
@@ -564,6 +579,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   const [pendingQualify, setPendingQualify]       = useState<Lead | null>(null)
   const [pendingDisqualify, setPendingDisqualify] = useState<Lead | null>(null)
   const [showStages, setShowStages]              = useState(false)
+  const [detailLead, setDetailLead]              = useState<Lead | null>(null)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -695,7 +711,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           </>
         ) : (
           <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>
-            Karte anklicken zum Auswählen · Ziehen zum Verschieben · Rechtsklick für Aktionen
+            Klicken zum Öffnen · Checkbox zum Auswählen · Ziehen zum Verschieben · Rechtsklick für Aktionen
           </span>
         )}
         <div style={{ flex: 1 }} />
@@ -731,12 +747,13 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
                 selected={selected}
                 onToggle={toggleSelect}
                 onContext={handleContext}
+                onOpen={setDetailLead}
                 onWarm={handleWarm}
               />
             ))}
           </div>
           <DragOverlay>
-            {activeLead ? <LeadCard lead={activeLead} onContext={() => {}} isDragging /> : null}
+            {activeLead ? <LeadCard lead={activeLead} onContext={() => {}} onOpen={() => {}} isDragging /> : null}
           </DragOverlay>
         </DndContext>
 
@@ -767,6 +784,13 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           lead={pendingDisqualify}
           onConfirm={handleDisqualifyConfirm}
           onCancel={() => setPendingDisqualify(null)}
+        />
+      )}
+      {detailLead && (
+        <LeadDetailModal
+          lead={detailLead}
+          workspaceId={workspaceId}
+          onClose={() => setDetailLead(null)}
         />
       )}
     </>
