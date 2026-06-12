@@ -14,7 +14,7 @@ const ACTIVITY_TYPES: { type: ActivityType; label: string }[] = [
   { type: 'call',  label: 'Anruf'   },
   { type: 'email', label: 'E-Mail'  },
   { type: 'note',  label: 'Notiz'   },
-  { type: 'meeting',  label: 'Treffen' },
+  { type: 'task',  label: 'Aufgabe' },
 ]
 
 function fmtDateTime(iso: string): string {

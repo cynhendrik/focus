@@ -55,7 +55,7 @@ export interface UpsertDealPayload {
   notes?: string
 }
 
-export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'followup'
+export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'followup' | 'task'
   | 'email_out' | 'email_in' | 'dm' | 'system_event'
 
 export interface Activity {
