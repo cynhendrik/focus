@@ -10,6 +10,7 @@ import { useDealsStore } from '@/store/deals.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useClientPickerStore } from '@/store/client-picker.store'
+import { useCustomerOpenCount } from '@/hooks/useCustomerOpenCount'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
@@ -123,6 +124,22 @@ function SignalBadge({ row }: { row: ClientRow }) {
   )
 }
 
+function OpenCountBadge({ customerId }: { customerId: string }) {
+  const count = useCustomerOpenCount(customerId)
+  if (count === 0) return null
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      minWidth: 18, height: 18, borderRadius: 999,
+      background: 'var(--accent)', color: 'var(--accent-ink)',
+      fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)',
+      padding: '0 5px', flexShrink: 0,
+    }}>
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
 // ── Client list row ──────────────────────────────────────────────────────────
 
 const COL_TEMPLATE = '1.6fr 1fr 0.6fr 0.45fr 0.6fr 28px'
@@ -171,7 +188,10 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
       </div>
 
       {/* Signal */}
-      <div><SignalBadge row={row} /></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <SignalBadge row={row} />
+        <OpenCountBadge customerId={row.customer.id} />
+      </div>
 
       {/* € im Spiel */}
       <div style={{
