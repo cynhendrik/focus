@@ -433,7 +433,7 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
             selected={selected.has(lead.id)}
             onToggle={() => onToggle(lead.id)}
             onContext={onContext}
-            onOpen={() => onOpen(lead)}
+            onOpen={onOpen}
             onWarm={() => onWarm(lead.id)}
           />
         ))}
