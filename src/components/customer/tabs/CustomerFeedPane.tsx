@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CheckSquare, Mail, FileText, Clock } from 'lucide-react'
+import { CheckSquare, Mail, FileText, Clock, type LucideIcon } from 'lucide-react'
 import { useTodosStore } from '@/store/todos.store'
 import { useMailStore } from '@/store/mail.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -47,7 +47,7 @@ const BUCKET_LABELS: Record<string, string> = {
 // ── Shared sub-components ────────────────────────────────────────────────────
 
 function SectionHeader({ icon: Icon, label, count }: {
-  icon: React.ElementType<any>
+  icon: LucideIcon
   label: string
   count: number
 }) {
@@ -279,7 +279,7 @@ export function CustomerFeedPane({ accountId }: Props) {
     [emails, accountId],
   )
   const followUps = useMemo(
-    () => allFollowUps.filter(f => f.customerId === accountId),
+    () => allFollowUps.filter(f => f.customerId === accountId && f.status === 'offen'),
     [allFollowUps, accountId],
   )
   const openInvoices = useMemo(
