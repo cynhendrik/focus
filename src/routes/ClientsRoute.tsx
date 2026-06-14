@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
-  UserPlus, Sparkles, ArrowRight,
-  Search, ChevronRight,
+  UserPlus,
+  Search, ChevronRight, Archive,
 } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
@@ -14,7 +14,6 @@ import { useCustomerOpenCount } from '@/hooks/useCustomerOpenCount'
 import { CustomerModal } from '@/components/customer/CustomerModal'
 import { CustomerRoute } from './CustomerRoute'
 import { StaggerList } from '@/components/ui/StaggerList'
-import { INDUSTRIES, type IndustryProfile } from '@/components/onboarding/OnboardingWizard'
 import type { Customer } from '@/types/customer.types'
 import { isPrivateCustomer } from '@/types/customer.types'
 import {
@@ -294,7 +293,6 @@ function SortTabs({
 
 function ClientBoard() {
   const allCustomers   = useCustomersStore(s => s.customers)
-  const upsertCustomer = useCustomersStore(s => s.upsert)
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
   const lastActivity   = useCrmStore(s => s.lastActivity)
   const deals          = useDealsStore(s => s.deals)
@@ -303,33 +301,25 @@ function ClientBoard() {
   const offers         = useFinanceStore(s => s.offers)
   const pinnedIds      = useClientPickerStore(s => s.pinnedIds)
 
-  // Private Kunden (isPrivate=true oder Sentinel-ID) aus dem Geschäfts-CRM ausblenden
-  const customers = useMemo(
+  const [showModal, setShowModal]         = useState(false)
+  const [search, setSearch]               = useState('')
+  const [sortKey, setSortKey]             = useState<ClientSortKey>('brauchen')
+  const [showArchived, setShowArchived]   = useState(false)
+
+  // Private Kunden (isPrivate=true oder Sentinel-ID) aus dem Geschäfts-CRM ausblenden.
+  // Archiv ist eine eigene Sicht: aktiv ODER archiviert, nie gemischt.
+  const businessCustomers = useMemo(
     () => allCustomers.filter(c => !isPrivateCustomer(c)),
     [allCustomers],
   )
-
-  const [showModal, setShowModal]         = useState(false)
-  const [loadingSample, setLoadingSample] = useState(false)
-  const [search, setSearch]               = useState('')
-  const [sortKey, setSortKey]             = useState<ClientSortKey>('brauchen')
-
-  const loadSampleData = async (ind: IndustryProfile) => {
-    setLoadingSample(true)
-    try {
-      for (const c of ind.sampleCustomers) {
-        await upsertCustomer({
-          name: c.name, company: c.company, email: c.email, phone: c.phone,
-          city: c.city, status: c.status, priority: c.priority,
-          industry: c.industry, goals: c.goals, tags: [],
-        })
-      }
-    } catch (e) {
-      console.error('Failed to load sample customers', e)
-    } finally {
-      setLoadingSample(false)
-    }
-  }
+  const archivedCount = useMemo(
+    () => businessCustomers.filter(c => c.archivedAt).length,
+    [businessCustomers],
+  )
+  const customers = useMemo(
+    () => businessCustomers.filter(c => showArchived ? !!c.archivedAt : !c.archivedAt),
+    [businessCustomers, showArchived],
+  )
 
   const allRows = useMemo(
     () => computeClientRows({ customers, deals, stages, invoices, offers, lastActivity }),
@@ -363,12 +353,12 @@ function ClientBoard() {
     return [...pinned, ...recent].slice(0, 6)
   }, [allRows, pinnedIds])
 
-  if (customers.length === 0) {
+  // Onboarding-Empty-State nur, wenn es WIRKLICH keine Kunden gibt (auch keine
+  // archivierten). Sonst durchfallen, damit der Archiv-Umschalter erreichbar bleibt.
+  if (customers.length === 0 && archivedCount === 0 && !showArchived) {
     return (
       <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <EmptyClientBoard
-          loading={loadingSample}
-          onLoadSample={loadSampleData}
           onAddManual={() => setShowModal(true)}
         />
         {showModal && <CustomerModal onClose={() => setShowModal(false)} />}
@@ -380,7 +370,7 @@ function ClientBoard() {
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 22,
       padding: '40px 48px 48px',
-      maxWidth: 1280, margin: '0 auto', width: '100%',
+      width: '100%', maxWidth: 1560, margin: '0 auto',
     }}>
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
@@ -390,7 +380,7 @@ function ClientBoard() {
             letterSpacing: '0.22em', textTransform: 'uppercase',
             color: 'var(--accent)', fontWeight: 600, marginBottom: 14,
           }}>
-            Kundenübersicht
+            {showArchived ? 'Archiv' : 'Kundenübersicht'}
           </div>
           <h1 style={{
             margin: 0,
@@ -453,6 +443,21 @@ function ClientBoard() {
           />
         </div>
         <SortTabs active={sortKey} onChange={setSortKey} />
+        {(archivedCount > 0 || showArchived) && (
+          <button
+            className="btn-ghost"
+            onClick={() => setShowArchived(v => !v)}
+            title={showArchived ? 'Zurück zu aktiven Kunden' : 'Archivierte Kunden anzeigen'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
+              fontSize: 12, whiteSpace: 'nowrap',
+              color: showArchived ? 'var(--accent)' : 'var(--fg-dim)',
+            }}
+          >
+            <Archive size={14} />
+            {showArchived ? 'Aktive Kunden' : `Archiv (${archivedCount})`}
+          </button>
+        )}
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 11,
           color: 'var(--fg-dim)', letterSpacing: '0.06em',
@@ -497,9 +502,7 @@ function ClientBoard() {
 
 // ── Empty state ──────────────────────────────────────────────────────────────
 
-function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
-  loading: boolean
-  onLoadSample: (ind: IndustryProfile) => void
+function EmptyClientBoard({ onAddManual }: {
   onAddManual: () => void
 }) {
   return (
@@ -527,7 +530,7 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
           Noch keine Kunden.
         </h2>
         <p style={{ fontSize: 14, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.55 }}>
-          Lege deinen ersten Kunden an — oder lade Beispiel-Daten um die App zu testen.
+          Lege deinen ersten Kunden an, um loszulegen.
         </p>
       </div>
 
@@ -539,75 +542,6 @@ function EmptyClientBoard({ loading, onLoadSample, onAddManual }: {
         <UserPlus size={14} /> Ersten Kunden anlegen
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: '8px 0' }}>
-        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          letterSpacing: '0.12em', textTransform: 'uppercase',
-          color: 'var(--fg-dim)', fontWeight: 600,
-        }}>
-          oder
-        </span>
-        <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{
-          fontSize: 12.5, color: 'var(--fg-muted)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          <Sparkles size={13} style={{ color: 'var(--accent)' }} />
-          Beispiel-Daten laden
-        </span>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 10,
-          marginTop: 8,
-        }}>
-          {INDUSTRIES.map(ind => (
-            <button
-              key={ind.id}
-              onClick={() => onLoadSample(ind)}
-              disabled={loading}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '14px 16px',
-                borderRadius: 14,
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border)',
-                cursor: loading ? 'wait' : 'pointer',
-                textAlign: 'left',
-                transition: 'all 180ms ease',
-                opacity: loading ? 0.5 : 1,
-              }}
-              onMouseEnter={e => {
-                if (!loading) {
-                  e.currentTarget.style.borderColor = 'var(--accent)'
-                  e.currentTarget.style.background = 'var(--accent-soft)'
-                }
-              }}
-              onMouseLeave={e => {
-                if (!loading) {
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                  e.currentTarget.style.background = 'var(--surface-2)'
-                }
-              }}
-            >
-              <span style={{ fontSize: 22, flexShrink: 0 }}>{ind.icon}</span>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
-                  {ind.label}
-                </span>
-                <span style={{ fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 1 }}>
-                  {ind.sampleCustomers.length} Beispiel-Kunden
-                </span>
-              </div>
-              <ArrowRight size={12} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

@@ -72,8 +72,8 @@ export function DownloadToast() {
             {(phase === 'generating' || phase === 'saving') && (
               <div style={{
                 width: 18, height: 18, borderRadius: '50%',
-                border: '2.5px solid oklch(92% 0.2 245 / 0.25)',
-                borderTopColor: 'oklch(92% 0.2 245)',
+                border: '2.5px solid oklch($1264 / 0.25)',
+                borderTopColor: 'oklch($1264)',
                 animation: 'spin-smooth 0.7s linear infinite',
               }} />
             )}
@@ -105,13 +105,13 @@ export function DownloadToast() {
             // Indeterminate shimmer
             <div style={{
               position: 'absolute', inset: 0,
-              background: 'linear-gradient(90deg, transparent 0%, oklch(92% 0.2 245) 40%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, oklch($1264) 40%, transparent 100%)',
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.2s linear infinite',
             }} />
           )}
           {isBatch && (phase === 'generating' || phase === 'saving') && (
-            <div style={{ height: '100%', width: `${progress}%`, background: 'oklch(92% 0.2 245)', transition: 'width 180ms ease', borderRadius: 2 }} />
+            <div style={{ height: '100%', width: `${progress}%`, background: 'oklch($1264)', transition: 'width 180ms ease', borderRadius: 2 }} />
           )}
           {phase === 'done' && (
             <div style={{ height: '100%', width: '100%', background: 'oklch(88% 0.18 145)', transition: 'width 300ms ease' }} />
@@ -128,7 +128,7 @@ export function DownloadToast() {
 function iconBg(phase: string | null) {
   if (phase === 'done')  return 'oklch(30% 0.06 145)'
   if (phase === 'error') return 'oklch(28% 0.06 25)'
-  return 'oklch(22% 0.04 245)'
+  return 'oklch($1264)'
 }
 
 function phaseLabel(phase: string | null, isBatch: boolean) {

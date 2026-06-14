@@ -20,13 +20,13 @@ export function useSyncBridge() {
 
     // 2. Connectivity-Events empfangen
     const unlistenConnectivity = listen<boolean>(
-      'cynera://connectivity-changed',
+      'cultera://connectivity-changed',
       (event) => setOnline(event.payload)
     )
 
     // 3. Pending-Count-Events empfangen
     const unlistenPending = listen<number>(
-      'cynera://pending-count',
+      'cultera://pending-count',
       (event) => setPendingCount(event.payload)
     )
 

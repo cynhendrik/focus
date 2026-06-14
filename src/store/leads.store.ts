@@ -14,7 +14,7 @@ interface LeadsState {
   isLoading: boolean
   error: AppError | null
   load: (workspaceId: string) => Promise<void>
-  upsert: (payload: UpsertLeadPayload) => Promise<void>
+  upsert: (payload: UpsertLeadPayload) => Promise<Lead>
   bulkUpdate: (payload: BulkUpdateLeadsPayload, workspaceId: string) => Promise<void>
   convertToClient: (id: string) => Promise<void>
   convertToDeal: (id: string, workspaceId: string, userId: string) => Promise<void>
@@ -57,6 +57,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
             : [lead, ...s.leads],
         }
       })
+      return lead
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })

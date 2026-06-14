@@ -36,6 +36,8 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             sent_at     TEXT NOT NULL DEFAULT '',
             is_read     INTEGER NOT NULL DEFAULT 0,
             customer_id TEXT,
+            auto_matched INTEGER NOT NULL DEFAULT 1,
+            not_a_lead  INTEGER NOT NULL DEFAULT 0,
             UNIQUE(account_id, folder, uid)
         );
 
@@ -89,6 +91,24 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
             CREATE INDEX IF NOT EXISTS idx_folders_account ON folders(account_id);
         ")?;
         conn.execute_batch("PRAGMA user_version = 3")?;
+    }
+
+    if version < 4 {
+        // auto_matched: 1 = automatisch per Adresse zugeordnet (wird beim Re-Match
+        // neu bewertet), 0 = manuell zugeordnet (bleibt unangetastet).
+        let _ = conn.execute_batch(
+            "ALTER TABLE emails ADD COLUMN auto_matched INTEGER NOT NULL DEFAULT 1;",
+        );
+        conn.execute_batch("PRAGMA user_version = 4")?;
+    }
+
+    if version < 5 {
+        // not_a_lead: 1 = vom Nutzer als „kein Lead" markiert → fällt dauerhaft
+        // aus der Newcomer-Liste der unbekannten Absender heraus.
+        let _ = conn.execute_batch(
+            "ALTER TABLE emails ADD COLUMN not_a_lead INTEGER NOT NULL DEFAULT 0;",
+        );
+        conn.execute_batch("PRAGMA user_version = 5")?;
     }
 
     Ok(())
@@ -251,7 +271,7 @@ pub fn list_emails(
     let pattern = format!("%{}%", search);
     let mut stmt = conn.prepare(
         "SELECT id, account_id, uid, folder, subject, from_addr, from_name,
-                to_addrs, sent_at, is_read, customer_id
+                to_addrs, sent_at, is_read, customer_id, not_a_lead
          FROM emails
          WHERE account_id = ?1 AND folder = ?2
            AND (subject LIKE ?3 OR from_addr LIKE ?3 OR from_name LIKE ?3)
@@ -275,10 +295,21 @@ pub fn list_emails(
                 sent_at:     row.get(8)?,
                 is_read:     row.get::<_, i32>(9)? != 0,
                 customer_id: row.get(10)?,
+                not_a_lead:  row.get::<_, i32>(11)? != 0,
             })
         }
     )?;
     rows.collect()
+}
+
+/// Markiert eine Mail als „kein Lead" (oder hebt es wieder auf). Damit fällt sie
+/// dauerhaft aus der Newcomer-Liste der unbekannten Absender heraus.
+pub fn set_not_a_lead(conn: &Connection, id: &str, value: bool) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE emails SET not_a_lead = ?1 WHERE id = ?2",
+        params![value as i32, id],
+    )?;
+    Ok(())
 }
 
 pub fn get_email_body(conn: &Connection, id: &str) -> rusqlite::Result<Option<EmailBody>> {
@@ -318,11 +349,55 @@ pub fn set_read(conn: &Connection, id: &str, is_read: bool) -> rusqlite::Result<
 }
 
 pub fn assign_customer(conn: &Connection, id: &str, customer_id: Option<&str>) -> rusqlite::Result<()> {
+    // Manuelle Zuordnung — als nicht-automatisch markieren, damit das Re-Match
+    // sie nicht überschreibt.
     conn.execute(
-        "UPDATE emails SET customer_id = ?1 WHERE id = ?2",
+        "UPDATE emails SET customer_id = ?1, auto_matched = 0 WHERE id = ?2",
         params![customer_id, id],
     )?;
     Ok(())
+}
+
+/// Vollständige Neubewertung der AUTOMATISCHEN Zuordnungen: läuft über alle
+/// auto-gematchten Mails und setzt customer_id auf das aktuelle Match — oder
+/// NULL, wenn keiner mehr passt. Damit folgen Zuordnungen Änderungen der
+/// Kunden-E-Mail (ändern → alte Mails fallen ab, entfernen → alle fallen ab).
+/// Manuelle Zuordnungen (auto_matched=0) bleiben unangetastet. Gibt die Anzahl
+/// geänderter Mails zurück. Auslöser: ein Kunde wird angelegt/geändert.
+pub fn rematch_auto(
+    conn: &Connection,
+    customers: &[crate::email::types::CustomerRef],
+) -> rusqlite::Result<usize> {
+    let rows: Vec<(String, String, String, String, Option<String>)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, from_addr, to_addrs, folder, customer_id FROM emails WHERE auto_matched = 1",
+        )?;
+        let mapped = stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, Option<String>>(4)?,
+            ))
+        })?;
+        mapped.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+
+    let mut changed = 0usize;
+    for (id, from_addr, to_json, folder, current) in rows {
+        let to_addrs: Vec<String> = serde_json::from_str(&to_json).unwrap_or_default();
+        let is_sent = folder == "Sent";
+        let next = crate::email::imap::match_email(&from_addr, &to_addrs, is_sent, customers);
+        if next != current {
+            conn.execute(
+                "UPDATE emails SET customer_id = ?1 WHERE id = ?2",
+                params![next, id],
+            )?;
+            changed += 1;
+        }
+    }
+    Ok(changed)
 }
 
 pub fn delete_email(conn: &Connection, id: &str) -> rusqlite::Result<()> {
@@ -550,6 +625,52 @@ mod tests {
     }
 
     #[test]
+    fn rematch_auto_follows_email_changes() {
+        use crate::email::types::CustomerRef;
+        let conn = in_memory_db();
+        conn.execute_batch(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, to_addrs, sent_at)
+             VALUES ('m1','a1',1,'INBOX','person@firma-a.de','[]','2026-01-01')"
+        ).unwrap();
+
+        // Verschiedene Domains — so greift kein Domain-Match, der Wechsel lässt
+        // die Mail von A sauber abfallen.
+        let cust_a = vec![CustomerRef { id: "cust".into(), email: Some("person@firma-a.de".into()) }];
+        let cust_b = vec![CustomerRef { id: "cust".into(), email: Some("kontakt@firma-b.de".into()) }];
+
+        // Adresse A → Mail wird zugeordnet.
+        assert_eq!(rematch_auto(&conn, &cust_a).unwrap(), 1);
+        let cid: Option<String> = conn.query_row("SELECT customer_id FROM emails WHERE id='m1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(cid.as_deref(), Some("cust"));
+
+        // Auf B geändert → Mail von A fällt wieder ab (NULL).
+        assert_eq!(rematch_auto(&conn, &cust_b).unwrap(), 1);
+        let cid: Option<String> = conn.query_row("SELECT customer_id FROM emails WHERE id='m1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(cid, None);
+
+        // Idempotent: erneuter Lauf ändert nichts mehr.
+        assert_eq!(rematch_auto(&conn, &cust_b).unwrap(), 0);
+    }
+
+    #[test]
+    fn rematch_auto_preserves_manual_assignment() {
+        use crate::email::types::CustomerRef;
+        let conn = in_memory_db();
+        conn.execute_batch(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, to_addrs, sent_at)
+             VALUES ('m1','a1',1,'INBOX','fremder@y.de','[]','2026-01-01')"
+        ).unwrap();
+        // Manuell zuordnen → auto_matched=0.
+        assign_customer(&conn, "m1", Some("manual-cust")).unwrap();
+
+        // Re-Match mit fremder Kundenliste darf das nicht überschreiben.
+        let others = vec![CustomerRef { id: "other".into(), email: Some("other@z.de".into()) }];
+        rematch_auto(&conn, &others).unwrap();
+        let cid: Option<String> = conn.query_row("SELECT customer_id FROM emails WHERE id='m1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(cid.as_deref(), Some("manual-cust"));
+    }
+
+    #[test]
     fn upsert_and_get_folders() {
         use crate::email::types::RawFolder;
         let conn = in_memory_db();
@@ -626,5 +747,29 @@ mod tests {
         let conn = in_memory_db();
         let flags = get_folder_flags(&conn, "acc1", "INBOX.Unknown").unwrap();
         assert!(flags.is_empty());
+    }
+
+    #[test]
+    fn set_not_a_lead_toggles_and_list_reflects_it() {
+        let conn = in_memory_db();
+        conn.execute_batch(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, sent_at)
+             VALUES ('e1','a1',1,'INBOX','x@x.de','2026-01-01')"
+        ).unwrap();
+
+        // Default: not flagged.
+        let before = list_emails(&conn, "a1", "INBOX", 50, 0, "").unwrap();
+        assert_eq!(before.len(), 1);
+        assert!(!before[0].not_a_lead);
+
+        // Flag it → list reflects the change.
+        set_not_a_lead(&conn, "e1", true).unwrap();
+        let after = list_emails(&conn, "a1", "INBOX", 50, 0, "").unwrap();
+        assert!(after[0].not_a_lead);
+
+        // Unflag again.
+        set_not_a_lead(&conn, "e1", false).unwrap();
+        let reset = list_emails(&conn, "a1", "INBOX", 50, 0, "").unwrap();
+        assert!(!reset[0].not_a_lead);
     }
 }

@@ -2,10 +2,20 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import {
   Folder, FolderOpen, File, FileText, Image, Film, Archive,
   Upload, FolderPlus, Trash2, ChevronRight, ChevronDown, Search, Plus, X,
-  FolderInput, Download, type LucideIcon,
+  FolderInput, Download, Eye, ExternalLink, type LucideIcon,
 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { useFilesStore } from '@/store/files.store'
+import { useToastStore } from '@/store/toast.store'
 import type { Folder as FolderType, FileEntry } from '@/types/file.types'
+
+function isPreviewable(mimeType: string | null): 'image' | 'pdf' | null {
+  if (!mimeType) return null
+  if (mimeType.startsWith('image/')) return 'image'
+  if (mimeType === 'application/pdf') return 'pdf'
+  return null
+}
 
 const MAX_BYTES = 50 * 1024 * 1024
 
@@ -338,9 +348,9 @@ function NewFolderCard({ onSubmit, onCancel }: {
 
 // ── FileRow ───────────────────────────────────────────────────────────────────
 
-function FileRow({ file, onDelete, onContextMenu }: {
+function FileRow({ file, onOpen, onContextMenu }: {
   file: FileEntry
-  onDelete: () => void
+  onOpen: () => void
   onContextMenu: (e: React.MouseEvent) => void
 }) {
   const [hov, setHov] = useState(false)
@@ -349,14 +359,16 @@ function FileRow({ file, onDelete, onContextMenu }: {
     <div
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
+      onDoubleClick={onOpen}
       onContextMenu={e => { e.preventDefault(); onContextMenu(e) }}
+      title="Doppelklick zum Öffnen"
       style={{
         display: 'grid', gridTemplateColumns: '1fr 120px 72px',
         alignItems: 'center', gap: 8,
         padding: '8px 12px', borderRadius: 9,
         background: hov ? 'var(--surface-2)' : 'transparent',
         transition: 'background 80ms',
-        cursor: 'default',
+        cursor: 'pointer',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
@@ -425,6 +437,7 @@ export function DateienPane({ customerId }: Props) {
   const createFolder    = useFilesStore(s => s.createFolder)
   const removeFolder    = useFilesStore(s => s.removeFolder)
   const importFile      = useFilesStore(s => s.importFile)
+  const importFromPath  = useFilesStore(s => s.importFromPath)
   const removeFile      = useFilesStore(s => s.removeFile)
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -434,6 +447,80 @@ export function DateienPane({ customerId }: Props) {
   const [creating,    setCreating]    = useState(false)
   const [delTarget,   setDelTarget]   = useState<FolderType | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [preview,     setPreview]     = useState<{ file: FileEntry; url: string; kind: 'image' | 'pdf' } | null>(null)
+  const [busyLabel,   setBusyLabel]   = useState<string | null>(null)
+  const [dragOver,    setDragOver]    = useState(false)
+  const toast = useToastStore(s => s.show)
+
+  // ── open / download ──────────────────────────────────────────────────────────
+  const openFile = async (file: FileEntry) => {
+    const kind = isPreviewable(file.mimeType)
+    if (kind) {
+      try {
+        const bytes = await invoke<number[]>('cmd_read_file', { path: file.path })
+        const blob = new Blob([new Uint8Array(bytes)], { type: file.mimeType ?? undefined })
+        setPreview({ file, url: URL.createObjectURL(blob), kind })
+      } catch (e) {
+        toast({ message: `Öffnen fehlgeschlagen: ${String(e)}`, variant: 'error' })
+      }
+    } else {
+      // Nicht-Vorschaubare Typen (docx, xlsx, …) im Standardprogramm öffnen.
+      try { await invoke('cmd_open_file', { path: file.path }) }
+      catch (e) { toast({ message: `Öffnen fehlgeschlagen: ${String(e)}`, variant: 'error' }) }
+    }
+  }
+
+  const closePreview = () => {
+    setPreview(p => { if (p) URL.revokeObjectURL(p.url); return null })
+  }
+
+  const downloadFile = async (file: FileEntry) => {
+    setBusyLabel('Lade herunter…')
+    try {
+      const path = await invoke<string>('cmd_download_file', { path: file.path, suggestedName: file.name })
+      toast({ message: `Gespeichert: ${path}`, variant: 'success', durationMs: 5000 })
+    } catch (e) {
+      toast({ message: `Download fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    } finally {
+      setBusyLabel(null)
+    }
+  }
+
+  const downloadAllZip = async () => {
+    if (files.length === 0 || busyLabel) return
+    setBusyLabel('Packe ZIP…')
+    try {
+      const zipFiles: { name: string; bytes: number[] }[] = []
+      for (const f of files) {
+        const bytes = await invoke<number[]>('cmd_read_file', { path: f.path })
+        zipFiles.push({ name: f.name, bytes })
+      }
+      const zipName = `${activeName ?? 'Dokumente'}.zip`
+      const path = await invoke<string>('save_zip', { files: zipFiles, suggestedName: zipName })
+      toast({ message: `ZIP gespeichert: ${path}`, variant: 'success', durationMs: 5000 })
+    } catch (e) {
+      toast({ message: `ZIP fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    } finally {
+      setBusyLabel(null)
+    }
+  }
+
+  // Dateien per Pfad importieren (Drag-&-Drop vom Desktop liefert Pfade).
+  const importPaths = async (paths: string[]) => {
+    if (!paths.length) return
+    setBusyLabel(paths.length > 1 ? `Importiere ${paths.length} Dateien…` : 'Importiere…')
+    let ok = 0
+    try {
+      for (const srcPath of paths) {
+        try { await importFromPath({ customerId, folderId: activeFolderId, srcPath }); ok++ }
+        catch { /* einzelne Datei übersprungen (z.B. Ordner) */ }
+      }
+      if (ok > 0) toast({ message: `${ok} Datei${ok === 1 ? '' : 'en'} importiert`, variant: 'success' })
+      if (ok < paths.length) toast({ message: `${paths.length - ok} konnte(n) nicht importiert werden`, variant: 'error' })
+    } finally {
+      setBusyLabel(null)
+    }
+  }
 
   const openFolderMenu = useCallback((e: React.MouseEvent, folder: FolderType) => {
     setContextMenu({
@@ -449,9 +536,12 @@ export function DateienPane({ customerId }: Props) {
     setContextMenu({
       x: e.clientX, y: e.clientY,
       items: [
+        { icon: isPreviewable(file.mimeType) ? Eye : ExternalLink, label: 'Öffnen', onClick: () => openFile(file) },
+        { icon: Download, label: 'Herunterladen', onClick: () => downloadFile(file) },
         { icon: Trash2, label: 'Löschen', danger: true, onClick: () => removeFile(file.id) },
       ],
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [removeFile])
 
   // ── navigation ─────────────────────────────────────────────────────────────
@@ -498,10 +588,33 @@ export function DateienPane({ customerId }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > MAX_BYTES) { alert('Datei zu groß (max. 50 MB)'); return }
-    const data = Array.from(new Uint8Array(await file.arrayBuffer()))
-    await importFile({ customerId, folderId: activeFolderId, name: file.name, data, mimeType: file.type || null })
-    e.target.value = ''
+    setBusyLabel('Lädt hoch…')
+    try {
+      const data = Array.from(new Uint8Array(await file.arrayBuffer()))
+      await importFile({ customerId, folderId: activeFolderId, name: file.name, data, mimeType: file.type || null })
+      toast({ message: `„${file.name}" hochgeladen`, variant: 'success' })
+    } catch (err) {
+      toast({ message: `Upload fehlgeschlagen: ${String(err)}`, variant: 'error' })
+    } finally {
+      setBusyLabel(null)
+      e.target.value = ''
+    }
   }
+
+  // Drag & Drop vom Desktop: Tauri liefert die Pfade der gezogenen Dateien
+  // (kein HTML5-Drop). Aktiv, solange die Dokumente-Ansicht offen ist.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    let cancelled = false
+    getCurrentWebview().onDragDropEvent(ev => {
+      const p = ev.payload
+      if (p.type === 'over') setDragOver(true)
+      else if (p.type === 'leave') setDragOver(false)
+      else if (p.type === 'drop') { setDragOver(false); importPaths(p.paths) }
+    }).then(fn => { if (cancelled) fn(); else unlisten = fn })
+    return () => { cancelled = true; if (unlisten) unlisten() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId, activeFolderId])
 
   const showFolders = shownSubfolders.length > 0 || creating
   const showFiles   = files.length > 0 || isLoading
@@ -629,11 +742,19 @@ export function DateienPane({ customerId }: Props) {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={handleUpload} />
-            <button className="btn-ghost" onClick={() => setCreating(true)} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
+            {files.length > 0 && (
+              <button className="btn-ghost" onClick={downloadAllZip} disabled={!!busyLabel} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
+                <Download size={13} /> {busyLabel === 'Packe ZIP…' ? 'Packe…' : `Alle als ZIP (${files.length})`}
+              </button>
+            )}
+            <button className="btn-ghost" onClick={() => setCreating(true)} disabled={!!busyLabel} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
               <FolderPlus size={13} /> Neuer Ordner
             </button>
-            <button className="btn-ghost" onClick={() => fileRef.current?.click()} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
-              <Upload size={13} /> Hochladen
+            <button className="btn-ghost" onClick={() => fileRef.current?.click()} disabled={!!busyLabel} style={{ fontSize: 12, gap: 5, padding: '5px 12px' }}>
+              {busyLabel === 'Lädt hoch…'
+                ? <span style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid var(--border-strong)', borderTopColor: 'var(--accent)' }} className="animate-spin" />
+                : <Upload size={13} />}
+              {busyLabel === 'Lädt hoch…' ? 'Lädt…' : 'Hochladen'}
             </button>
           </div>
         </div>
@@ -695,7 +816,7 @@ export function DateienPane({ customerId }: Props) {
                   <FileRow
                     key={f.id}
                     file={f}
-                    onDelete={() => removeFile(f.id)}
+                    onOpen={() => openFile(f)}
                     onContextMenu={e => openFileMenu(e, f)}
                   />
                 ))
@@ -732,6 +853,76 @@ export function DateienPane({ customerId }: Props) {
 
       {delTarget && (
         <ConfirmModal name={delTarget.name} onConfirm={confirmDelete} onCancel={() => setDelTarget(null)} />
+      )}
+
+      {/* Drop-Overlay beim Ziehen vom Desktop */}
+      {dragOver && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 560, pointerEvents: 'none',
+          background: 'var(--accent-soft)', border: '3px dashed var(--accent)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--accent)' }}>
+            <Upload size={36} />
+            <span style={{ fontSize: 16, fontWeight: 700 }}>Dateien hier ablegen</span>
+          </div>
+        </div>
+      )}
+
+      {/* Busy-Overlay — Upload / Download / ZIP / Import */}
+      {busyLabel && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 570,
+          background: 'oklch(0% 0 0 / 0.35)', backdropFilter: 'blur(2px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 12, padding: '16px 22px', boxShadow: 'var(--shadow-2)',
+          }}>
+            <span className="animate-spin" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid var(--border-strong)', borderTopColor: 'var(--accent)' }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{busyLabel}</span>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <div
+          onClick={closePreview}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 600,
+            background: 'oklch(0% 0 0 / 0.72)', backdropFilter: 'blur(8px)',
+            display: 'flex', flexDirection: 'column', padding: '36px 48px',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, width: '100%', maxWidth: 1100, margin: '0 auto' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {preview.file.name}
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <button className="btn-ghost" onClick={() => downloadFile(preview.file)} style={{ fontSize: 12, gap: 6 }}>
+                  <Download size={13} /> Herunterladen
+                </button>
+                <button className="btn-ghost" onClick={() => invoke('cmd_open_file', { path: preview.file.path }).catch(() => {})} style={{ fontSize: 12, gap: 6 }}>
+                  <ExternalLink size={13} /> Extern öffnen
+                </button>
+                <button className="icon-btn" onClick={closePreview} style={{ color: '#fff' }} aria-label="Schließen">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, borderRadius: 12, overflow: 'hidden', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {preview.kind === 'image'
+                ? <img src={preview.url} alt={preview.file.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                : <iframe src={preview.url} title={preview.file.name} style={{ width: '100%', height: '100%', border: 'none' }} />}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -1,28 +1,22 @@
 // src/components/tasks/TasksHeader.tsx
-import { useUiStore } from '@/store/ui.store'
-import { Sparkles, List, LayoutGrid, Target } from 'lucide-react'
+import { Sparkles, LayoutGrid, Target } from 'lucide-react'
 
 interface Props {
   total: number
   completedToday: number
   plannedHours: number
   onOpenCyPanel: () => void
+  /** Board ist die Hauptansicht; Fokus ist ein Modus, kein Tab. */
+  focusActive: boolean
+  onToggleFocus: () => void
   /** Compact = lebt im Kunden-Workflow (Cockpit-Header schon präsent) */
   compact?: boolean
 }
 
-const TABS = [
-  { id: 'list',  label: 'Liste', icon: List       },
-  { id: 'board', label: 'Board', icon: LayoutGrid },
-  { id: 'focus', label: 'Fokus', icon: Target     },
-] as const
-
 export function TasksHeader({
-  total, completedToday, plannedHours, onOpenCyPanel, compact = false,
+  total, completedToday, plannedHours, onOpenCyPanel,
+  focusActive, onToggleFocus, compact = false,
 }: Props) {
-  const tasksTab    = useUiStore(s => s.tasksTab)
-  const setTasksTab = useUiStore(s => s.setTasksTab)
-
   const denominator = Math.max(total, 1)
   const ringPct = Math.min(100, (completedToday / denominator) * 100)
 
@@ -114,33 +108,24 @@ export function TasksHeader({
         {compact ? 'Cy' : 'Cy · Tag planen'}
       </button>
 
-      {/* Tab-Switcher */}
-      <div style={{
-        display: 'inline-flex', gap: 2, padding: 3, borderRadius: 99,
-        background: 'oklch(50% 0 0 / 0.06)', border: '1px solid var(--border)',
-      }}>
-        {TABS.map(t => {
-          const active = tasksTab === t.id
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTasksTab(t.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: compact ? '5px 10px' : '6px 14px',
-                borderRadius: 99,
-                fontSize: compact ? 11.5 : 12.5, fontWeight: 600,
-                background: active ? 'var(--accent)' : 'transparent',
-                color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
-                transition: 'background 180ms, color 180ms',
-              }}
-            >
-              <t.icon size={compact ? 12 : 13} />
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
+      {/* Fokus-Toggle — Board ist die Standardansicht */}
+      <button
+        onClick={onToggleFocus}
+        title={focusActive ? 'Zurück zum Board' : 'Eine Aufgabe nach der anderen'}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: compact ? '6px 12px' : '8px 16px',
+          borderRadius: 99,
+          fontSize: compact ? 11.5 : 12.5, fontWeight: 600,
+          background: focusActive ? 'var(--accent)' : 'transparent',
+          color: focusActive ? 'var(--accent-ink)' : 'var(--fg-muted)',
+          border: `1px solid ${focusActive ? 'var(--accent)' : 'var(--border)'}`,
+          transition: 'all 180ms',
+        }}
+      >
+        {focusActive ? <LayoutGrid size={compact ? 12 : 13} /> : <Target size={compact ? 12 : 13} />}
+        {focusActive ? 'Board' : 'Fokus'}
+      </button>
     </div>
   )
 }

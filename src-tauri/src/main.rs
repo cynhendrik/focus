@@ -123,7 +123,7 @@ fn main() {
             app.manage(EmailDb(std::sync::Mutex::new(conn)));
 
             let window = app.get_webview_window("main").unwrap();
-            window.set_title("Focus").unwrap();
+            window.set_title("Cultera Focus").unwrap();
             window.center().unwrap();
 
             #[cfg(target_os = "macos")]
@@ -146,6 +146,7 @@ fn main() {
             commands::account::upsert_account,
             commands::account::delete_account,
             commands::account::cmd_set_primary_deal,
+            commands::account::cmd_set_account_archived,
             commands::pipeline_stage::cmd_get_pipeline_stages,
             commands::pipeline_stage::cmd_upsert_pipeline_stage,
             commands::pipeline_stage::cmd_delete_pipeline_stage,
@@ -190,6 +191,10 @@ fn main() {
             commands::folder::cmd_add_file,
             commands::folder::cmd_delete_file,
             commands::folder::cmd_import_file,
+            commands::folder::cmd_import_file_from_path,
+            commands::folder::cmd_read_file,
+            commands::folder::cmd_open_file,
+            commands::folder::cmd_download_file,
             commands::company::get_company_settings,
             commands::company::update_company_settings,
             email::commands::email_get_accounts,
@@ -203,7 +208,9 @@ fn main() {
             email::commands::email_fetch_body_imap,
             email::commands::email_mark_read,
             email::commands::email_assign_customer,
+            email::commands::email_rematch_customers,
             email::commands::email_delete,
+            email::commands::email_set_not_a_lead,
             email::commands::email_test_smtp,
             email::commands::email_send,
             email::commands::email_get_attachments,
@@ -258,6 +265,8 @@ fn main() {
             commands::workspace_ablage::cmd_save_invoice_to_ablage,
             commands::export::save_pdf,
             commands::export::save_zip,
+            commands::export::cmd_export_backup,
+            commands::export::cmd_import_backup,
             commands::calendar::get_calendar_events,
             commands::calendar::upsert_calendar_event,
             commands::calendar::delete_calendar_event,
@@ -281,6 +290,14 @@ fn main() {
             commands::notes::update_note_folder,
             commands::notes::delete_note_folder,
         ])
+        .on_window_event(|window, event| {
+            // Sicherheitsnetz: beim Schließen automatisch ein frisches lokales
+            // Backup schreiben (rotierend), damit Datensicherheit nicht an der
+            // Disziplin des Nutzers hängt. Best-effort — blockiert das Schließen nicht.
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                commands::export::auto_export(window.app_handle());
+            }
+        })
         .run(tauri::generate_context!())
         .expect("Fehler beim Starten der Anwendung");
 }

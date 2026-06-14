@@ -20,3 +20,8 @@ pub fn delete_account(db: State<'_, DbPool>, id: String, workspace_id: String) -
 pub fn cmd_set_primary_deal(db: State<'_, DbPool>, account_id: String, deal_id: Option<String>) -> Result<Account, AppError> {
     db::account::set_primary_deal(&db.conn(), &account_id, deal_id.as_deref())
 }
+
+#[tauri::command]
+pub fn cmd_set_account_archived(db: State<'_, DbPool>, id: String, archived: bool) -> Result<Account, AppError> {
+    db::account::set_archived(&db.conn(), &id, archived)
+}

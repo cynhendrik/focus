@@ -64,7 +64,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
           background: 'var(--accent)',
-          boxShadow: '0 0 8px oklch(92% 0.2 245 / 0.4)',
+          boxShadow: '0 0 8px oklch($1264 / 0.4)',
         }} />
         <span style={{
           fontSize: 10, fontWeight: 700, color: 'var(--accent)',
@@ -76,7 +76,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
             <span style={{
               fontSize: 9, fontFamily: 'var(--font-mono)',
               color: 'var(--accent)', letterSpacing: '0.1em',
-              background: 'oklch(92% 0.2 245 / 0.1)',
+              background: 'oklch($1264 / 0.1)',
               padding: '2px 8px', borderRadius: 99,
             }}>
               {openCount} OFFEN

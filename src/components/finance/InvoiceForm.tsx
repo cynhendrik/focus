@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { X, Plus, Trash2, Clock } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAccountsStore } from '@/store/accounts.store'
@@ -34,6 +35,15 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
   // Accounts beim Öffnen frisch laden — damit neu erstellte Kunden sofort verfügbar sind
   useEffect(() => { loadAccounts() }, [])
 
+  // Nächste Rechnungsnummer vorschlagen (nur wenn noch keine gesetzt)
+  useEffect(() => {
+    if (invoiceNumber || !workspaceId) return
+    invoke<[number, number]>('get_invoice_sequence', { workspaceId }).then(([next]) => {
+      const year = new Date().getFullYear()
+      setInvoiceNumber(`${year}-${String(next + 1).padStart(5, '0')}`)
+    }).catch(() => {})
+  }, [workspaceId])
+
   const kleinunternehmer = profile.kleinunternehmer ?? false
   const zahlungszielTage = profile.zahlungszielTage ?? 14
 
@@ -48,6 +58,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
       ? initial.items.map(i => ({ ...i }))
       : [defaultItem(kleinunternehmer, 0)]
   )
+  const [invoiceNumber, setInvoiceNumber] = useState(initial?.invoice.number ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
@@ -122,6 +133,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
       const payload: UpsertInvoicePayload = {
         workspaceId, createdBy: user?.id ?? '', accountId, date, dueDate,
         status: asDraft ? 'draft' : 'open',
+        number: !asDraft && invoiceNumber.trim() ? invoiceNumber.trim() : undefined,
         taxMode, subtotal: totals.subtotal, taxAmount: totals.taxAmount, total: totals.total,
         bankInfo, notes: notes || undefined,
         items: toUpsertItems(items),
@@ -177,7 +189,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
             {kleinunternehmer && (
               <span style={{
                 display: 'inline-flex', marginTop: 8, fontSize: 10,
-                color: 'oklch(38% 0.15 245)', background: 'oklch(92% 0.2 245 / 0.2)',
+                color: 'oklch($1264)', background: 'oklch($1264 / 0.2)',
                 padding: '3px 9px', borderRadius: 99,
                 fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase',
               }}>
@@ -220,6 +232,21 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
             </FieldBlock>
           </div>
 
+          {/* Rechnungsnummer */}
+          <FieldBlock label="Rechnungsnummer">
+            <input
+              type="text"
+              value={invoiceNumber}
+              onChange={e => setInvoiceNumber(e.target.value)}
+              placeholder="z.B. 2026-00001"
+              readOnly={!!(initial?.invoice.status === 'open' && initial?.invoice.number)}
+              className="inv-input"
+              style={initial?.invoice.status === 'open' && initial?.invoice.number
+                ? { opacity: 0.6, cursor: 'default' }
+                : undefined}
+            />
+          </FieldBlock>
+
           {/* Leistungsdatum strip */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -234,8 +261,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                 {formatDateDE(leistungsdatum)}
               </span>
               <span style={{
-                fontSize: 9.5, color: 'oklch(38% 0.15 245)',
-                background: 'oklch(92% 0.2 245 / 0.2)',
+                fontSize: 9.5, color: 'oklch($1264)',
+                background: 'oklch($1264 / 0.2)',
                 padding: '2px 8px', borderRadius: 99,
                 fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
               }}>
@@ -250,8 +277,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           {/* Offene Zeiteinträge */}
           {accountId && unbilled.entries.length > 0 && (
             <div style={{
-              borderRadius: 10, border: '1px solid oklch(92% 0.2 245 / 0.25)',
-              background: 'oklch(92% 0.2 245 / 0.04)', padding: '12px 14px',
+              borderRadius: 10, border: '1px solid oklch($1264 / 0.25)',
+              background: 'oklch($1264 / 0.04)', padding: '12px 14px',
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -284,8 +311,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
-                      background: checked ? 'oklch(92% 0.2 245 / 0.1)' : 'transparent',
-                      border: `1px solid ${checked ? 'oklch(92% 0.2 245 / 0.35)' : 'transparent'}`,
+                      background: checked ? 'oklch($1264 / 0.1)' : 'transparent',
+                      border: `1px solid ${checked ? 'oklch($1264 / 0.35)' : 'transparent'}`,
                       transition: 'all 150ms',
                     }}
                   >

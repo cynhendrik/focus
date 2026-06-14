@@ -5,7 +5,8 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { downloadInvoicePDF } from './InvoicePDF'
+// downloadInvoicePDF is imported lazily at call time (keeps react-pdf out of
+// the main bundle — loads only on actual export).
 import { FinanceService } from '@/services/finance.service'
 import type { Invoice } from '@/types/finance.types'
 
@@ -46,6 +47,7 @@ export function InvoiceSuggestions({ suggestions, onClose }: Props) {
       const full = await FinanceService.getInvoice(inv.id)
       const account = accounts.find(a => a.id === inv.accountId)
       if (!account) return
+      const { downloadInvoicePDF } = await import('./InvoicePDF')
       await downloadInvoicePDF(full, profile, account)
     } finally { setBusy(null) }
   }

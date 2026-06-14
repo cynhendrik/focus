@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { buildCorraIntelligenceContext, parseCorraResponse } from './corra-intelligence'
 import type { Invoice } from '@/types/finance.types'
 import type { Account } from '@/types/account.types'
+import type { FollowUp } from '@/types/crm.types'
+import type { Lead } from '@/types/lead.types'
 
 // Minimal mocks — use type assertions to avoid filling every required field
 const baseAccount = { id: 'acc-1', name: 'Müller GmbH' } as Account
@@ -10,6 +12,8 @@ const baseInvoice = {
   id: 'inv-1', accountId: 'acc-1', number: 'RE-001',
   dueDate: '2026-05-01', status: 'overdue', total: 1190,
 } as Invoice
+
+const todayStr = new Date().toISOString().slice(0, 10)
 
 describe('parseCorraResponse', () => {
   it('returns plain text unchanged when no JSON', () => {
@@ -50,6 +54,7 @@ describe('buildCorraIntelligenceContext', () => {
     const ctx = buildCorraIntelligenceContext({
       todos: [], invoices: [baseInvoice], emails: [],
       deals: [], calendarEvents: [], accounts: [baseAccount],
+      followUps: [], leads: [],
     })
     expect(ctx).toContain('Müller GmbH')
     expect(ctx).toContain('RE-001')
@@ -61,6 +66,7 @@ describe('buildCorraIntelligenceContext', () => {
     const ctx = buildCorraIntelligenceContext({
       todos: [], invoices: [], emails: [],
       deals: [], calendarEvents: [], accounts: [],
+      followUps: [], leads: [],
     })
     expect(ctx).toContain('Keine offenen')
   })
@@ -70,8 +76,51 @@ describe('buildCorraIntelligenceContext', () => {
     const ctx = buildCorraIntelligenceContext({
       todos: [], invoices: [paid], emails: [],
       deals: [], calendarEvents: [], accounts: [baseAccount],
+      followUps: [], leads: [],
     })
     expect(ctx).not.toContain('RECHNUNGEN ÜBERFÄLLIG')
+  })
+
+  it('surfaces a due lead follow-up with lead name and ID', () => {
+    const lead = { id: 'lead-1', name: 'Sven Klar', pipelineStage: 'replied' } as Lead
+    const fu = {
+      id: 'fu-1', customerId: 'lead-1', title: 'Angebot nachfassen',
+      dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '',
+    } as FollowUp
+    const ctx = buildCorraIntelligenceContext({
+      todos: [], invoices: [], emails: [],
+      deals: [], calendarEvents: [], accounts: [],
+      followUps: [fu], leads: [lead],
+    })
+    expect(ctx).toContain('FOLLOW-UPS FÄLLIG')
+    expect(ctx).toContain('Sven Klar')
+    expect(ctx).toContain('Angebot nachfassen')
+    expect(ctx).toContain('ID:fu-1')
+  })
+
+  it('flags a cold lead with no open follow-up', () => {
+    const lead = {
+      id: 'lead-cold', name: 'Alte Spur', pipelineStage: 'waiting_reply',
+      lastActivityAt: '2026-01-01T00:00:00.000Z',
+    } as Lead
+    const ctx = buildCorraIntelligenceContext({
+      todos: [], invoices: [], emails: [],
+      deals: [], calendarEvents: [], accounts: [],
+      followUps: [], leads: [lead],
+    })
+    expect(ctx).toContain('LEADS OHNE FOLLOW-UP')
+    expect(ctx).toContain('Alte Spur')
+    expect(ctx).toContain('ID:lead-cold')
+  })
+
+  it('does not flag won/lost leads as cold', () => {
+    const won = { id: 'l-won', name: 'Gewonnen', pipelineStage: 'won', lastActivityAt: '2026-01-01T00:00:00.000Z' } as Lead
+    const ctx = buildCorraIntelligenceContext({
+      todos: [], invoices: [], emails: [],
+      deals: [], calendarEvents: [], accounts: [],
+      followUps: [], leads: [won],
+    })
+    expect(ctx).not.toContain('LEADS OHNE FOLLOW-UP')
   })
 })
 

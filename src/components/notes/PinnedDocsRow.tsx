@@ -15,61 +15,32 @@ export function PinnedDocsRow({ docs, accountId, onCreate, onUpdate, onDelete }:
 
   return (
     <>
-      <div style={{ marginBottom: 28 }}>
-        <div style={{
-          fontSize: 9, fontWeight: 700, letterSpacing: '0.14em',
-          textTransform: 'uppercase', color: 'var(--fg-dim)',
-          fontFamily: 'var(--font-mono)', marginBottom: 10,
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
+      {/* Reference migration: design-token utilities instead of inline styles.
+          JS onMouseEnter hovers replaced by `hover:` classes (no re-render,
+          works with keyboard focus too). */}
+      <div className="mb-7">
+        <div className="mb-2.5 flex items-center gap-2 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-fg-dim">
           <span>📌 Angeheftet</span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.07)' }} />
+          <div className="h-px flex-1 bg-white/[0.07]" />
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="flex flex-wrap gap-2">
           {docs.map(doc => (
             <button
               key={doc.id}
               onClick={() => setOpenDoc(doc)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 12px', borderRadius: 9,
-                border: '1px solid rgba(255,255,255,0.07)',
-                background: 'var(--bg2)', cursor: 'pointer', transition: 'all 140ms',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-                e.currentTarget.style.background = 'var(--bg3)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
-                e.currentTarget.style.background = 'var(--bg2)'
-              }}
+              className="flex items-center gap-2 rounded-[9px] border border-white/[0.07] bg-surface-2 px-3 py-2 transition-colors hover:border-white/[0.12] hover:bg-surface-3"
             >
-              <span style={{ fontSize: 13 }}>📋</span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)' }}>{doc.title}</div>
+              <span className="text-[13px]">📋</span>
+              <div className="text-left">
+                <div className="text-xs font-semibold text-fg">{doc.title}</div>
               </div>
             </button>
           ))}
 
           <button
             onClick={() => setOpenDoc('new')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 12px', borderRadius: 9,
-              border: '1px dashed rgba(255,255,255,0.1)',
-              background: 'transparent', cursor: 'pointer', color: 'var(--fg-dim)',
-              fontSize: 12, fontFamily: 'inherit', transition: 'all 140ms',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'rgba(181,240,35,0.3)'
-              e.currentTarget.style.color = 'var(--accent)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
-              e.currentTarget.style.color = 'var(--fg-dim)'
-            }}
+            className="flex items-center gap-1.5 rounded-[9px] border border-dashed border-white/10 bg-transparent px-3 py-2 text-xs text-fg-dim transition-colors hover:border-accent hover:text-accent"
           >
             + Dokument
           </button>

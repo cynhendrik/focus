@@ -8,9 +8,9 @@ import { useTodosStore } from '@/store/todos.store'
 import { useCompanyStore } from '@/store/company.store'
 import {
   Home, Users, CreditCard,
-  Target, TrendingUp, Reply,
-  Mail, Calendar,
-  Settings, PanelLeftClose, PanelLeftOpen, Sparkles,
+  Target, TrendingUp,
+  Mail, Calendar, Inbox, UserPlus,
+  Settings, PanelLeftClose, PanelLeftOpen, Sparkles, HelpCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -21,12 +21,19 @@ function NavItem({
   badge?: number; kbd?: string
 }) {
   return (
-    <div className="nav-item" data-active={String(active)} onClick={onClick} title={label}>
+    <button
+      type="button"
+      className="nav-item"
+      data-active={String(active)}
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
+      title={label}
+    >
       <Ic size={16} />
       <span>{label}</span>
       {badge ? <span className="nav-badge">{badge}</span> : null}
       {kbd && !badge ? <span className="nav-kbd">{kbd}</span> : null}
-    </div>
+    </button>
   )
 }
 
@@ -39,6 +46,7 @@ export function NavSidebar() {
   const setAppView      = useUiStore(s => s.setAppView)
   const collapsed       = useUiStore(s => s.sidebarCollapsed)
   const toggleSidebar   = useUiStore(s => s.toggleSidebar)
+  const setHelpOpen     = useUiStore(s => s.setHelpOpen)
   const user            = useAuthStore(s => s.user)
 
   const openDealCount = useDealsStore(s =>
@@ -65,10 +73,6 @@ export function NavSidebar() {
   const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
   const initials    = displayName.slice(0, 2).toUpperCase()
 
-  // Sales views — any of the three counts as "sales active"
-  const SALES_VIEWS = new Set(['akquise', 'leads', 'pipeline', 'followups', 'sales'])
-  const inSales = SALES_VIEWS.has(appView)
-
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
 
@@ -82,11 +86,11 @@ export function NavSidebar() {
         </div>
         <div className="sidebar-brand-text">
           <strong>Focus</strong>
-          <span>CYNERA · 2026</span>
+          <span>CULTERA · 2026</span>
         </div>
       </div>
 
-      {/* KORA */}
+      {/* KORA — der Dirigent über allem */}
       <button
         type="button"
         className="nav-corra-card"
@@ -113,21 +117,19 @@ export function NavSidebar() {
       {mod('finanzen') && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
 
-      {/* ── SALES ─────────────────────────────────────────────────────── */}
-      {mod('crm') && (
-        <>
-          {!collapsed && <SectionLabel>Sales</SectionLabel>}
-          <NavItem icon={Target}     label="Leads"      active={inSales && appView !== 'pipeline' && appView !== 'followups'}
-            onClick={() => setAppView('leads')} badge={newLeadsCount || undefined} kbd="L" />
-          <NavItem icon={Reply}      label="Follow-ups" active={appView === 'followups'}
-            onClick={() => setAppView('followups')} />
-          <NavItem icon={TrendingUp} label="Pipeline"   active={appView === 'pipeline'}
-            onClick={() => setAppView('pipeline')} badge={openDealCount || undefined} />
-        </>
-      )}
+      {/* ── AKQUISE — Leads → Deals, der Weg zum Neukunden ─────────────── */}
+      {!collapsed && <SectionLabel>Akquise</SectionLabel>}
+      <NavItem icon={Inbox}      label="Follow-Ups" active={appView === 'leverage_inbox'}
+        onClick={() => setAppView('leverage_inbox')} />
+      <NavItem icon={Target}     label="Leads"      active={appView === 'leverage_leads' || appView === 'leverage_lead_detail'}
+        onClick={() => setAppView('leverage_leads')} badge={newLeadsCount || undefined} />
+      <NavItem icon={TrendingUp} label="Pipeline"   active={appView === 'leverage_pipeline'}
+        onClick={() => setAppView('leverage_pipeline')} badge={openDealCount || undefined} />
+      <NavItem icon={UserPlus}   label="Newcomer"   active={appView === 'leverage_mail'}
+        onClick={() => setAppView('leverage_mail')} />
 
-      {/* ── INBOX ─────────────────────────────────────────────────────── */}
-      {!collapsed && <SectionLabel>Inbox</SectionLabel>}
+      {/* ── KOMMUNIKATION ─────────────────────────────────────────────── */}
+      {(mod('mail') || mod('kalender')) && !collapsed && <SectionLabel>Kommunikation</SectionLabel>}
       {mod('mail')     && <NavItem icon={Mail}     label="Mail"     active={appView === 'posteingang' || appView === 'mail'}
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />}
       {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
@@ -135,19 +137,23 @@ export function NavSidebar() {
 
       <div style={{ flex: 1 }} />
 
+      <NavItem icon={HelpCircle} label="Hilfe" active={false}
+        onClick={() => setHelpOpen(true)} />
+
       <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings' || appView === 'integrations'}
         onClick={() => setAppView('settings')} />
 
       {/* Profil + Einklappen */}
       <div className="sidebar-bottom">
-        <div
+        <button
+          type="button"
           className="sidebar-profile"
           onClick={() => setAppView('profile')}
           title="Profil & Workspace"
         >
           <div className="sidebar-user-avatar">{initials}</div>
           {!collapsed && <span className="sidebar-user-name">{displayName}</span>}
-        </div>
+        </button>
         <button
           type="button"
           className="sidebar-collapse-btn"

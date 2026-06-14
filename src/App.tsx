@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useClientPickerStore } from '@/store/client-picker.store'
 import { ClientPicker } from '@/components/clients/ClientPicker'
 import { AppShell }    from '@/components/layout/AppShell'
@@ -17,42 +17,62 @@ import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 
-const DEV_BYPASS = import.meta.env.DEV
+// Login-Bypass: im Dev immer, im Build via VITE_LOCAL_MODE=true (Tester-Build
+// ohne Supabase-Login — die App läuft dann komplett lokal).
+const DEV_BYPASS = import.meta.env.DEV || import.meta.env.VITE_LOCAL_MODE === 'true'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
 import { WorkspacePicker } from '@/core/workspace/WorkspacePicker'
 import { useSyncBridge } from '@/core/sync/useSyncBridge'
+import { useMailAutoSync } from '@/core/sync/useMailAutoSync'
 
-import { DashboardRoute }  from '@/routes/DashboardRoute'
-import { ClientsRoute }    from '@/routes/ClientsRoute'
-import { FinanceRoute }    from '@/routes/FinanceRoute'
-import { SettingsRoute }   from '@/routes/SettingsRoute'
-import { IntegrationsRoute } from '@/routes/IntegrationsRoute'
-import { ProfileRoute }    from '@/routes/ProfileRoute'
-import { LeadsRoute }            from '@/routes/LeadsRoute'
-import { PipelineRoute }         from '@/routes/PipelineRoute'
-import { FollowupsDashboardRoute } from '@/routes/FollowupsDashboardRoute'
-import { CalendarRoute }         from '@/routes/CalendarRoute'
-import { MailRoute }             from '@/routes/MailRoute'
-import { JournalRoute }          from '@/routes/JournalRoute'
-import { CorraRoute }            from '@/routes/CorraRoute'
-import { NotesRoute }            from '@/routes/NotesRoute'
-import { AkquiseRoute }          from '@/routes/AkquiseRoute'
-import { PosteingangRoute }      from '@/routes/PosteingangRoute'
-import { ZeitmanagementRoute }   from '@/routes/ZeitmanagementRoute'
-import { PrivateShell }          from '@/routes/private/PrivateShell'
+// Routes are code-split: each becomes its own chunk loaded on first navigation
+// instead of inflating the initial bundle. Named exports are adapted to the
+// default export that React.lazy expects.
+const named = <T extends Record<string, unknown>, K extends keyof T>(p: Promise<T>, key: K) =>
+  p.then(m => ({ default: m[key] as React.ComponentType<unknown> }))
+
+const DashboardRoute     = lazy(() => named(import('@/routes/DashboardRoute'), 'DashboardRoute'))
+const ClientsRoute       = lazy(() => named(import('@/routes/ClientsRoute'), 'ClientsRoute'))
+const FinanceRoute       = lazy(() => named(import('@/routes/FinanceRoute'), 'FinanceRoute'))
+const SettingsRoute      = lazy(() => named(import('@/routes/SettingsRoute'), 'SettingsRoute'))
+const IntegrationsRoute  = lazy(() => named(import('@/routes/IntegrationsRoute'), 'IntegrationsRoute'))
+const ProfileRoute       = lazy(() => named(import('@/routes/ProfileRoute'), 'ProfileRoute'))
+const CalendarRoute      = lazy(() => named(import('@/routes/CalendarRoute'), 'CalendarRoute'))
+const JournalRoute       = lazy(() => named(import('@/routes/JournalRoute'), 'JournalRoute'))
+const CorraRoute         = lazy(() => named(import('@/routes/CorraRoute'), 'CorraRoute'))
+const NotesRoute         = lazy(() => named(import('@/routes/NotesRoute'), 'NotesRoute'))
+const AkquiseRoute       = lazy(() => named(import('@/routes/AkquiseRoute'), 'AkquiseRoute'))
+const PosteingangRoute   = lazy(() => named(import('@/routes/PosteingangRoute'), 'PosteingangRoute'))
+const ZeitmanagementRoute = lazy(() => named(import('@/routes/ZeitmanagementRoute'), 'ZeitmanagementRoute'))
+const LeverageInboxRoute    = lazy(() => named(import('@/routes/leverage/LeverageInboxRoute'), 'LeverageInboxRoute'))
+const LeverageLeadsRoute    = lazy(() => named(import('@/routes/leverage/LeverageLeadsRoute'), 'LeverageLeadsRoute'))
+const LeveragePipelineRoute = lazy(() => named(import('@/routes/leverage/LeveragePipelineRoute'), 'LeveragePipelineRoute'))
+const LeverageMailRoute     = lazy(() => named(import('@/routes/leverage/LeverageMailRoute'), 'LeverageMailRoute'))
+const LeverageLeadRoute     = lazy(() => named(import('@/routes/leverage/LeverageLeadRoute'), 'LeverageLeadRoute'))
+
+// Always-mounted editor components pull in TipTap/ProseMirror (~heavy). Code-
+// split so that engine lands in its own chunk and loads after first paint
+// instead of inflating the main bundle.
+const GlobalQuickComposer = lazy(() => named(import('@/components/global/GlobalQuickComposer'), 'GlobalQuickComposer'))
+const QuickCaptureModal   = lazy(() => named(import('@/components/layout/QuickCaptureModal'), 'QuickCaptureModal'))
+
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
-import { GlobalQuickComposer } from '@/components/global/GlobalQuickComposer'
 import { ToastViewport }       from '@/components/ui/Toast'
-import { SplashScreen }        from '@/components/ui/SplashScreen'
+
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
-import { QuickCaptureModal }   from '@/components/layout/QuickCaptureModal'
 import { ZeitPanel }           from '@/components/layout/ZeitPanel'
-import { OnboardingWizard, hasCompletedOnboarding } from '@/components/onboarding/OnboardingWizard'
-import { seedSampleAiSummaries } from '@/lib/seed-ai-summaries'
+import { WelcomeIntro } from '@/components/onboarding/WelcomeIntro'
+import { OnboardingBar } from '@/components/onboarding/OnboardingBar'
+import { OnboardingCard } from '@/components/onboarding/OnboardingCard'
+import { CompanyStep } from '@/components/onboarding/CompanyStep'
+import { SplashScreen } from '@/components/ui/SplashScreen'
+import { HelpDrawer } from '@/components/help/HelpDrawer'
+import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
+import { useOnboardingStore } from '@/store/onboarding.store'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -71,43 +91,27 @@ export default function App() {
   const loadLeads       = useLeadsStore(s => s.load)
   const loadCalendar    = useCalendarStore(s => s.load)
   const selectedCustomerId = useUiStore(s => s.selectedCustomerId)
+  const selectedLeverageLeadId = useUiStore(s => s.selectedLeverageLeadId)
   const appView         = useUiStore(s => s.appView)
   const setAppView      = useUiStore(s => s.setAppView)
   const cmdOpen             = useUiStore(s => s.cmdPaletteOpen)
   const setCmdPaletteOpen   = useUiStore(s => s.setCmdPaletteOpen)
   const setQuickCaptureOpen = useUiStore(s => s.setQuickCaptureOpen)
   const sidebarCollapsed  = useUiStore(s => s.sidebarCollapsed)
-  const appMode           = useUiStore(s => s.appMode)
   const pickerOpen        = useClientPickerStore(s => s.isOpen)
   const openPicker        = useClientPickerStore(s => s.open)
-  // Onboarding signal — must be called BEFORE any early return below to satisfy
-  // the Rules of Hooks. Hook order must be stable across renders.
-  const customersCount    = useCustomersStore(s => s.customers.length)
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
+  // Onboarding — Selektoren BEFORE any early return (Rules of Hooks).
+  const welcomeSeen     = useOnboardingStore(s => s.welcomeSeen)
+  const bootstrapped    = useOnboardingStore(s => s.bootstrapped)
+  const markWelcomeSeen = useOnboardingStore(s => s.markWelcomeSeen)
 
-  // ── Splash ────────────────────────────────────────────────────────────────
-  // Splash wartet auf zwei Bedingungen: ein kurzer Min-Floor (damit der Splash
-  // nicht kurz aufblitzt) UND Auth fertig. Frueher 4300 ms — das war ein
-  // fester Floor, auch wenn Auth in 200 ms zurueckkam. Jetzt 900 ms: lang
-  // genug, dass das Branding wahrgenommen wird, kurz genug, dass es sich nicht
-  // wie eine traege App anfuehlt.
-  const [minTimeDone,  setMinTimeDone]  = useState(false)
-  const [splashExit,   setSplashExit]   = useState(false)
-  const [splashGone,   setSplashGone]   = useState(false)
-
+  // Intro-Splash ("If we build, we build to lead") bei jedem Start.
+  const [splashPhase, setSplashPhase] = useState<'show' | 'exiting' | 'done'>('show')
   useEffect(() => {
-    const t = setTimeout(() => setMinTimeDone(true), 900)
-    return () => clearTimeout(t)
+    const t1 = setTimeout(() => setSplashPhase('exiting'), 2600)
+    const t2 = setTimeout(() => setSplashPhase('done'), 3200)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
-
-  useEffect(() => {
-    if (minTimeDone && !authLoading) {
-      setSplashExit(true)
-      const t = setTimeout(() => setSplashGone(true), 320)
-      return () => clearTimeout(t)
-    }
-  }, [minTimeDone, authLoading])
-  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => { initAuth() }, [initAuth])
 
@@ -183,7 +187,7 @@ export default function App() {
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
       // Demo-Seeder gehoert ganz nach hinten, blockiert nichts.
-      seedSampleAiSummaries()
+      useOnboardingStore.getState().bootstrap()
     })
 
     return () => {
@@ -195,8 +199,10 @@ export default function App() {
   }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
   useSyncBridge()
+  useMailAutoSync()
+  useOnboardingSync()
 
-  if (!splashGone) return <SplashScreen exiting={splashExit} />
+  if (authLoading && !DEV_BYPASS) return <div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />
 
   if (!user && !DEV_BYPASS) return <LoginScreen />
 
@@ -218,6 +224,12 @@ export default function App() {
       case 'notes':           return <NotesRoute />
       case 'zeitmanagement':  return <ZeitmanagementRoute />
       case 'calendar':        return <CalendarRoute />
+      // Akquise / Sales (vormals LEVERAGE — jetzt in der einen Shell)
+      case 'leverage_inbox':       return <LeverageInboxRoute />
+      case 'leverage_leads':       return <LeverageLeadsRoute />
+      case 'leverage_pipeline':    return <LeveragePipelineRoute />
+      case 'leverage_mail':        return <LeverageMailRoute />
+      case 'leverage_lead_detail': return <LeverageLeadRoute />
       // Redirects
       case 'leads':           return <AkquiseRoute />
       case 'pipeline':        return <AkquiseRoute />
@@ -235,33 +247,17 @@ export default function App() {
   const SALES_VIEWS = new Set<string>(['akquise', 'leads', 'pipeline', 'followups', 'sales'])
   const routeKey = appView === 'clients' && selectedCustomerId
     ? `clients:${selectedCustomerId}`
+    : appView === 'leverage_lead_detail' && selectedLeverageLeadId
+    ? `lead:${selectedLeverageLeadId}`
     : SALES_VIEWS.has(appView) ? 'akquise'
     : appView
 
-  // First-run onboarding: shown if user has never completed it AND there are
-  // no customers yet. Once they finish (or skip) it stays gone.
-  // (Hooks declared at top of component to satisfy Rules of Hooks.)
-  const showOnboarding = !onboardingDismissed
-    && !hasCompletedOnboarding()
-    && customersCount === 0
-    && !!activeWorkspaceId
-
-  // Privater Raum: komplett anderes Layout, kein NavSidebar/Topbar.
-  // Modals/Toasts laufen weiter parallel — bewusst, damit z.B. Toasts
-  // beim Loeschen einer Notiz auch hier sichtbar werden.
-  if (appMode === 'private') {
-    return (
-      <AppShell>
-        <PrivateShell />
-        <QuickCaptureModal />
-        <DownloadToast />
-        <ToastViewport />
-      </AppShell>
-    )
-  }
+  // Erststart: WelcomeIntro nur nach Bootstrap und solange nicht gesehen.
+  const showWelcome = bootstrapped && !welcomeSeen && !!activeWorkspaceId
 
   return (
     <AppShell>
+      <OnboardingBar />
       <div className="app" data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}>
         <NavSidebar />
         <main className="main">
@@ -269,7 +265,9 @@ export default function App() {
           <div className="main-content">
             <ErrorBoundary>
               <RouteSwitch viewKey={routeKey}>
-                {renderMain()}
+                <Suspense fallback={<div style={{ flex: 1 }} />}>
+                  {renderMain()}
+                </Suspense>
               </RouteSwitch>
             </ErrorBoundary>
           </div>
@@ -277,14 +275,16 @@ export default function App() {
       </div>
       {cmdOpen && <CommandPalette open={cmdOpen} onClose={() => setCmdPaletteOpen(false)} />}
       {pickerOpen && <ClientPicker />}
-      <QuickCaptureModal />
+      <Suspense fallback={null}><QuickCaptureModal /></Suspense>
       <ZeitPanel />
       <DownloadToast />
       <ToastViewport />
-      <GlobalQuickComposer />
-      {showOnboarding && (
-        <OnboardingWizard onComplete={() => setOnboardingDismissed(true)} />
-      )}
+      <Suspense fallback={null}><GlobalQuickComposer /></Suspense>
+      <HelpDrawer />
+      <OnboardingCard />
+      <CompanyStep />
+      {showWelcome && <WelcomeIntro onDone={markWelcomeSeen} />}
+      {splashPhase !== 'done' && <SplashScreen exiting={splashPhase === 'exiting'} />}
     </AppShell>
   )
 }

@@ -130,7 +130,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 9,
-              color: isDark ? 'oklch(92% 0.2 245 / 0.5)' : 'var(--fg-dim)',
+              color: isDark ? 'oklch($1264 / 0.5)' : 'var(--fg-dim)',
               fontFamily: 'var(--font-mono)', letterSpacing: '0.18em',
               textTransform: 'uppercase', marginBottom: 10,
             }}>
@@ -161,14 +161,14 @@ export function CorraIdleView({ onSend, loading }: Props) {
                   <span style={{
                     margin: '0 10px',
                     fontSize: 9, fontFamily: 'var(--font-mono)',
-                    color: isDark ? 'rgba(163,230,53,0.25)' : 'var(--fg-dim)',
+                    color: isDark ? 'rgba(59,109,244,0.25)' : 'var(--fg-dim)',
                     opacity: 0.5,
                   }}>·</span>
                 )}
                 <span style={{
                   fontSize: 9, fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.12em',
-                  color: isDark ? 'rgba(163,230,53,0.6)' : 'var(--fg-dim)',
+                  color: isDark ? 'rgba(59,109,244,0.6)' : 'var(--fg-dim)',
                 }}>
                   {item}
                 </span>
@@ -224,7 +224,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
               transition: 'all 180ms',
-              boxShadow: input.trim() && !loading && isDark ? '0 0 12px rgba(163,230,53,0.4)' : 'none',
+              boxShadow: input.trim() && !loading && isDark ? '0 0 12px rgba(59,109,244,0.4)' : 'none',
               fontSize: 16,
             }}
           >

@@ -52,6 +52,7 @@ export interface UpsertInvoicePayload {
   createdBy: string
   accountId: string
   dealId?: string
+  number?: string
   date: string
   dueDate: string
   status?: InvoiceStatus

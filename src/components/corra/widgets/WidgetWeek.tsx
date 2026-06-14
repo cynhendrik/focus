@@ -31,18 +31,18 @@ export function WidgetWeek() {
       <div style={{
         position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)',
         width: 280, height: 140,
-        background: 'radial-gradient(ellipse, rgba(163,230,53,0.07) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse, rgba(59,109,244,0.07) 0%, transparent 70%)',
         pointerEvents: 'none', borderRadius: '50%',
       }} />
 
-      <div style={{ fontSize: 9, color: 'rgba(163,230,53,0.5)', fontFamily: 'var(--font-mono)', letterSpacing: '0.18em', marginBottom: 12 }}>
+      <div style={{ fontSize: 9, color: 'rgba(59,109,244,0.5)', fontFamily: 'var(--font-mono)', letterSpacing: '0.18em', marginBottom: 12 }}>
         DIESE WOCHE
       </div>
 
       <div style={{
         fontSize: 48, fontWeight: 900, color: 'var(--accent)',
         letterSpacing: '-0.04em', lineHeight: 1,
-        textShadow: '0 0 40px rgba(163,230,53,0.25)', marginBottom: 20,
+        textShadow: '0 0 40px rgba(59,109,244,0.25)', marginBottom: 20,
       }}>
         {totalThisWeek} Termine
       </div>
@@ -54,7 +54,7 @@ export function WidgetWeek() {
           return (
             <div key={day} style={{ flex: 1, textAlign: 'center' }}>
               <div style={{
-                fontSize: 8, color: isToday ? 'var(--accent)' : 'rgba(163,230,53,0.3)',
+                fontSize: 8, color: isToday ? 'var(--accent)' : 'rgba(59,109,244,0.3)',
                 fontFamily: 'var(--font-mono)', marginBottom: 4,
                 fontWeight: isToday ? 700 : 400,
               }}>
@@ -62,15 +62,15 @@ export function WidgetWeek() {
               </div>
               <div style={{
                 height: 28, borderRadius: 4,
-                background: isToday ? 'rgba(163,230,53,0.12)' : 'rgba(163,230,53,0.04)',
-                border: isToday ? '1px solid rgba(163,230,53,0.3)' : '1px solid transparent',
+                background: isToday ? 'rgba(59,109,244,0.12)' : 'rgba(59,109,244,0.04)',
+                border: isToday ? '1px solid rgba(59,109,244,0.3)' : '1px solid transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {count > 0 && (
                   <div style={{
                     width: count > 1 ? 8 : 6, height: count > 1 ? 8 : 6,
                     borderRadius: '50%', background: 'var(--accent)',
-                    boxShadow: isToday ? '0 0 6px rgba(163,230,53,0.6)' : 'none',
+                    boxShadow: isToday ? '0 0 6px rgba(59,109,244,0.6)' : 'none',
                   }} />
                 )}
               </div>
@@ -81,12 +81,12 @@ export function WidgetWeek() {
 
       {nextEvent && (
         <>
-          <div style={{ width: 40, height: 1, background: 'rgba(163,230,53,0.15)', marginBottom: 10 }} />
-          <div style={{ fontSize: 9, color: 'rgba(163,230,53,0.4)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
+          <div style={{ width: 40, height: 1, background: 'rgba(59,109,244,0.15)', marginBottom: 10 }} />
+          <div style={{ fontSize: 9, color: 'rgba(59,109,244,0.4)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>
             HEUTE
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: 'rgba(163,230,53,0.5)', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 11, color: 'rgba(59,109,244,0.5)', fontFamily: 'var(--font-mono)' }}>
               {nextEvent.startAt.slice(11, 16)}
             </span>
             <span style={{ fontSize: 13, color: '#ddd' }}>{nextEvent.title}</span>

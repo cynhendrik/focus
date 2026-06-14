@@ -4,11 +4,13 @@ import type { EmailHeader } from '@/types/mail.types'
 import type { Deal } from '@/types/pipeline.types'
 import type { CalendarEvent } from '@/types/calendar.types'
 import type { Account } from '@/types/account.types'
+import type { FollowUp } from '@/types/crm.types'
+import type { Lead } from '@/types/lead.types'
 
 // ─── Public Types ────────────────────────────────────────────────────────────
 
 export interface CorraActionItem {
-  type: 'invoice' | 'todo' | 'mail'
+  type: 'invoice' | 'todo' | 'mail' | 'followup'
   id: string
   label: string
   detail: string
@@ -42,6 +44,10 @@ export interface CorraContextInput {
   deals: Deal[]
   calendarEvents: CalendarEvent[]
   accounts: Account[]
+  /** Offene Follow-Ups über alle Leads & Kunden — damit KORA keinen vergisst. */
+  followUps: FollowUp[]
+  /** Alle Leads — für Namensauflösung und das Erkennen kalter Kontakte. */
+  leads: Lead[]
 }
 
 // ─── Context Builder ─────────────────────────────────────────────────────────
@@ -56,8 +62,10 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
   const today    = new Date()
   const todayStr = today.toISOString().slice(0, 10)
 
+  // Leads und Kunden sind beide Accounts — ein Follow-Up kann an beiden hängen.
   const accountName = (id: string) =>
-    input.accounts.find(a => a.id === id)?.name ?? id
+    input.accounts.find(a => a.id === id)?.name ??
+    input.leads.find(l => l.id === id)?.name ?? id
 
   const openTodos = input.todos
     .filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress' || t.status === 'in_progress'))
@@ -81,6 +89,30 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
   const todayEvents = input.calendarEvents
     .filter(e => e.startAt.startsWith(todayStr))
     .sort((a, b) => a.startAt.localeCompare(b.startAt))
+    .slice(0, 5)
+
+  // Offene Follow-Ups, die heute oder früher fällig sind — echte Versprechen,
+  // die nicht untergehen dürfen. Sortiert nach Fälligkeit (älteste zuerst).
+  const openFollowUps = input.followUps.filter(f => f.status === 'offen' && f.dueDate)
+  const dueFollowUps = openFollowUps
+    .filter(f => f.dueDate.slice(0, 10) <= todayStr)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 10)
+
+  // Kalte Leads: kein offenes Follow-Up und seit >14 Tagen keine Aktivität —
+  // genau die, die man sonst vergisst. Won/Lost ausgenommen.
+  const leadIdsWithOpenFu = new Set(openFollowUps.map(f => f.customerId))
+  const coldCutoff = new Date(today)
+  coldCutoff.setDate(coldCutoff.getDate() - 14)
+  const coldCutoffStr = coldCutoff.toISOString()
+  const coldLeads = input.leads
+    .filter(l =>
+      l.pipelineStage !== 'won' &&
+      l.pipelineStage !== 'lost' &&
+      !leadIdsWithOpenFu.has(l.id) &&
+      (!l.lastActivityAt || l.lastActivityAt < coldCutoffStr),
+    )
+    .sort((a, b) => (a.lastActivityAt ?? '0').localeCompare(b.lastActivityAt ?? '0'))
     .slice(0, 5)
 
   const lines: string[] = [
@@ -133,6 +165,30 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     lines.push('')
   }
 
+  if (dueFollowUps.length > 0) {
+    lines.push('FOLLOW-UPS FÄLLIG:')
+    for (const f of dueFollowUps) {
+      const days = Math.floor(
+        (today.getTime() - new Date(f.dueDate).getTime()) / 86_400_000,
+      )
+      const prefix = days > 0 ? `[ÜBERFÄLLIG ${days}T]` : '[HEUTE]'
+      lines.push(`- ${prefix} ${accountName(f.customerId)} · „${f.title}" · ID:${f.id}`)
+    }
+    lines.push('')
+  }
+
+  if (coldLeads.length > 0) {
+    lines.push('LEADS OHNE FOLLOW-UP (KALT, >14 TAGE STILL):')
+    for (const l of coldLeads) {
+      const days = l.lastActivityAt
+        ? Math.floor((today.getTime() - new Date(l.lastActivityAt).getTime()) / 86_400_000)
+        : null
+      const since = days != null ? `seit ${days} Tagen still` : 'noch nie kontaktiert'
+      lines.push(`- ${l.name} · ${since} · ID:${l.id}`)
+    }
+    lines.push('')
+  }
+
   if (todayEvents.length > 0) {
     lines.push('KALENDER HEUTE:')
     for (const e of todayEvents) {
@@ -141,8 +197,12 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     lines.push('')
   }
 
-  if (openTodos.length === 0 && overdueInvoices.length === 0 && unreadEmails.length === 0 && openDeals.length === 0 && todayEvents.length === 0) {
-    lines.push('Keine offenen Aufgaben, Rechnungen oder Mails heute.')
+  if (
+    openTodos.length === 0 && overdueInvoices.length === 0 && unreadEmails.length === 0 &&
+    openDeals.length === 0 && todayEvents.length === 0 &&
+    dueFollowUps.length === 0 && coldLeads.length === 0
+  ) {
+    lines.push('Keine offenen Aufgaben, Rechnungen, Follow-Ups oder Mails heute.')
   }
 
   return lines.join('\n').trim()
@@ -178,12 +238,13 @@ export function parseCorraResponse(raw: string): CorraIntelligenceResponse {
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
-export const CORRA_INTELLIGENCE_SYSTEM = `Du bist KORA Intelligence, ein persönlicher KI-Assistent in Cynera (CRM-App für Berater).
-Du hast Zugriff auf alle aktuellen Geschäftsdaten des Nutzers (Todos, Rechnungen, Mails, Deals, Kalender).
+export const CORRA_INTELLIGENCE_SYSTEM = `Du bist KORA Intelligence, ein persönlicher KI-Assistent in Cultera (CRM-App für Berater).
+Du hast Zugriff auf alle aktuellen Geschäftsdaten des Nutzers (Todos, Rechnungen, Mails, Deals, Kalender, Lead-Follow-Ups).
 
 DEINE AUFGABE:
 - Beantworte Fragen direkt und präzise mit echten Daten aus dem Kontext
 - Erkenne actionable Items und schlage vor, sie im Fokus-Modus zu bearbeiten
+- Erinnere aktiv an fällige Lead-Follow-Ups und kalte Leads — kein Kontakt darf untergehen
 
 ANTWORT-FORMAT:
 Wenn deine Antwort actionable Items enthält (Rechnungen, Mails, Todos die bearbeitet werden sollen), antworte AUSSCHLIESSLICH als JSON — kein Text davor oder danach:
@@ -199,6 +260,7 @@ Typen für actions[].type:
 - "invoice" → überfällige Rechnung → ID nach "ID:" im Kontext
 - "mail" → ungelesene Kunden-Mail → ID nach "ID:" im Kontext
 - "todo" → bestehendes Todo → ID nach "ID:" im Kontext
+- "followup" → fälliges Lead-Follow-Up → ID nach "ID:" im Kontext (aus FOLLOW-UPS FÄLLIG)
 
 Wenn KEINE Aktionen nötig sind, antworte als normaler Text (kein JSON).
 

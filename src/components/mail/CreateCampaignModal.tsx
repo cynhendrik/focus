@@ -9,6 +9,7 @@ import { useMailStore } from '@/store/mail.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { CampaignService } from '@/services/campaign.service'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { LeadRef } from '@/types/campaign.types'
 
 type RecipientType = 'lead' | 'account'
@@ -50,6 +51,7 @@ export function CreateCampaignModal({ onClose, onCreated }: {
   const accounts     = useAccountsStore(s => s.accounts)
   const mailAccounts = useMailStore(s => s.accounts)
   const create       = useCampaignStore(s => s.create)
+  const dialogRef    = useDialogFocus(true)
 
   const [name,           setName]           = useState('')
   const [subject,        setSubject]        = useState('')
@@ -207,8 +209,9 @@ export function CreateCampaignModal({ onClose, onCreated }: {
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
+      aria-label="Neue Kampagne"
     >
-      <div style={{
+      <div ref={dialogRef} style={{
         width: 620, maxWidth: '95vw', maxHeight: '90vh',
         background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 16,
         boxShadow: '0 24px 64px rgba(0,0,0,0.7)',

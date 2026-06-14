@@ -2,18 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'light' | 'dark'
+type ColorStyle = 'default' | 'bw'
 /**
- * Top-Level-Tabs im Customer-Detail. 7 statt 3 — eine Ebene tiefer war
- * dem User zu verschachtelt. Jeder Tab mappt 1:1 auf eine eigenstaendige
- * Pane, keine Sub-Tab-Navigation mehr darunter.
+ * Top-Level-Tabs im Customer-Detail. "Aktivitäten" (verlauf) ist der Default
+ * und die Seele der Kundenakte — Timeline mit KPI-Zeile oben. Das frühere
+ * Cockpit ist darin aufgegangen.
  */
 export type CustomerTab =
-  | 'cockpit'      // Briefing + Lead Score + Quick-Stats
   | 'tasks'        // Tasks (offene + erledigte)
   | 'notizen'      // Notebooks + Notes
   | 'dokumente'    // Dateien + Folder
-  | 'kommunikation' // Mails + Chat + Calls
-  | 'verlauf'      // Activity-Timeline
+  | 'kommunikation' // Mails + Chat + Calls (legacy-redirect → verlauf)
+  | 'verlauf'      // Aktivitäten: Timeline + KPI-Strip (Default)
   | 'finanzen'     // Rechnungen + Angebote (gefiltert auf diesen Kunden)
 
 /** Clients page view mode: card board vs. filtered list (Smart Lists). */
@@ -27,31 +27,18 @@ export type TasksTab = 'list' | 'board' | 'focus'
  */
 export type DashboardView = 'workspace' | 'sales'
 
-/** App-Modus: das normale Business-Layout oder der "Privater Raum"-Modus
- *  mit eigener Sidebar und eigenem Theme. */
-export type AppMode = 'business' | 'private'
-
-/** Sub-Routes innerhalb des Privaten Raums. */
-export type PrivateView =
-  | 'capture'  // Quick Capture (Inbox)
-  | 'todos'    // Persoenliche To-Dos
-  | 'notes'    // Persoenliche Notizen
-  | 'journal'  // Tagebuch mit Stimmung
-  | 'goals'    // Persoenliche Ziele mit Progress
-  | 'review'   // Wochen-Review-Ritual
-  | 'docs'     // Persoenliche Dokumente
 
 /** Legacy CustomerTab values, kept for backwards-compat with deep-link callers. */
 export type LegacyCustomerTab =
+  | 'cockpit'                                      // ehem. eigener Tab, jetzt in Aktivitäten aufgegangen
   | 'ueberblick' | 'arbeiten' | 'historie'         // 3-Tab-Aera
   | 'dashboard' | 'aktivitaeten' | 'informationen' // noch aeltere 9-Tab-Aera
   | 'sales' | 'workflow' | 'arbeitsraum' | 'dateien'
 
-/** Map legacy tab IDs onto the new 7-tab model. */
+/** Map legacy tab IDs onto the current 5-tab model. */
 export function mapLegacyCustomerTab(tab: string): CustomerTab {
   switch (tab) {
     // Schon im neuen Schema
-    case 'cockpit':
     case 'tasks':
     case 'notizen':
     case 'dokumente':
@@ -59,9 +46,10 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
     case 'verlauf':
     case 'finanzen':
       return tab as CustomerTab
-    // Mapping aus dem 3-Tab-Modell
+    // Cockpit + 3-Tab-Modell — Übersichten landen in Aktivitäten
+    case 'cockpit':
     case 'ueberblick':
-      return 'cockpit'
+      return 'verlauf'
     case 'arbeiten':
       return 'tasks'
     case 'historie':
@@ -70,7 +58,7 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
     case 'dashboard':
     case 'sales':
     case 'informationen':
-      return 'cockpit'
+      return 'verlauf'
     case 'workflow':
       return 'tasks'
     case 'arbeitsraum':
@@ -78,10 +66,9 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
     case 'dateien':
       return 'dokumente'
     case 'aktivitaeten':
-      // User-Wunsch: "nur Kommunikation ist bei Aktivitaeten"
-      return 'kommunikation'
+      return 'verlauf'
     default:
-      return 'cockpit'
+      return 'verlauf'
   }
 }
 export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'developer' | 'gefahrenzone' | 'auftraege'
@@ -94,9 +81,16 @@ export type AppView =
   | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
   | 'journal'   | 'focus'     | 'corra'
   | 'notes'     | 'inbox'     | 'sales'
+  // Akquise / Sales views (vormals LEVERAGE — jetzt Teil der einen Nav)
+  | 'leverage_inbox'
+  | 'leverage_leads'
+  | 'leverage_pipeline'
+  | 'leverage_mail'
+  | 'leverage_lead_detail'
 
 interface UiState {
   theme: Theme
+  colorStyle: ColorStyle
   selectedCustomerId: string | null
   appView: AppView
   focusMode: boolean
@@ -105,16 +99,16 @@ interface UiState {
   cmdPaletteOpen: boolean
   quickCaptureOpen: boolean
   zeitPanelOpen: boolean
+  helpOpen: boolean
   activeCustomerTab: CustomerTab
   tasksTab: TasksTab
   dashboardView: DashboardView
   settingsTab: SettingsTab
   /** Sidebar im Icon-only-Modus (mehr Platz fuer die Workflaeche). Persistiert. */
   sidebarCollapsed: boolean
-  /** Aktiver App-Modus — Business-Plattform oder Privater Raum. */
-  appMode: AppMode
-  /** Aktive Sub-Route innerhalb des Privaten Raums. */
-  privateView: PrivateView
+  /** Aktiver Lead im LEVERAGE-Modus (für die Detail-Ansicht). */
+  selectedLeverageLeadId: string | null
+  setColorStyle: (style: ColorStyle) => void
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
   openCustomerAt: (id: string, tab?: CustomerTab | LegacyCustomerTab) => void
@@ -125,20 +119,20 @@ interface UiState {
   setCmdPaletteOpen: (open: boolean) => void
   setQuickCaptureOpen: (open: boolean) => void
   setZeitPanelOpen: (open: boolean) => void
+  setHelpOpen: (open: boolean) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
   setTasksTab: (tab: TasksTab) => void
   setDashboardView: (view: DashboardView) => void
   setSettingsTab: (tab: SettingsTab) => void
   toggleSidebar: () => void
-  enterPrivate: (view?: PrivateView) => void
-  leavePrivate: () => void
-  setPrivateView: (view: PrivateView) => void
+  setSelectedLeverageLeadId: (id: string | null) => void
 }
 
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       theme: 'dark',
+      colorStyle: 'default',
       selectedCustomerId: null,
       appView: 'dashboard',
       focusMode: false,
@@ -147,13 +141,16 @@ export const useUiStore = create<UiState>()(
       cmdPaletteOpen: false,
       quickCaptureOpen: false,
       zeitPanelOpen: false,
-      activeCustomerTab: 'cockpit',
+      helpOpen: false,
+      activeCustomerTab: 'verlauf',
       tasksTab: 'list',
       dashboardView: 'workspace',
       settingsTab: 'workspace',
       sidebarCollapsed: false,
-      appMode: 'business',
-      privateView: 'capture',
+      selectedLeverageLeadId: null,
+
+      setColorStyle: (style) =>
+        set({ colorStyle: style }),
 
       toggleTheme: () =>
         set(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
@@ -185,6 +182,9 @@ export const useUiStore = create<UiState>()(
       setZeitPanelOpen: (open) =>
         set({ zeitPanelOpen: open }),
 
+      setHelpOpen: (open) =>
+        set({ helpOpen: open }),
+
       setActiveCustomerTab: (tab) =>
         set({ activeCustomerTab: mapLegacyCustomerTab(tab) }),
 
@@ -200,28 +200,34 @@ export const useUiStore = create<UiState>()(
       toggleSidebar: () =>
         set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
-      enterPrivate: (view) =>
-        set(s => ({ appMode: 'private', privateView: view ?? s.privateView })),
-
-      leavePrivate: () =>
-        set({ appMode: 'business' }),
-
-      setPrivateView: (view) =>
-        set({ privateView: view }),
+      setSelectedLeverageLeadId: (id) =>
+        set({ selectedLeverageLeadId: id }),
     }),
     {
       name: 'focus-ui-v2',
+      version: 2,
+      // v0/v1 → v2: Es gibt keinen App-Modus mehr (LEVERAGE und der Private
+      // Raum sind beide entfernt). Obsolete persistierte Felder wegräumen,
+      // damit niemand in einem toten Modus hängen bleibt.
+      migrate: (persisted) => {
+        const state = persisted as Record<string, unknown> | undefined
+        if (state) {
+          delete state.appMode
+          delete state.privateView
+        }
+        return state as unknown as UiState
+      },
       partialize: (s) => ({
         theme: s.theme,
+        colorStyle: s.colorStyle,
         selectedCustomerId: s.selectedCustomerId,
+        activeCustomerTab: s.activeCustomerTab,
         hasSeenIntro: s.hasSeenIntro,
         migrationDone: s.migrationDone,
         tasksTab: s.tasksTab,
         dashboardView: s.dashboardView,
         settingsTab: s.settingsTab,
         sidebarCollapsed: s.sidebarCollapsed,
-        appMode: s.appMode,
-        privateView: s.privateView,
       }),
     }
   )

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { Lead } from '@/types/lead.types'
 
 interface Props {
@@ -20,6 +21,8 @@ export function QualifyModal({ lead, onConfirm, onCancel }: Props) {
     }
   }
 
+  const dialogRef = useDialogFocus(true, onCancel)
+
   return (
     <div
       style={{
@@ -29,14 +32,20 @@ export function QualifyModal({ lead, onConfirm, onCancel }: Props) {
       }}
       onClick={e => e.target === e.currentTarget && onCancel()}
     >
-      <div style={{
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Termin buchen"
+        tabIndex={-1}
+        style={{
         width: '100%', maxWidth: 360,
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 16, padding: 24,
         boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#D0FC69', flexShrink: 0 }} />
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
           <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Termin buchen</h2>
         </div>
         <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '0 0 20px' }}>{lead.name}</p>

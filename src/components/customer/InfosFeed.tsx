@@ -340,35 +340,8 @@ export function InfosFeed({ customerId, notes }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Empty state */}
-      {allInfos.length === 0 && !composerOpen && (
-        <button
-          onClick={() => setComposerOpen(true)}
-          style={{
-            display: 'block', width: '100%',
-            padding: '14px 13px',
-            borderRadius: 11,
-            background: 'transparent',
-            border: '1px dashed var(--border)',
-            color: 'var(--fg-dim)',
-            fontSize: 12.5, fontStyle: 'italic',
-            lineHeight: 1.55,
-            textAlign: 'left',
-            cursor: 'pointer',
-            transition: 'border-color 180ms ease, color 180ms ease',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--accent)'
-            e.currentTarget.style.color = 'var(--accent)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--border)'
-            e.currentTarget.style.color = 'var(--fg-dim)'
-          }}
-        >
-          + Erste Notiz pinnen — tippe @ für Kontakte, # für Tags.
-        </button>
-      )}
+      {/* Kein leerer Platzhalter mehr — der "+ Notiz"-Button im Kopf genügt.
+          Leere Sektion = nur Kopf, kein wertvoller Platz für "hier könnte was stehen". */}
 
       {/* Filter-empty state */}
       {filterTag && filteredInfos.length === 0 && (

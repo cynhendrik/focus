@@ -333,33 +333,25 @@ export function ContactCard({ contact, onEdit, mentionCount = 0 }: Props) {
         >
           {contact.notes}
         </button>
-      ) : (
+      ) : hover ? (
+        // Kompakt: kein dauerhafter gestrichelter Kasten — nur ein dezenter
+        // Link bei Hover. Notizfeld erscheint erst beim Klick.
         <button
           onClick={() => setEditing(true)}
           style={{
-            display: 'block', width: '100%',
-            padding: '8px 10px',
-            borderRadius: 8,
-            background: 'transparent',
-            border: '1px dashed var(--border)',
-            color: 'var(--fg-dim)',
-            fontSize: 12, fontStyle: 'italic',
-            textAlign: 'left',
+            alignSelf: 'flex-start',
+            padding: '2px 0',
+            background: 'transparent', border: 'none',
+            color: 'var(--fg-dim)', fontSize: 11.5, fontStyle: 'italic',
             cursor: 'text',
-            transition: 'border-color 180ms ease, color 180ms ease',
+            transition: 'color 160ms ease',
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--accent)'
-            e.currentTarget.style.color = 'var(--accent)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--border)'
-            e.currentTarget.style.color = 'var(--fg-dim)'
-          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-dim)' }}
         >
           + Notiz zur Person
         </button>
-      )}
+      ) : null}
     </motion.div>
   )
 }

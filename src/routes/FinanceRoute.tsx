@@ -13,8 +13,8 @@ import { OfferForm } from '@/components/finance/OfferForm'
 import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
 import { MahnwesenPanel } from '@/components/finance/MahnwesenPanel'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
-import { downloadInvoicePDF, batchExportInvoicesPDF, getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
-import { downloadOfferPDF } from '@/components/finance/OfferPDF'
+// PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
+// react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceService } from '@/services/finance.service'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
@@ -165,7 +165,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
         <path
           d={GAUGE_PATH}
           fill="none"
-          stroke="oklch(96% 0.15 245)"
+          stroke="oklch($1264)"
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${GAUGE_LEN}`}
@@ -179,7 +179,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
               style={{ filter: 'url(#dot-glow)' }} />
             <circle cx={tipX} cy={tipY} r={5} fill="var(--accent)"
               style={{ filter: 'url(#dot-glow)' }} />
-            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(96% 0.15 245)" />
+            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch($1264)" />
           </>
         )}
 
@@ -254,10 +254,10 @@ function RevenueBarChart({ bars, maxRevenue }: { bars: BarEntry[]; maxRevenue: n
                 background: bar.isCurrent
                   ? 'var(--accent)'
                   : 'var(--surface-2)',
-                border: `1px solid ${bar.isCurrent ? 'oklch(92% 0.2 245 / 0.5)' : 'var(--border)'}`,
+                border: `1px solid ${bar.isCurrent ? 'oklch($1264 / 0.5)' : 'var(--border)'}`,
                 borderRadius: '4px 4px 0 0',
                 transition: 'height 700ms cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: bar.isCurrent ? '0 0 12px oklch(92% 0.2 245 / 0.35)' : 'none',
+                boxShadow: bar.isCurrent ? '0 0 12px oklch($1264 / 0.35)' : 'none',
               }} />
             </div>
           )
@@ -532,7 +532,7 @@ export function FinanceRoute() {
         {/* Subtle background glow blob */}
         <div style={{
           position: 'absolute', top: -60, right: -40, width: 280, height: 280,
-          background: 'radial-gradient(circle, oklch(92% 0.2 245 / 0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, oklch($1264 / 0.06) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -650,7 +650,7 @@ export function FinanceRoute() {
                       <RowBtn icon={<Download size={12} />} label="PDF" onClick={async () => {
                         const full = await FinanceService.getOffer(offer.id)
                         const acc = accounts.find(a => a.id === offer.accountId)
-                        if (acc) await downloadOfferPDF(full, profile, acc)
+                        if (acc) { const { downloadOfferPDF } = await import('@/components/finance/OfferPDF'); await downloadOfferPDF(full, profile, acc) }
                       }} />
                       {offer.status === 'accepted' && (
                         <RowBtn icon={<ChevronRight size={12} />} label="→ Rechnung" tone="accent"
@@ -790,7 +790,7 @@ export function FinanceRoute() {
                       <RowBtn icon={<Download size={12} />} label="PDF" onClick={async () => {
                         const full = await FinanceService.getInvoice(inv.id)
                         const acc = accounts.find(a => a.id === inv.accountId)
-                        if (acc) await downloadInvoicePDF(full, profile, acc)
+                        if (acc) { const { downloadInvoicePDF } = await import('@/components/finance/InvoicePDF'); await downloadInvoicePDF(full, profile, acc) }
                       }} />
                       {isAdmin && inv.isSuggestion && (
                         <RowBtn icon={<CheckCircle size={12} />} label="Freigeben" tone="ok"
@@ -1018,6 +1018,7 @@ function BatchExportModal({ invoices, accounts, profile, onClose }: BatchExportM
         if (acc) loaded.push({ data: full, account: acc })
       }
       const zipName = `Rechnungen_${from}_bis_${to}.zip`
+      const { batchExportInvoicesPDF } = await import('@/components/finance/InvoicePDF')
       await batchExportInvoicesPDF(loaded, profile, zipName)
       onClose()
     } finally {

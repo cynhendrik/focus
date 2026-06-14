@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Modal } from '@/components/ui/Sheet'
 import { useCustomersStore } from '@/store/customers.store'
 import type { Customer, CustomerStatus, Priority, UpsertCustomerPayload } from '@/types/customer.types'
 
@@ -79,16 +80,12 @@ export function CustomerModal({ customer, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div
-        className="bg-[var(--bg)] rounded-2xl w-[480px] shadow-2xl border border-[var(--border)] overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal open onClose={onClose} width={480} labelledBy="customer-modal-title">
         <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--text)]">
+          <h2 id="customer-modal-title" className="text-base font-semibold text-[var(--text)]">
             {customer ? 'Kunde bearbeiten' : 'Neuer Kunde'}
           </h2>
-          <button onClick={onClose} className="text-[var(--text2)] hover:text-[var(--text)] text-lg">✕</button>
+          <button onClick={onClose} aria-label="Schließen" className="text-[var(--text2)] hover:text-[var(--text)] text-lg">✕</button>
         </div>
 
         <div className="px-6 py-5 flex flex-col gap-3">
@@ -227,7 +224,6 @@ export function CustomerModal({ customer, onClose }: Props) {
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

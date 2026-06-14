@@ -4,17 +4,11 @@ import { useUiStore } from '@/store/ui.store'
 import { Mail, Video, Webhook, CalendarDays, Landmark, ShoppingBag } from 'lucide-react'
 import { IntegrationRow } from '@/components/integrations/IntegrationRow'
 import { ZoomSetupModal } from '@/components/integrations/ZoomSetupModal'
-import { WebhookInfoModal } from '@/components/integrations/WebhookInfoModal'
-
-const WEBHOOK_CONFIGURED = !!(
-  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_LEAD_WEBHOOK_SECRET
-)
 
 export function IntegrationenSettings() {
   const mailAccounts = useMailStore(s => s.accounts)
   const setAppView   = useUiStore(s => s.setAppView)
-  const [showZoom,    setShowZoom]    = useState(false)
-  const [showWebhook, setShowWebhook] = useState(false)
+  const [showZoom, setShowZoom] = useState(false)
 
   const hasMailAccount = mailAccounts.length > 0
 
@@ -26,7 +20,7 @@ export function IntegrationenSettings() {
           Integrationen
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.5 }}>
-          Verbinde externe Dienste mit Cynera.
+          Verbinde externe Dienste mit Cultera.
         </p>
       </div>
 
@@ -36,7 +30,7 @@ export function IntegrationenSettings() {
             icon={Mail}
             name="IMAP / SMTP"
             category="E-Mail"
-            description="Empfange und sende E-Mails direkt in Cynera über dein eigenes Postfach."
+            description="Empfange und sende E-Mails direkt in Cultera über dein eigenes Postfach."
             status={hasMailAccount ? 'connected' : 'disconnected'}
             connectedDetail={mailAccounts[0]?.email}
             onAction={() => setAppView('mail')}
@@ -57,12 +51,8 @@ export function IntegrationenSettings() {
             icon={Webhook}
             name="Webhook"
             category="Lead-Eingang"
-            description="Empfange Leads von deiner Website, Zapier oder externen Formularen."
-            status={WEBHOOK_CONFIGURED ? 'connected' : 'disconnected'}
-            connectedLabel="URL bereit"
-            connectedDetail="Kein Setup nötig — URL kopieren & eintragen"
-            onAction={WEBHOOK_CONFIGURED ? () => setShowWebhook(true) : undefined}
-            actionLabel="URL anzeigen"
+            description="Nicht in der Testversion verfügbar — kommt mit der offiziellen Veröffentlichung."
+            status="coming_soon"
           />
 
           <IntegrationRow
@@ -95,8 +85,7 @@ export function IntegrationenSettings() {
 
         </div>
 
-      {showZoom    && <ZoomSetupModal    onClose={() => setShowZoom(false)} />}
-      {showWebhook && <WebhookInfoModal  onClose={() => setShowWebhook(false)} />}
+      {showZoom && <ZoomSetupModal onClose={() => setShowZoom(false)} />}
     </div>
   )
 }

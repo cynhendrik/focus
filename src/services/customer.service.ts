@@ -7,6 +7,8 @@ function accountToCustomer(a: Account): Customer {
     id: a.id,
     name: a.name,
     company: a.kind === 'company' ? a.name : undefined,
+    email: a.email,
+    phone: a.phone,
     status: (a.status === 'prospect' ? 'lead' : a.status === 'churned' ? 'lost' : a.status) as Customer['status'],
     priority: (a.priority === 'vip' ? 'high' : a.priority) as Customer['priority'],
     tags: a.tags,
@@ -22,6 +24,7 @@ function accountToCustomer(a: Account): Customer {
     country: a.country,
     leadScore: a.leadScore,
     scoreFactors: a.scoreFactors,
+    archivedAt: a.archivedAt ?? null,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   }
@@ -50,11 +53,17 @@ export const CustomerService = {
       zip: payload.zip,
       city: payload.city,
       country: payload.country,
+      email: payload.email,
+      phone: payload.phone,
     }
     return invoke<Account>('upsert_account', { payload: accountPayload }).then(accountToCustomer)
   },
 
   delete(id: string, workspaceId: string): Promise<void> {
     return invoke<void>('delete_account', { id, workspaceId })
+  },
+
+  setArchived(id: string, archived: boolean): Promise<Customer> {
+    return invoke<Account>('cmd_set_account_archived', { id, archived }).then(accountToCustomer)
   },
 }

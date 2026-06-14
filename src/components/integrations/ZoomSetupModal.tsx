@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Copy, Check, X } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 
 const SUPABASE_URL   = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const WEBHOOK_SECRET = import.meta.env.VITE_LEAD_WEBHOOK_SECRET as string | undefined
@@ -20,12 +21,14 @@ export function ZoomSetupModal({ onClose }: { onClose: () => void }) {
     setTimeout(() => setCopied(false), 1800)
   }
 
+  const dialogRef = useDialogFocus(true, onClose)
+
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ width: '100%', maxWidth: 480, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Zoom einrichten" tabIndex={-1} style={{ width: '100%', maxWidth: 480, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Zoom einrichten</h2>

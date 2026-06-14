@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Copy, Check, X } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 
 const SUPABASE_URL   = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const WEBHOOK_SECRET = import.meta.env.VITE_LEAD_WEBHOOK_SECRET as string | undefined
 
 const EXAMPLE_PAYLOAD = `{
   "name": "Max Mustermann",
-  "email": "max@beispiel.de",
-  "source": "generic"
+  "email": "max@beispiel.de"
 }`
 
 function CopyUrl({ label, url }: { label: string; url: string }) {
@@ -35,16 +35,18 @@ export function WebhookInfoModal({ onClose }: { onClose: () => void }) {
   const base   = SUPABASE_URL ?? null
   const secret = WEBHOOK_SECRET ?? null
 
-  const zoomUrl    = base && secret ? `${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=zoom` : null
-  const genericUrl = base && secret ? `${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=generic` : null
+  const zoomUrl       = base && secret ? `${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=zoom` : null
+  const newsletterUrl = base && secret ? `${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=newsletter` : null
+  const genericUrl    = base && secret ? `${base}/functions/v1/lead-intake?workspace_id=${workspaceId}&secret=${secret}&source=generic` : null
   const configured = !!zoomUrl
+  const dialogRef = useDialogFocus(true, onClose)
 
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ width: '100%', maxWidth: 500, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Webhook" tabIndex={-1} style={{ width: '100%', maxWidth: 500, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Webhook</h2>
@@ -57,13 +59,19 @@ export function WebhookInfoModal({ onClose }: { onClose: () => void }) {
 
         {configured ? (
           <>
+            <CopyUrl label="Newsletter URL (WordPress, Wix, eigene Website)" url={newsletterUrl!} />
             <CopyUrl label="Zoom Webhook URL" url={zoomUrl!} />
-            <CopyUrl label="Generic Webhook URL (Wix, Zapier, Typeform)" url={genericUrl!} />
+            <CopyUrl label="Generic URL (Zapier, Typeform, Make)" url={genericUrl!} />
             <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Beispiel-Payload (POST, JSON)</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                Payload (POST · application/json)
+              </div>
               <pre style={{ margin: 0, padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', lineHeight: 1.6, overflow: 'auto' }}>
                 {EXAMPLE_PAYLOAD}
               </pre>
+              <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--fg-dim)', lineHeight: 1.5 }}>
+                Pflichtfeld: <code style={{ fontFamily: 'var(--font-mono)' }}>email</code> · Optional: <code style={{ fontFamily: 'var(--font-mono)' }}>name</code>, <code style={{ fontFamily: 'var(--font-mono)' }}>source_detail</code>
+              </p>
             </div>
           </>
         ) : (

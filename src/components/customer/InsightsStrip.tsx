@@ -34,7 +34,7 @@ const SEVERITY_COLOR: Record<InsightSeverity, string> = {
 const SEVERITY_TINT: Record<InsightSeverity, string> = {
   urgent:   'oklch(72% 0.18 25 / 0.08)',
   caution:  'oklch(82% 0.16 70 / 0.08)',
-  positive: 'oklch(92% 0.2 245 / 0.07)',
+  positive: 'oklch($1264 / 0.07)',
   neutral:  'oklch(100% 0 0 / 0.03)',
 }
 

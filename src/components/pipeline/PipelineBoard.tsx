@@ -23,7 +23,7 @@ function DroppableColumn({ stage, deals, onEdit, showStallWarnings }: {
     <div
       ref={setNodeRef}
       style={{
-        flex: 1, minWidth: 190, maxWidth: 240,
+        flex: 1, minWidth: 190,
         background: isOver ? 'rgba(255,255,255,0.04)' : 'transparent',
         borderRight: '1px solid var(--border)',
         padding: '14px 12px', transition: 'background 150ms',

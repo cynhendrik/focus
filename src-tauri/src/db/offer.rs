@@ -298,6 +298,7 @@ pub fn convert_to_invoice(
         notes: offer.notes.clone(),
         is_suggestion: Some(false),
         suggested_by: None,
+        number: None,
         items: invoice_items,
     };
 

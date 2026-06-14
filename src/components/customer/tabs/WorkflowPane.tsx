@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTodosStore } from '@/store/todos.store'
-import { useUiStore } from '@/store/ui.store'
 import { TasksHeader } from '@/components/tasks/TasksHeader'
 import { TasksListView } from '@/components/tasks/TasksListView'
 import { TasksBoardView } from '@/components/tasks/TasksBoardView'
@@ -12,9 +11,9 @@ interface Props { customerId: string }
 export function WorkflowPane({ customerId }: Props) {
   const loadForCustomer = useTodosStore(s => s.loadForCustomer)
   const allTodos        = useTodosStore(s => s.allTodos)
-  const tasksTab        = useUiStore(s => s.tasksTab)
 
-  const [cyOpen, setCyOpen] = useState(false)
+  const [cyOpen, setCyOpen]       = useState(false)
+  const [focusMode, setFocusMode] = useState(false)
 
   useEffect(() => {
     loadForCustomer(customerId)
@@ -50,11 +49,23 @@ export function WorkflowPane({ customerId }: Props) {
         completedToday={completedToday}
         plannedHours={plannedHours}
         onOpenCyPanel={() => setCyOpen(true)}
+        focusActive={focusMode}
+        onToggleFocus={() => setFocusMode(v => !v)}
       />
 
-      {tasksTab === 'list'  && <TasksListView  customerId={customerId} />}
-      {tasksTab === 'board' && <TasksBoardView customerId={customerId} />}
-      {tasksTab === 'focus' && <TasksFocusView customerId={customerId} />}
+      {focusMode ? (
+        <TasksFocusView customerId={customerId} />
+      ) : (
+        // Links: breite Arbeitsliste (Composer + Aufgaben). Rechts: die Stages
+        // nebeneinander als schmale Spalten.
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'minmax(440px, 1.2fr) minmax(360px, 1fr)',
+          gap: 24, alignItems: 'start',
+        }}>
+          <TasksListView customerId={customerId} defaultGroupBy="priority" />
+          <TasksBoardView customerId={customerId} showComposer={false} />
+        </div>
+      )}
 
       <CyPlanPanel open={cyOpen} onClose={() => setCyOpen(false)} customerId={customerId} />
     </div>

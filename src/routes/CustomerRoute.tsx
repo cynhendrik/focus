@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronLeft, ChevronDown, Mail as MailIcon, Phone, Clock, X,
-  DollarSign, CalendarClock, Trash2, User,
-  Target, CheckCircle, FileText, File, Mail, History, Euro,
+  DollarSign, CalendarClock, Trash2, User, Archive,
+  CheckCircle, FileText, File, Mail, History, Euro,
   type LucideIcon,
 } from 'lucide-react'
+import { useToastStore } from '@/store/toast.store'
 import type { CreateActivityPayload } from '@/types/pipeline.types'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore, type CustomerTab } from '@/store/ui.store'
@@ -24,24 +25,20 @@ import { useAuthStore } from '@/store/auth.store'
 import { FinanceService } from '@/services/finance.service'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
-import { CockpitPane } from '@/components/customer/tabs/CockpitPane'
 import { WorkflowPane } from '@/components/customer/tabs/WorkflowPane'
 import { CustomerNotesPane } from '@/components/notes/CustomerNotesPane'
 import { DateienPane } from '@/components/customer/tabs/DateienPane'
 import { TimelinePane } from '@/components/customer/tabs/TimelinePane'
 import { FinanzPane } from '@/components/customer/tabs/FinanzPane'
-import { KommunikationPane } from '@/components/chat/KommunikationPane'
 import { PulseBar } from '@/components/customer/PulseBar'
 import { PrimaryContact } from '@/components/customer/PrimaryContact'
 
 const TAB_DEFS: { id: CustomerTab; label: string; icon: LucideIcon }[] = [
-  { id: 'cockpit',       label: 'Cockpit',       icon: Target      },
-  { id: 'tasks',         label: 'Aufgaben',      icon: CheckCircle },
-  { id: 'notizen',       label: 'Notizen',       icon: FileText    },
-  { id: 'dokumente',     label: 'Dokumente',     icon: File        },
-  { id: 'kommunikation', label: 'Kommunikation', icon: Mail        },
-  { id: 'verlauf',       label: 'Verlauf',       icon: History     },
-  { id: 'finanzen',      label: 'Finanzen',      icon: Euro        },
+  { id: 'verlauf',   label: 'Aktivitäten', icon: History     },
+  { id: 'tasks',     label: 'Aufgaben',    icon: CheckCircle },
+  { id: 'notizen',   label: 'Notizen',     icon: FileText    },
+  { id: 'dokumente', label: 'Dokumente',   icon: File        },
+  { id: 'finanzen',  label: 'Finanzen',    icon: Euro        },
 ]
 
 interface Props { customerId: string }
@@ -62,6 +59,8 @@ export function CustomerRoute({ customerId }: Props) {
   const user           = useAuthStore(s => s.user)
   const createActivity = useActivitiesStore(s => s.create)
   const removeCustomer = useCustomersStore(s => s.remove)
+  const setArchived    = useCustomersStore(s => s.setArchived)
+  const showToast      = useToastStore(s => s.show)
   const aktionenRef    = useRef<HTMLDivElement>(null)
   const anrufenRef     = useRef<HTMLDivElement>(null)
   const contacts       = useContactsStore(s => s.contacts)
@@ -109,16 +108,32 @@ export function CustomerRoute({ customerId }: Props) {
   const loadContacts   = useContactsStore(s => s.loadByAccount)
 
   useEffect(() => {
-    loadTodos(customerId)
-    loadNotes(customerId)
-    loadDeadlines(customerId)
-    loadFollowUps(customerId)
-    loadFolders(customerId)
+    // Wave 1 — what the default tab (Aktivitäten) and the header badges /
+    // primary contact need on first paint. Keeps the customer switch snappy.
     loadActivities(customerId)
-    loadDeals(customerId)
-    loadEmails()
+    loadTodos(customerId)
     loadContacts(customerId)
     if (workspaceId) loadStages(workspaceId)
+
+    // Wave 2 — data for the other tabs (Notizen / Dokumente / Finanzen-Deals /
+    // Mail). Deferred past first paint via requestIdleCallback so 10 parallel
+    // store loads no longer hit on every customer click (mirrors App.tsx).
+    const ric: (cb: () => void) => number =
+      (window as unknown as { requestIdleCallback?: (cb: () => void) => number })
+        .requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200))
+    const handle = ric(() => {
+      loadNotes(customerId)
+      loadDeadlines(customerId)
+      loadFollowUps(customerId)
+      loadFolders(customerId)
+      loadDeals(customerId)
+      loadEmails()
+    })
+    return () => {
+      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback
+      if (cic) cic(handle)
+      else window.clearTimeout(handle)
+    }
   }, [customerId, workspaceId])
 
   // Badges: live-Zaehler fuer Tasks (offen) und Finanzen (offen/ueberfaellig).
@@ -139,22 +154,34 @@ export function CustomerRoute({ customerId }: Props) {
     finanzen: openInvoiceCount || undefined,
   }), [openTaskCount, openInvoiceCount])
 
-  if (!customer) return <div className="p-6 text-[var(--text2)]">Kunde nicht gefunden</div>
+  if (!customer) return (
+    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
+      <p style={{ fontSize: 14, color: 'var(--fg-dim)', margin: 0 }}>
+        Dieser Kunde existiert nicht (mehr).
+      </p>
+      <button
+        className="btn-primary"
+        onClick={() => setSelected(null)}
+        style={{ fontSize: 13, padding: '8px 16px' }}
+      >
+        ← Zur Kundenliste
+      </button>
+    </div>
+  )
 
   const renderPane = () => {
     switch (activeTab) {
-      case 'cockpit':       return <CockpitPane       customerId={customerId} />
       case 'tasks':         return <WorkflowPane      customerId={customerId} />
       case 'notizen':       return <CustomerNotesPane accountId={customerId} />
       case 'dokumente':     return <DateienPane       customerId={customerId} />
-      case 'kommunikation': return <KommunikationPane customerId={customerId} />
+      case 'kommunikation': // legacy-redirect
       case 'verlauf':       return <TimelinePane      customerId={customerId} />
       case 'finanzen':      return <FinanzPane        customerId={customerId} />
     }
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg)' }}>
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg)', width: '100%', maxWidth: 1560, margin: '0 auto' }}>
       {/* Header */}
       <div className="detail-head">
         <button className="back" onClick={() => setSelected(null)}>
@@ -300,6 +327,23 @@ export function CustomerRoute({ customerId }: Props) {
                 <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
 
                 <AktionItem
+                  icon={<Archive size={14} />}
+                  label={customer.archivedAt ? 'Reaktivieren' : 'Archivieren'}
+                  onClick={async () => {
+                    setAktionenOpen(false)
+                    const willArchive = !customer.archivedAt
+                    try {
+                      await setArchived(customerId, willArchive)
+                      showToast({
+                        message: willArchive ? `${customer.name} archiviert.` : `${customer.name} reaktiviert.`,
+                        variant: 'success',
+                      })
+                    } catch {
+                      showToast({ message: 'Aktion fehlgeschlagen.', variant: 'error' })
+                    }
+                  }}
+                />
+                <AktionItem
                   icon={<Trash2 size={14} />} label="Löschen"
                   danger onClick={() => { setShowDeleteModal(true); setAktionenOpen(false) }}
                 />
@@ -308,6 +352,33 @@ export function CustomerRoute({ customerId }: Props) {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Archiviert-Banner */}
+      {customer.archivedAt && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 24px', background: 'var(--surface-2)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: 12, color: 'var(--fg-dim)',
+        }}>
+          <Archive size={13} />
+          <span>Dieser Kunde ist archiviert — er taucht nicht in der aktiven Liste auf, alle Daten bleiben erhalten.</span>
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 11, padding: '3px 10px', marginLeft: 'auto' }}
+            onClick={async () => {
+              try {
+                await setArchived(customerId, false)
+                showToast({ message: `${customer.name} reaktiviert.`, variant: 'success' })
+              } catch {
+                showToast({ message: 'Aktion fehlgeschlagen.', variant: 'error' })
+              }
+            }}
+          >
+            Reaktivieren
+          </button>
+        </div>
+      )}
 
       {/* Tab bar — flach, underline-akzentuiert, Badges fuer Tasks + Finanzen */}
       <div style={{
@@ -357,7 +428,7 @@ export function CustomerRoute({ customerId }: Props) {
                   position: 'absolute', left: 18, right: 18, bottom: -1,
                   height: 2, borderRadius: 2,
                   background: 'var(--accent)',
-                  boxShadow: '0 0 12px oklch(92% 0.2 245 / 0.5)',
+                  boxShadow: '0 0 12px oklch($1264 / 0.5)',
                 }} />
               )}
             </button>

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { CustomerService } from '@/services/customer.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useMailStore } from '@/store/mail.store'
 import { log } from '@/lib/logger'
 import type { Customer, UpsertCustomerPayload } from '@/types/customer.types'
 import type { AppError } from '@/types/error.types'
@@ -14,6 +15,7 @@ interface CustomersState {
   init: () => Promise<void>
   upsert: (payload: Omit<UpsertCustomerPayload, 'workspaceId' | 'createdBy'> & { id?: string }) => Promise<void>
   remove: (id: string) => Promise<void>
+  setArchived: (id: string, archived: boolean) => Promise<void>
 }
 
 function upsertById(list: Customer[], updated: Customer): Customer[] {
@@ -59,6 +61,14 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
     try {
       const updated = await CustomerService.upsert({ ...payload, workspaceId, createdBy })
       set(s => ({ customers: upsertById(s.customers, updated) }))
+      // Kunde angelegt/geändert → Mail-Zuordnungen neu bewerten. IMMER feuern
+      // (auch beim Entfernen der E-Mail, damit alte Zuordnungen wieder abfallen).
+      // Fire-and-forget, blockiert das Speichern nicht.
+      {
+        const refs = useCustomersStore.getState().customers
+          .map(c => ({ id: c.id, email: c.email ?? null }))
+        void useMailStore.getState().rematchCustomers(JSON.stringify(refs)).catch(() => {})
+      }
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
@@ -76,6 +86,18 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to delete customer', { id, error })
+      throw err
+    }
+  },
+
+  setArchived: async (id, archived) => {
+    try {
+      const updated = await CustomerService.setArchived(id, archived)
+      set(s => ({ customers: upsertById(s.customers, updated) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to (un)archive customer', { id, archived, error })
       throw err
     }
   },

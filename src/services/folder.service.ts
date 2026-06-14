@@ -37,4 +37,11 @@ export const FolderService = {
       mimeType: params.mimeType ?? null,
     })
   },
+  importFromPath(params: { customerId: string; folderId?: string | null; srcPath: string }): Promise<FileEntry> {
+    return invoke<FileEntry>('cmd_import_file_from_path', {
+      accountId: params.customerId,
+      folderId: params.folderId ?? null,
+      srcPath: params.srcPath,
+    })
+  },
 }

@@ -370,7 +370,7 @@ export function MailRoute() {
               onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-dim)' }}>
               {t.label}
-              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'oklch(92% 0.2 245)', boxShadow: '0 0 12px oklch(92% 0.2 245 / 0.5)' }} />}
+              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'oklch($1264)', boxShadow: '0 0 12px oklch($1264 / 0.5)' }} />}
             </button>
           )
         })}
@@ -526,7 +526,7 @@ export function MailRoute() {
                   </button>
                 </div>
                 <div style={{ height: 4, borderRadius: 99, background: 'var(--surface-2)', overflow: 'hidden', marginBottom: 5 }}>
-                  <div style={{ height: '100%', width: isSyncing && syncProgress?.total ? `${(syncProgress.done / syncProgress.total) * 100}%` : '40%', background: 'oklch(92% 0.2 245)', borderRadius: 99, transition: 'width 300ms' }} />
+                  <div style={{ height: '100%', width: isSyncing && syncProgress?.total ? `${(syncProgress.done / syncProgress.total) * 100}%` : '40%', background: 'oklch($1264)', borderRadius: 99, transition: 'width 300ms' }} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
                   {isSyncing ? 'Synchronisiert…' : foldersLastFetched > 0 ? `Synchronisiert · ${formatLastFetched(foldersLastFetched)}` : 'Bereit'}

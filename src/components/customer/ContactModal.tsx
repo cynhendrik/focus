@@ -4,6 +4,7 @@ import {
   Trash2, X, Star, Link as LinkIcon, Mail, Phone, MessageCircle, Users, Cake, Zap,
 } from 'lucide-react'
 import { useContactsStore } from '@/store/contacts.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { Contact, DecisionPower, PreferredChannel } from '@/types/contact.types'
 
 interface Props {
@@ -120,6 +121,15 @@ export function ContactModal({ accountId, contact, onClose }: Props) {
     }
   }
 
+  // Accessibility: trap+restore focus and close on Escape (the modal is mounted
+  // conditionally by its parent, so it is always "open" while rendered).
+  const cardRef = useDialogFocus(true)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <AnimatePresence>
       <motion.div
@@ -137,6 +147,11 @@ export function ContactModal({ accountId, contact, onClose }: Props) {
         }}
       >
         <motion.div
+          ref={cardRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-modal-title"
+          tabIndex={-1}
           initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1,    y: 0 }}
           exit   ={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -169,7 +184,7 @@ export function ContactModal({ accountId, contact, onClose }: Props) {
               {initials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.02em' }}>
+              <h2 id="contact-modal-title" style={{ margin: 0, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.02em' }}>
                 {contact ? 'Kontakt bearbeiten' : 'Neuer Kontakt'}
               </h2>
               <p style={{ margin: '3px 0 0', fontSize: 11.5, color: 'var(--fg-dim)',
@@ -177,7 +192,7 @@ export function ContactModal({ accountId, contact, onClose }: Props) {
                 {contact ? `seit ${new Date(contact.createdAt).toLocaleDateString('de-DE')}` : 'Eine Person zum Account'}
               </p>
             </div>
-            <button onClick={onClose} className="icon-btn" style={{ width: 32, height: 32 }}>
+            <button onClick={onClose} aria-label="Schließen" className="icon-btn" style={{ width: 32, height: 32 }}>
               <X size={14} />
             </button>
           </div>

@@ -5,6 +5,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { X, Trash2 } from 'lucide-react'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { NoteDoc } from '@/types/notes-module.types'
 
 interface Props {
@@ -53,6 +54,8 @@ export function NoteDocModal({ doc, onSave, onDelete, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler, true)
   }, [onClose])
 
+  const dialogRef = useDialogFocus(true)
+
   const handleSave = async () => {
     if (!title.trim()) return
     setSaving(true)
@@ -88,6 +91,11 @@ export function NoteDocModal({ doc, onSave, onDelete, onClose }: Props) {
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Dokument"
+        tabIndex={-1}
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: 720, maxHeight: '85vh',

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Focus",
+  "productName": "Cultera Focus",
   "version": "2.0.0",
   "identifier": "com.cynera.focus",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Focus",
+        "title": "Cultera Focus",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
@@ -40,11 +40,11 @@
       "icons/Icon.ico",
       "icons/icon.icns"
     ],
-    "publisher": "Cynera",
-    "copyright": "© 2026 Cynera",
+    "publisher": "Cultera",
+    "copyright": "© 2026 Cultera",
     "category": "Business",
     "shortDescription": "Kunden- und Projektverwaltung für Selbstständige",
-    "longDescription": "Focus ist eine Desktop-App für Selbstständige und kleine Agenturen zur professionellen Kunden- und Projektverwaltung.",
+    "longDescription": "Cultera Focus ist eine Desktop-App für Selbstständige und kleine Agenturen zur professionellen Kunden- und Projektverwaltung.",
     "windows": {
       "nsis": {
         "installMode": "perMachine",

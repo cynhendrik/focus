@@ -1,7 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { parseTaskText } from './prefix-parser'
 
 describe('parseTaskText', () => {
+  // Datums-Tests gegen einen festen Zeitpunkt verankern, sonst kippen sie am
+  // Tageswechsel (Parser und Test-Helfer werteten `new Date()` an leicht
+  // versetzten Momenten aus → Off-by-one). Mittag UTC vermeidet jede
+  // Mitternachtsgrenze, lokal wie UTC.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('parses plain title', () => {
     const r = parseTaskText('Brand Guidelines')
     expect(r.title).toBe('Brand Guidelines')

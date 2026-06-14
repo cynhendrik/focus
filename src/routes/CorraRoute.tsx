@@ -8,6 +8,8 @@ import { useMailStore }     from '@/store/mail.store'
 import { useDealsStore }    from '@/store/deals.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useCrmStore }      from '@/store/crm.store'
+import { useLeadsStore }    from '@/store/leads.store'
 import { useToastStore }    from '@/store/toast.store'
 import { getApiKey, getModel, MissingApiKeyError } from '@/lib/ai/briefing'
 import {
@@ -46,6 +48,8 @@ export function CorraRoute() {
   const deals          = useDealsStore(s => s.deals)
   const calendarEvents = useCalendarStore(s => s.events)
   const accounts       = useAccountsStore(s => s.accounts)
+  const followUps      = useCrmStore(s => s.allFollowUps)
+  const leads          = useLeadsStore(s => s.leads)
   const showToast      = useToastStore(s => s.show)
 
   const handleSend = useCallback(async (text: string) => {
@@ -63,7 +67,7 @@ export function CorraRoute() {
       isFirst.current = false
 
       const ctx = buildCorraIntelligenceContext({
-        todos, invoices, emails, deals, calendarEvents, accounts,
+        todos, invoices, emails, deals, calendarEvents, accounts, followUps, leads,
       })
       const ctxWithFlag = firstTurn ? `[ERSTER_TURN]\n\n${ctx}` : ctx
 
@@ -103,7 +107,7 @@ export function CorraRoute() {
     } finally {
       setLoading(false)
     }
-  }, [phase, messages, todos, invoices, emails, deals, calendarEvents, accounts])
+  }, [phase, messages, todos, invoices, emails, deals, calendarEvents, accounts, followUps, leads])
 
   const handleExecuteAction = useCallback(async (action: CorraActionItem) => {
     try {
@@ -127,6 +131,17 @@ export function CorraRoute() {
           bucket: 'today', priority: 'p1', checklist: [], tags: [],
         })
         showToast({ message: `Task für ${action.label} angelegt.`, variant: 'success' })
+      } else if (action.type === 'followup') {
+        const fu   = followUps.find(f => f.id === action.id)
+        const lead = fu ? leads.find(l => l.id === fu.customerId) : undefined
+        await upsertTodo({
+          title: `Follow-up: ${lead?.name ?? action.label}`,
+          actionType: 'followup',
+          sourceRef: action.id,
+          customerId: fu?.customerId,
+          bucket: 'today', priority: 'p1', checklist: [], tags: [],
+        })
+        showToast({ message: `Follow-up für ${lead?.name ?? action.label} angelegt.`, variant: 'success' })
       } else if (action.type === 'todo') {
         await upsertTodo({
           title: action.label,
@@ -137,7 +152,7 @@ export function CorraRoute() {
     } catch {
       showToast({ message: 'Aktion konnte nicht ausgeführt werden.', variant: 'error' })
     }
-  }, [invoices, emails, upsertTodo, showToast])
+  }, [invoices, emails, followUps, leads, upsertTodo, showToast])
 
   const handleClear = useCallback(() => {
     setMessages([makeGreeting()])

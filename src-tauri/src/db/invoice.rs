@@ -59,6 +59,7 @@ pub struct UpsertInvoicePayload {
     pub created_by: String,
     pub account_id: String,
     pub deal_id: Option<String>,
+    pub number: Option<String>,
     pub date: String,
     pub due_date: String,
     pub status: Option<String>,
@@ -246,7 +247,10 @@ pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<Invoic
     )?;
     // Assign invoice number immediately when creating a published (non-draft) invoice
     if !is_suggestion && status == "open" {
-        let number = next_invoice_number(conn, &payload.workspace_id)?;
+        let number = match payload.number.as_deref().filter(|s| !s.trim().is_empty()) {
+            Some(n) => n.to_string(),
+            None    => next_invoice_number(conn, &payload.workspace_id)?,
+        };
         conn.execute(
             "UPDATE invoices SET number=?1 WHERE id=?2",
             rusqlite::params![number, id],
@@ -281,7 +285,10 @@ pub fn update(conn: &Connection, id: &str, payload: UpsertInvoicePayload) -> Res
             |r| r.get(0),
         ).map_err(|_| AppError::NotFound(format!("Invoice {id} not found")))?;
         if current_number.is_none() {
-            let number = next_invoice_number(conn, &payload.workspace_id)?;
+            let number = match payload.number.as_deref().filter(|s| !s.trim().is_empty()) {
+                Some(n) => n.to_string(),
+                None    => next_invoice_number(conn, &payload.workspace_id)?,
+            };
             conn.execute(
                 "UPDATE invoices SET number=?1 WHERE id=?2",
                 rusqlite::params![number, id],
@@ -532,6 +539,7 @@ mod tests {
             notes: None,
             is_suggestion: None,
             suggested_by: None,
+            number: None,
             items,
         }
     }
@@ -772,6 +780,7 @@ mod tests {
             notes: None,
             is_suggestion: None,
             suggested_by: None,
+            number: None,
             items: vec![UpsertInvoiceItemPayload {
                 id: None,
                 title: "Visitenkarten".into(),

@@ -42,9 +42,11 @@ interface MailState {
   addAccount: (payload: AddAccountPayload) => Promise<void>
   removeAccount: (id: string) => Promise<void>
   sync: (customersJson: string) => Promise<void>
+  rematchCustomers: (customersJson: string) => Promise<number>
   setSyncProgress: (p: SyncProgress | null) => void
   markRead: (emailId: string, isRead: boolean) => void
   assignCustomer: (emailId: string, customerId: string | null) => Promise<void>
+  setNotALead: (emailId: string, value: boolean) => Promise<void>
   deleteEmail: (emailId: string) => Promise<void>
   sendEmail: (payload: SendEmailPayload) => Promise<void>
   getAttachments: (emailId: string) => Promise<void>
@@ -127,6 +129,8 @@ export const useMailStore = create<MailState>()((set, get) => ({
     ) {
       set({ isFolderLoading: true })
       try {
+        // Ohne Matching — der periodische Auto-Sync (alle 5 Min, mit Kundenliste)
+        // ordnet die hier geholten Mails spätestens beim nächsten Lauf zu.
         await MailService.sync(selectedAccountId, '[]', folder)
         set(s => ({ syncedFolders: new Set([...s.syncedFolders, folder]) }))
         await get().loadEmails()
@@ -209,6 +213,12 @@ export const useMailStore = create<MailState>()((set, get) => ({
     }
   },
 
+  rematchCustomers: async (customersJson) => {
+    const n = await MailService.rematchCustomers(customersJson)
+    if (n > 0) get().loadEmails()
+    return n
+  },
+
   setSyncProgress: (p) => set({ syncProgress: p }),
 
   markRead: (emailId, isRead) => {
@@ -219,6 +229,19 @@ export const useMailStore = create<MailState>()((set, get) => ({
   assignCustomer: async (emailId, customerId) => {
     await MailService.assignCustomer(emailId, customerId)
     set(s => ({ emails: s.emails.map(e => e.id === emailId ? { ...e, customerId } : e) }))
+  },
+
+  setNotALead: async (emailId, value) => {
+    // Optimistisch — die Newcomer-Ansicht filtert nach diesem Flag.
+    set(s => ({ emails: s.emails.map(e => e.id === emailId ? { ...e, notALead: value } : e) }))
+    try {
+      await MailService.setNotALead(emailId, value)
+    } catch (err) {
+      // Rollback bei Fehler.
+      set(s => ({ emails: s.emails.map(e => e.id === emailId ? { ...e, notALead: !value } : e) }))
+      log.error('Failed to set not_a_lead', { err })
+      throw err
+    }
   },
 
   deleteEmail: async (emailId) => {

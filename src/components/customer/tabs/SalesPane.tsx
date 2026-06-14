@@ -468,8 +468,9 @@ export function SalesPane({ customerId }: Props) {
             {closedDeals.length > 0 && (
               <div style={{ marginTop: 4 }}>
                 {closedDeals.map(deal => (
-                  <div key={deal.id} onClick={() => setEditDeal(deal)} style={{
+                  <button type="button" key={deal.id} onClick={() => setEditDeal(deal)} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    width: '100%', textAlign: 'left',
                     padding: '5px 10px', borderRadius: 7, marginBottom: 3,
                     cursor: 'pointer', opacity: 0.5,
                   }}>
@@ -477,7 +478,7 @@ export function SalesPane({ customerId }: Props) {
                     <span style={{ fontSize: 10, fontWeight: 700, color: deal.stage === 'won' ? 'var(--accent)' : 'var(--fg-dim)' }}>
                       {deal.stage === 'won' ? '✓ Gewonnen' : 'Lost'}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -521,12 +522,12 @@ export function SalesPane({ customerId }: Props) {
                 </div>
               )}
               {openFollowUps.length === 0 && doneFollowUps.length === 0 && !showFuForm ? (
-                <div onClick={() => setShowFuForm(true)} style={{
-                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                <button type="button" onClick={() => setShowFuForm(true)} style={{
+                  width: '100%', padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
                   cursor: 'pointer', textAlign: 'center', borderBottom: '1px solid var(--border)',
                 }}>
                   Keine Follow-ups — klicken zum Erstellen
-                </div>
+                </button>
               ) : (
                 <>
                   {openFollowUps.map(fu => (
@@ -557,12 +558,12 @@ export function SalesPane({ customerId }: Props) {
           {openSects.has('calls') && (
             <div>
               {callActivities.length === 0 ? (
-                <div onClick={() => setActModal('call')} style={{
-                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                <button type="button" onClick={() => setActModal('call')} style={{
+                  width: '100%', padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
                   cursor: 'pointer', textAlign: 'center', borderBottom: '1px solid var(--border)',
                 }}>
                   Noch kein Anruf oder Meeting — jetzt erfassen
-                </div>
+                </button>
               ) : (
                 callActivities.map(item => (
                   <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />
@@ -585,12 +586,12 @@ export function SalesPane({ customerId }: Props) {
             <div>
               <WhatsAppPlaceholder />
               {emailActivities.length === 0 ? (
-                <div onClick={() => setActModal('email')} style={{
-                  padding: '10px 0', color: 'var(--fg-dim)', fontSize: 11,
+                <button type="button" onClick={() => setActModal('email')} style={{
+                  width: '100%', textAlign: 'left', padding: '10px 0', color: 'var(--fg-dim)', fontSize: 11,
                   cursor: 'pointer', borderBottom: '1px solid var(--border)',
                 }}>
                   Keine E-Mails protokolliert
-                </div>
+                </button>
               ) : (
                 emailActivities.map(item => (
                   <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />
@@ -612,12 +613,12 @@ export function SalesPane({ customerId }: Props) {
           {openSects.has('notes') && (
             <div>
               {noteActivities.length === 0 ? (
-                <div onClick={() => setActModal('note')} style={{
-                  padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
+                <button type="button" onClick={() => setActModal('note')} style={{
+                  width: '100%', padding: '12px 0', color: 'var(--fg-dim)', fontSize: 11,
                   cursor: 'pointer', textAlign: 'center',
                 }}>
                   Noch keine Notizen — jetzt erstellen
-                </div>
+                </button>
               ) : (
                 noteActivities.map(item => (
                   <ActivityItem key={item.id} item={item} onRemove={() => remove(item.id)} />

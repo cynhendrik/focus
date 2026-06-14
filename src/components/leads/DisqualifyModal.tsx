@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { Lead } from '@/types/lead.types'
 
 interface Props {
@@ -27,6 +28,8 @@ export function DisqualifyModal({ lead, onConfirm, onCancel }: Props) {
     }
   }
 
+  const dialogRef = useDialogFocus(true, onCancel)
+
   return (
     <div
       style={{
@@ -36,7 +39,13 @@ export function DisqualifyModal({ lead, onConfirm, onCancel }: Props) {
       }}
       onClick={e => e.target === e.currentTarget && onCancel()}
     >
-      <div style={{
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Wann re-engagen?"
+        tabIndex={-1}
+        style={{
         width: '100%', maxWidth: 360,
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 16, padding: 24,

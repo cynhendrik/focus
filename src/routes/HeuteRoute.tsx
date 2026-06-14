@@ -4,7 +4,10 @@ import { RefreshCw, Sparkles } from 'lucide-react'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { useTodosStore } from '@/store/todos.store'
+import { useCrmStore } from '@/store/crm.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { useToastStore } from '@/store/toast.store'
+import { CrmService } from '@/services/crm.service'
 import type { UpsertTodoPayload } from '@/types/todo.types'
 
 function HeuteEmpty({ onReshuffle }: { onReshuffle: () => void }) {
@@ -60,6 +63,9 @@ export function HeuteRoute() {
 
   const upsertTodo  = useTodosStore(s => s.upsert)
   const allTodos    = useTodosStore(s => s.allTodos)
+  const allFollowUps = useCrmStore(s => s.allFollowUps)
+  const reloadCrm   = useCrmStore(s => s.loadAll)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const showToast   = useToastStore(s => s.show)
 
   const advance = useCallback((dir: 1 | -1 = 1) => {
@@ -90,6 +96,15 @@ export function HeuteRoute() {
           }
           await upsertTodo(payload)
         }
+      } else if (item.type === 'lead_followup') {
+        const fu = allFollowUps.find(f => f.id === item.id)
+        if (fu) {
+          await CrmService.upsert({
+            id: fu.id, customerId: fu.customerId, title: fu.title,
+            dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
+          })
+          if (workspaceId) await reloadCrm(workspaceId)
+        }
       }
       // invoice_reminder: sending the mail is the action — no status change needed here
     } catch {
@@ -97,7 +112,7 @@ export function HeuteRoute() {
     }
 
     advance(1)
-  }, [items, index, allTodos, upsertTodo, advance, showToast])
+  }, [items, index, allTodos, allFollowUps, workspaceId, upsertTodo, reloadCrm, advance, showToast])
 
   const handleSkip = useCallback(() => {
     advance(1)

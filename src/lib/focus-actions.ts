@@ -21,7 +21,7 @@ const CONFIGS: Record<FocusActionType, FocusActionConfig> = {
   invoice:  { label: 'Rechnung erstellen',  icon: 'FileText', customerTab: 'finanzen',       globalView: 'invoices'  },
   offer:    { label: 'Angebot erstellen',   icon: 'Tag',      customerTab: 'finanzen',       globalView: 'invoices'  },
   mail:     { label: 'Mail öffnen',         icon: 'Mail',     customerTab: 'kommunikation',  globalView: 'mail'      },
-  call:     { label: 'Kunden öffnen',       icon: 'Phone',    customerTab: 'cockpit',        globalView: 'clients'   },
+  call:     { label: 'Kunden öffnen',       icon: 'Phone',    customerTab: 'verlauf',        globalView: 'clients'   },
   followup: { label: 'Nachfassen',          icon: 'Reply',    customerTab: 'kommunikation',  globalView: 'followups' },
 }
 

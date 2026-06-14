@@ -27,7 +27,7 @@ pub async fn run_loop(app: tauri::AppHandle, state: SyncState, pool: DbPool) {
             .unwrap_or(false);
 
         if is_online != was_online {
-            let _ = app.emit("cynera://connectivity-changed", is_online);
+            let _ = app.emit("cultera://connectivity-changed", is_online);
             was_online = is_online;
         }
 
@@ -37,7 +37,7 @@ pub async fn run_loop(app: tauri::AppHandle, state: SyncState, pool: DbPool) {
             } else {
                 let conn = pool.conn();
                 if let Ok(count) = super::get_pending_count(&conn) {
-                    let _ = app.emit("cynera://pending-count", count);
+                    let _ = app.emit("cultera://pending-count", count);
                 }
             }
         }

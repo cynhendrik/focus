@@ -57,7 +57,7 @@ export function AkquiseRoute() {
               <t.icon size={14} />
               {t.label}
               {b ? <span style={{ fontSize: 11, fontWeight: 700, minWidth: 18, height: 18, borderRadius: 99, background: active ? 'var(--accent)' : 'var(--surface-3)', color: active ? 'var(--accent-ink)' : 'var(--fg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', fontFamily: 'var(--font-mono)' }}>{b}</span> : null}
-              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'oklch(92% 0.2 245)', boxShadow: '0 0 12px oklch(92% 0.2 245 / 0.5)' }} />}
+              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'oklch($1264)', boxShadow: '0 0 12px oklch($1264 / 0.5)' }} />}
             </button>
           )
         })}

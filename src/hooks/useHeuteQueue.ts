@@ -5,6 +5,8 @@ import { useMailStore } from '@/store/mail.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useCrmStore } from '@/store/crm.store'
+import { useLeadsStore } from '@/store/leads.store'
 import { fetchHeuteQueue, staticHeuteQueue } from '@/lib/ai/heute-queue'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
 import { MissingApiKeyError } from '@/lib/ai/briefing'
@@ -23,6 +25,8 @@ export function useHeuteQueue() {
       deals:          useDealsStore.getState().deals,
       calendarEvents: useCalendarStore.getState().events,
       accounts:       useAccountsStore.getState().accounts,
+      followUps:      useCrmStore.getState().allFollowUps,
+      leads:          useLeadsStore.getState().leads,
     }
     try {
       const queue = await fetchHeuteQueue(input)

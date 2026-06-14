@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useLeadsStore } from '@/store/leads.store'
+import { leadToUpsertPayload } from '@/lib/lead-payload'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { Lead } from '@/types/lead.types'
 import type { ActivityType } from '@/types/pipeline.types'
 
@@ -33,12 +36,43 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const isLoading      = useActivitiesStore(s => s.isLoading)
   const loadActivities = useActivitiesStore(s => s.loadForCustomer)
   const createActivity = useActivitiesStore(s => s.create)
+  const upsertLead     = useLeadsStore(s => s.upsert)
+  const dialogRef      = useDialogFocus(true)
 
   const [actType, setActType]   = useState<ActivityType>('call')
   const [title, setTitle]       = useState('')
   const [dueAt, setDueAt]       = useState('')
   const [saving, setSaving]     = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Local mirror of the phone — the modal receives `lead` as a snapshot, so
+  // edits would otherwise not show until the board re-opens the modal.
+  const [phone, setPhone]             = useState(lead.phone ?? '')
+  const [editingPhone, setEditingPhone] = useState(false)
+  const [phoneDraft, setPhoneDraft]   = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneError, setPhoneError]   = useState<string | null>(null)
+
+  function startEditPhone() {
+    setPhoneDraft(phone)
+    setPhoneError(null)
+    setEditingPhone(true)
+  }
+
+  async function savePhone() {
+    const next = phoneDraft.trim()
+    setPhoneSaving(true)
+    setPhoneError(null)
+    try {
+      await upsertLead(leadToUpsertPayload(lead, { phone: next || undefined }))
+      setPhone(next)
+      setEditingPhone(false)
+    } catch (err) {
+      setPhoneError(err instanceof Error ? err.message : 'Fehler beim Speichern')
+    } finally {
+      setPhoneSaving(false)
+    }
+  }
 
   useEffect(() => {
     loadActivities(lead.id)
@@ -83,7 +117,13 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={lead.name}
+        tabIndex={-1}
+        style={{
         width: '100%', maxWidth: 480,
         background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 16, padding: 0,
@@ -114,7 +154,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
           </div>
 
           {/* Contact info */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 14 }}>
             {lead.email && (
               <a
                 href={`mailto:${lead.email}`}
@@ -128,23 +168,86 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
                 ✉️ {lead.email}
               </a>
             )}
-            {lead.phone && (
-              <a
-                href={`tel:${lead.phone}`}
+
+            {/* Phone — editable inline */}
+            {editingPhone ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  className="mock-input"
+                  type="tel"
+                  value={phoneDraft}
+                  onChange={e => setPhoneDraft(e.target.value)}
+                  placeholder="+49 151 1234567"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') savePhone()
+                    if (e.key === 'Escape') { e.stopPropagation(); setEditingPhone(false) }
+                  }}
+                  style={{ width: 170, fontSize: 12, padding: '5px 10px' }}
+                />
+                <button
+                  className="btn-primary"
+                  onClick={savePhone}
+                  disabled={phoneSaving}
+                  style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0 }}
+                >
+                  {phoneSaving ? '…' : 'OK'}
+                </button>
+                <button
+                  className="btn-ghost"
+                  onClick={() => setEditingPhone(false)}
+                  disabled={phoneSaving}
+                  style={{ fontSize: 11, padding: '5px 8px', flexShrink: 0 }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            ) : phone ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <a
+                  href={`tel:${phone}`}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
+                    background: 'var(--accent-soft)', padding: '5px 10px',
+                    borderRadius: 99, fontWeight: 500,
+                  }}
+                >
+                  📞 {phone}
+                </a>
+                <button
+                  aria-label="Telefonnummer bearbeiten"
+                  title="Bearbeiten"
+                  onClick={startEditPhone}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--fg-dim)', fontSize: 12, padding: '2px 4px',
+                  }}
+                >
+                  ✎
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={startEditPhone}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
-                  background: 'var(--accent-soft)', padding: '5px 10px',
-                  borderRadius: 99, fontWeight: 500,
+                  fontSize: 12, color: 'var(--warn)', cursor: 'pointer',
+                  background: 'rgba(251,191,36,0.10)', padding: '5px 10px',
+                  border: '1px dashed rgba(251,191,36,0.4)', borderRadius: 99, fontWeight: 600,
                 }}
               >
-                📞 {lead.phone}
-              </a>
+                📞 + Telefon hinzufügen
+              </button>
             )}
-            {!lead.email && !lead.phone && (
-              <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Keine Kontaktdaten hinterlegt</span>
+
+            {!lead.email && !phone && !editingPhone && (
+              <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Keine E-Mail hinterlegt</span>
             )}
           </div>
+          {phoneError && (
+            <div style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>{phoneError}</div>
+          )}
         </div>
 
         {/* Scrollable body */}

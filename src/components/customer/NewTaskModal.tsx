@@ -76,13 +76,13 @@ export function NewTaskModal({ open, customerId, onClose, context = 'Workflow' }
   }
 
   return (
-    <Modal open={open} onClose={handleClose} width={480}>
+    <Modal open={open} onClose={handleClose} width={480} labelledBy="new-task-modal-title">
       <div style={{ padding: '20px 22px 22px' }}>
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex flex-col gap-0.5">
             <span className="card-label">{context}</span>
-            <h3 style={{
+            <h3 id="new-task-modal-title" style={{
               fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600,
               letterSpacing: '-0.02em', lineHeight: 1.1, margin: 0,
               color: 'var(--fg)',

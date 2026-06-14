@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { FinanceService } from '@/services/finance.service'
-import { getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
+// getInvoicePdfBytes is imported lazily at call time. This store is in the main
+// bundle, so a static import here would drag the heavy react-pdf lib into the
+// initial load even though PDFs are only generated on demand.
 import { log } from '@/lib/logger'
 import type {
   Invoice, InvoiceWithItems, UpsertInvoicePayload,
@@ -23,6 +25,7 @@ async function tryAutoSaveToAblage(invoice: Invoice): Promise<void> {
 
     const full = await FinanceService.getInvoice(invoice.id)
     const profile = useCompanyStore.getState().profile
+    const { getInvoicePdfBytes } = await import('@/components/finance/InvoicePDF')
     const bytes = await getInvoicePdfBytes(full, profile, account)
     const arr = Array.from(bytes)
 

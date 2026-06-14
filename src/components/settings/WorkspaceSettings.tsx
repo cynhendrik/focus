@@ -128,7 +128,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
               border: `1px solid ${form.kleinunternehmer ? 'var(--accent)' : 'var(--border)'}`,
-              background: form.kleinunternehmer ? 'oklch(92% 0.2 245 / 0.06)' : 'var(--surface-2)',
+              background: form.kleinunternehmer ? 'oklch($1264 / 0.06)' : 'var(--surface-2)',
               transition: 'all 180ms',
             }}
           >

@@ -4,7 +4,6 @@ import { AtSign, CheckSquare, FileText, Sparkles, X } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { usePrivateNotesStore }  from '@/store/private-notes.store'
 import { useNotesModuleStore }   from '@/store/notes-module.store'
 import { useAccountsStore }      from '@/store/accounts.store'
 import { useTodosStore }         from '@/store/todos.store'
@@ -25,8 +24,6 @@ export function QuickCaptureModal() {
   const open    = useUiStore(s => s.quickCaptureOpen)
   const setOpen = useUiStore(s => s.setQuickCaptureOpen)
 
-  const createPrivate   = usePrivateNotesStore(s => s.create)
-  const updatePrivate   = usePrivateNotesStore(s => s.update)
   const createNoteEntry = useNotesModuleStore(s => s.createEntry)
   const upsertTodo      = useTodosStore(s => s.upsert)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
@@ -114,16 +111,13 @@ export function QuickCaptureModal() {
         source:     'manual',
       }).catch(() => {})
     } else {
+      // Notizen brauchen einen Kunden. Ohne @Kunde nichts speichern und das
+      // Modal offen lassen — der Footer fordert zur Kundenwahl auf.
+      if (!customer) return
       const html  = editor.getHTML()
-      const text  = rawText
-      const title = text.split('\n')[0].slice(0, 60) ||
+      const title = rawText.split('\n')[0].slice(0, 60) ||
         new Date().toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-      if (customer) {
-        createNoteEntry({ workspaceId, accountId: customer.id, title, content: html, createdBy: userId }).catch(() => {})
-      } else {
-        const id = createPrivate()
-        updatePrivate(id, { title, body: html })
-      }
+      createNoteEntry({ workspaceId, accountId: customer.id, title, content: html, createdBy: userId }).catch(() => {})
     }
     setOpen(false)
   }
@@ -138,10 +132,13 @@ export function QuickCaptureModal() {
   const modeBg = captureMode === 'task-urgent' ? 'oklch(72% 0.18 25 / 0.12)'
     : captureMode === 'task' ? 'oklch(82% 0.16 70 / 0.12)'
     : 'transparent'
+  const noteNeedsCustomer = captureMode === 'note' && !customer
   const btnLabel = captureMode !== 'note' ? 'Als Aufgabe' : 'Speichern'
   const footerTarget = captureMode !== 'note'
     ? `→ Aufgaben${customer ? ` · ${customer.name}` : ''} · ⌘↵`
-    : `${customer ? `→ ${customer.name} · Notizen` : '→ Privat'} · ⌘↵`
+    : noteNeedsCustomer
+      ? 'Notiz braucht einen @Kunden'
+      : `→ ${customer!.name} · Notizen · ⌘↵`
 
   return (
     <AnimatePresence>
@@ -166,6 +163,9 @@ export function QuickCaptureModal() {
             style={{ position: 'fixed', top: '28%', left: '50%', transform: 'translateX(-50%)', zIndex: 1001, width: '100%', maxWidth: 500, padding: '0 16px' }}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Quick Capture"
               onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); save() } }}
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, boxShadow: '0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)', overflow: 'hidden' }}
             >
@@ -275,8 +275,10 @@ export function QuickCaptureModal() {
                     padding: '7px 16px', borderRadius: 99, border: 'none',
                     background: modeColor,
                     color: 'var(--accent-ink)',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    boxShadow: `0 0 12px ${modeColor.replace(')', ' / 0.4)').replace('var(', 'var(')}`,
+                    fontSize: 12, fontWeight: 700,
+                    cursor: noteNeedsCustomer ? 'not-allowed' : 'pointer',
+                    opacity: noteNeedsCustomer ? 0.4 : 1,
+                    boxShadow: noteNeedsCustomer ? 'none' : `0 0 12px ${modeColor.replace(')', ' / 0.4)').replace('var(', 'var(')}`,
                     transition: 'all 150ms',
                   }}
                 >

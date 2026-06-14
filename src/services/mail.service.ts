@@ -40,6 +40,10 @@ export const MailService = {
       customersJson,
     })
   },
+  /** Ordnet bislang nicht zugeordnete Mails rückwirkend passenden Kunden zu. */
+  rematchCustomers(customersJson: string): Promise<number> {
+    return invoke<number>('email_rematch_customers', { customersJson })
+  },
   list(accountId: string, folder: string, limit: number, offset: number, search: string): Promise<EmailHeader[]> {
     return invoke<EmailHeader[]>('email_list', { accountId, folder, limit, offset, search })
   },
@@ -54,6 +58,9 @@ export const MailService = {
   },
   delete(emailId: string): Promise<void> {
     return invoke<void>('email_delete', { emailId })
+  },
+  setNotALead(emailId: string, value: boolean): Promise<void> {
+    return invoke<void>('email_set_not_a_lead', { emailId, value })
   },
   testSmtp(email: string, password: string, smtpHost: string, smtpPort: number, starttls: boolean): Promise<void> {
     return invoke<void>('email_test_smtp', { email, password, smtpHost, smtpPort, starttls })

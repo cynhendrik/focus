@@ -25,7 +25,7 @@ const supabase = createClient(
 interface NormalizedLead {
   email: string
   name: string | null
-  source: 'zoom' | 'generic'
+  source: 'zoom' | 'generic' | 'newsletter'
   source_detail: string | null
 }
 
@@ -46,13 +46,13 @@ function parseZoom(body: Record<string, unknown>): NormalizedLead | null {
   }
 }
 
-function parseGeneric(body: Record<string, unknown>): NormalizedLead | null {
+function parseGeneric(body: Record<string, unknown>, source: NormalizedLead['source']): NormalizedLead | null {
   const email = body.email as string | undefined
   if (!email) return null
   return {
     email,
     name: (body.name as string | null) ?? null,
-    source: 'generic',
+    source,
     source_detail: (body.source_detail as string | null) ?? null,
   }
 }
@@ -83,7 +83,9 @@ Deno.serve(async (req: Request) => {
     return new Response('Invalid JSON', { status: 400 })
   }
 
-  const lead = source === 'zoom' ? parseZoom(body) : parseGeneric(body)
+  const normalizedSource: NormalizedLead['source'] =
+    source === 'zoom' ? 'zoom' : source === 'newsletter' ? 'newsletter' : 'generic'
+  const lead = source === 'zoom' ? parseZoom(body) : parseGeneric(body, normalizedSource)
   if (!lead) {
     return new Response('Could not parse lead — missing email field', { status: 422 })
   }

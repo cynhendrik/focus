@@ -30,6 +30,9 @@ export interface Account extends TimestampedEntity {
   pipelinePhase?: string
   pipelinePhaseLabel?: string
   email?: string
+  phone?: string
+  /** NULL = aktiv, Zeitstempel = archiviert. */
+  archivedAt?: string | null
 }
 
 export interface UpsertAccountPayload {
@@ -51,4 +54,6 @@ export interface UpsertAccountPayload {
   zip?: string
   city?: string
   country?: string
+  email?: string
+  phone?: string
 }

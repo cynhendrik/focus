@@ -2,7 +2,8 @@ import { X, Download } from 'lucide-react'
 import type { InvoiceWithItems } from '@/types/finance.types'
 import type { CompanyProfile } from '@/types/company.types'
 import type { Account } from '@/types/account.types'
-import { downloadInvoicePDF } from './InvoicePDF'
+// downloadInvoicePDF is imported lazily at call time so react-pdf stays out of
+// the main bundle (loads only when a PDF is actually exported).
 
 interface Props {
   data: InvoiceWithItems
@@ -68,7 +69,7 @@ export function InvoicePreview({ data, profile, account, onClose }: Props) {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn-ghost" onClick={() => downloadInvoicePDF(data, profile, account)}
+            <button className="btn-ghost" onClick={async () => { const { downloadInvoicePDF } = await import('./InvoicePDF'); await downloadInvoicePDF(data, profile, account) }}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Download size={13} /> PDF herunterladen
             </button>

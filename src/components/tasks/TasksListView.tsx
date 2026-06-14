@@ -40,15 +40,15 @@ const PRIORITY_SECTIONS = [
   { id: 'p4', label: 'P4 — Niedrig'  },
 ]
 
-interface Props { customerId?: string }
+interface Props { customerId?: string; defaultGroupBy?: GroupBy }
 
-export function TasksListView({ customerId }: Props = {}) {
+export function TasksListView({ customerId, defaultGroupBy = 'time' }: Props = {}) {
   const allTodos = useTodosStore(s => s.allTodos)
   const todos = useMemo(
     () => customerId ? allTodos.filter(t => t.customerId === customerId) : allTodos,
     [allTodos, customerId],
   )
-  const [groupBy, setGroupBy] = useState<GroupBy>('time')
+  const [groupBy, setGroupBy] = useState<GroupBy>(defaultGroupBy)
 
   const grouped = useMemo(() => {
     const map: Record<string, Todo[]> = {}

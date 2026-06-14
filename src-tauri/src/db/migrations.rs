@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 26;
+const CURRENT_VERSION: u32 = 28;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -696,6 +696,23 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
         26 => {
             if table_exists(conn, "accounts") && !column_exists(conn, "accounts", "phone") {
                 conn.execute_batch("ALTER TABLE accounts ADD COLUMN phone TEXT;")?;
+            }
+            Ok(())
+        }
+        27 => {
+            // Kunden archivieren: NULL = aktiv, Zeitstempel = archiviert.
+            if table_exists(conn, "accounts") && !column_exists(conn, "accounts", "archived_at") {
+                conn.execute_batch("ALTER TABLE accounts ADD COLUMN archived_at TEXT;")?;
+            }
+            Ok(())
+        }
+        28 => {
+            // Verwaiste Follow-Ups reparieren: Das FollowUpModal hatte sie früher als
+            // type='followup' angelegt, aber alle Follow-Up-Listen erwarten
+            // type='task' + payload.is_follow_up (get_open_tasks: WHERE type='task').
+            // Solche Einträge waren real gespeichert, aber unsichtbar — hier zurückholen.
+            if table_exists(conn, "activities") {
+                conn.execute_batch("UPDATE activities SET type = 'task' WHERE type = 'followup';")?;
             }
             Ok(())
         }

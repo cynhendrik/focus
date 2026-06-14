@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { X, Paperclip } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { EmailHeader, SendEmailPayload } from '@/types/mail.types'
 
 interface ComposeModalProps {
@@ -154,6 +155,8 @@ export function ComposeModal({
     }
   }
 
+  const dialogRef = useDialogFocus(true, onClose)
+
   return (
     <>
       {/* Backdrop */}
@@ -165,7 +168,13 @@ export function ComposeModal({
       />
 
       {/* Slideout panel */}
-      <div style={{
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="E-Mail verfassen"
+        tabIndex={-1}
+        style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
         background: 'var(--bg)', borderLeft: '1px solid var(--border)',
         zIndex: 999, display: 'flex', flexDirection: 'column',

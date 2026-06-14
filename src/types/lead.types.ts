@@ -29,7 +29,7 @@ export type LeadStatus = 'new' | 'attempted' | 'warm' | 'lost_reengage'
   | 'neu' | 'kontaktiert' | 'qualifiziert' | 'disqualifiziert'
   | string
 
-export type LeadSource = 'zoom' | 'generic' | 'manual' | 'inbox' | 'linkedin' | 'website' | 'event'
+export type LeadSource = 'zoom' | 'generic' | 'manual' | 'inbox' | 'linkedin' | 'website' | 'event' | 'newsletter'
 
 export interface Lead {
   id: string
@@ -81,7 +81,7 @@ export interface PendingLead {
   workspace_id: string
   email: string
   name: string | null
-  source: 'zoom' | 'generic'
+  source: 'zoom' | 'generic' | 'newsletter'
   source_detail: string | null
   payload: Record<string, unknown>
   synced: boolean

@@ -133,22 +133,59 @@ fn parse_to_addrs(raw: &str) -> Vec<String> {
 
 // ── Auto-customer matching ────────────────────────────────────────────────────
 
-fn match_customer(from_addr: &str, customers: &[CustomerRef]) -> Option<String> {
-    let from_lower = from_addr.to_lowercase();
-    // Exact match
+/// Freemail-Domains: hier NIEMALS per Domain matchen — sonst landet jeder
+/// gmail.com-Absender beim erstbesten Gmail-Kunden. Nur exakte Adress-Treffer.
+const FREEMAIL_DOMAINS: &[&str] = &[
+    "gmail.com", "googlemail.com",
+    "yahoo.com", "yahoo.de", "ymail.com",
+    "hotmail.com", "hotmail.de", "outlook.com", "outlook.de", "live.com", "live.de", "msn.com",
+    "gmx.de", "gmx.net", "gmx.com", "gmx.at", "gmx.ch",
+    "web.de", "t-online.de", "freenet.de", "arcor.de",
+    "aol.com", "icloud.com", "me.com", "mac.com",
+    "mail.com", "yandex.com", "yandex.ru",
+    "proton.me", "protonmail.com", "pm.me",
+    "posteo.de", "mailbox.org", "zoho.com",
+];
+
+fn is_freemail(domain: &str) -> bool {
+    FREEMAIL_DOMAINS.contains(&domain.to_lowercase().as_str())
+}
+
+fn match_customer(addr: &str, customers: &[CustomerRef]) -> Option<String> {
+    let addr_lower = addr.to_lowercase();
+    // 1. Exakter Treffer — gilt immer, auch bei Freemail.
     if let Some(c) = customers.iter().find(|c| {
-        c.email.as_deref().map(|e| e.to_lowercase()) == Some(from_lower.clone())
+        c.email.as_deref().map(|e| e.to_lowercase()) == Some(addr_lower.clone())
     }) {
         return Some(c.id.clone());
     }
-    // Domain match
-    let domain = from_addr.split('@').nth(1)?.to_lowercase();
+    // 2. Domain-Treffer — NUR bei Firmendomains, niemals bei Freemail.
+    let domain = addr.split('@').nth(1)?.to_lowercase();
+    if is_freemail(&domain) {
+        return None;
+    }
     customers.iter().find(|c| {
         c.email.as_deref()
             .and_then(|e| e.split('@').nth(1))
             .map(|d| d.to_lowercase() == domain)
             .unwrap_or(false)
     }).map(|c| c.id.clone())
+}
+
+/// Ordnet eine Mail einem Kunden zu. Gesendete Mails (eigener Versand) werden
+/// über die Empfänger gematcht, alle anderen über den Absender — so steht der
+/// ganze Gesprächsfaden in der Kunden-Timeline. Wird von Sync UND Re-Match genutzt.
+pub fn match_email(
+    from_addr: &str,
+    to_addrs: &[String],
+    is_sent: bool,
+    customers: &[CustomerRef],
+) -> Option<String> {
+    if is_sent {
+        to_addrs.iter().find_map(|to| match_customer(to, customers))
+    } else {
+        match_customer(from_addr, customers)
+    }
 }
 
 // ── Sent folder detection ─────────────────────────────────────────────────────
@@ -351,7 +388,8 @@ where
                 let parts = extract_parts(body_bytes);
                 let body_text = parts.body_text;
                 let body_html = parts.body_html;
-                let customer_id = match_customer(&from_addr, customers);
+                let is_sent = normalized_folder == "Sent";
+                let customer_id = match_email(&from_addr, &to_addrs, is_sent, customers);
 
                 let email_id = Uuid::new_v4().to_string();
                 let mut row_attachments = parts.attachments;
@@ -491,5 +529,57 @@ mod tests {
         let parts = extract_parts(b"Content-Type: text/plain\r\n\r\nHi");
         // Just verifies no panic
         let _ = parts;
+    }
+
+    fn cust(id: &str, email: &str) -> CustomerRef {
+        CustomerRef { id: id.into(), email: Some(email.into()) }
+    }
+
+    #[test]
+    fn match_customer_exact_wins() {
+        let customers = vec![cust("h", "hendrikwehe@fn.de")];
+        assert_eq!(match_customer("hendrikwehe@fn.de", &customers).as_deref(), Some("h"));
+        // Case-insensitive
+        assert_eq!(match_customer("HendrikWehe@FN.de", &customers).as_deref(), Some("h"));
+    }
+
+    #[test]
+    fn match_customer_company_domain_matches() {
+        let customers = vec![cust("h", "hendrikwehe@fn.de")];
+        // Anderer Absender, gleiche Firmendomain → Treffer.
+        assert_eq!(match_customer("kollege@fn.de", &customers).as_deref(), Some("h"));
+    }
+
+    #[test]
+    fn match_customer_freemail_domain_never_matches() {
+        let customers = vec![cust("g", "kunde@gmail.com")];
+        // Exakt: Treffer.
+        assert_eq!(match_customer("kunde@gmail.com", &customers).as_deref(), Some("g"));
+        // Anderer gmail-Absender: KEIN Treffer (kein Domain-Match bei Freemail).
+        assert_eq!(match_customer("fremder@gmail.com", &customers), None);
+        assert_eq!(match_customer("wer@gmx.de", &vec![cust("x", "kunde@gmx.de")]), None);
+    }
+
+    #[test]
+    fn match_email_sent_uses_recipient() {
+        let customers = vec![cust("h", "hendrikwehe@fn.de")];
+        let to = vec!["hendrikwehe@fn.de".to_string()];
+        // Gesendet: Absender bin ich, Empfänger = Kunde → Treffer über Empfänger.
+        assert_eq!(
+            match_email("ich@meinefirma.de", &to, true, &customers).as_deref(),
+            Some("h"),
+        );
+        // Empfangen: Absender = Kunde → Treffer über Absender.
+        assert_eq!(
+            match_email("hendrikwehe@fn.de", &[], false, &customers).as_deref(),
+            Some("h"),
+        );
+    }
+
+    #[test]
+    fn match_email_sent_no_matching_recipient() {
+        let customers = vec![cust("h", "hendrikwehe@fn.de")];
+        let to = vec!["jemand@anders.de".to_string()];
+        assert_eq!(match_email("ich@meinefirma.de", &to, true, &customers), None);
     }
 }

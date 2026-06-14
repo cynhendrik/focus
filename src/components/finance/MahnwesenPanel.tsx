@@ -11,7 +11,8 @@ import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { generateCorraDraft } from '@/lib/ai/corra'
 import { MailService } from '@/services/mail.service'
 import { FinanceService } from '@/services/finance.service'
-import { getInvoicePdfBytes } from '@/components/finance/InvoicePDF'
+// getInvoicePdfBytes is imported lazily at call time (keeps react-pdf out of
+// the main bundle — loads only when a dunning PDF is generated).
 import { invoke } from '@tauri-apps/api/core'
 import type { Contact } from '@/types/contact.types'
 import type { Invoice } from '@/types/finance.types'
@@ -243,6 +244,7 @@ export function MahnwesenPanel() {
       if (profile && account) {
         try {
           const fullInvoice = await FinanceService.getInvoice(invoice.id)
+          const { getInvoicePdfBytes } = await import('@/components/finance/InvoicePDF')
           const bytes = await getInvoicePdfBytes(fullInvoice, profile, account)
           const safeClient = account.name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 40)
           const filename = `${LEVEL_LABEL[dunningLevel] ?? 'Mahnung'}_${invoice.number ?? invoice.id.slice(0, 8)}_${safeClient}.pdf`

@@ -4,6 +4,7 @@ import type { CorraContextInput } from './corra-intelligence'
 
 const emptyInput: CorraContextInput = {
   todos: [], invoices: [], emails: [], deals: [], calendarEvents: [], accounts: [],
+  followUps: [], leads: [],
 }
 
 describe('parseHeuteQueue', () => {
@@ -75,5 +76,35 @@ describe('staticHeuteQueue', () => {
     }
     const queue = staticHeuteQueue(input)
     expect(queue[0].type).toBe('mail_reply')
+  })
+
+  it('surfaces a due lead follow-up as lead_followup', () => {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const input: CorraContextInput = {
+      ...emptyInput,
+      followUps: [
+        { id: 'fu-1', customerId: 'lead-1', title: 'Angebot nachfassen', dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '' },
+      ],
+      leads: [
+        { id: 'lead-1', name: 'Sven Klar' } as CorraContextInput['leads'][number],
+      ],
+    }
+    const queue = staticHeuteQueue(input)
+    const fu = queue.find(q => q.type === 'lead_followup')
+    expect(fu).toBeDefined()
+    expect(fu!.id).toBe('fu-1')
+    expect(fu!.reason).toContain('Sven Klar')
+  })
+
+  it('ignores erledigte and future follow-ups', () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+    const input: CorraContextInput = {
+      ...emptyInput,
+      followUps: [
+        { id: 'fu-done', customerId: 'l', title: 'x', dueDate: '2026-01-01', status: 'erledigt', priority: 'normal', createdAt: '' },
+        { id: 'fu-future', customerId: 'l', title: 'y', dueDate: future, status: 'offen', priority: 'normal', createdAt: '' },
+      ],
+    }
+    expect(staticHeuteQueue(input).filter(q => q.type === 'lead_followup')).toHaveLength(0)
   })
 })

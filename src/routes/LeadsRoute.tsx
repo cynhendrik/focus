@@ -38,6 +38,7 @@ function fmtDate(iso: string): string {
 function sourceLabel(source: LeadSource, detail: string | null): string {
   if (detail) return detail
   if (source === 'zoom') return 'Zoom Webinar'
+  if (source === 'newsletter') return 'Newsletter'
   if (source === 'generic') return 'Web'
   if (source === 'manual') return 'Manuell'
   return source
@@ -72,35 +73,53 @@ const SIDEBAR_LIMIT = 8
 
 // ── Follow-Up Modal ───────────────────────────────────────────────────────────
 
-function FollowUpModal({
-  leads, workspaceId, onClose,
+export function FollowUpModal({
+  leads, workspaceId, onClose, onCreated,
 }: {
   leads: Lead[]
   workspaceId: string
   onClose: () => void
+  onCreated?: () => void
 }) {
   const user = useAuthStore(s => s.user)
+  const showToast = useToastStore(s => s.show)
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(tomorrow())
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleSave() {
     if (!title.trim()) return
     setSaving(true)
+    setError(null)
     try {
       await Promise.all(leads.map(lead =>
         ActivitiesService.create({
           workspaceId,
           createdBy: user?.id ?? '',
           accountId: lead.id,
-          type: 'followup',
+          // type 'task' + is_follow_up: das ist die Konvention, die die Follow-Up-
+          // Liste (get_open_tasks: WHERE type='task') und getByCustomer erwarten.
+          // Mit 'followup' fällt der Eintrag aus allen Follow-Up-Listen heraus.
+          type: 'task',
           title: title.trim(),
           dueAt: date || undefined,
           status: 'open',
           payload: JSON.stringify({ is_follow_up: true }),
         })
       ))
+      showToast({
+        message: leads.length > 1
+          ? `Follow-Up für ${leads.length} Leads erstellt.`
+          : `Follow-Up für ${leads[0].name} erstellt.`,
+        variant: 'success',
+      })
+      onCreated?.()
       onClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Follow-Up konnte nicht erstellt werden'
+      setError(msg)
+      showToast({ message: msg, variant: 'error' })
     } finally {
       setSaving(false)
     }
@@ -156,7 +175,11 @@ function FollowUpModal({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
+        {error && (
+          <div style={{ fontSize: 11, color: '#f87171', marginTop: 12 }}>{error}</div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: error ? 12 : 24, justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={onClose} disabled={saving}>Abbrechen</button>
           <button
             className="btn-primary"
@@ -290,8 +313,9 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
   onWarm?: () => void
   isDragging?: boolean
 }) {
-  const isWebinar = lead.leadSource === 'zoom'
-  const showWarmBtn = isWebinar && lead.leadStatus !== 'warm' && onWarm
+  const isWebinar    = lead.leadSource === 'zoom'
+  const isNewsletter = lead.leadSource === 'newsletter'
+  const showWarmBtn  = isWebinar && lead.leadStatus !== 'warm' && onWarm
 
   return (
     <div
@@ -313,6 +337,31 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
           {lead.email && (
             <div style={{ fontSize: 10.5, color: 'var(--fg-dim)', marginBottom: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {lead.email}
+            </div>
+          )}
+          {lead.phone ? (
+            <a
+              href={`tel:${lead.phone}`}
+              onClick={e => e.stopPropagation()}
+              title="Anrufen"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 10.5, color: 'var(--accent)', textDecoration: 'none',
+                fontWeight: 600, marginBottom: 5, fontFamily: 'var(--font-mono)',
+              }}
+            >
+              📞 {lead.phone}
+            </a>
+          ) : (
+            <div
+              title="Keine Telefonnummer — zum Nachtragen Karte öffnen"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 9.5, color: 'var(--warn)', fontWeight: 700,
+                marginBottom: 5, opacity: 0.85,
+              }}
+            >
+              📞 Keine Nr.
             </div>
           )}
         </div>
@@ -341,8 +390,12 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
           fontSize: 10, padding: '1px 7px', borderRadius: 99, fontWeight: 700,
-          background: isWebinar ? 'rgba(139,92,246,0.15)' : 'var(--surface-2)',
-          color: isWebinar ? '#a78bfa' : 'var(--fg-dim)',
+          background: isWebinar    ? 'rgba(139,92,246,0.15)'
+                    : isNewsletter ? 'rgba(34,197,94,0.12)'
+                    : 'var(--surface-2)',
+          color: isWebinar    ? '#a78bfa'
+               : isNewsletter ? '#4ade80'
+               : 'var(--fg-dim)',
         }}>
           {sourceLabel(lead.leadSource, lead.leadSourceDetail)}
         </span>
@@ -449,8 +502,12 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
 
 // ── Re-Engage Sidebar ─────────────────────────────────────────────────────────
 
-function ReEngageSidebar({ leads }: { leads: Lead[] }) {
+function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: string }) {
+  const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
   const [expanded, setExpanded] = useState(false)
+
+  const reactivate = (lead: Lead) =>
+    bulkUpdate({ ids: [lead.id], status: 'inbox' }, workspaceId)
 
   const sorted = useMemo(
     () => [...leads].sort((a, b) => (a.reEngageDate ?? '') < (b.reEngageDate ?? '') ? -1 : 1),
@@ -531,6 +588,17 @@ function ReEngageSidebar({ leads }: { leads: Lead[] }) {
                   <div style={{ fontSize: 10, color: 'var(--fg-dim)', marginTop: 1 }}>
                     {fmtDate(lead.reEngageDate!)}
                   </div>
+                  <button
+                    onClick={() => reactivate(lead)}
+                    style={{
+                      marginTop: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                      borderRadius: 6, border: '1px solid rgba(74,222,128,0.3)',
+                      background: 'rgba(74,222,128,0.08)', color: '#4ade80',
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    Reaktivieren
+                  </button>
                 </div>
               </div>
             )
@@ -562,13 +630,13 @@ function ReEngageSidebar({ leads }: { leads: Lead[] }) {
 
 // ── Phasen Board ──────────────────────────────────────────────────────────────
 
-function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onShowCreate: () => void }) {
+export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true }: { workspaceId: string; onShowCreate: () => void; showCreateButton?: boolean }) {
   const allLeads      = useLeadsStore(s => s.leads)
   const bulkUpdate    = useLeadsStore(s => s.bulkUpdate)
   const deleteLead    = useLeadsStore(s => s.deleteLead)
   const convertToDeal = useLeadsStore(s => s.convertToDeal)
   const userId        = useAuthStore(s => s.user?.id ?? '')
-  const setAppView    = useUiStore(s => s.setAppView)
+  const openCustomerAt = useUiStore(s => s.openCustomerAt)
   const showToast     = useToastStore(s => s.show)
   const stages        = useLeadStagesStore(s => s.stages)
 
@@ -637,10 +705,13 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
   const handleQualifyConfirm = async (_appointmentDate?: string) => {
     if (!pendingQualify) return
     try {
-      await convertToDeal(pendingQualify.id, workspaceId, userId)
+      const leadId = pendingQualify.id
+      await convertToDeal(leadId, workspaceId, userId)
+      // Lead → Kunde: gleiche ID, History/Follow-Ups bleiben dran. Direkt zum
+      // Kunden springen, damit die Kontinuität sofort sichtbar ist.
       showToast({
-        message: `Deal angelegt — ${pendingQualify.name}`,
-        action: { label: '→ Pipeline öffnen', onClick: () => setAppView('pipeline') },
+        message: `${pendingQualify.name} ist jetzt Kunde — Deal in der Pipeline.`,
+        action: { label: '→ Kunde öffnen', onClick: () => openCustomerAt(leadId, 'verlauf') },
       })
     } catch (err) {
       showToast({ message: err instanceof Error ? err.message : 'Konvertierung fehlgeschlagen', variant: 'error' })
@@ -722,9 +793,11 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
         >
           Stages
         </button>
-        <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={onShowCreate}>
-          + Lead
-        </button>
+        {showCreateButton && (
+          <button className="btn-primary" style={{ fontSize: 12, padding: '6px 14px' }} onClick={onShowCreate}>
+            + Lead
+          </button>
+        )}
         {showStages && (
           <LeadStagesManager workspaceId={workspaceId} onClose={() => setShowStages(false)} />
         )}
@@ -757,7 +830,7 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
           </DragOverlay>
         </DndContext>
 
-        <ReEngageSidebar leads={reEngageLeads} />
+        <ReEngageSidebar leads={reEngageLeads} workspaceId={workspaceId} />
       </div>
 
       {ctxMenu && (
@@ -801,12 +874,20 @@ function PhasenBoard({ workspaceId, onShowCreate }: { workspaceId: string; onSho
 
 function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
   const upsert = useLeadsStore(s => s.upsert)
+  const stages = useLeadStagesStore(s => s.stages)
+  // Only non-terminal stages — qualified converts to customer, disqualified
+  // moves to re-engage, so a brand-new lead can't sensibly start there.
+  const openStages = useMemo(() => stages.filter(s => !s.isQualified && !s.isDisqualified), [stages])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [status, setStatus] = useState('')
   const [source, setSource] = useState<LeadSource>('manual')
   const [sourceDetail, setSourceDetail] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Stages load async; fall back to the first open stage until the user picks one.
+  const effectiveStatus = status || openStages[0]?.name || 'neu'
 
   async function handleSave() {
     if (!name.trim()) return
@@ -818,7 +899,7 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
       phone: phone.trim() || undefined,
       leadSource: source,
       leadSourceDetail: sourceDetail.trim() || undefined,
-      leadStatus: 'neu',
+      leadStatus: effectiveStatus,
     }
     try {
       await upsert(payload)
@@ -876,6 +957,16 @@ function CreateLeadModal({ workspaceId, onClose }: { workspaceId: string; onClos
               placeholder="+49 123 456789"
             />
           </div>
+          {openStages.length > 0 && (
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>Stage</label>
+              <select className="mock-input" value={effectiveStatus} onChange={e => setStatus(e.target.value)}>
+                {openStages.map(s => (
+                  <option key={s.id} value={s.name}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>Quelle</label>
             <select className="mock-input" value={source} onChange={e => setSource(e.target.value as LeadSource)}>

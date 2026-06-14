@@ -2,6 +2,8 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useMailStore } from '@/store/mail.store'
 import { useAccountsStore } from '@/store/accounts.store'
+import { useCrmStore } from '@/store/crm.store'
+import { useLeadsStore } from '@/store/leads.store'
 import { TileBodyTodo } from './TileBodyTodo'
 import { TileBodyMail } from './TileBodyMail'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
@@ -42,15 +44,17 @@ function deriveHeadline(item: HeuteQueueItem, name: string, total?: number): str
     return `Zahlungserinnerung${amount ? ` für ${amount}` : ''} schicken`
   }
   if (item.type === 'mail_reply') return `${name ? name + ' ' : ''}antworten`
-  if (item.type === 'followup')   return `Follow-up: ${name}`
+  if (item.type === 'followup' || item.type === 'lead_followup') return `Follow-up: ${name}`
   return ''
 }
 
 export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
-  const invoices = useFinanceStore(s => s.invoices)
-  const todos    = useTodosStore(s => s.allTodos)
-  const emails   = useMailStore(s => s.emails)
-  const accounts = useAccountsStore(s => s.accounts)
+  const invoices  = useFinanceStore(s => s.invoices)
+  const todos     = useTodosStore(s => s.allTodos)
+  const emails    = useMailStore(s => s.emails)
+  const accounts  = useAccountsStore(s => s.accounts)
+  const followUps = useCrmStore(s => s.allFollowUps)
+  const leads     = useLeadsStore(s => s.leads)
 
   const invoice = item.type === 'invoice_reminder'
     ? invoices.find(i => i.id === item.id) ?? null
@@ -64,11 +68,20 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
     ? emails.find(e => e.id === item.id) ?? null
     : null
 
+  // Echtes Lead/Kunden-Follow-Up aus dem CRM — Empfänger ist der Lead.
+  const followUp = item.type === 'lead_followup'
+    ? followUps.find(f => f.id === item.id) ?? null
+    : null
+  const followUpLead = followUp
+    ? leads.find(l => l.id === followUp.customerId) ?? null
+    : null
+
   const accountId = invoice?.accountId ?? todo?.customerId
   const account   = accountId ? accounts.find(a => a.id === accountId) : undefined
 
   const headline = (() => {
     if (item.type === 'invoice_reminder' && invoice) return deriveHeadline(item, account?.name ?? '', invoice.total)
+    if (item.type === 'lead_followup') return deriveHeadline(item, followUpLead?.name ?? 'Lead')
     if (todo) return todo.actionType ? deriveHeadline(item, account?.name ?? '') : todo.title
     if (email) return `${email.fromName ?? email.fromAddr} antworten`
     return item.type.replace('_', ' ')
@@ -80,6 +93,9 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
     }
     if (item.type === 'followup' && todo) {
       return <TileBodyMail mode="followup" todo={todo} onDone={onDone} onSkip={onSkip} />
+    }
+    if (item.type === 'lead_followup' && followUp && followUpLead) {
+      return <TileBodyMail mode="lead_followup" lead={followUpLead} followUp={followUp} onDone={onDone} onSkip={onSkip} />
     }
     if (item.type === 'mail_reply' && todo) {
       return <TileBodyMail mode="reply_mail" todo={todo} onDone={onDone} onSkip={onSkip} />

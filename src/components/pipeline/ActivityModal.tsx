@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { ActivityType } from '@/types/pipeline.types'
 import { Phone, Users, Mail, FileText } from 'lucide-react'
 
@@ -51,6 +52,8 @@ export function ActivityModal({ customerId, presetType, onClose }: Props) {
     }
   }
 
+  const dialogRef = useDialogFocus(true, onClose)
+
   return (
     <div
       style={{
@@ -59,7 +62,14 @@ export function ActivityModal({ customerId, presetType, onClose }: Props) {
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 380, maxWidth: '90vw' }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Aktivität erfassen"
+        tabIndex={-1}
+        style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 380, maxWidth: '90vw' }}
+      >
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>Aktivität erfassen</h2>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>

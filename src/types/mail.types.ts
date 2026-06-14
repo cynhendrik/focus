@@ -25,6 +25,7 @@ export interface EmailHeader {
   sentAt: string
   isRead: boolean
   customerId: string | null
+  notALead: boolean
 }
 
 export interface EmailBody {

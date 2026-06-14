@@ -13,6 +13,8 @@ import { log } from '@/lib/logger'
 import type { Todo } from '@/types/todo.types'
 import type { Invoice } from '@/types/finance.types'
 import type { Contact } from '@/types/contact.types'
+import type { Lead } from '@/types/lead.types'
+import type { FollowUp } from '@/types/crm.types'
 
 interface BaseProps {
   onDone: () => Promise<void>
@@ -23,17 +25,29 @@ interface TodoMailProps extends BaseProps {
   mode: 'reply_mail' | 'followup'
   todo: Todo
   invoice?: never
+  lead?: never
+  followUp?: never
 }
 
 interface InvoiceReminderProps extends BaseProps {
   mode: 'invoice_reminder'
   invoice: Invoice
   todo?: never
+  lead?: never
+  followUp?: never
 }
 
-type Props = TodoMailProps | InvoiceReminderProps
+interface LeadFollowUpProps extends BaseProps {
+  mode: 'lead_followup'
+  lead: Lead
+  followUp: FollowUp
+  todo?: never
+  invoice?: never
+}
 
-export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
+type Props = TodoMailProps | InvoiceReminderProps | LeadFollowUpProps
+
+export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSkip }: Props) {
   const accounts     = useAccountsStore(s => s.accounts)
   const mailAccounts = useMailStore(s => s.accounts)
   const showToast    = useToastStore(s => s.show)
@@ -83,9 +97,12 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
       setSubject(`Re: ${todo.title.replace(/ beantworten$/, '')}`)
     } else if (mode === 'followup' && todo) {
       setSubject(todo.title)
+    } else if (mode === 'lead_followup' && lead) {
+      setTo(lead.email ?? '')
+      setSubject(followUp!.title)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, todo?.id, invoice?.id])
+  }, [mode, todo?.id, invoice?.id, followUp?.id])
 
   // Auto-generate draft on mount
   useEffect(() => {
@@ -129,6 +146,17 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
           notes: todo.notes,
         })
       }
+      if (mode === 'lead_followup' && lead) {
+        const daysAgo = lead.lastActivityAt
+          ? Math.max(0, Math.floor((Date.now() - new Date(lead.lastActivityAt).getTime()) / 86_400_000))
+          : undefined
+        return generateCorraDraft({
+          kind: 'followup',
+          customerName: lead.name,
+          topic: followUp!.title,
+          daysAgo,
+        })
+      }
       return Promise.resolve('')
     })()
 
@@ -145,7 +173,7 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
       })
       .finally(() => setGenerating(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todo?.id ?? invoice?.id, editor])
+  }, [todo?.id ?? invoice?.id ?? followUp?.id, editor])
 
   const regenerate = useCallback(async () => {
     if (generating || !editor) return
@@ -164,6 +192,9 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
           const fromLine = (todo.notes ?? '').split('\n')[0]?.replace(/^Von: /, '') ?? ''
           return generateCorraDraft({ kind: 'followup', customerName: account?.name ?? '', contactName: fromLine, topic: subject || todo.title, notes: todo.notes })
         }
+        if (mode === 'lead_followup' && lead) {
+          return generateCorraDraft({ kind: 'followup', customerName: lead.name, topic: subject || followUp!.title })
+        }
         return Promise.resolve('')
       })()
       if (draft) {
@@ -175,7 +206,7 @@ export function TileBodyMail({ mode, todo, invoice, onDone, onSkip }: Props) {
     } finally {
       setGenerating(false)
     }
-  }, [generating, editor, mode, todo, invoice, account?.name, subject, showToast])
+  }, [generating, editor, mode, todo, invoice, lead, followUp, account?.name, subject, showToast])
 
   const handleSend = async () => {
     const bodyText = editor?.getText() ?? ''

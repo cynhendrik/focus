@@ -23,7 +23,7 @@ export function IntegrationsRoute() {
       <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Integrationen.</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-dim)' }}>
-          Verbinde externe Dienste mit Cynera
+          Verbinde externe Dienste mit Cultera
         </p>
       </div>
 
@@ -34,7 +34,7 @@ export function IntegrationsRoute() {
             icon={Mail}
             name="IMAP / SMTP"
             category="E-Mail"
-            description="Empfange und sende E-Mails direkt in Cynera über dein eigenes Postfach. Unterstützt alle IMAP-fähigen Anbieter (Gmail, Outlook, iCloud, etc.)."
+            description="Empfange und sende E-Mails direkt in Cultera über dein eigenes Postfach. Unterstützt alle IMAP-fähigen Anbieter (Gmail, Outlook, iCloud, etc.)."
             status={hasMailAccount ? 'connected' : 'disconnected'}
             connectedDetail={mailAccounts[0]?.email}
             onAction={() => setAppView('mail')}
@@ -45,7 +45,7 @@ export function IntegrationsRoute() {
             icon={Video}
             name="Zoom"
             category="Webinar Lead-Import"
-            description="Importiere Teilnehmer aus Zoom-Webinaren automatisch als Leads in Cynera. Einrichtung via Webhook in deinen Zoom-Einstellungen."
+            description="Importiere Teilnehmer aus Zoom-Webinaren automatisch als Leads in Cultera. Einrichtung via Webhook in deinen Zoom-Einstellungen."
             status="disconnected"
             onAction={() => setShowZoom(true)}
             actionLabel="Einrichten →"
@@ -67,7 +67,7 @@ export function IntegrationsRoute() {
             icon={CalendarDays}
             name="Google Calendar / Outlook"
             category="Kalender-Sync"
-            description="Synchronisiere Termine bidirektional mit deinem Google Calendar oder Outlook. Cynera-Termine erscheinen in deinem Kalender und umgekehrt."
+            description="Synchronisiere Termine bidirektional mit deinem Google Calendar oder Outlook. Cultera-Termine erscheinen in deinem Kalender und umgekehrt."
             status="coming_soon"
           />
 
@@ -79,7 +79,7 @@ export function IntegrationsRoute() {
             icon={Landmark}
             name="Bank"
             category="Finanzsystem"
-            description="Verknüpfe dein Geschäftskonto für automatischen Zahlungsabgleich mit deinen Rechnungen in Cynera."
+            description="Verknüpfe dein Geschäftskonto für automatischen Zahlungsabgleich mit deinen Rechnungen in Cultera."
             status="coming_soon"
           />
 

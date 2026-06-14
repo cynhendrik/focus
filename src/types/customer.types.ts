@@ -39,6 +39,8 @@ export interface Customer extends TimestampedEntity {
   country?: string
   leadScore: number
   scoreFactors: Record<string, number>
+  /** NULL/undefined = aktiv, Zeitstempel = archiviert. */
+  archivedAt: string | null
 }
 
 export interface UpsertCustomerPayload {

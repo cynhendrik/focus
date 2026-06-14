@@ -1,8 +1,8 @@
 [package]
 name = "focus"
 version = "2.0.0"
-description = "Focus — Business Management Desktop App"
-authors = ["Cynera"]
+description = "Cultera Focus — Business Management Desktop App"
+authors = ["Cultera"]
 edition = "2021"
 rust-version = "1.77"
 

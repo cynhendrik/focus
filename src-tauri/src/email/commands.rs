@@ -421,6 +421,19 @@ pub fn email_assign_customer(
         .map_err(|e| e.to_string())
 }
 
+/// Ordnet bislang nicht zugeordnete Mails rückwirkend passenden Kunden zu —
+/// Auslöser: ein neuer/aktualisierter Kunde. Gibt die Anzahl Treffer zurück.
+#[tauri::command]
+pub fn email_rematch_customers(
+    customers_json: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<usize, String> {
+    let customers: Vec<CustomerRef> = serde_json::from_str(&customers_json)
+        .map_err(|e| format!("Ungültiges customers_json: {}", e))?;
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::rematch_auto(&conn, &customers).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn email_delete(
     email_id: String,
@@ -428,6 +441,18 @@ pub fn email_delete(
 ) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     db::delete_email(&conn, &email_id).map_err(|e| e.to_string())
+}
+
+/// Markiert eine Mail als „kein Lead" (oder hebt es auf) — blendet sie dauerhaft
+/// aus der Newcomer-Liste der unbekannten Absender aus.
+#[tauri::command]
+pub fn email_set_not_a_lead(
+    email_id: String,
+    value: bool,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::set_not_a_lead(&conn, &email_id, value).map_err(|e| e.to_string())
 }
 
 // ── SMTP ──────────────────────────────────────────────────────────────────────

@@ -46,12 +46,12 @@
   --fg-2: oklch(82% 0.005 270);
   --fg-muted: oklch(64% 0.008 270);
   --fg-dim: oklch(46% 0.008 270);
-  --accent: oklch(70% 0.22 245);
-  --accent-2: oklch(62% 0.22 245);
-  --accent-soft: oklch(70% 0.22 245 / 0.14);
-  --accent-glow: oklch(70% 0.22 245 / 0.5);
-  --accent-ink: oklch(98% 0 0);
-  --accent-text: oklch(70% 0.22 245);
+  --accent:      #3B6DF4;
+  --accent-2:    #2D5CDC;
+  --accent-soft: rgb(59 109 244 / 0.14);
+  --accent-glow: rgb(59 109 244 / 0.50);
+  --accent-ink:  oklch(98% 0 0);
+  --accent-text: #3B6DF4;
   --danger: oklch(72% 0.18 25);
   --warn: oklch(82% 0.16 70);
   --ok: oklch(82% 0.18 155);
@@ -126,12 +126,12 @@
   --fg-muted: oklch(40% 0 0);
   --fg-dim:   oklch(56% 0 0);
 
-  /* Accent = Blau für Light-Mode */
-  --accent:      oklch(42% 0.22 245);
-  --accent-2:    oklch(34% 0.22 245);
-  --accent-soft: oklch(42% 0.22 245 / 0.10);
-  --accent-glow: oklch(42% 0.22 245 / 0.20);
-  --accent-text: oklch(42% 0.22 245);
+  /* Accent = #3B6DF4 für beide Modi */
+  --accent:      #3B6DF4;
+  --accent-2:    #2D5CDC;
+  --accent-soft: rgb(59 109 244 / 0.10);
+  --accent-glow: rgb(59 109 244 / 0.20);
+  --accent-text: #3B6DF4;
   --accent-ink:  oklch(98% 0 0);
 
   /* Status-Farben — dunkel für Weiß-Hintergrund */
@@ -152,6 +152,25 @@
   --bg1: var(--surface);
   --bg2: var(--surface-2);
   --bg3: var(--surface-3);
+}
+
+/* ========== B&W Style ========== */
+
+[data-style="bw"] {
+  --accent:      oklch(100% 0 0);
+  --accent-2:    oklch(90% 0 0);
+  --accent-soft: oklch(100% 0 0 / 0.12);
+  --accent-glow: oklch(100% 0 0 / 0.25);
+  --accent-text: oklch(100% 0 0);
+  --accent-ink:  oklch(10% 0 0);
+}
+[data-theme="light"][data-style="bw"] {
+  --accent:      oklch(22% 0 0);
+  --accent-2:    oklch(34% 0 0);
+  --accent-soft: oklch(22% 0 0 / 0.08);
+  --accent-glow: oklch(22% 0 0 / 0.16);
+  --accent-text: oklch(22% 0 0);
+  --accent-ink:  oklch(98% 0 0);
 }
 
 /* ========== Base ========== */
@@ -185,7 +204,19 @@ button {
   font-size: inherit; letter-spacing: inherit;
 }
 input, textarea { font-family: inherit; color: inherit; letter-spacing: inherit; }
-input:focus, textarea:focus, button:focus { outline: none; }
+/* Suppress the focus ring only for pointer interactions; keep a clear,
+   accessible ring for keyboard navigation. Previously `outline: none` hit
+   every :focus, leaving keyboard users with no visible focus anywhere.
+   :focus-visible only fires on keyboard/programmatic focus. */
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+button:focus:not(:focus-visible) { outline: none; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -212,8 +243,8 @@ input:focus, textarea:focus, button:focus { outline: none; }
      - unten-links: leiser blauer Counterpunkt
      Werte bewusst niedrig — soll nicht "Effekt" sein, nur Atmosphaere. */
   background:
-    radial-gradient(1300px 700px at 75% -12%, oklch(92% 0.20 245 / 0.13), transparent 62%),
-    radial-gradient(800px 240px at 50%  -6%, oklch(92% 0.20 245 / 0.07), transparent 70%),
+    radial-gradient(1300px 700px at 75% -12%, oklch(92% 0.18 264 / 0.13), transparent 62%),
+    radial-gradient(800px 240px at 50%  -6%, oklch(92% 0.18 264 / 0.07), transparent 70%),
     radial-gradient(900px  500px at -10% 100%, oklch(78% 0.13 235 / 0.07), transparent 60%),
     var(--bg);
   transition: grid-template-columns 280ms cubic-bezier(.2,.7,.1,1);
@@ -267,7 +298,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
 .main-inner {
   padding: 32px 48px 80px;
   width: 100%;
-  max-width: 1380px;
+  max-width: 1560px;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -452,6 +483,7 @@ input:focus, textarea:focus, button:focus { outline: none; }
 
 .nav-item {
   display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
   padding: 8px 10px; border-radius: 10px;
   font-size: 13.5px; color: var(--fg-2);
   cursor: pointer;
@@ -522,13 +554,13 @@ input:focus, textarea:focus, button:focus { outline: none; }
   letter-spacing: -0.01em; line-height: 1.2;
 }
 .nav-corra-card__sub {
-  font-size: 10px; color: oklch(100% 0 0 / 0.65);
+  font-size: 10px; color: var(--accent-ink); opacity: 0.7;
   font-family: var(--font-mono); letter-spacing: 0.05em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .nav-corra-card__badge {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-  color: var(--accent-ink); background: oklch(100% 0 0 / 0.15);
+  color: var(--accent-ink); background: color-mix(in oklch, var(--accent-ink) 15%, transparent);
   padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
 }
 
@@ -963,7 +995,7 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 }
 .splash__aura--a {
   top: -38vmax; left: -28vmax;
-  background: radial-gradient(circle, oklch(72% 0.18 145 / 0.34), transparent 62%);
+  background: radial-gradient(circle, rgb(59 109 244 / 0.34), transparent 62%);
 }
 .splash__aura--b {
   bottom: -38vmax; right: -28vmax;
@@ -1031,8 +1063,8 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   position: absolute;
   bottom: 16vh;
   width: 5px; height: 5px; border-radius: 50%;
-  background: oklch(72% 0.18 145);
-  box-shadow: 0 0 14px oklch(72% 0.18 145 / 0.75);
+  background: #3B6DF4;
+  box-shadow: 0 0 14px rgb(59 109 244 / 0.75);
   opacity: 0;
   will-change: transform, opacity;
   animation:
@@ -1043,8 +1075,8 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   to { opacity: 1; }
 }
 @keyframes splash-mark-pulse {
-  0%, 100% { transform: scale(1);   box-shadow: 0 0 14px oklch(72% 0.18 145 / 0.75); }
-  50%      { transform: scale(1.7); box-shadow: 0 0 28px oklch(72% 0.18 145 / 0.55); }
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 14px rgb(59 109 244 / 0.75); }
+  50%      { transform: scale(1.7); box-shadow: 0 0 28px rgb(59 109 244 / 0.55); }
 }
 
 @keyframes splash-fade-in {
@@ -1187,7 +1219,7 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 
 .bar { display: flex; align-items: flex-end; height: 100px; gap: 6px; padding-top: 8px; }
 .bar-col {
-  flex: 1; background: linear-gradient(180deg, var(--accent), oklch(55% 0.22 245));
+  flex: 1; background: linear-gradient(180deg, var(--accent), var(--accent-2));
   border-radius: 4px 4px 2px 2px; position: relative; min-height: 6px;
   transition: opacity 200ms ease;
 }
@@ -1776,11 +1808,11 @@ div:hover > .file-delete-btn {
 }
 .corra-input-wrap[data-focused="true"] {
   animation: none;
-  box-shadow: 0 0 0 1.5px rgba(163,230,53,0.55), 0 0 28px rgba(163,230,53,0.1);
+  box-shadow: 0 0 0 1.5px rgba(59,109,244,0.55), 0 0 28px rgba(59,109,244,0.1);
 }
 @keyframes corraInputIdle {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(163,230,53,0.18); }
-  50%       { box-shadow: 0 0 0 1px rgba(163,230,53,0.4), 0 0 18px rgba(163,230,53,0.07); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(59,109,244,0.18); }
+  50%       { box-shadow: 0 0 0 1px rgba(59,109,244,0.4), 0 0 18px rgba(59,109,244,0.07); }
 }
 [data-theme="light"] .corra-input-wrap {
   animation: corraInputIdleLight 4s ease-in-out infinite;

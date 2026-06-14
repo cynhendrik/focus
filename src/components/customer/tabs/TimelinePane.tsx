@@ -27,6 +27,7 @@ import { ContactCard } from '@/components/customer/ContactCard'
 import { ContactModal } from '@/components/customer/ContactModal'
 import { InfosFeed, readInfos, matchContact } from '@/components/customer/InfosFeed'
 import { InsightsStrip } from '@/components/customer/InsightsStrip'
+import { CustomerKpiStrip } from '@/components/customer/CustomerKpiStrip'
 import { NewTaskModal } from '@/components/customer/NewTaskModal'
 import { UserPlus } from 'lucide-react'
 
@@ -208,6 +209,10 @@ export function TimelinePane({ customerId }: Props) {
     }
 
     for (const t of todos) {
+      // Undatierte offene Aufgaben leben in der linken Spalte — sie hier nochmal
+      // als Stream-Event zu zeigen ist Doppelung (und das Import-Rauschen vom
+      // Screenshot). In den Stream gehören nur terminierte oder erledigte Aufgaben.
+      if (!t.dueDate && t.status !== 'done') continue
       const ts = t.dueDate ?? t.createdAt
       out.push({
         id: `todo-${t.id}`,
@@ -356,13 +361,20 @@ export function TimelinePane({ customerId }: Props) {
 
   return (
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(440px, 560px) 1fr',
-      gap: 36,
-      padding: '20px 24px 64px',
-      alignItems: 'start',
+      display: 'flex', flexDirection: 'column',
+      padding: '14px 24px 64px',
       overflowY: 'auto', flex: 1,
     }}>
+      {/* ── KPI-Zeile — Kontext, nicht Inhalt: eine Zeile, vier Zahlen ──── */}
+      <CustomerKpiStrip customerId={customerId} />
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '380px 1fr',
+        gap: 36,
+        marginTop: 18,
+        alignItems: 'start',
+      }}>
       {/* ── LEFT RAIL — knowledge column, sticky during scroll ──────────── */}
       <aside style={{
         position: 'sticky',
@@ -374,13 +386,14 @@ export function TimelinePane({ customerId }: Props) {
         flexDirection: 'column',
         gap: 18,
       }}>
-        <InfosFeed customerId={customerId} notes={notes} />
+        {/* Aufgaben zuerst — actionable. Infos & Kontakte sind Nachschlagewerk. */}
         <TasksList customerId={customerId} />
+        <InfosFeed customerId={customerId} notes={notes} />
         <ContactsList customerId={customerId} notes={notes} />
       </aside>
 
-      {/* ── RIGHT COLUMN — insights + composer + stream ─────────────────── */}
-      <div style={{ minWidth: 0, maxWidth: 760 }}>
+      {/* ── RIGHT COLUMN — insights + composer + stream (volle Restbreite) ── */}
+      <div style={{ minWidth: 0 }}>
         <InsightsStrip customerId={customerId} />
         <Composer
           kind={composerKind}
@@ -479,6 +492,7 @@ export function TimelinePane({ customerId }: Props) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   )
@@ -682,14 +696,14 @@ function Composer({
     <div
       style={{
         background: 'var(--surface)',
-        border: '1px solid var(--border)',
+        border: '1px solid var(--border-strong)',
         borderRadius: 18,
-        padding: '12px 14px',
-        boxShadow: 'var(--shadow-1)',
+        padding: '16px 18px',
+        boxShadow: 'var(--shadow-2)',
         transition: 'border-color 200ms ease',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div ref={menuRef} style={{ position: 'relative' }}>
           <button
             onClick={() => onMenuToggle(!menuOpen)}
@@ -777,8 +791,9 @@ function Composer({
           style={{
             flex: 1, minWidth: 0,
             background: 'transparent', border: 'none',
-            fontSize: 14, color: 'var(--fg)',
+            fontSize: 15, color: 'var(--fg)',
             letterSpacing: '-0.01em',
+            padding: '4px 0',
           }}
         />
 
@@ -902,7 +917,7 @@ function EventRow({ event, delay, isExpanded, onClick, body }: EventRowProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: dimmed ? 0.5 : 1, y: 0 }}
+      animate={{ opacity: dimmed ? 0.38 : 1, y: 0 }}
       transition={{ delay, duration: 0.34, ease: [0.2, 0.7, 0.1, 1] }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -1166,11 +1181,11 @@ interface StreamFilterBarProps {
 }
 
 const STREAM_TABS: { id: StreamFilterId; label: string; icon: typeof Phone }[] = [
-  { id: 'all',   label: 'Alle',           icon: Inbox       },
-  { id: 'calls', label: 'Anrufe & Mtgs',  icon: Phone       },
-  { id: 'notes', label: 'Notizen',        icon: FileText    },
-  { id: 'mails', label: 'Mails',          icon: Mail        },
-  { id: 'tasks', label: 'Tasks & FUs',    icon: CheckSquare },
+  { id: 'all',   label: 'Alle',             icon: Inbox       },
+  { id: 'calls', label: 'Anrufe & Meetings',icon: Phone       },
+  { id: 'notes', label: 'Notizen',          icon: FileText    },
+  { id: 'mails', label: 'Mails',            icon: Mail        },
+  { id: 'tasks', label: 'Aufgaben',          icon: CheckSquare },
 ]
 
 function StreamFilterBar({
@@ -1378,7 +1393,7 @@ function TasksList({ customerId }: TasksListProps) {
           letterSpacing: '0.18em', textTransform: 'uppercase',
           color: 'var(--fg-dim)', fontWeight: 500,
         }}>
-          Tasks
+          Aufgaben
         </span>
         {openTodos.length > 0 && (
           <span style={{
@@ -1394,7 +1409,7 @@ function TasksList({ customerId }: TasksListProps) {
         }} />
         <button
           onClick={() => setModalOpen(true)}
-          aria-label="Task hinzufügen"
+          aria-label="Aufgabe hinzufügen"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '3px 8px 3px 6px', borderRadius: 999,
@@ -1414,7 +1429,7 @@ function TasksList({ customerId }: TasksListProps) {
           }}
         >
           <Plus size={11} strokeWidth={2.4} />
-          Task
+          Aufgabe
         </button>
       </div>
 

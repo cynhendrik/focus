@@ -5,6 +5,7 @@ import { usePipelineStore } from '@/store/pipeline.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useDialogFocus } from '@/components/ui/Sheet'
 import type { Deal, UpsertDealPayload } from '@/types/pipeline.types'
 
 interface Props {
@@ -73,6 +74,8 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
     }
   }
 
+  const dialogRef = useDialogFocus(true, onClose)
+
   return (
     <div
       style={{
@@ -81,7 +84,14 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 420, maxWidth: '90vw' }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={initial ? 'Deal bearbeiten' : 'Zur Pipeline hinzufügen'}
+        tabIndex={-1}
+        style={{ background: 'var(--surface)', borderRadius: 16, padding: 24, width: 420, maxWidth: '90vw' }}
+      >
         <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>
           {initial ? 'Deal bearbeiten' : 'Zur Pipeline hinzufügen'}
         </h2>

@@ -28,6 +28,10 @@ pub struct Account {
     pub zip: Option<String>,
     pub city: Option<String>,
     pub country: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    // NULL = aktiv, Zeitstempel = archiviert (raus aus der aktiven Liste, History bleibt)
+    pub archived_at: Option<String>,
     // Computed via JOIN, never stored on Account
     pub pipeline_phase: Option<String>,
     pub pipeline_phase_label: Option<String>,
@@ -56,6 +60,8 @@ pub struct UpsertAccountPayload {
     pub zip: Option<String>,
     pub city: Option<String>,
     pub country: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
 }
 
 fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
@@ -87,8 +93,11 @@ fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
         country:              row.get(21)?,
         created_at:           row.get(22)?,
         updated_at:           row.get(23)?,
-        pipeline_phase:       row.get(24)?,
-        pipeline_phase_label: row.get(25)?,
+        archived_at:          row.get(24)?,
+        email:                row.get(25)?,
+        phone:                row.get(26)?,
+        pipeline_phase:       row.get(27)?,
+        pipeline_phase_label: row.get(28)?,
     })
 }
 
@@ -98,7 +107,7 @@ SELECT
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.street, a.zip, a.city, a.country,
-    a.created_at, a.updated_at,
+    a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
 FROM accounts a
@@ -122,7 +131,7 @@ SELECT
     a.status, a.priority, a.tags, a.goals, a.health_score, a.internal_notes,
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.street, a.zip, a.city, a.country,
-    a.created_at, a.updated_at,
+    a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
     ps.name   AS pipeline_phase,
     ps.label  AS pipeline_phase_label
 FROM accounts a
@@ -169,15 +178,16 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
         "INSERT INTO accounts (id, workspace_id, created_by, name, kind, industry, website,
                                status, priority, tags, goals, internal_notes,
                                pending_sync, social_links, primary_deal_id,
-                               street, zip, city, country,
+                               street, zip, city, country, email, phone,
                                created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?16,?17,?18,?19,?19)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?16,?17,?18,?19,?20,?21,?21)
          ON CONFLICT(id) DO UPDATE SET
            name=excluded.name, kind=excluded.kind, industry=excluded.industry,
            website=excluded.website, status=excluded.status, priority=excluded.priority,
            tags=excluded.tags, goals=excluded.goals, internal_notes=excluded.internal_notes,
            social_links=excluded.social_links, primary_deal_id=excluded.primary_deal_id,
            street=excluded.street, zip=excluded.zip, city=excluded.city, country=excluded.country,
+           email=excluded.email, phone=excluded.phone,
            pending_sync=1, updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.name,
@@ -189,6 +199,7 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
             payload.social_links.unwrap_or_else(|| "{}".to_string()),
             payload.primary_deal_id,
             payload.street, payload.zip, payload.city, payload.country,
+            payload.email, payload.phone,
             now,
         ],
     )?;
@@ -218,6 +229,25 @@ pub fn set_primary_deal(
         return Err(AppError::NotFound(format!("Account {account_id} not found")));
     }
     get_by_id(conn, account_id)
+}
+
+/// Archiviert (oder reaktiviert) einen Account. Archiviert = aus der aktiven
+/// Liste raus, aber alle Daten (Rechnungen, History) bleiben erhalten.
+pub fn set_archived(conn: &Connection, id: &str, archived: bool) -> Result<Account, AppError> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let archived_at: Option<String> = if archived { Some(now.clone()) } else { None };
+    let affected = conn.execute(
+        "UPDATE accounts SET archived_at = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![archived_at, now, id],
+    )?;
+    if affected == 0 {
+        return Err(AppError::NotFound(format!("Account {id} not found")));
+    }
+    crate::core::sync::enqueue(
+        conn, "accounts", id, "UPDATE",
+        serde_json::json!({"id": id, "archived_at": archived_at, "updated_at": now}),
+    )?;
+    get_by_id(conn, id)
 }
 
 pub fn delete(conn: &Connection, id: &str, workspace_id: &str) -> Result<(), AppError> {
@@ -268,6 +298,8 @@ mod tests {
             zip: None,
             city: None,
             country: None,
+            email: None,
+            phone: None,
         }
     }
 
@@ -279,6 +311,21 @@ mod tests {
         assert_eq!(acc.kind, "company");
         assert_eq!(acc.workspace_id, "ws-1");
         assert!(!acc.is_private);
+    }
+
+    #[test]
+    fn upsert_persists_email_and_phone() {
+        let conn = setup();
+        let mut p = make_payload("acc-em", "ws-1", "MailCo");
+        p.email = Some("kunde@firma.de".into());
+        p.phone = Some("+49 30 123".into());
+        let acc = upsert(&conn, p).unwrap();
+        assert_eq!(acc.email.as_deref(), Some("kunde@firma.de"));
+        assert_eq!(acc.phone.as_deref(), Some("+49 30 123"));
+        // Round-trip über get_by_id (Stammdaten neu laden)
+        let fetched = get_by_id(&conn, &acc.id).unwrap();
+        assert_eq!(fetched.email.as_deref(), Some("kunde@firma.de"));
+        assert_eq!(fetched.phone.as_deref(), Some("+49 30 123"));
     }
 
     #[test]
@@ -318,6 +365,36 @@ mod tests {
         let acc = upsert(&conn, make_payload("del-1", "ws-1", "To Delete")).unwrap();
         delete(&conn, &acc.id, "ws-1").unwrap();
         assert!(get_all(&conn, "ws-1").unwrap().is_empty());
+    }
+
+    #[test]
+    fn upsert_account_is_not_archived_by_default() {
+        let conn = setup();
+        let acc = upsert(&conn, make_payload("arc-0", "ws-1", "Fresh")).unwrap();
+        assert!(acc.archived_at.is_none());
+    }
+
+    #[test]
+    fn set_archived_sets_and_clears_timestamp() {
+        let conn = setup();
+        let acc = upsert(&conn, make_payload("arc-1", "ws-1", "Einmal GmbH")).unwrap();
+
+        let archived = set_archived(&conn, &acc.id, true).unwrap();
+        assert!(archived.archived_at.is_some());
+
+        // Account bleibt in get_all (nur das Frontend filtert ihn aus der aktiven Liste).
+        let all = get_all(&conn, "ws-1").unwrap();
+        assert!(all.iter().any(|a| a.id == acc.id && a.archived_at.is_some()));
+
+        let reactivated = set_archived(&conn, &acc.id, false).unwrap();
+        assert!(reactivated.archived_at.is_none());
+    }
+
+    #[test]
+    fn set_archived_unknown_id_returns_not_found() {
+        let conn = setup();
+        let result = set_archived(&conn, "nope", true);
+        assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 
     #[test]

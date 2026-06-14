@@ -19,6 +19,7 @@ interface FilesState {
   removeFolder: (id: string) => Promise<void>
   addFile: (payload: AddFilePayload) => Promise<void>
   importFile: (params: ImportFileParams) => Promise<void>
+  importFromPath: (params: { customerId: string; folderId?: string | null; srcPath: string }) => Promise<void>
   removeFile: (id: string) => Promise<void>
 }
 
@@ -103,6 +104,18 @@ export const useFilesStore = create<FilesState>()((set, get) => ({
   importFile: async (params) => {
     try {
       const file = await FolderService.importFile(params)
+      if (file.folderId === get().activeFolderId) {
+        set(s => ({ files: [...s.files, file] }))
+      }
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  importFromPath: async (params) => {
+    try {
+      const file = await FolderService.importFromPath(params)
       if (file.folderId === get().activeFolderId) {
         set(s => ({ files: [...s.files, file] }))
       }

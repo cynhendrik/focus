@@ -29,6 +29,7 @@ pub struct EmailHeader {
     pub sent_at: String,
     pub is_read: bool,
     pub customer_id: Option<String>,
+    pub not_a_lead: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -21,6 +21,7 @@ function makeEmail(p: Partial<EmailHeader> & { id: string }): EmailHeader {
     toAddrs: [], sentAt: '2026-01-01T00:00:00Z',
     isRead: p.isRead ?? false,
     customerId: p.customerId !== undefined ? p.customerId : 'c1',
+    notALead: p.notALead ?? false,
   }
 }
 

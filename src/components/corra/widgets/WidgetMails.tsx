@@ -27,18 +27,18 @@ export function WidgetMails() {
       <div style={{
         position: 'absolute', top: -40, left: '50%', transform: 'translateX(-50%)',
         width: 280, height: 140,
-        background: 'radial-gradient(ellipse, rgba(163,230,53,0.07) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse, rgba(59,109,244,0.07) 0%, transparent 70%)',
         pointerEvents: 'none', borderRadius: '50%',
       }} />
 
-      <div style={{ fontSize: 9, color: 'rgba(163,230,53,0.5)', fontFamily: 'var(--font-mono)', letterSpacing: '0.18em', marginBottom: 12 }}>
+      <div style={{ fontSize: 9, color: 'rgba(59,109,244,0.5)', fontFamily: 'var(--font-mono)', letterSpacing: '0.18em', marginBottom: 12 }}>
         UNGELESENE MAILS
       </div>
 
       <div style={{
         fontSize: 48, fontWeight: 900, color: 'var(--accent)',
         letterSpacing: '-0.04em', lineHeight: 1,
-        textShadow: '0 0 40px rgba(163,230,53,0.25)', marginBottom: 20,
+        textShadow: '0 0 40px rgba(59,109,244,0.25)', marginBottom: 20,
       }}>
         {unread.length} neu
       </div>
@@ -46,26 +46,26 @@ export function WidgetMails() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {unread.map((mail, i) => (
           <div key={mail.id}>
-            {i > 0 && <div style={{ height: 1, background: 'rgba(163,230,53,0.08)', marginBottom: 12 }} />}
+            {i > 0 && <div style={{ height: 1, background: 'rgba(59,109,244,0.08)', marginBottom: 12 }} />}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                background: 'var(--accent)', boxShadow: '0 0 6px rgba(163,230,53,0.6)',
+                background: 'var(--accent)', boxShadow: '0 0 6px rgba(59,109,244,0.6)',
               }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: '#ddd', flex: 1 }}>
                 {accountName(mail.customerId ?? undefined) ?? mail.fromName ?? mail.fromAddr}
               </span>
-              <span style={{ fontSize: 9, color: 'rgba(163,230,53,0.35)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 9, color: 'rgba(59,109,244,0.35)', fontFamily: 'var(--font-mono)' }}>
                 {fmtTime(mail.sentAt)}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(163,230,53,0.4)', paddingLeft: 14, marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'rgba(59,109,244,0.4)', paddingLeft: 14, marginTop: 2 }}>
               {mail.subject || '(ohne Betreff)'}
             </div>
           </div>
         ))}
         {unread.length === 0 && (
-          <span style={{ fontSize: 13, color: 'rgba(163,230,53,0.4)' }}>Keine ungelesenen Mails ✓</span>
+          <span style={{ fontSize: 13, color: 'rgba(59,109,244,0.4)' }}>Keine ungelesenen Mails ✓</span>
         )}
       </div>
     </div>

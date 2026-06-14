@@ -1,0 +1,74 @@
+name: Build installers
+
+# Baut die Tester-Installer für Windows, macOS (Universal: Intel + Apple Silicon)
+# und Linux in der Cloud. Auslösbar manuell (workflow_dispatch) oder per Versions-Tag.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    permissions:
+      contents: write          # für das automatische Release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            rust_targets: ''
+            args: ''
+          - platform: ubuntu-22.04
+            rust_targets: ''
+            args: ''
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Rust einrichten
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Rust-Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Nur Linux: System-Abhängigkeiten für Tauri (WebKitGTK etc.)
+      - name: Linux-Abhängigkeiten
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
+
+      - name: Frontend-Deps installieren
+        run: npm ci
+
+      - name: Tauri bauen
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tester-Build: lokaler Modus (kein Login), Supabase als Platzhalter.
+          # (Diese Werte liegen lokal in src-tauri/.cargo/config.toml, das gitignored ist.)
+          VITE_LOCAL_MODE: 'true'
+          SUPABASE_URL: 'https://placeholder.supabase.co'
+          SUPABASE_ANON_KEY: 'placeholder-key'
+        with:
+          args: ${{ matrix.args }}
+          # Legt automatisch ein (Entwurfs-)Release mit den Installern als Assets an.
+          tagName: app-v__VERSION__
+          releaseName: 'Cultera Focus v__VERSION__'
+          releaseDraft: true
+          prerelease: false
