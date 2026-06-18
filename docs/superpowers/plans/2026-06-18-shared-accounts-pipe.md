@@ -577,9 +577,13 @@ Expected: keine Typfehler; alle Tests grün.
 
 - [ ] **Step 3: Realtime im Supabase-Projekt aktivieren (einmalig)**
 
-Sicherstellen, dass `accounts` zur Realtime-Publication gehört. Im Supabase SQL-Editor:
+Sicherstellen, dass `accounts` zur Realtime-Publication gehört UND `replica
+identity full` gesetzt ist — letzteres, damit bei DELETE/UPDATE die alte Zeile
+(inkl. `workspace_id`) im Realtime-Payload steckt und das `workspace_id=eq.…`-
+Filter Cross-User-Deletes nicht verwirft. Im Supabase SQL-Editor:
 ```sql
 alter publication supabase_realtime add table public.accounts;
+alter table public.accounts replica identity full;
 ```
 (Idempotent prüfen: `select * from pg_publication_tables where pubname='supabase_realtime';`)
 
