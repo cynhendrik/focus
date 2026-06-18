@@ -45,9 +45,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       isOnline: true,
 
       loadWorkspaces: async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        const uid = session?.user?.id
+        if (!uid) {
+          set({ workspaces: [] })
+          return
+        }
+
         const { data, error } = await supabase
           .from('workspace_members')
           .select('workspace_id, role, workspaces(id, name, logo_url)')
+          .eq('user_id', uid)
 
         if (error) throw error
 
