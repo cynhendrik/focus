@@ -7,6 +7,19 @@ export interface Workspace {
   name: string
   logo_url: string | null
   role: 'owner' | 'member'
+  isShared: boolean
+}
+
+/** Pro Workspace true, wenn mehr als ein Mitglied existiert. */
+export function deriveShared(
+  ids: string[],
+  memberRows: { workspace_id: string }[],
+): Record<string, boolean> {
+  const counts = new Map<string, number>()
+  for (const r of memberRows) counts.set(r.workspace_id, (counts.get(r.workspace_id) ?? 0) + 1)
+  const out: Record<string, boolean> = {}
+  for (const id of ids) out[id] = (counts.get(id) ?? 0) > 1
+  return out
 }
 
 interface WorkspaceState {
@@ -19,6 +32,8 @@ interface WorkspaceState {
   setActiveWorkspace: (id: string) => void
   setPendingCount: (count: number) => void
   setOnline: (online: boolean) => void
+  getActiveWorkspaceId: () => string | null
+  isActiveWorkspaceShared: () => boolean
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -36,11 +51,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         if (error) throw error
 
-        const workspaces: Workspace[] = (data ?? []).map((m: any) => ({
+        const base = (data ?? []).map((m: any) => ({
           id: m.workspaces.id,
           name: m.workspaces.name,
           logo_url: m.workspaces.logo_url,
           role: m.role as 'owner' | 'member',
+        }))
+
+        const ids = base.map((w) => w.id)
+        let sharedMap: Record<string, boolean> = {}
+        if (ids.length > 0) {
+          const { data: members } = await supabase
+            .from('workspace_members')
+            .select('workspace_id')
+            .in('workspace_id', ids)
+          sharedMap = deriveShared(ids, members ?? [])
+        }
+
+        const workspaces: Workspace[] = base.map((w) => ({
+          ...w,
+          isShared: sharedMap[w.id] ?? false,
         }))
 
         set({ workspaces })
@@ -74,6 +104,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
       setPendingCount: (count) => set({ pendingCount: count }),
       setOnline: (online) => set({ isOnline: online }),
+
+      getActiveWorkspaceId: () => get().activeWorkspaceId,
+      isActiveWorkspaceShared: () => {
+        const { workspaces, activeWorkspaceId } = get()
+        return workspaces.find((w) => w.id === activeWorkspaceId)?.isShared ?? false
+      },
     }),
     {
       name: 'focus-workspace-v1',

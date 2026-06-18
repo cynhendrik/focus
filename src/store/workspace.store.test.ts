@@ -1,5 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useWorkspaceStore } from './workspace.store'
+import { useWorkspaceStore, deriveShared } from './workspace.store'
+
+describe('deriveShared', () => {
+  it('markiert Workspaces mit >1 Mitglied als shared', () => {
+    const memberRows = [
+      { workspace_id: 'a' }, { workspace_id: 'a' }, // a: 2 Mitglieder
+      { workspace_id: 'b' },                        // b: 1 Mitglied
+    ]
+    const result = deriveShared(['a', 'b'], memberRows)
+    expect(result).toEqual({ a: true, b: false })
+  })
+
+  it('Workspace ohne Mitglieder-Rows ist nicht shared', () => {
+    expect(deriveShared(['x'], [])).toEqual({ x: false })
+  })
+})
 
 beforeEach(() => {
   useWorkspaceStore.setState({
@@ -35,20 +50,31 @@ describe('useWorkspaceStore', () => {
 
   it('loadWorkspaces calls supabase and sets workspaces', async () => {
     const { supabase } = await import('@/lib/supabase')
-    vi.mocked(supabase.from).mockReturnValue({
-      select: vi.fn().mockResolvedValue({
-        data: [
-          {
-            workspace_id: 'ws-1',
-            role: 'owner',
-            workspaces: { id: 'ws-1', name: 'Agentur', logo_url: null },
-          },
-        ],
-        error: null,
-      }),
-    } as any)
+    // First call: members + joined workspaces. Second call: member rows for isShared.
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({
+        select: vi.fn().mockResolvedValue({
+          data: [
+            {
+              workspace_id: 'ws-1',
+              role: 'owner',
+              workspaces: { id: 'ws-1', name: 'Agentur', logo_url: null },
+            },
+          ],
+          error: null,
+        }),
+      } as any)
+      .mockReturnValueOnce({
+        select: vi.fn().mockReturnValue({
+          in: vi.fn().mockResolvedValue({
+            data: [{ workspace_id: 'ws-1' }, { workspace_id: 'ws-1' }],
+            error: null,
+          }),
+        }),
+      } as any)
     await useWorkspaceStore.getState().loadWorkspaces()
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(1)
     expect(useWorkspaceStore.getState().workspaces[0].name).toBe('Agentur')
+    expect(useWorkspaceStore.getState().workspaces[0].isShared).toBe(true)
   })
 })
