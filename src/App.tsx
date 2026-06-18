@@ -25,6 +25,7 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
 import { WorkspacePicker } from '@/core/workspace/WorkspacePicker'
 import { useSyncBridge } from '@/core/sync/useSyncBridge'
+import { useWorkspaceRealtime } from '@/core/sync/useWorkspaceRealtime'
 import { useMailAutoSync } from '@/core/sync/useMailAutoSync'
 
 // Routes are code-split: each becomes its own chunk loaded on first navigation
@@ -201,6 +202,7 @@ export default function App() {
   }, [activeWorkspaceId, init, initCustomers, loadLastActivity, loadCrmAll, loadPipelineStages, loadAllDeals, loadAllTodos, syncLeads, loadLeads, loadCalendar])
 
   useSyncBridge()
+  useWorkspaceRealtime()
   useMailAutoSync()
   useOnboardingSync()
 
