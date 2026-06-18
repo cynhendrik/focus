@@ -70,7 +70,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   bulkUpdate: async (payload, workspaceId) => {
     set({ error: null })
     try {
-      await LeadsService.bulkUpdate(payload)
+      await AccountsGateway.bulkUpdate(payload)
       await get().load(workspaceId)
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }

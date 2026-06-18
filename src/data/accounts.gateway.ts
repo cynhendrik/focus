@@ -3,7 +3,7 @@ import { LeadsService } from '@/services/leads.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { accountRowToLead, leadPayloadToAccountRow } from './accounts.mapper'
-import type { Lead, UpsertLeadPayload, PipelineStage } from '@/types/lead.types'
+import type { Lead, UpsertLeadPayload, PipelineStage, BulkUpdateLeadsPayload } from '@/types/lead.types'
 
 function shared(): boolean {
   return useWorkspaceStore.getState().isActiveWorkspaceShared()
@@ -66,5 +66,20 @@ export const AccountsGateway = {
       .single()
     if (error) throw error
     return accountRowToLead(data)
+  },
+
+  async bulkUpdate(payload: BulkUpdateLeadsPayload): Promise<void> {
+    if (!shared()) { await LeadsService.bulkUpdate(payload); return }
+    const now = new Date().toISOString()
+    const { error } = await supabase
+      .from('accounts')
+      .update({
+        lead_status: payload.status,
+        re_engage_date: payload.reEngageDate ?? null,
+        updated_at: now,
+      })
+      .in('id', payload.ids)
+      .eq('account_type', 'lead')
+    if (error) throw error
   },
 }
