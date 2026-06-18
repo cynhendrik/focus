@@ -539,18 +539,24 @@ pub fn get_finance_kpis(conn: &Connection, workspace_id: &str) -> Result<Finance
     // Fälligkeit. Überfälligkeit wird aus due_date abgeleitet (Status wird nie auf
     // 'overdue' gesetzt). date('now','localtime') statt UTC, damit CET-Rechnungen
     // nicht einen Tag zu früh kippen.
+    // Die Summen sind RESTBETRÄGE (total minus bereits erfasste Teilzahlungen),
+    // damit Cockpit (clientseitig) und KPI-Karten denselben offenen Betrag zeigen.
     let (open_count, open_total): (i64, f64) = conn.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(total),0) FROM invoices
-         WHERE workspace_id=?1 AND status IN ('open','overdue') AND is_suggestion=0
-           AND due_date >= date('now','localtime')",
+        "SELECT COUNT(*), COALESCE(SUM(i.total - COALESCE(
+                    (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)), 0)
+         FROM invoices i
+         WHERE i.workspace_id=?1 AND i.status IN ('open','overdue') AND i.is_suggestion=0
+           AND i.due_date >= date('now','localtime')",
         [workspace_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
 
     let (overdue_count, overdue_total): (i64, f64) = conn.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(total),0) FROM invoices
-         WHERE workspace_id=?1 AND status IN ('open','overdue') AND is_suggestion=0
-           AND due_date < date('now','localtime')",
+        "SELECT COUNT(*), COALESCE(SUM(i.total - COALESCE(
+                    (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id), 0)), 0)
+         FROM invoices i
+         WHERE i.workspace_id=?1 AND i.status IN ('open','overdue') AND i.is_suggestion=0
+           AND i.due_date < date('now','localtime')",
         [workspace_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
@@ -945,5 +951,24 @@ mod tests {
         assert_eq!(kpis.open_count, 1);
         assert_eq!(kpis.suggestion_count, 1);
         assert_eq!(kpis.month_revenue, 119.0);
+    }
+
+    #[test]
+    fn get_finance_kpis_open_total_subtracts_partial_payments() {
+        let conn = setup();
+        // Offene Rechnung über 119,00 (due_date in der Zukunft → zählt als "offen")
+        let inv = create(&conn, sample_payload(vec![])).unwrap();
+        update_status(&conn, &inv.invoice.id, "open").unwrap();
+
+        // Teilzahlung über 19,00 → Restbetrag 100,00
+        conn.execute(
+            "INSERT INTO payments (id, workspace_id, invoice_id, amount, paid_at, created_at)
+             VALUES ('pay-1', 'ws-1', ?1, 19.0, '2026-06-15', '2026-06-15')",
+            [&inv.invoice.id],
+        ).unwrap();
+
+        let kpis = get_finance_kpis(&conn, "ws-1").unwrap();
+        assert_eq!(kpis.open_count, 1);          // Rechnung zählt weiterhin als offen
+        assert_eq!(kpis.open_total, 100.0);      // aber nur der Restbetrag
     }
 }

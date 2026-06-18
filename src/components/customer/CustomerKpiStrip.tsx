@@ -5,8 +5,10 @@ import { useDealsStore } from '@/store/deals.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useUiStore } from '@/store/ui.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { FinanceService } from '@/services/finance.service'
-import type { Invoice } from '@/types/finance.types'
+import { paidAmount, remaining } from '@/lib/invoice-status'
+import type { Invoice, Payment } from '@/types/finance.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CustomerKpiStrip — die Eckdaten des Kunden als EINE schmale Zeile über der
@@ -87,11 +89,17 @@ export function CustomerKpiStrip({ customerId }: Props) {
   const activities   = useActivitiesStore(s => s.activities)
   const lastActivity = useCrmStore(s => s.lastActivity)
   const setActiveTab = useUiStore(s => s.setActiveCustomerTab)
+  const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId)
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [payments, setPayments] = useState<Payment[]>([])
   useEffect(() => {
     FinanceService.getInvoicesByAccount(customerId).then(setInvoices).catch(() => {})
   }, [customerId])
+  useEffect(() => {
+    if (!workspaceId) return
+    FinanceService.getPaymentsByWorkspace(workspaceId).then(setPayments).catch(() => {})
+  }, [workspaceId])
 
   const today = new Date().toLocaleDateString('sv')
 
@@ -116,7 +124,8 @@ export function CustomerKpiStrip({ customerId }: Props) {
     ),
     [invoices, today],
   )
-  const overdueTotal = overdueList.reduce((s, i) => s + i.total, 0)
+  // Restbetrag, nicht Brutto — Teilzahlungen reduzieren das offene Geld.
+  const overdueTotal = overdueList.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0)
 
   const lastContactDays = useMemo(() => {
     const fromCrm = lastActivity.find(a => a.accountId === customerId)?.lastActivityAt
