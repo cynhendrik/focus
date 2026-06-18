@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { LeadsService } from '@/services/leads.service'
+import { AccountsGateway } from '@/data/accounts.gateway'
 import { usePipelineStore } from './pipeline.store'
 import { useDealsStore } from './deals.store'
 import { useCustomersStore } from './customers.store'
@@ -36,7 +37,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   load: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const leads = await LeadsService.getAll(workspaceId)
+      const leads = await AccountsGateway.getLeads(workspaceId)
       set({ leads, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -48,7 +49,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   upsert: async (payload) => {
     set({ error: null })
     try {
-      const lead = await LeadsService.upsert(payload)
+      const lead = await AccountsGateway.upsertLead(payload)
       set(s => {
         const exists = s.leads.some(l => l.id === lead.id)
         return {
@@ -82,7 +83,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   convertToClient: async (id) => {
     set({ error: null })
     try {
-      await LeadsService.convertToClient(id)
+      await AccountsGateway.convertToClient(id)
       set(s => ({ leads: s.leads.filter(l => l.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -103,7 +104,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     const firstStage = stages[0]
 
     // 1) Convert lead → customer (changes account_type in DB)
-    await LeadsService.convertToClient(id)
+    await AccountsGateway.convertToClient(id)
 
     // 2) Create deal pointing to the now-customer (same ID)
     const userIdSafe = userId || lead.workspaceId  // never empty, but createdBy is required
@@ -132,7 +133,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   deleteLead: async (id, workspaceId) => {
     set({ error: null })
     try {
-      await LeadsService.deleteLead(id, workspaceId)
+      await AccountsGateway.deleteAccount(id, workspaceId)
       set(s => ({ leads: s.leads.filter(l => l.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -154,7 +155,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
 
   updateStage: async (id, stage) => {
     try {
-      const lead = await LeadsService.updateStage(id, stage)
+      const lead = await AccountsGateway.updateStage(id, stage)
       set(s => ({ leads: s.leads.map(l => l.id === id ? lead : l) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
