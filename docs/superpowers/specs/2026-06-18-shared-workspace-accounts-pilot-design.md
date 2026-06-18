@@ -1,4 +1,4 @@
-# Shared Workspace — Pilot: geteilte `accounts` (Leads + Kunden), Cloud-Direct + Realtime
+# Shared Workspace — Pilot: geteilte Kunden-Oberfläche (alle Tabs) + Attribution
 
 **Datum:** 2026-06-18
 **Status:** Design — zur Umsetzung freigegeben
@@ -15,199 +15,220 @@ lokal (`leads.service.ts:18` → `invoke('get_leads')`).
 
 Folge: Zwei Mitarbeiter können **nicht** gemeinsam auf einem Workspace
 arbeiten — jeder hat eine isolierte lokale Kopie; die Cloud ist ein reines
-Schreib-Backup.
+Schreib-Backup. Man sieht auch nicht, **wer was gemacht hat**.
 
-Gleichzeitig existiert das Cloud-Fundament für Mehrbenutzer schon: Tabellen
-`workspaces` + `workspace_members` mit Rollen `owner`/`member`
-(`src/store/workspace.store.ts:5-22`), und die Daten werden ohnehin nach
-Supabase gepusht.
+Das Cloud-Fundament für Mehrbenutzer existiert: `workspaces` +
+`workspace_members` mit Rollen `owner`/`member`
+(`src/store/workspace.store.ts:5-22`), und die Daten werden ohnehin gepusht.
 
 ## Ziel
 
-Ein Testkunde soll mit **einem** Mitarbeiter auf demselben Workspace arbeiten
-und Änderungen **quasi in Echtzeit** sehen — im Desktop-Client.
-
-Dieser Pilot beweist das Muster an **einer** Tabelle und ist die Blaupause für
-den späteren Ausbau auf die restliche App.
+Ein Testkunde soll mit **einem** Mitarbeiter auf demselben Workspace arbeiten,
+Änderungen **quasi in Echtzeit** sehen, und an jedem Objekt **erkennen, wer es
+erstellt und wer es erledigt hat** — im Desktop-Client.
 
 ### Pilot-Umfang
 
-- **Genau eine Tabelle: `accounts`.** Leads und Kunden sind dieselbe Tabelle,
-  unterschieden über `account_type` ('lead' / 'client')
-  (`src-tauri/src/db/lead.rs:79,135`). Damit deckt der Pilot Leads-Liste,
-  Leads-Board und die Kundenliste/-stammdaten ab.
-- Betroffene Stores: `leads.store`, `customers.store`.
+**1) Geteilte Kunden-Oberfläche (Kernziel) — alle Tabs des Kundendetails plus
+die Leads-Liste/-Board.** Betroffene Tabellen:
+
+| Bereich (Tab) | Pane | Tabelle(n) |
+|---|---|---|
+| Leads-Liste/-Board + Profil/Header | LeverageLeadsRoute / ProfilPane | `accounts` (Leads+Kunden, `account_type`) |
+| Aktivitäten | TimelinePane | `activities` |
+| Aufgaben | WorkflowPane | `todos` |
+| Notizen | CustomerNotesPane | `notes` |
+| Dokumente | DateienPane | `files` |
+| Finanzen | FinanzPane | `invoices`, `offers`, `deals` |
+
+**2) Attribution „erstellt + erledigt".** An jedem Objekt sichtbar: wer hat es
+erstellt (`created_by`, oft schon vorhanden) und — bei Aufgaben/Rechnungen —
+wer hat es erledigt/abgeschlossen (`completed_by`, neu). Dargestellt als kleines
+farbiges Initialen-Badge.
+
+**3) Nutzerprofile** (Name + Farbe) als Grundlage für die Badges.
+
+**4) Beitritts-Code** + Login (Login existiert).
+
+### Reihenfolge der Umsetzung (innerhalb des Piloten)
+
+Wir bauen **nicht** alle Tabellen gleichzeitig blind. Das Fundament wird zuerst
+**end-to-end an `accounts`** bewiesen (Gateway-Routing, Realtime-Infra,
+Nutzerprofile, Beitritts-Code, RLS, Badge), inklusive Attribution. Sobald dieser
+eine Pfad sauber steht, werden die übrigen Kunden-Tab-Tabellen **nach demselben
+Muster** ergänzt (`activities` → `todos` → `notes` → `files` →
+`invoices/offers/deals`). Der Implementierungsplan schneidet das in einzelne,
+je für sich testbare Schritte.
+
+### Folge-Schritt (nach dem Piloten, eigene Spec)
+
+- **Zeiterfassung teilen.** Liegt heute nur in `localStorage`
+  (`auftraege.store.ts`) und wird nicht synchronisiert. **Voraussetzung:** erst
+  nach SQLite/Supabase migrieren, dann nach demselben Muster teilbar machen.
 
 ### Nicht-Ziele (bewusst draußen, YAGNI)
 
-- Andere Tabellen (Rechnungen, Pipeline-Deals als eigene Entität, Aktivitäten,
-  Notizen, Verträge, Mail). Kommen erst nach erfolgreichem Pilot.
+- Mail (IMAP ist ohnehin pro Nutzer), Verträge, Notizen-Module-Stickies,
+  Kalender — kommen später.
 - Präsenz / „wer ist online" / Live-Cursor.
-- Feldweises Merge / CRDT. Es gilt **last-write-wins** über `updated_at`.
+- Volles Audit-Log jeder Aktion (gewählt wurde „erstellt + erledigt", nicht
+  „jede Aktion").
+- Feldweises Merge / CRDT — es gilt **last-write-wins** über `updated_at`.
 - Echtes Offline-Weiterarbeiten mit Merge im geteilten Modus.
-- E-Mail-basierte Einladung (wir nehmen Beitritts-Code).
 
 ## Erfolgskriterien
 
-1. Owner (Testkunde) erstellt einen Beitritts-Code und gibt ihn weiter.
-2. Mitarbeiter loggt sich mit eigenem Account ein, gibt den Code ein und wird
-   Mitglied des Workspaces.
-3. Owner legt in der Leads-Liste einen Lead an → Mitarbeiter sieht ihn
-   **innerhalb weniger Sekunden ohne Reload**.
-4. Mitarbeiter macht den Lead zum Kunden (`convertToClient`) → bei beiden
-   verschwindet er aus der Leads-Liste und erscheint in der Kundenliste.
-5. Ein zweiter Nutzer kann **nur** Daten der Workspaces sehen, in denen er
-   Mitglied ist (RLS verifiziert).
+1. Owner erstellt einen Beitritts-Code; Mitarbeiter loggt sich mit eigenem
+   Account ein, gibt den Code ein und wird Mitglied.
+2. Owner legt einen Lead an → Mitarbeiter sieht ihn **in Sekunden ohne Reload**.
+3. Im Kundendetail: Owner schreibt eine Notiz / legt eine Aufgabe / entwirft
+   eine Rechnung → Mitarbeiter sieht es live im jeweiligen Tab.
+4. Jedes dieser Objekte trägt ein farbiges Badge „erstellt von <Kürzel>".
+   Schließt der Mitarbeiter eine Aufgabe ab oder versendet die Rechnung,
+   erscheint zusätzlich „erledigt von <Kürzel>".
+5. Ein Nutzer sieht **nur** Daten der Workspaces, in denen er Mitglied ist
+   (RLS verifiziert).
 6. Solo-Workspaces funktionieren unverändert offline weiter.
 
 ## Architektur — Überblick
 
 Wir führen einen **Workspace-Modus** ein. Ist der aktive Workspace *geteilt*
-(`isShared`), läuft der Datenzugriff für `accounts` **direkt gegen Supabase**
-(Lesen/Schreiben) statt gegen die lokale SQLite, plus eine Supabase-Realtime-
-Subscription. Solo-Workspaces bleiben unverändert auf dem lokalen Pfad.
+(`isShared`), läuft der Datenzugriff für die Pilot-Tabellen **direkt gegen
+Supabase** statt gegen die lokale SQLite, plus Supabase-Realtime-Subscriptions.
+Solo-Workspaces bleiben unverändert auf dem lokalen Pfad.
 
 ```
-Solo-Workspace:     Store → AccountsGateway → invoke('get_leads') → SQLite (lokal)
-Shared-Workspace:   Store → AccountsGateway → supabase.from('accounts')  → Postgres
-                                                   ↑ postgres_changes ↓
-                                              useWorkspaceRealtime → Store
+Solo:    Store → Gateway → invoke('get_*') → SQLite (lokal)
+Shared:  Store → Gateway → supabase.from('<tabelle>')  → Postgres
+                                  ↑ postgres_changes ↓
+                             useWorkspaceRealtime → Store
 ```
 
-Schlüsselprinzip: Der Store kennt **nur** das Gateway-Interface. Ob lokal oder
-Cloud entschieden wird, ist im Gateway gekapselt — kein `if (shared)` in der UI.
+Schlüsselprinzip: Stores kennen **nur** das Gateway-Interface. Ob lokal oder
+Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
 
 ## Komponenten
 
 ### 1. Workspace-Modus (`isShared`)
+- `Workspace` (`workspace.store.ts`) bekommt abgeleitetes `isShared: boolean`.
+- Beim `loadWorkspaces` Mitgliederzahl je Workspace zählen
+  (`workspace_members`); `isShared = memberCount > 1`.
+- Selektor/Helper liefert den Modus des aktiven Workspaces. Einzige Information,
+  die Gateways und Realtime-Hook zur Entscheidung brauchen.
 
-- `Workspace` (`workspace.store.ts`) bekommt ein abgeleitetes Feld
-  `isShared: boolean`.
-- Beim `loadWorkspaces` wird pro Workspace die Mitgliederzahl ermittelt
-  (Count auf `workspace_members`); `isShared = memberCount > 1`.
-- Helper `useIsSharedWorkspace()` / Selektor liefert den Modus des aktiven
-  Workspaces.
-- **Schnittstelle:** `isShared` ist die einzige Information, die das Gateway und
-  der Realtime-Hook zur Entscheidung brauchen.
-
-### 2. AccountsGateway (Kernstück)
-
-- Neues Modul `src/data/accounts.gateway.ts` mit demselben Methodenumfang, den
-  `LeadsService`/`CustomerService` heute bieten, mindestens:
-  `getLeads(workspaceId)`, `getCustomers(workspaceId)`,
-  `upsertLead(payload)`, `convertToClient(id)`, `deleteAccount(id)`,
-  `updateStage(id, stage)`.
-- Intern:
-  - **Solo:** delegiert an die bestehenden `invoke(...)`-Aufrufe (heutiger
-    Code, unverändert).
-  - **Shared:** `supabase.from('accounts')...` mit Filter auf `workspace_id`
-    und `account_type`.
-- Stores (`leads.store`, `customers.store`) rufen künftig das Gateway statt
-  direkt `LeadsService`/`CustomerService`.
-- **Abhängigkeit:** liest `isShared` + `activeWorkspaceId` aus
-  `useWorkspaceStore` (nicht-reaktiv via `getState()` im Service-Kontext).
+### 2. Daten-Gateways (Kernstück)
+- Pro Pilot-Entität ein Gateway mit demselben Methodenumfang wie heute die
+  Services (`getAll/upsert/delete/…`), z. B. `accounts.gateway.ts`,
+  `activities.gateway.ts`, `todos.gateway.ts`, `notes.gateway.ts`,
+  `files.gateway.ts`, `finance.gateway.ts`.
+- **Solo:** delegiert an die bestehenden `invoke(...)`-Aufrufe (unverändert).
+- **Shared:** `supabase.from('<tabelle>')…`, gefiltert auf `workspace_id`.
+- Die jeweiligen Stores rufen künftig das Gateway statt direkt den Service.
+- Gemeinsamer Helper `resolveMode()` liest `isShared`+`activeWorkspaceId` aus
+  `useWorkspaceStore.getState()`.
 
 ### 3. Mapper (TS ↔ Supabase-Spalten)
-
-- Reines Modul `src/data/accounts.mapper.ts`:
-  `rowToLead(row)`, `rowToCustomer(row)`, `leadPayloadToRow(payload)`.
-- Übersetzt camelCase ↔ snake_case und Account-Felder. Orientiert sich an
-  vorhandener Logik (`normalizePendingLead` in `leads.service.ts`,
-  Push-Payload-Aufbau).
-- **Unabhängig testbar** (Round-Trip-Tests), keine Netz-Abhängigkeit.
+- Je Entität ein reines Mapper-Modul (camelCase ↔ snake_case), Round-Trip
+  testbar, keine Netz-Abhängigkeit. Orientiert sich an `normalizePendingLead`
+  und den Push-Payloads.
 
 ### 4. Realtime-Hook
-
-- `src/core/sync/useWorkspaceRealtime.ts`.
-- Aktiv nur, wenn aktiver Workspace `isShared`. Abonniert
-  `supabase.channel(...).on('postgres_changes', { event: '*', schema:
-  'public', table: 'accounts', filter: 'workspace_id=eq.<id>' }, …)`.
-- Bei INSERT/UPDATE/DELETE: mappt die Row und ruft die passenden Setter in
-  `leads.store` / `customers.store` (Routing nach `account_type`).
-- Unsubscribe bei Workspace-Wechsel/Unmount.
+- `src/core/sync/useWorkspaceRealtime.ts`. Aktiv nur bei `isShared`.
+- Abonniert `postgres_changes` (event `*`) je Pilot-Tabelle mit Filter
+  `workspace_id=eq.<id>` und spielt INSERT/UPDATE/DELETE über den Mapper in den
+  passenden Store ein.
+- Sauberes Unsubscribe bei Workspace-Wechsel/Unmount. Beim (Re)connect
+  einmaliger Full-Refetch je Tabelle, um verpasste Änderungen aufzuholen.
 - Mount-Punkt: dort, wo heute `useSyncBridge` eingehängt ist.
 
-### 5. Beitritts-Code + Beitritt
+### 5. Nutzerprofile (Name + Farbe)
+- Supabase-Tabelle `profiles` (`user_id` PK, `display_name`, `color`).
+- Beim ersten Login angelegt: `display_name` aus E-Mail abgeleitet, `color`
+  deterministisch aus `user_id` vergeben (stabil, kollisionsarm).
+- Client lädt die Profile der Workspace-Mitglieder einmal und cached sie
+  (`workspaceMembers.store` oder Erweiterung von `workspace.store`).
+- Name in den Profil-Einstellungen editierbar (optional, geringe Prio).
 
-- **Schema:** Spalte `join_code text unique` auf `workspaces` (kurzer
-  Zufallscode, z. B. 8 alphanumerische Zeichen), beim Anlegen generiert;
-  rotierbar per Owner-Aktion.
-- **Owner-UI:** Code in den Workspace-Einstellungen anzeigen + „Code neu
-  generieren".
+### 6. Attribution-Felder + Badge
+- **Felder:** alle Pilot-Tabellen führen `created_by` (vorhanden, sonst
+  ergänzen). `todos`, `invoices` zusätzlich `completed_by` (neu) — gesetzt beim
+  Übergang auf `done` bzw. beim Versand/Bezahlt-Markieren.
+- **UI:** wiederverwendbares `<UserBadge userId>` — farbiges Kürzel
+  (Initialen) aus dem Profil, Tooltip mit vollem Namen. Eingesetzt an
+  Aufgaben-, Notiz-, Aktivitäts-, Datei- und Rechnungs-Items: „erstellt von",
+  bei erledigt/abgeschlossen zusätzlich „erledigt von".
+- Im Solo-Modus zeigt das Badge schlicht den einzigen Nutzer (kein Sonderfall).
+
+### 7. Beitritts-Code + Beitritt
+- **Schema:** `join_code text unique` auf `workspaces` (kurzer Zufallscode,
+  beim Anlegen generiert, vom Owner rotierbar).
+- **Owner-UI:** Code in den Workspace-Einstellungen anzeigen + neu generieren.
 - **Beitritt:** Postgres-RPC `join_workspace_by_code(code text)` als
-  `SECURITY DEFINER`: validiert den Code und legt für `auth.uid()` eine Zeile
-  in `workspace_members` mit Rolle `member` an. Verhindert das Offenlegen aller
-  Codes und umgeht client-seitiges User-Lookup.
-- **Member-UI:** Nach Login Eingabefeld „Workspace beitreten" → ruft die RPC,
-  danach `loadWorkspaces` + aktiven Workspace setzen.
-- Login selbst existiert bereits (Supabase-Auth, `LoginScreen.tsx`); die
-  Member-Rolle wird in `loadWorkspaces` schon unterstützt.
+  `SECURITY DEFINER`: validiert den Code, legt für `auth.uid()` eine
+  `workspace_members`-Zeile mit Rolle `member` an. Keine Offenlegung aller
+  Codes, kein client-seitiges User-Lookup.
+- **Member-UI:** nach Login „Workspace beitreten" → RPC →
+  `loadWorkspaces` + aktiven Workspace setzen.
 
-### 6. RLS-Policies (Pflicht bei Multi-User)
+### 8. RLS-Policies (Pflicht bei Multi-User)
+- Auf **allen Pilot-Tabellen** + `workspaces`, `workspace_members`, `profiles`:
+  Zugriff nur, wenn `workspace_id in (select workspace_id from
+  workspace_members where user_id = auth.uid())`.
+- `workspace_members`: eigene Zeile sichtbar; Insert nur über die
+  `SECURITY DEFINER`-RPC. `profiles`: für Mitglieder gemeinsamer Workspaces
+  lesbar.
+- Aktueller RLS-Stand wird zu Beginn der Umsetzung verifiziert.
 
-- Auf `accounts`, `workspaces`, `workspace_members`:
-  Zugriff (select/insert/update/delete) nur, wenn
-  `workspace_id in (select workspace_id from workspace_members where user_id =
-  auth.uid())`.
-- `workspace_members`: ein Nutzer darf seine eigene Zeile sehen; Insert läuft
-  ausschließlich über die `SECURITY DEFINER`-RPC.
-- Aktueller RLS-Stand wird zu Beginn der Umsetzung verifiziert (der Push nutzt
-  bereits das User-Bearer-Token, also existiert vermutlich eine Owner-Policy).
-
-### 7. Offline-Verhalten (geteilter Modus)
-
-- **Lesen:** braucht Verbindung. Bei offline klare Anzeige „Geteilter
-  Workspace — Verbindung nötig" (nutzt das vorhandene
-  `cultera://connectivity-changed`-Event / `isOnline`).
-- **Schreiben:** offen getätigte Schreibvorgänge werden über die bestehende
+### 9. Offline-Verhalten (geteilter Modus)
+- **Lesen:** braucht Verbindung; klare Anzeige „Geteilter Workspace —
+  Verbindung nötig" (nutzt `cultera://connectivity-changed` / `isOnline`).
+- **Schreiben:** offline getätigte Writes werden über die bestehende
   `sync_queue` gepuffert und beim Reconnect via `flush_pending` nachgeschoben
-  (last-write-wins). Best-effort; kein Merge.
+  (last-write-wins). Best-effort, kein Merge.
 
-## Datenfluss — Beispiel (A legt Lead an, B sieht ihn)
+## Datenfluss — Beispiel (A entwirft Rechnung, B sieht sie + Badge)
 
-1. A (shared WS) erstellt Lead → `leads.store.upsert` → `AccountsGateway`
-   (shared) → `supabase.from('accounts').insert(...)`.
-2. Postgres persistiert, RLS erlaubt (A ist Mitglied).
-3. Supabase Realtime sendet `INSERT` an alle Abonnenten des Workspace-Channels.
-4. B's `useWorkspaceRealtime` empfängt das Event → `rowToLead` →
-   `leads.store` fügt den Lead ein → B's Liste rendert neu.
-5. A aktualisiert seinen Store optimistisch beim Insert (und/oder über das
-   eigene Realtime-Echo).
+1. A (shared WS) entwirft Rechnung im Finanzen-Tab → `finance.store` →
+   `finance.gateway` (shared) → `supabase.from('invoices').insert({ …,
+   created_by: A })`.
+2. Postgres persistiert (RLS erlaubt, A ist Mitglied).
+3. Realtime sendet `INSERT` an den Workspace-Channel.
+4. B's `useWorkspaceRealtime` empfängt es → Mapper → `finance.store` → B's
+   Finanzen-Tab rendert die Rechnung mit Badge „entworfen von A".
+5. B markiert sie als bezahlt → `completed_by: B` → A sieht „erledigt von B".
 
 ## Fehlerbehandlung
-
 - **Supabase-Schreibfehler (shared):** Toast + Rollback der optimistischen
-  Store-Änderung. Bei Netzfehler → in `sync_queue` puffern statt verwerfen.
-- **RPC-Beitritt mit ungültigem Code:** klare Fehlermeldung „Code ungültig".
-- **Realtime-Verbindungsabbruch:** automatischer Reconnect von Supabase;
-  beim Reconnect einmaliger Full-Refetch der `accounts` des Workspaces, damit
-  während des Ausfalls verpasste Änderungen aufgeholt werden.
-- **Workspace-Wechsel:** alte Subscription sauber abmelden, Stores für den
-  neuen Workspace neu laden.
+  Store-Änderung; bei Netzfehler in `sync_queue` puffern statt verwerfen.
+- **Ungültiger Beitritts-Code:** klare Fehlermeldung.
+- **Realtime-Abbruch:** Supabase-Auto-Reconnect; beim Reconnect Full-Refetch.
+- **Workspace-Wechsel:** alte Subscriptions abmelden, Stores neu laden.
+- **Fehlendes Profil eines Mitglieds:** Badge fällt auf Initialen aus
+  E-Mail/Default-Farbe zurück.
 
 ## Teststrategie
-
-- **Unit:** Gateway-Routing (solo → `invoke`, shared → supabase) mit Mocks;
-  `accounts.mapper` Round-Trip; `isShared`-Ableitung aus Mitgliederzahl.
-- **Integration (Supabase, Testprojekt):** RLS — Nutzer ohne Mitgliedschaft
-  bekommt keine Zeilen; `join_workspace_by_code` legt Mitgliedschaft an.
-- **Manuell (zwei Sessions):** zwei Logins, Erfolgskriterien 1–6 durchspielen;
-  Lead-Anlage und Convert in Echtzeit beobachten; Offline-Write → Reconnect.
+- **Unit:** Gateway-Routing (solo → `invoke`, shared → supabase) mit Mocks je
+  Entität; Mapper-Round-Trips; `isShared`-Ableitung; deterministische
+  Farbvergabe.
+- **Integration (Supabase-Testprojekt):** RLS — Nichtmitglied bekommt keine
+  Zeilen; `join_workspace_by_code` legt Mitgliedschaft an; `completed_by` wird
+  korrekt gesetzt.
+- **Manuell (zwei Logins):** Erfolgskriterien 1–6 durchspielen — Lead-Anlage,
+  Notiz/Aufgabe/Rechnung im Kundendetail live, Badges „erstellt/erledigt von",
+  Offline-Write → Reconnect.
 
 ## Risiken / offene Punkte
-
-- **Doppelter Datenpfad** (lokal vs. Cloud) in der Service-Schicht — der Pilot
-  muss zeigen, dass das Gateway-Muster sauber bleibt, bevor wir es auf ~20
-  weitere Services ausrollen.
-- **RLS korrekt aufsetzen** ist sicherheitskritisch (sonst Datenleck über
-  Workspaces hinweg).
-- **Eingebetteter Anthropic-Key** (separates Thema, siehe Memory) wird durch
-  Multi-User heikler, ist aber **nicht** Teil dieses Piloten.
+- **Doppelter Datenpfad** (lokal vs. Cloud) über mehrere Services — der
+  Accounts-Schritt muss zeigen, dass das Gateway-Muster sauber bleibt, bevor wir
+  es fächern.
+- **RLS korrekt** ist sicherheitskritisch (sonst Datenleck über Workspaces).
+- **`completed_by`-Felder** müssen in Backend (SQLite-Schema + Migrationen) und
+  Supabase konsistent ergänzt werden.
+- **Eingebetteter Anthropic-Key** (separates Thema, Memory) wird durch
+  Multi-User heikler, ist aber nicht Teil dieses Piloten.
 - **localStorage-Reste** (Aufträge/Zeit, Journal) sind nicht im Scope und
-  bleiben im Pilot gerätelokal.
+  bleiben gerätelokal, bis der Zeiterfassungs-Folgeschritt sie migriert.
 
-## Ausbau nach dem Piloten (nicht Teil dieser Spec)
-
-Wenn das Muster trägt: dieselbe Gateway-+-Realtime-Mechanik tabellenweise auf
-Rechnungen, Pipeline, Aktivitäten/Notizen usw. ausrollen; localStorage-Stores
-vorher nach SQLite/Supabase migrieren.
+## Ausbau nach dem Piloten (eigene Specs)
+Dieselbe Gateway-+-Realtime-+-Attribution-Mechanik auf Zeiterfassung (nach
+localStorage→DB-Migration), Mail-Zuordnung, Verträge, Kalender ausrollen.
