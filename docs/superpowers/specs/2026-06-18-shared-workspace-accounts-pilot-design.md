@@ -24,8 +24,9 @@ Das Cloud-Fundament für Mehrbenutzer existiert: `workspaces` +
 ## Ziel
 
 Ein Testkunde soll mit **einem** Mitarbeiter auf demselben Workspace arbeiten,
-Änderungen **quasi in Echtzeit** sehen, und an jedem Objekt **erkennen, wer es
-erstellt und wer es erledigt hat** — im Desktop-Client.
+Änderungen **quasi in Echtzeit** sehen, und erkennen, **wer eine Notiz/ein
+Objekt angelegt hat, wer zuletzt drin war, und wer eine Aufgabe auf erledigt
+gesetzt hat** — im Desktop-Client.
 
 ### Pilot-Umfang
 
@@ -41,10 +42,12 @@ die Leads-Liste/-Board.** Betroffene Tabellen:
 | Dokumente | DateienPane | `files` |
 | Finanzen | FinanzPane | `invoices`, `offers`, `deals` |
 
-**2) Attribution „erstellt + erledigt".** An jedem Objekt sichtbar: wer hat es
-erstellt (`created_by`, oft schon vorhanden) und — bei Aufgaben/Rechnungen —
-wer hat es erledigt/abgeschlossen (`completed_by`, neu). Dargestellt als kleines
-farbiges Initialen-Badge.
+**2) Leichte Attribution.** Drei Signale, dargestellt als kleines farbiges
+Initialen-Badge: (a) **erstellt von** (`created_by`, oft vorhanden) — v. a. an
+Notizen/Objekten; (b) **zuletzt bearbeitet von** (`updated_by`, neu, „wer war
+als letztes drin"); (c) **erledigt von** (`completed_by`, neu) — **nur bei
+Aufgaben**, gesetzt beim Übergang auf `done`. **Rechnungen bekommen keine
+Attribution.**
 
 **3) Nutzerprofile** (Name + Farbe) als Grundlage für die Badges.
 
@@ -71,8 +74,8 @@ je für sich testbare Schritte.
 - Mail (IMAP ist ohnehin pro Nutzer), Verträge, Notizen-Module-Stickies,
   Kalender — kommen später.
 - Präsenz / „wer ist online" / Live-Cursor.
-- Volles Audit-Log jeder Aktion (gewählt wurde „erstellt + erledigt", nicht
-  „jede Aktion").
+- Volles Audit-Log jeder Aktion. Attribution beschränkt sich auf
+  erstellt / zuletzt bearbeitet / Aufgabe-erledigt; keine Rechnungs-Attribution.
 - Feldweises Merge / CRDT — es gilt **last-write-wins** über `updated_at`.
 - Echtes Offline-Weiterarbeiten mit Merge im geteilten Modus.
 
@@ -83,9 +86,9 @@ je für sich testbare Schritte.
 2. Owner legt einen Lead an → Mitarbeiter sieht ihn **in Sekunden ohne Reload**.
 3. Im Kundendetail: Owner schreibt eine Notiz / legt eine Aufgabe / entwirft
    eine Rechnung → Mitarbeiter sieht es live im jeweiligen Tab.
-4. Jedes dieser Objekte trägt ein farbiges Badge „erstellt von <Kürzel>".
-   Schließt der Mitarbeiter eine Aufgabe ab oder versendet die Rechnung,
-   erscheint zusätzlich „erledigt von <Kürzel>".
+4. Notizen/Objekte tragen ein Badge „erstellt von <Kürzel>" und „zuletzt von
+   <Kürzel>". Schließt der Mitarbeiter eine **Aufgabe** ab, erscheint dort
+   „erledigt von <Kürzel>".
 5. Ein Nutzer sieht **nur** Daten der Workspaces, in denen er Mitglied ist
    (RLS verifiziert).
 6. Solo-Workspaces funktionieren unverändert offline weiter.
@@ -150,13 +153,14 @@ Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
 - Name in den Profil-Einstellungen editierbar (optional, geringe Prio).
 
 ### 6. Attribution-Felder + Badge
-- **Felder:** alle Pilot-Tabellen führen `created_by` (vorhanden, sonst
-  ergänzen). `todos`, `invoices` zusätzlich `completed_by` (neu) — gesetzt beim
-  Übergang auf `done` bzw. beim Versand/Bezahlt-Markieren.
-- **UI:** wiederverwendbares `<UserBadge userId>` — farbiges Kürzel
-  (Initialen) aus dem Profil, Tooltip mit vollem Namen. Eingesetzt an
-  Aufgaben-, Notiz-, Aktivitäts-, Datei- und Rechnungs-Items: „erstellt von",
-  bei erledigt/abgeschlossen zusätzlich „erledigt von".
+- **Felder:** Pilot-Tabellen führen `created_by` (vorhanden, sonst ergänzen)
+  und `updated_by` (neu, bei jedem Update gesetzt = „wer als letztes drin war").
+  **`todos`** zusätzlich `completed_by` (neu), gesetzt beim Übergang auf `done`.
+  **Rechnungen bekommen keine Attribution.**
+- **UI:** wiederverwendbares `<UserBadge userId>` — farbiges Kürzel (Initialen)
+  aus dem Profil, Tooltip mit vollem Namen. Eingesetzt v. a. an Notiz-,
+  Aktivitäts- und Aufgaben-Items: „erstellt von" / „zuletzt von"; bei Aufgaben
+  zusätzlich „erledigt von".
 - Im Solo-Modus zeigt das Badge schlicht den einzigen Nutzer (kein Sonderfall).
 
 ### 7. Beitritts-Code + Beitritt
@@ -186,16 +190,17 @@ Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
   `sync_queue` gepuffert und beim Reconnect via `flush_pending` nachgeschoben
   (last-write-wins). Best-effort, kein Merge.
 
-## Datenfluss — Beispiel (A entwirft Rechnung, B sieht sie + Badge)
+## Datenfluss — Beispiel (A schreibt Notiz, B sieht sie + Badge)
 
-1. A (shared WS) entwirft Rechnung im Finanzen-Tab → `finance.store` →
-   `finance.gateway` (shared) → `supabase.from('invoices').insert({ …,
-   created_by: A })`.
+1. A (shared WS) schreibt im Notizen-Tab eine Notiz → `notes.store` →
+   `notes.gateway` (shared) → `supabase.from('notes').insert({ …,
+   created_by: A, updated_by: A })`.
 2. Postgres persistiert (RLS erlaubt, A ist Mitglied).
 3. Realtime sendet `INSERT` an den Workspace-Channel.
-4. B's `useWorkspaceRealtime` empfängt es → Mapper → `finance.store` → B's
-   Finanzen-Tab rendert die Rechnung mit Badge „entworfen von A".
-5. B markiert sie als bezahlt → `completed_by: B` → A sieht „erledigt von B".
+4. B's `useWorkspaceRealtime` empfängt es → Mapper → `notes.store` → B's
+   Notizen-Tab rendert die Notiz mit Badge „erstellt von A".
+5. B bearbeitet die Notiz → `updated_by: B` → bei A erscheint „zuletzt von B".
+   Setzt B eine Aufgabe auf erledigt, erscheint dort „erledigt von B".
 
 ## Fehlerbehandlung
 - **Supabase-Schreibfehler (shared):** Toast + Rollback der optimistischen
@@ -222,8 +227,9 @@ Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
   Accounts-Schritt muss zeigen, dass das Gateway-Muster sauber bleibt, bevor wir
   es fächern.
 - **RLS korrekt** ist sicherheitskritisch (sonst Datenleck über Workspaces).
-- **`completed_by`-Felder** müssen in Backend (SQLite-Schema + Migrationen) und
-  Supabase konsistent ergänzt werden.
+- **Neue Attribut-Felder** (`updated_by` auf Pilot-Tabellen, `completed_by` bei
+  `todos`) müssen in Backend (SQLite-Schema + Migrationen) und Supabase
+  konsistent ergänzt werden.
 - **Eingebetteter Anthropic-Key** (separates Thema, Memory) wird durch
   Multi-User heikler, ist aber nicht Teil dieses Piloten.
 - **localStorage-Reste** (Aufträge/Zeit, Journal) sind nicht im Scope und
