@@ -15,6 +15,8 @@ interface FollowUpQueueState {
   cancelForLead: (leadId: string) => Promise<void>
   markSent: (id: string, sentActivityId: string) => Promise<void>
   markSkipped: (id: string) => Promise<void>
+  markDone: (id: string) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
   updateDraft: (id: string, subject: string | null, body: string | null) => Promise<void>
   pendingItems: () => FollowUpQueueItem[]
   dueToday: () => FollowUpQueueItem[]
@@ -89,6 +91,26 @@ export const useFollowUpQueueStore = create<FollowUpQueueState>()((set, get) => 
     try {
       const updated = await FollowUpQueueService.markSkipped(id)
       set(s => ({ items: s.items.map(i => i.id === id ? updated : i) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  markDone: async (id) => {
+    try {
+      const updated = await FollowUpQueueService.markDone(id)
+      set(s => ({ items: s.items.map(i => i.id === id ? updated : i) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error }); throw err
+    }
+  },
+
+  deleteItem: async (id) => {
+    try {
+      await FollowUpQueueService.delete(id)
+      set(s => ({ items: s.items.filter(i => i.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err

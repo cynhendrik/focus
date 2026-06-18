@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import type React from 'react'
 import {
   CornerUpLeft, Mail, Phone, MessageCircle, Bookmark,
-  Clock, Plus, Search, X, Check, Trash2, Send, SkipForward, Edit3,
+  Clock, Plus, Search, X, Check, Trash2, Send, Edit3,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
@@ -658,13 +658,15 @@ function AutoFollowUpRow({
   leadName,
   companyName,
   onEdit,
-  onSkip,
+  onDone,
+  onDelete,
 }: {
   item: FollowUpQueueItem
   leadName: string
   companyName: string | null
   onEdit: (item: FollowUpQueueItem) => void
-  onSkip: (id: string) => void
+  onDone: (id: string) => void
+  onDelete: (id: string) => void
 }) {
   const tpl = TEMPLATE_LABELS[item.templateKey] ?? TEMPLATE_LABELS.none
   const seqLabel = `Follow-up ${item.sequenceIndex + 1}/${FOLLOW_UP_SEQUENCE_LENGTH}`
@@ -725,17 +727,30 @@ function AutoFollowUpRow({
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <button
-          onClick={() => onSkip(item.id)}
-          title="Überspringen"
+          onClick={() => onDone(item.id)}
+          title="Erledigt (ohne Mail)"
           style={{
             width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', background: 'rgba(148,163,184,0.08)',
-            color: 'var(--fg-dim)', cursor: 'pointer', border: 'none',
+            justifyContent: 'center', background: 'rgba(74,222,128,0.1)', color: '#4ade80',
+            cursor: 'pointer', border: 'none',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(148,163,184,0.16)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(148,163,184,0.08)')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(74,222,128,0.2)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(74,222,128,0.1)')}
         >
-          <SkipForward size={12} />
+          <Check size={12} strokeWidth={3} />
+        </button>
+        <button
+          onClick={() => onDelete(item.id)}
+          title="Löschen"
+          style={{
+            width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', background: 'rgba(239,68,68,0.08)',
+            color: '#ef4444', cursor: 'pointer', border: 'none',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+        >
+          <Trash2 size={12} />
         </button>
         <button
           onClick={() => onEdit(item)}
@@ -909,9 +924,10 @@ export function FollowupsDashboardRoute() {
   const setSelectedCustomer = useUiStore(s => s.setSelectedCustomer)
   const setAppView = useUiStore(s => s.setAppView)
 
-  const loadDue     = useFollowUpQueueStore(s => s.loadDue)
-  const markSkipped = useFollowUpQueueStore(s => s.markSkipped)
-  const leads       = useLeadsStore(s => s.leads)
+  const loadDue        = useFollowUpQueueStore(s => s.loadDue)
+  const markQueueDone  = useFollowUpQueueStore(s => s.markDone)
+  const deleteQueueItem = useFollowUpQueueStore(s => s.deleteItem)
+  const leads          = useLeadsStore(s => s.leads)
 
   const [showCreate, setShowCreate] = useState(false)
   const [composeTarget, setComposeTarget] = useState<ComposeTarget | null>(null)
@@ -971,9 +987,30 @@ export function FollowupsDashboardRoute() {
 
   const handleDone = (id: string) => { update(id, { status: 'done' }) }
 
-  const handleSkip = async (id: string) => {
+  const handleQueueDone = async (id: string) => {
+    const item = dueQueueItems.find(i => i.id === id)
     try {
-      await markSkipped(id)
+      // Verlaufseintrag, damit "manuell erledigt" im Lead-/Kunden-Stream sichtbar ist.
+      if (item) {
+        await create({
+          workspaceId,
+          createdBy: user?.email ?? 'user',
+          accountId: item.leadId,
+          customerId: item.leadId,
+          type: 'followup',
+          title: 'Follow-up manuell erledigt',
+          status: 'done',
+        })
+      }
+      await markQueueDone(id)
+    } catch {
+      // silently ignore — store already sets error state
+    }
+  }
+
+  const handleQueueDelete = async (id: string) => {
+    try {
+      await deleteQueueItem(id)
     } catch {
       // silently ignore — store already sets error state
     }
@@ -1042,14 +1079,16 @@ export function FollowupsDashboardRoute() {
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {dueQueueItems.map((item, i) => {
               const lead = leadMap.get(item.leadId)
+              const customer = customerMap.get(item.leadId)
               return (
                 <div key={item.id} style={{ borderBottom: i < dueQueueItems.length - 1 ? '1px solid var(--border)' : 'none' }}>
                   <AutoFollowUpRow
                     item={item}
-                    leadName={lead?.name ?? 'Unbekannt'}
-                    companyName={lead?.companyName ?? null}
+                    leadName={lead?.name ?? customer?.name ?? 'Unbekannt'}
+                    companyName={lead?.companyName ?? customer?.company ?? null}
                     onEdit={setDraftItem}
-                    onSkip={handleSkip}
+                    onDone={handleQueueDone}
+                    onDelete={handleQueueDelete}
                   />
                 </div>
               )

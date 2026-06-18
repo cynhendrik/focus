@@ -32,6 +32,14 @@ export const FollowUpQueueService = {
     return invoke('cmd_mark_follow_up_skipped', { id })
   },
 
+  markDone(id: string): Promise<FollowUpQueueItem> {
+    return invoke('cmd_mark_follow_up_done', { id })
+  },
+
+  delete(id: string): Promise<void> {
+    return invoke('cmd_delete_follow_up', { id })
+  },
+
   updateDraft(id: string, subject: string | null, body: string | null): Promise<FollowUpQueueItem> {
     return invoke('cmd_update_follow_up_draft', { id, subject, body })
   },

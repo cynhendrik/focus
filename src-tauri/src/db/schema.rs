@@ -475,6 +475,26 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
         CREATE INDEX IF NOT EXISTS idx_followup_queue_workspace
             ON follow_up_queue(workspace_id, status, send_at);
 
+        CREATE TABLE IF NOT EXISTS contracts (
+            id                TEXT PRIMARY KEY,
+            workspace_id      TEXT NOT NULL,
+            account_id        TEXT NOT NULL,
+            title             TEXT NOT NULL,
+            interval_value    INTEGER NOT NULL DEFAULT 1,
+            interval_unit     TEXT NOT NULL DEFAULT 'months',
+            start_date        TEXT NOT NULL,
+            next_billing_date TEXT NOT NULL,
+            end_date          TEXT,
+            status            TEXT NOT NULL DEFAULT 'active',
+            tax_mode          TEXT NOT NULL DEFAULT 'standard',
+            notes             TEXT NOT NULL DEFAULT '',
+            items             TEXT NOT NULL DEFAULT '[]',
+            created_at        TEXT NOT NULL,
+            updated_at        TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_contracts_workspace
+            ON contracts(workspace_id, status);
+
         CREATE TABLE IF NOT EXISTS campaigns (
             id                TEXT PRIMARY KEY,
             workspace_id      TEXT NOT NULL,

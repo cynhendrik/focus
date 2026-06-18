@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 28;
+const CURRENT_VERSION: u32 = 31;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -714,6 +714,51 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             if table_exists(conn, "activities") {
                 conn.execute_batch("UPDATE activities SET type = 'task' WHERE type = 'followup';")?;
             }
+            Ok(())
+        }
+        29 => {
+            // Empfänger-USt-IdNr. für Rechnungen (Reverse-Charge / EU-B2B, §14 UStG).
+            if table_exists(conn, "accounts") && !column_exists(conn, "accounts", "vat_id") {
+                conn.execute_batch("ALTER TABLE accounts ADD COLUMN vat_id TEXT;")?;
+            }
+            Ok(())
+        }
+        30 => {
+            // Konfigurierbares Rechnungsnummern-Format + Jahres-Reset.
+            if table_exists(conn, "invoice_sequences") {
+                if !column_exists(conn, "invoice_sequences", "format") {
+                    conn.execute_batch("ALTER TABLE invoice_sequences ADD COLUMN format TEXT;")?;
+                }
+                if !column_exists(conn, "invoice_sequences", "seq_year") {
+                    conn.execute_batch("ALTER TABLE invoice_sequences ADD COLUMN seq_year INTEGER;")?;
+                }
+            }
+            Ok(())
+        }
+        31 => {
+            // Verträge (wiederkehrende Rechnungen) von localStorage in die DB —
+            // damit sie im Backup/Export landen und GoBD-relevant erhalten bleiben.
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS contracts (
+                    id                TEXT PRIMARY KEY,
+                    workspace_id      TEXT NOT NULL,
+                    account_id        TEXT NOT NULL,
+                    title             TEXT NOT NULL,
+                    interval_value    INTEGER NOT NULL DEFAULT 1,
+                    interval_unit     TEXT NOT NULL DEFAULT 'months',
+                    start_date        TEXT NOT NULL,
+                    next_billing_date TEXT NOT NULL,
+                    end_date          TEXT,
+                    status            TEXT NOT NULL DEFAULT 'active',
+                    tax_mode          TEXT NOT NULL DEFAULT 'standard',
+                    notes             TEXT NOT NULL DEFAULT '',
+                    items             TEXT NOT NULL DEFAULT '[]',
+                    created_at        TEXT NOT NULL,
+                    updated_at        TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_contracts_workspace
+                    ON contracts(workspace_id, status);
+            "#)?;
             Ok(())
         }
         _ => Ok(()),

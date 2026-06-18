@@ -57,7 +57,7 @@ export function CyPlanPanel({ open, onClose, customerId }: Props) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>
-                  <Sparkles size={12} /> CY · TAG GEPLANT
+                  <Sparkles size={12} /> KORA · TAG GEPLANT
                 </div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, margin: '6px 0 0' }}>
                   Dein Fahrplan für heute

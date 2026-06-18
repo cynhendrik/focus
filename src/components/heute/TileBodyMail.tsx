@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Send, Sparkles, Loader } from 'lucide-react'
+import { Send, Sparkles, Loader, Check } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useMailStore } from '@/store/mail.store'
@@ -61,6 +61,7 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
   const [generating, setGenerating] = useState(false)
   const [sending, setSending]       = useState(false)
   const [hasDraft, setHasDraft]     = useState(false)
+  const [marking, setMarking]       = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -235,6 +236,12 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
     }
   }
 
+  // Erledigt OHNE Mail — z.B. wenn telefonisch/persönlich abgewickelt.
+  const handleMarkDone = async () => {
+    setMarking(true)
+    try { await onDone() } finally { setMarking(false) }
+  }
+
   const sendLabel = mode === 'invoice_reminder' ? 'Erinnerung senden' : mode === 'reply_mail' ? 'Antwort senden' : 'E-Mail senden'
 
   return (
@@ -257,10 +264,10 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
           </div>
           {generating
             ? <span style={{ fontSize: 9, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Loader size={9} style={{ animation: 'spin 1s linear infinite' }} /> CY-ENTWURF…
+                <Loader size={9} style={{ animation: 'spin 1s linear infinite' }} /> KORA-ENTWURF…
               </span>
             : hasDraft
-            ? <span style={{ fontSize: 9, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>✦ CY-ENTWURF · EDITIERBAR</span>
+            ? <span style={{ fontSize: 9, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>✦ KORA-ENTWURF · EDITIERBAR</span>
             : null
           }
         </div>
@@ -310,8 +317,23 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
             fontSize: 13, fontWeight: 600, cursor: generating ? 'not-allowed' : 'pointer',
           }}>
           {generating ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={13} />}
-          Cy neu
+          KORA neu
         </button>
+
+        {mode !== 'invoice_reminder' && (
+          <button type="button" onClick={handleMarkDone} disabled={marking || sending}
+            title="Ohne Mail als erledigt markieren (z.B. telefonisch erledigt)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7, padding: '11px 18px',
+              borderRadius: 99, border: '1px solid oklch(72% 0.17 150 / 0.4)',
+              background: 'oklch(72% 0.17 150 / 0.1)',
+              color: marking ? 'var(--fg-dim)' : 'oklch(72% 0.17 150)',
+              fontSize: 13, fontWeight: 600, cursor: marking ? 'not-allowed' : 'pointer',
+            }}>
+            {marking ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
+            Erledigt
+          </button>
+        )}
 
         <button type="button" onClick={onSkip}
           style={{

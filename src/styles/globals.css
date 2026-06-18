@@ -38,6 +38,8 @@
   --bg: oklch(19% 0.006 270);
   --bg-2: oklch(21% 0.007 270);
   --surface: oklch(24% 0.008 270);
+  /* Alias — manche Komponenten (z. B. KORA-Chat) nutzen --surface-1; late-bound, folgt dem Theme. */
+  --surface-1: var(--surface);
   --surface-2: oklch(28% 0.009 270);
   --surface-3: oklch(32% 0.01 270);
   --border: oklch(36% 0.011 270);
@@ -473,7 +475,7 @@ button:focus:not(:focus-visible) { outline: none; }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 8px 8px 18px; }
 .sidebar-brand-logo {
   width: 28px; height: 28px; border-radius: 8px;
-  background: var(--accent);
+  background: transparent;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
@@ -974,7 +976,7 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 */
 .splash {
   position: fixed; inset: 0; z-index: 9999;
-  background: #050505;
+  background: radial-gradient(circle at 50% 45%, #3B6DF4 0%, #2d5cdc 100%);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
   isolation: isolate;
@@ -1030,13 +1032,13 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
 .splash__headline {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: clamp(19px, 2.6vw, 30px);
+  font-size: clamp(14px, 1.7vw, 21px);
   font-weight: 300;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.005em;
   line-height: 1.18;
-  color: var(--accent);
+  color: #fff;
   text-align: center;
-  text-shadow: 0 0 50px var(--accent-glow);
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.22);
   white-space: nowrap;
 }
 
@@ -1046,7 +1048,7 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   will-change: transform, opacity, filter;
   transform: translate3d(0, 22px, 0);
   filter: blur(12px);
-  animation: splash-word-rise 1300ms cubic-bezier(.18,.72,.16,1) both;
+  animation: splash-word-rise 1600ms cubic-bezier(.18,.72,.16,1) both;
 }
 .splash__word--accent {
   font-weight: 400;
@@ -1056,6 +1058,12 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   0%   { opacity: 0;    transform: translate3d(0, 26px, 0); filter: blur(14px); }
   55%  { opacity: 0.92; filter: blur(0.4px); }
   100% { opacity: 1;    transform: translate3d(0, 0, 0);    filter: blur(0); }
+}
+
+/* Login intro — gentler, single smooth deceleration (no mid-keyframe kink) */
+@keyframes intro-word-rise {
+  0%   { opacity: 0; transform: translate3d(0, 14px, 0); filter: blur(7px); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0);    filter: blur(0); }
 }
 
 /* Brand mark — small accent dot, fades in then breathes */

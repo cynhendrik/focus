@@ -74,8 +74,15 @@ describe('shouldCreateReminderTask', () => {
     expect(shouldCreateReminderTask(invoice, [doneOld])).toBe(true)
   })
 
-  it('returns false for non-overdue invoice', () => {
-    const invoice = makeInvoice({ id: 'inv1', status: 'open' })
+  it('returns false for an open invoice not yet due', () => {
+    const future = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
+    const invoice = makeInvoice({ id: 'inv1', status: 'open', dueDate: future })
     expect(shouldCreateReminderTask(invoice, [])).toBe(false)
+  })
+
+  it('returns true for an open invoice past its due date (overdue derived from dueDate)', () => {
+    const past = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10)
+    const invoice = makeInvoice({ id: 'inv1', status: 'open', dueDate: past })
+    expect(shouldCreateReminderTask(invoice, [])).toBe(true)
   })
 })

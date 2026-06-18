@@ -1,6 +1,7 @@
 import { useUiStore } from '@/store/ui.store'
+import { NotificationCenter } from './NotificationCenter'
 import {
-  Sun, Bell, Sunrise, Users, CreditCard, Target,
+  Sun, Sunrise, Users, CreditCard, Target,
   Mail, Calendar, Clock, Settings, Plug, Sparkles, User, Timer,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -61,9 +62,7 @@ export function Topbar() {
         <button className="icon-btn" onClick={toggleTheme} title="Theme wechseln">
           <Sun size={16} />
         </button>
-        <button className="icon-btn" title="Benachrichtigungen">
-          <Bell size={16} />
-        </button>
+        <NotificationCenter />
       </div>
     </div>
   )

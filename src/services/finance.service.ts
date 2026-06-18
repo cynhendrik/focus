@@ -37,11 +37,20 @@ export const FinanceService = {
   getFinanceKpis(workspaceId: string): Promise<FinanceKpis> {
     return invoke('get_finance_kpis', { workspaceId })
   },
-  getInvoiceSequence(workspaceId: string): Promise<[number, number]> {
+  getInvoiceSequence(workspaceId: string): Promise<[number, number, string]> {
     return invoke('get_invoice_sequence', { workspaceId })
   },
   setInvoiceStartNumber(workspaceId: string, startNumber: number): Promise<void> {
     return invoke('set_invoice_start_number', { workspaceId, startNumber })
+  },
+  peekInvoiceNumber(workspaceId: string): Promise<string> {
+    return invoke('peek_invoice_number', { workspaceId })
+  },
+  setInvoiceFormat(workspaceId: string, format: string): Promise<void> {
+    return invoke('set_invoice_format', { workspaceId, format })
+  },
+  invoiceNumberExists(workspaceId: string, number: string, excludeId?: string): Promise<boolean> {
+    return invoke('invoice_number_exists', { workspaceId, number, excludeId: excludeId ?? null })
   },
 
   // ── Offers ────────────────────────────────────────────────────────────────

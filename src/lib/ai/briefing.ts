@@ -387,8 +387,8 @@ interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: strin
  * prefix. Structured output via `output_config.format` matches CustomerBriefing.
  */
 export async function generateBriefing(input: DossierInput): Promise<CustomerBriefing> {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new MissingApiKeyError()
+  // Leerer Key → Rust fällt auf den eingebetteten Key zurück (Tester ohne eigenen Key).
+  const apiKey = getApiKey() ?? ''
 
   const dossier = buildDossier(input)
 

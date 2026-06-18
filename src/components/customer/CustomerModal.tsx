@@ -11,7 +11,7 @@ interface Props {
 type FormPayload = Omit<UpsertCustomerPayload, 'workspaceId' | 'createdBy'>
 
 const EMPTY: FormPayload = {
-  name: '', company: '', email: '', phone: '',
+  name: '', company: '', email: '', phone: '', vatId: '',
   status: 'aktiv', priority: 'normal', tags: [],
   street: '', zip: '', city: '', country: '',
 }
@@ -33,6 +33,7 @@ export function CustomerModal({ customer, onClose }: Props) {
         company:  customer.company ?? '',
         email:    customer.email ?? '',
         phone:    customer.phone ?? '',
+        vatId:    customer.vatId ?? '',
         status:   customer.status,
         priority: customer.priority,
         tags:     customer.tags ?? [],
@@ -140,6 +141,12 @@ export function CustomerModal({ customer, onClose }: Props) {
             placeholder="Land"
             value={form.country ?? ''}
             onChange={e => set('country', e.target.value)}
+            className="w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <input
+            placeholder="USt-IdNr. (für Reverse-Charge / EU)"
+            value={form.vatId ?? ''}
+            onChange={e => set('vatId', e.target.value)}
             className="w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] text-[var(--text)] border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <div className="grid grid-cols-2 gap-3">

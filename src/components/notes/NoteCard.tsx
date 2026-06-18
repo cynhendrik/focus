@@ -220,7 +220,7 @@ export function NoteCard({ entry, folders, onUpdate, onDelete, onMoveToFolder }:
             background: 'var(--bg)', border: '1px solid var(--border)',
             borderRadius: 8, padding: '10px 12px',
           }}>
-            <EditorContent editor={editor} />
+            <EditorContent editor={editor} className="tt-editor" />
           </div>
         </div>
       )}

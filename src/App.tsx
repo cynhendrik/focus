@@ -73,6 +73,7 @@ import { SplashScreen } from '@/components/ui/SplashScreen'
 import { HelpDrawer } from '@/components/help/HelpDrawer'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
+import { useVertraege } from '@/store/vertraege.store'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -108,8 +109,8 @@ export default function App() {
   // Intro-Splash ("If we build, we build to lead") bei jedem Start.
   const [splashPhase, setSplashPhase] = useState<'show' | 'exiting' | 'done'>('show')
   useEffect(() => {
-    const t1 = setTimeout(() => setSplashPhase('exiting'), 2600)
-    const t2 = setTimeout(() => setSplashPhase('done'), 3200)
+    const t1 = setTimeout(() => setSplashPhase('exiting'), 3200)
+    const t2 = setTimeout(() => setSplashPhase('done'), 3800)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
@@ -186,6 +187,7 @@ export default function App() {
       loadAllDeals(activeWorkspaceId)
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
+      useVertraege.getState().loadVertraege(activeWorkspaceId)
       // Demo-Seeder gehoert ganz nach hinten, blockiert nichts.
       useOnboardingStore.getState().bootstrap()
     })

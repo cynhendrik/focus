@@ -23,6 +23,7 @@ export interface Customer extends TimestampedEntity {
   company?: string
   email?: string
   phone?: string
+  vatId?: string
   status: CustomerStatus
   priority: Priority
   tags: string[]
@@ -49,6 +50,7 @@ export interface UpsertCustomerPayload {
   company?: string
   email?: string
   phone?: string
+  vatId?: string
   status?: CustomerStatus
   priority?: Priority
   tags?: string[]

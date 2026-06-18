@@ -44,9 +44,23 @@ export function TaskRow({ todo }: Props) {
     }
   }
 
+  const formatDue = (iso: string): string => {
+    const d = new Date(iso); d.setHours(0, 0, 0, 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000)
+    if (diff < 0)   return `${Math.abs(diff)} T überfällig`
+    if (diff === 0) return 'heute fällig'
+    if (diff === 1) return 'morgen fällig'
+    if (diff < 7)   return `in ${diff} Tagen`
+    return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
+  }
+  // Plan-Zeit (scheduledAt) hat Vorrang; sonst Fälligkeit (dueDate) anzeigen.
   const timeLabel = todo.scheduledAt
     ? new Date(todo.scheduledAt).toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })
+    : todo.dueDate
+    ? formatDue(todo.dueDate)
     : null
+  const dueOverdue = !todo.scheduledAt && !!todo.dueDate && timeLabel?.includes('überfällig')
 
   return (
     <div
@@ -123,8 +137,8 @@ export function TaskRow({ todo }: Props) {
 
         {timeLabel && (
           <span style={{
-            fontSize: 11.5, color: 'var(--fg-muted)',
-            fontFamily: 'var(--font-mono)',
+            fontSize: 11.5, color: dueOverdue ? '#ef4444' : 'var(--fg-muted)',
+            fontFamily: 'var(--font-mono)', fontWeight: dueOverdue ? 700 : 400,
           }}>
             {timeLabel}
           </span>

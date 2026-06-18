@@ -31,6 +31,8 @@ export interface Account extends TimestampedEntity {
   pipelinePhaseLabel?: string
   email?: string
   phone?: string
+  /** USt-IdNr. des Kunden (Reverse-Charge / EU-B2B). */
+  vatId?: string
   /** NULL = aktiv, Zeitstempel = archiviert. */
   archivedAt?: string | null
 }
@@ -56,4 +58,5 @@ export interface UpsertAccountPayload {
   country?: string
   email?: string
   phone?: string
+  vatId?: string
 }

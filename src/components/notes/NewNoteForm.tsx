@@ -107,7 +107,7 @@ export function NewNoteForm({ onSave, onCancel }: Props) {
         background: 'var(--bg)', border: '1px solid var(--border)',
         borderRadius: 8, padding: '8px 10px',
       }}>
-        <EditorContent editor={editor} />
+        <EditorContent editor={editor} className="tt-editor" />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>

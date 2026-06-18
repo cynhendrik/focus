@@ -70,7 +70,9 @@ export function NavSidebar() {
   }
 
   const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
-  const displayName = user?.email?.split('@')[0] ?? 'Nutzer'
+  const displayName = ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
+    || user?.email?.split('@')[0]
+    || 'Nutzer'
   const initials    = displayName.slice(0, 2).toUpperCase()
 
   return (
@@ -79,9 +81,13 @@ export function NavSidebar() {
       {/* Brand */}
       <div className="sidebar-brand" data-tauri-drag-region>
         <div className="sidebar-brand-logo">
-          <svg width="18" height="18" viewBox="0 0 100 100" fill="none">
-            <rect x="36" y="19" width="40" height="13" rx="6.5" fill="oklch(98% 0 0)" transform="rotate(-28 56 25.5)"/>
-            <rect x="24" y="46" width="44" height="13" rx="6.5" fill="oklch(98% 0 0)" transform="rotate(-23 46 52.5)"/>
+          <svg width="28" height="28" viewBox="0 0 160 160">
+            <rect width="160" height="160" rx="36" fill="#3B6DF4"/>
+            <g fill="#FFFFFF" transform="translate(1 0) skewX(-14)">
+              <rect x="78" y="36" width="56" height="23" rx="11"/>
+              <rect x="56" y="69" width="56" height="23" rx="11"/>
+              <rect x="68" y="102" width="33" height="23" rx="11"/>
+            </g>
           </svg>
         </div>
         <div className="sidebar-brand-text">

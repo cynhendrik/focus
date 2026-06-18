@@ -3,6 +3,7 @@ import { Check, Copy } from 'lucide-react'
 import { useCompanyStore } from '@/store/company.store'
 import { useUiStore } from '@/store/ui.store'
 import type { CompanyProfile } from '@/types/company.types'
+import { InvoiceNumberSettings } from './InvoiceNumberSettings'
 
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false)
@@ -128,7 +129,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
               border: `1px solid ${form.kleinunternehmer ? 'var(--accent)' : 'var(--border)'}`,
-              background: form.kleinunternehmer ? 'oklch($1264 / 0.06)' : 'var(--surface-2)',
+              background: form.kleinunternehmer ? 'oklch(56% 0.19 264 / 0.06)' : 'var(--surface-2)',
               transition: 'all 180ms',
             }}
           >
@@ -152,6 +153,8 @@ export function WorkspaceSettings({ workspaceId }: Props) {
           </div>
         </div>
       </div>
+
+      <InvoiceNumberSettings />
 
       {/* Rechnungsdesign */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>

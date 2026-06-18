@@ -84,8 +84,37 @@ pub fn get_finance_kpis(
 pub fn get_invoice_sequence(
     db: State<'_, DbPool>,
     workspace_id: String,
-) -> Result<(i64, i64), AppError> {
+) -> Result<(i64, i64, String), AppError> {
     db::invoice::get_invoice_sequence(&db.conn(), &workspace_id)
+        .map_err(|e| AppError::Db(e.to_string()))
+}
+
+#[tauri::command]
+pub fn peek_invoice_number(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+) -> Result<String, AppError> {
+    Ok(db::invoice::peek_invoice_number(&db.conn(), &workspace_id))
+}
+
+#[tauri::command]
+pub fn set_invoice_format(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+    format: String,
+) -> Result<(), AppError> {
+    db::invoice::set_invoice_format(&db.conn(), &workspace_id, &format)
+        .map_err(|e| AppError::Db(e.to_string()))
+}
+
+#[tauri::command]
+pub fn invoice_number_exists(
+    db: State<'_, DbPool>,
+    workspace_id: String,
+    number: String,
+    exclude_id: Option<String>,
+) -> Result<bool, AppError> {
+    db::invoice::invoice_number_exists(&db.conn(), &workspace_id, &number, exclude_id.as_deref())
         .map_err(|e| AppError::Db(e.to_string()))
 }
 

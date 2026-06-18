@@ -15,7 +15,8 @@ function dayDiff(iso: string | undefined): number | null {
 }
 
 function timeSection(t: Todo): string {
-  const d = dayDiff(t.scheduledAt)
+  // Plan-Datum (scheduledAt) bevorzugen, sonst Fälligkeit (dueDate) — sonst Backlog.
+  const d = dayDiff(t.scheduledAt ?? t.dueDate)
   if (t.status === 'done') return 'erledigt'
   if (d === 0)             return 'heute'
   if (d === 1)             return 'morgen'
@@ -58,8 +59,8 @@ export function TasksListView({ customerId, defaultGroupBy = 'time' }: Props = {
     }
     for (const k of Object.keys(map)) {
       map[k].sort((a, b) => {
-        const sa = a.scheduledAt ?? ''
-        const sb = b.scheduledAt ?? ''
+        const sa = a.scheduledAt ?? a.dueDate ?? ''
+        const sb = b.scheduledAt ?? b.dueDate ?? ''
         if (sa !== sb) return sa.localeCompare(sb)
         return a.priority.localeCompare(b.priority)
       })

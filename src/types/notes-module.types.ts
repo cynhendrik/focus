@@ -23,18 +23,6 @@ export interface NoteEntry {
   updatedAt:   string
 }
 
-export interface NoteDoc {
-  id:          string
-  workspaceId: string
-  accountId:   string
-  title:       string
-  content:     string
-  createdBy:   string
-  updatedBy:   string | null
-  createdAt:   string
-  updatedAt:   string
-}
-
 export interface CreateNoteEntryPayload {
   workspaceId: string
   accountId:   string
@@ -63,20 +51,6 @@ export interface CreateNoteFolderPayload {
 
 export interface UpdateNoteFolderPayload {
   name: string
-}
-
-export interface CreateNoteDocPayload {
-  workspaceId: string
-  accountId:   string
-  title?:      string
-  content?:    string
-  createdBy:   string
-}
-
-export interface UpdateNoteDocPayload {
-  title?:     string
-  content?:   string
-  updatedBy?: string
 }
 
 export interface StickyCheck {

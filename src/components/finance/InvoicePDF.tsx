@@ -6,6 +6,7 @@ import type { InvoiceWithItems } from '@/types/finance.types'
 import type { CompanyProfile } from '@/types/company.types'
 import type { Account } from '@/types/account.types'
 import { useDownloadToastStore } from '@/store/download-toast.store'
+import { computeTaxRateGroups } from '@/lib/invoice-tax'
 
 interface Props {
   data: InvoiceWithItems
@@ -82,6 +83,10 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
   const accent = profile.invoiceAccentColor ?? '#111111'
   const noTax = invoice.taxMode === 'reverse_charge' || invoice.taxMode === 'kleinunternehmer'
 
+  // Entgelt nach Steuersätzen aufgeschlüsselt (§14 UStG — Pflicht bei gemischten Sätzen).
+  const rateGroups = computeTaxRateGroups(items)
+  const multiRate = rateGroups.length > 1
+
   // Bank info: per-invoice JSON first, then profile defaults
   let bankInfo: Record<string, string> = {}
   try { bankInfo = JSON.parse(invoice.bankInfo) } catch {}
@@ -150,6 +155,7 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
             <Text style={s.label}>Rechnungsempfänger</Text>
             <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 }}>{account.name}</Text>
             {address && <Text style={{ fontSize: 8.5, color: '#555', lineHeight: 1.5 }}>{address}</Text>}
+            {account.vatId && <Text style={{ fontSize: 8.5, color: '#555', marginTop: 2 }}>USt-IdNr.: {account.vatId}</Text>}
           </View>
           <View style={s.metaBlock}>
             {[
@@ -203,14 +209,34 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
 
         {/* Totals */}
         <View style={s.totalsBox}>
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Nettobetrag</Text>
-            <Text style={s.totalValue}>{fmt(invoice.subtotal)}</Text>
-          </View>
-          {!noTax && (
+          {noTax ? (
             <View style={s.totalRow}>
-              <Text style={s.totalLabel}>MwSt</Text>
-              <Text style={s.totalValue}>{fmt(invoice.taxAmount)}</Text>
+              <Text style={s.totalLabel}>Nettobetrag</Text>
+              <Text style={s.totalValue}>{fmt(invoice.subtotal)}</Text>
+            </View>
+          ) : multiRate ? (
+            rateGroups.map(g => (
+              <View key={g.rate}>
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Netto {g.rate}%</Text>
+                  <Text style={s.totalValue}>{fmt(g.net)}</Text>
+                </View>
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>MwSt {g.rate}%</Text>
+                  <Text style={s.totalValue}>{fmt(g.tax)}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View>
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Nettobetrag</Text>
+                <Text style={s.totalValue}>{fmt(invoice.subtotal)}</Text>
+              </View>
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>MwSt {rateGroups[0]?.rate ?? 0}%</Text>
+                <Text style={s.totalValue}>{fmt(invoice.taxAmount)}</Text>
+              </View>
             </View>
           )}
           <View style={s.divider} />

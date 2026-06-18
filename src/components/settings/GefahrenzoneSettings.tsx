@@ -9,14 +9,20 @@ interface ImportSummary { tables: number; rows: number; skipped_unknown_columns:
 
 export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
   const [confirmText, setConfirmText] = useState('')
-  const [resetDone, setResetDone] = useState(false)
   const [busy, setBusy] = useState<'export' | 'import' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const toast = useToastStore(s => s.show)
 
   const handleReset = () => {
-    // TODO: actual workspace reset implementation
-    setResetDone(true)
+    // Ehrlich: es gibt (noch) kein Backend-Kommando, das den Workspace wirklich
+    // leert. Vorher hat der Button "✓ Zurückgesetzt" gezeigt, ohne etwas zu
+    // löschen — das war irreführend. Bis ein echtes, abgesichertes Reset-Kommando
+    // existiert, sagen wir die Wahrheit statt Erfolg vorzutäuschen.
+    toast({
+      message: 'Workspace-Reset ist noch nicht verfügbar. Exportiere ein Backup und lösche Einträge gezielt, oder installiere neu.',
+      variant: 'error',
+      durationMs: 6000,
+    })
     setConfirmText('')
   }
 
@@ -123,7 +129,7 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
             transition: 'background 140ms, color 140ms',
           }}
         >
-          {resetDone ? '✓ Zurückgesetzt' : 'Workspace zurücksetzen'}
+          Workspace zurücksetzen
         </button>
       </div>
     </div>

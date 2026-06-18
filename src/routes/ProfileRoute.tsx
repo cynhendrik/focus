@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { User, Shield, CreditCard, LogOut, Check } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { User, Shield, CreditCard, LogOut, Check, MessageSquare, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
@@ -234,6 +234,69 @@ function AboSection() {
   )
 }
 
+// ── Feedback section (Testphase — lokale Notizen, exportierbar) ─────────────────
+
+const FEEDBACK_STORE = 'cultera:feedback:v1'
+
+function FeedbackSection() {
+  const showToast = useToastStore(s => s.show)
+  const [text, setText] = useState(() => {
+    try { return localStorage.getItem(FEEDBACK_STORE) ?? '' } catch { return '' }
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem(FEEDBACK_STORE, text) } catch { /* ignore */ }
+  }, [text])
+
+  function exportFeedback() {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const fname = `cultera-feedback-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.txt`
+    const content = `Cultera Focus — Feedback\nExportiert: ${now.toLocaleString('de-DE')}\n\n${text}`
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fname
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    showToast({ message: 'Feedback exportiert.', variant: 'success' })
+  }
+
+  return (
+    <Section icon={MessageSquare} title="Feedback" subtitle="Notizen zur Testphase — wird lokal gespeichert und ist exportierbar.">
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="Was läuft gut, was fehlt, was nervt? Schreib's hier rein…"
+        rows={6}
+        style={{
+          width: '100%', resize: 'vertical', minHeight: 120, lineHeight: 1.55,
+          fontSize: 14, fontFamily: 'inherit', padding: '12px 14px',
+          borderRadius: 10, border: '1px solid var(--border)',
+          background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none',
+          boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+        <button
+          className="btn-primary"
+          onClick={exportFeedback}
+          disabled={!text.trim()}
+          style={{ fontSize: 13, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <Download size={14} /> Exportieren
+        </button>
+        <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+          {text.trim() ? `${text.length} Zeichen · automatisch gespeichert` : 'Noch kein Feedback'}
+        </span>
+      </div>
+    </Section>
+  )
+}
+
 // ── Route ───────────────────────────────────────────────────────────────────────
 
 export function ProfileRoute() {
@@ -247,6 +310,7 @@ export function ProfileRoute() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640, margin: '0 auto' }}>
           <ProfilSection />
+          <FeedbackSection />
           <SicherheitSection />
           <AboSection />
         </div>

@@ -2,6 +2,7 @@ import { X, Download } from 'lucide-react'
 import type { InvoiceWithItems } from '@/types/finance.types'
 import type { CompanyProfile } from '@/types/company.types'
 import type { Account } from '@/types/account.types'
+import { computeTaxRateGroups } from '@/lib/invoice-tax'
 // downloadInvoicePDF is imported lazily at call time so react-pdf stays out of
 // the main bundle (loads only when a PDF is actually exported).
 
@@ -35,6 +36,10 @@ export function InvoicePreview({ data, profile, account, onClose }: Props) {
 
   const address = [account.street, `${account.zip ?? ''} ${account.city ?? ''}`.trim(), account.country]
     .filter(Boolean).join('\n')
+
+  // Entgelt nach Steuersätzen aufgeschlüsselt (§14 UStG).
+  const rateGroups = computeTaxRateGroups(items)
+  const multiRate = rateGroups.length > 1
 
   // Footer legal
   const legalParts: string[] = []
@@ -115,6 +120,7 @@ export function InvoicePreview({ data, profile, account, onClose }: Props) {
               <div style={{ fontSize: 9, color: '#bbb', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Rechnungsempfänger</div>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>{account.name}</div>
               {address && <div style={{ fontSize: 11, color: '#555', whiteSpace: 'pre-line', lineHeight: 1.6 }}>{address}</div>}
+              {account.vatId && <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>USt-IdNr.: {account.vatId}</div>}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 180, flexShrink: 0 }}>
               {[
@@ -166,8 +172,19 @@ export function InvoicePreview({ data, profile, account, onClose }: Props) {
 
           {/* Totals */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, marginBottom: 20 }}>
-            <TotalRow label="Nettobetrag" value={fmt(invoice.subtotal)} />
-            {!noTax && <TotalRow label="MwSt" value={fmt(invoice.taxAmount)} />}
+            {noTax ? (
+              <TotalRow label="Nettobetrag" value={fmt(invoice.subtotal)} />
+            ) : multiRate ? (
+              rateGroups.flatMap(g => [
+                <TotalRow key={`n${g.rate}`} label={`Netto ${g.rate}%`} value={fmt(g.net)} />,
+                <TotalRow key={`t${g.rate}`} label={`MwSt ${g.rate}%`} value={fmt(g.tax)} />,
+              ])
+            ) : (
+              [
+                <TotalRow key="net" label="Nettobetrag" value={fmt(invoice.subtotal)} />,
+                <TotalRow key="mwst" label={`MwSt ${rateGroups[0]?.rate ?? 0}%`} value={fmt(invoice.taxAmount)} />,
+              ]
+            )}
             <div style={{ height: 1, background: '#ddd', width: 250, margin: '3px 0' }} />
             <TotalRow label="Rechnungsbetrag" value={fmt(invoice.total)} bold />
           </div>

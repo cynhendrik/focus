@@ -3,10 +3,10 @@ import { Plus, Search, List, LayoutGrid, CalendarClock } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useUiStore } from '@/store/ui.store'
 import { useToastStore } from '@/store/toast.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { PhasenBoard, FollowUpModal } from '@/routes/LeadsRoute'
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal'
 import type { Lead, LeadSource, LeadStage } from '@/types/lead.types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -349,8 +349,6 @@ export function LeverageLeadsRoute() {
   const stages       = useLeadStagesStore(s => s.stages)
   const allFollowUps = useCrmStore(s => s.allFollowUps)
   const loadAllFollowUps = useCrmStore(s => s.loadAll)
-  const setAppView   = useUiStore(s => s.setAppView)
-  const setLeadId    = useUiStore(s => s.setSelectedLeverageLeadId)
   const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const [viewMode,    setViewMode]    = useState<ViewMode>('list')
@@ -358,6 +356,7 @@ export function LeverageLeadsRoute() {
   const [showCreate,  setShowCreate]  = useState(false)
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null)
+  const [detailLead,  setDetailLead]  = useState<Lead | null>(null)
 
   const followUpsByLead = useMemo(() => {
     const map = new Map<string, number>()
@@ -384,11 +383,6 @@ export function LeverageLeadsRoute() {
         return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
       })
   }, [leads, query, stageFilter, followUpsByLead])
-
-  const openLead = (id: string) => {
-    setLeadId(id)
-    setAppView('leverage_lead_detail')
-  }
 
   return (
     <div className="main-inner" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: 0 }}>
@@ -467,7 +461,7 @@ export function LeverageLeadsRoute() {
                 lead={lead}
                 stages={stages}
                 followUpCount={followUpsByLead.get(lead.id) ?? 0}
-                onClick={() => openLead(lead.id)}
+                onClick={() => setDetailLead(lead)}
                 onFollowUp={() => setFollowUpLead(lead)}
               />
             ))
@@ -481,8 +475,11 @@ export function LeverageLeadsRoute() {
           onClose={() => setShowCreate(false)}
           onCreated={id => {
             setShowCreate(false)
-            // In der Liste direkt ins Detail springen; im Board dort bleiben.
-            if (viewMode === 'list') openLead(id)
+            // In der Liste direkt das Detail-Modal öffnen; im Board dort bleiben.
+            if (viewMode === 'list') {
+              const lead = useLeadsStore.getState().leads.find(l => l.id === id)
+              if (lead) setDetailLead(lead)
+            }
           }}
         />
       )}
@@ -493,6 +490,14 @@ export function LeverageLeadsRoute() {
           workspaceId={workspaceId}
           onClose={() => setFollowUpLead(null)}
           onCreated={() => loadAllFollowUps(workspaceId)}
+        />
+      )}
+
+      {detailLead && (
+        <LeadDetailModal
+          lead={detailLead}
+          workspaceId={workspaceId}
+          onClose={() => setDetailLead(null)}
         />
       )}
     </div>

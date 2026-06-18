@@ -1,11 +1,15 @@
 import { useEffect, useState, useMemo } from 'react'
-import { FileText, Tag, Clock, ChevronRight } from 'lucide-react'
+import { FileText, Tag, Clock, ChevronRight, Download } from 'lucide-react'
 import { FinanceService } from '@/services/finance.service'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAuftraege }   from '@/store/auftraege.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore }      from '@/store/auth.store'
 import { useUiStore }        from '@/store/ui.store'
+import { useCompanyStore }   from '@/store/company.store'
+import { useAccountsStore }  from '@/store/accounts.store'
+import { useToastStore }     from '@/store/toast.store'
+import { isOverdue }         from '@/lib/invoice-status'
 import type { Invoice, Offer } from '@/types/finance.types'
 import type { Zeiteintrag }   from '@/types/auftrag.types'
 
@@ -52,6 +56,35 @@ export function FinanzPane({ customerId }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [offers,   setOffers]   = useState<Offer[]>([])
   const [loading,  setLoading]  = useState(true)
+
+  const profile = useCompanyStore(s => s.profile)
+  const account = useAccountsStore(s => s.accounts.find(a => a.id === customerId))
+  const toast   = useToastStore(s => s.show)
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null)
+
+  const downloadInvoice = async (inv: Invoice) => {
+    if (!profile || !account) { toast({ message: 'Firmenprofil oder Kunde fehlt für das PDF.', variant: 'error' }); return }
+    setPdfBusy(inv.id)
+    try {
+      const full = await FinanceService.getInvoice(inv.id)
+      const { downloadInvoicePDF } = await import('@/components/finance/InvoicePDF')
+      await downloadInvoicePDF(full, profile, account)
+    } catch (e) {
+      toast({ message: `PDF fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    } finally { setPdfBusy(null) }
+  }
+
+  const downloadOffer = async (o: Offer) => {
+    if (!profile || !account) { toast({ message: 'Firmenprofil oder Kunde fehlt für das PDF.', variant: 'error' }); return }
+    setPdfBusy(o.id)
+    try {
+      const full = await FinanceService.getOffer(o.id)
+      const { downloadOfferPDF } = await import('@/components/finance/OfferPDF')
+      await downloadOfferPDF(full, profile, account)
+    } catch (e) {
+      toast({ message: `PDF fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    } finally { setPdfBusy(null) }
+  }
   const [creating, setCreating] = useState(false)
 
   const auftraege         = useAuftraege(s => s.auftraege)
@@ -207,7 +240,7 @@ export function FinanzPane({ customerId }: Props) {
                 <div
                   key={key}
                   onClick={() => toggleGroup(key)}
-                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'oklch($1264 / 0.05)' : 'transparent', transition: 'background 100ms' }}
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'oklch(56% 0.19 264 / 0.05)' : 'transparent', transition: 'background 100ms' }}
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleGroup(key)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
                   <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{g.auftragTitle}</span>
@@ -250,7 +283,7 @@ export function FinanzPane({ customerId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Nummer', 'Datum', 'Fällig', 'Betrag', 'Status'].map(h => (
+                {['Nummer', 'Datum', 'Fällig', 'Betrag', 'Status', ''].map(h => (
                   <th key={h} className="card-label" style={{ padding: '8px 14px', fontWeight: 500, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
                 ))}
               </tr>
@@ -262,7 +295,16 @@ export function FinanzPane({ customerId }: Props) {
                   <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
                   <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.dueDate)}</td>
                   <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
-                  <td style={tdS}><span className="chip" data-tone={STATUS_TONE[inv.status] ?? ''}>{STATUS_LABEL[inv.status] ?? inv.status}</span></td>
+                  <td style={tdS}>{(() => {
+                    const s = isOverdue(inv) ? 'overdue' : inv.status
+                    return <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                  })()}</td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>
+                    <button onClick={() => downloadInvoice(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
+                      <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -276,7 +318,7 @@ export function FinanzPane({ customerId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['Nummer', 'Titel', 'Gültig bis', 'Betrag', 'Status'].map(h => (
+                {['Nummer', 'Titel', 'Gültig bis', 'Betrag', 'Status', ''].map(h => (
                   <th key={h} className="card-label" style={{ padding: '8px 14px', fontWeight: 500, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
                 ))}
               </tr>
@@ -289,6 +331,12 @@ export function FinanzPane({ customerId }: Props) {
                   <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(offer.validUntil)}</td>
                   <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(offer.total)}</td>
                   <td style={tdS}><span className="chip" data-tone={STATUS_TONE[offer.status] ?? ''}>{STATUS_LABEL[offer.status] ?? offer.status}</span></td>
+                  <td style={{ ...tdS, textAlign: 'right' }}>
+                    <button onClick={() => downloadOffer(offer)} disabled={pdfBusy === offer.id} title="Angebot als PDF"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === offer.id ? 'wait' : 'pointer', fontSize: 11 }}>
+                      <Download size={12} /> {pdfBusy === offer.id ? '…' : 'PDF'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

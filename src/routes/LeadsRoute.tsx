@@ -357,11 +357,11 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
               title="Keine Telefonnummer — zum Nachtragen Karte öffnen"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 9.5, color: 'var(--warn)', fontWeight: 700,
-                marginBottom: 5, opacity: 0.85,
+                fontSize: 9.5, color: 'var(--fg-dim)', fontWeight: 500,
+                marginBottom: 5, opacity: 0.6,
               }}
             >
-              📞 Keine Nr.
+              📞 —
             </div>
           )}
         </div>
@@ -649,6 +649,12 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
   const [showStages, setShowStages]              = useState(false)
   const [detailLead, setDetailLead]              = useState<Lead | null>(null)
 
+  // ── Filter / search / sort ──────────────────────────────────────────────
+  const [search, setSearch]             = useState('')
+  const [sourceFilter, setSourceFilter] = useState<'all' | LeadSource>('all')
+  const [noPhoneOnly, setNoPhoneOnly]   = useState(false)
+  const [sortByScore, setSortByScore]   = useState(true)
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   const boardLeads = useMemo(
@@ -661,8 +667,38 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
     [allLeads],
   )
 
-  const leadsForStage = (stageName: string) =>
-    boardLeads.filter(l => l.leadStatus === stageName)
+  const filteredBoardLeads = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return boardLeads.filter(l => {
+      if (sourceFilter !== 'all' && l.leadSource !== sourceFilter) return false
+      if (noPhoneOnly && l.phone) return false
+      if (q) {
+        const hay = `${l.name} ${l.email ?? ''} ${l.phone ?? ''} ${l.companyName ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [boardLeads, search, sourceFilter, noPhoneOnly])
+
+  // Group once per render instead of filtering all leads per stage; sort hottest first.
+  const leadsByStage = useMemo(() => {
+    const map = new Map<string, Lead[]>()
+    for (const l of filteredBoardLeads) {
+      const arr = map.get(l.leadStatus)
+      if (arr) arr.push(l)
+      else map.set(l.leadStatus, [l])
+    }
+    if (sortByScore) {
+      for (const arr of map.values()) {
+        arr.sort((a, b) => (b.engagementScore ?? 0) - (a.engagementScore ?? 0))
+      }
+    }
+    return map
+  }, [filteredBoardLeads, sortByScore])
+
+  const leadsForStage = (stageName: string) => leadsByStage.get(stageName) ?? []
+
+  const isFiltered = search.trim() !== '' || sourceFilter !== 'all' || noPhoneOnly
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -800,6 +836,84 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
         )}
         {showStages && (
           <LeadStagesManager workspaceId={workspaceId} onClose={() => setShowStages(false)} />
+        )}
+      </div>
+
+      {/* Filter / search toolbar */}
+      <div style={{
+        padding: '8px 16px', borderBottom: '1px solid var(--border)',
+        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap',
+      }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '4px 10px', width: 220,
+        }}>
+          <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>🔍</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Leads durchsuchen…"
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: 'var(--fg)', minWidth: 0 }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', fontSize: 13, padding: 0, lineHeight: 1 }}>×</button>
+          )}
+        </div>
+
+        <select
+          className="mock-input"
+          value={sourceFilter}
+          onChange={e => setSourceFilter(e.target.value as 'all' | LeadSource)}
+          style={{ fontSize: 12, padding: '5px 8px', width: 'auto' }}
+        >
+          <option value="all">Alle Quellen</option>
+          <option value="manual">Manuell</option>
+          <option value="zoom">Zoom Webinar</option>
+          <option value="newsletter">Newsletter</option>
+          <option value="generic">Web / Sonstiges</option>
+        </select>
+
+        <button
+          onClick={() => setNoPhoneOnly(v => !v)}
+          style={{
+            fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+            background: noPhoneOnly ? 'var(--accent-soft)' : 'transparent',
+            color: noPhoneOnly ? 'var(--accent)' : 'var(--fg-dim)',
+            border: `1px solid ${noPhoneOnly ? 'var(--accent)' : 'var(--border)'}`,
+            fontWeight: 600,
+          }}
+        >
+          📞 Ohne Telefon
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        <button
+          onClick={() => setSortByScore(v => !v)}
+          title="Heißeste Leads (Engagement-Score) zuerst"
+          style={{
+            fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer',
+            background: sortByScore ? 'var(--accent-soft)' : 'transparent',
+            color: sortByScore ? 'var(--accent)' : 'var(--fg-dim)',
+            border: `1px solid ${sortByScore ? 'var(--accent)' : 'var(--border)'}`,
+            fontWeight: 600,
+          }}
+        >
+          {sortByScore ? '↓ Score' : 'Score-Sortierung aus'}
+        </button>
+
+        <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+          {isFiltered ? `${filteredBoardLeads.length}/${boardLeads.length}` : boardLeads.length}
+        </span>
+
+        {isFiltered && (
+          <button
+            onClick={() => { setSearch(''); setSourceFilter('all'); setNoPhoneOnly(false) }}
+            style={{ fontSize: 11, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 600 }}
+          >
+            Zurücksetzen
+          </button>
         )}
       </div>
 

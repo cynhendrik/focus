@@ -105,7 +105,7 @@ export function TasksHeader({
         }}
       >
         <Sparkles size={compact ? 12 : 14} />
-        {compact ? 'Cy' : 'Cy · Tag planen'}
+        {compact ? 'KORA' : 'KORA · Tag planen'}
       </button>
 
       {/* Fokus-Toggle — Board ist die Standardansicht */}

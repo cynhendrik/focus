@@ -3,6 +3,7 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { log } from '@/lib/logger'
+import { isOverdue } from '@/lib/invoice-status'
 import type { Invoice } from '@/types/finance.types'
 import type { Todo } from '@/types/todo.types'
 
@@ -24,7 +25,7 @@ export interface DunningState {
 }
 
 export function getDunningState(invoice: Invoice, todos: Todo[]): DunningState {
-  if (invoice.status !== 'overdue') return { level: 0, canCreate: false, label: '', priority: 'p2' }
+  if (!isOverdue(invoice)) return { level: 0, canCreate: false, label: '', priority: 'p2' }
 
   const related = todos.filter(
     t => t.sourceRef === invoice.id && t.actionType === 'send_reminder',

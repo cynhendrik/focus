@@ -16,6 +16,7 @@ import { InvoicePreview } from '@/components/finance/InvoicePreview'
 // PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
 // react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceService } from '@/services/finance.service'
+import { isOverdue } from '@/lib/invoice-status'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
         <path
           d={GAUGE_PATH}
           fill="none"
-          stroke="oklch($1264)"
+          stroke="oklch(56% 0.19 264)"
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${GAUGE_LEN}`}
@@ -179,7 +180,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
               style={{ filter: 'url(#dot-glow)' }} />
             <circle cx={tipX} cy={tipY} r={5} fill="var(--accent)"
               style={{ filter: 'url(#dot-glow)' }} />
-            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch($1264)" />
+            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(56% 0.19 264)" />
           </>
         )}
 
@@ -254,10 +255,10 @@ function RevenueBarChart({ bars, maxRevenue }: { bars: BarEntry[]; maxRevenue: n
                 background: bar.isCurrent
                   ? 'var(--accent)'
                   : 'var(--surface-2)',
-                border: `1px solid ${bar.isCurrent ? 'oklch($1264 / 0.5)' : 'var(--border)'}`,
+                border: `1px solid ${bar.isCurrent ? 'oklch(56% 0.19 264 / 0.5)' : 'var(--border)'}`,
                 borderRadius: '4px 4px 0 0',
                 transition: 'height 700ms cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: bar.isCurrent ? '0 0 12px oklch($1264 / 0.35)' : 'none',
+                boxShadow: bar.isCurrent ? '0 0 12px oklch(56% 0.19 264 / 0.35)' : 'none',
               }} />
             </div>
           )
@@ -408,8 +409,10 @@ export function FinanceRoute() {
       .reduce((s, i) => s + i.total, 0),
     [realInvoices, period, customFrom, customTo],
   )
-  const openInvoices    = useMemo(() => realInvoices.filter(i => i.status === 'open'), [realInvoices])
-  const overdueInvoices = useMemo(() => realInvoices.filter(i => i.status === 'overdue'), [realInvoices])
+  // "Offen" = unbezahlt & noch nicht fällig; "Überfällig" = unbezahlt & über Fälligkeit.
+  // Überfälligkeit wird aus dueDate abgeleitet (Status wird nie auf 'overdue' gesetzt).
+  const openInvoices    = useMemo(() => realInvoices.filter(i => i.status === 'open' && !isOverdue(i)), [realInvoices])
+  const overdueInvoices = useMemo(() => realInvoices.filter(i => isOverdue(i)), [realInvoices])
   const yearRevenue     = useMemo(() =>
     realInvoices.filter(i => i.status === 'paid' && inPeriod(i.date, 'jahr'))
       .reduce((s, i) => s + i.total, 0),
@@ -532,7 +535,7 @@ export function FinanceRoute() {
         {/* Subtle background glow blob */}
         <div style={{
           position: 'absolute', top: -60, right: -40, width: 280, height: 280,
-          background: 'radial-gradient(circle, oklch($1264 / 0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, oklch(56% 0.19 264 / 0.06) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -774,12 +777,15 @@ export function FinanceRoute() {
                   <td style={{ ...td, fontWeight: 500 }}>{accountName(inv.accountId)}</td>
                   <td style={{ ...td, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
                   <td style={{ ...td, fontSize: 12 }}>
-                    <span style={{ color: inv.status === 'overdue' ? 'var(--danger)' : 'var(--fg-dim)' }}>
+                    <span style={{ color: isOverdue(inv) ? 'var(--danger)' : 'var(--fg-dim)' }}>
                       {relDate(inv.dueDate)}
                     </span>
                   </td>
                   <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
-                  <td style={td}><span className="chip" data-tone={STATUS_TONE[inv.status] ?? ''}>{STATUS_LABEL[inv.status] ?? inv.status}</span></td>
+                  <td style={td}>{(() => {
+                    const s = isOverdue(inv) ? 'overdue' : inv.status
+                    return <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                  })()}</td>
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                       <RowBtn

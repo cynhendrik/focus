@@ -11,7 +11,7 @@ async function closeWin()    { await getCurrentWindow().close() }
 
 // ── Intro ─────────────────────────────────────────────────────────────────────
 
-const INTRO_WORDS = ['If', 'we', 'build,', 'we', 'build', 'to', 'lead.']
+const INTRO_WORDS = ['You', "don't", 'find', 'yourself,', 'you', 'create', 'yourself.']
 
 function IntroOverlay({ fading }: { fading: boolean }) {
   return (
@@ -25,7 +25,7 @@ function IntroOverlay({ fading }: { fading: boolean }) {
       <p style={{
         margin: 0,
         fontFamily: 'var(--font-sans)',
-        fontSize: 'clamp(22px, 2.8vw, 36px)',
+        fontSize: 'clamp(17px, 2.1vw, 27px)',
         fontWeight: 300,
         letterSpacing: '-0.025em',
         lineHeight: 1,
@@ -39,7 +39,7 @@ function IntroOverlay({ fading }: { fading: boolean }) {
             style={{
               display: 'inline-block',
               willChange: 'transform, opacity, filter',
-              animation: `splash-word-rise 1200ms cubic-bezier(.18,.72,.16,1) ${300 + i * 260}ms both`,
+              animation: `intro-word-rise 1500ms cubic-bezier(.16,1,.3,1) ${220 + i * 150}ms both`,
             }}
           >
             {word}
@@ -121,9 +121,14 @@ function Field({
 
 // ── LoginScreen ───────────────────────────────────────────────────────────────
 
+const TESTER_NAME_STORE = 'cultera:tester-name'
+
 export function LoginScreen() {
   const signIn = useAuthStore(s => s.signIn)
   const signUp = useAuthStore(s => s.signUp)
+  const [devName, setDevName] = useState(() => {
+    try { return localStorage.getItem(TESTER_NAME_STORE) ?? '' } catch { return '' }
+  })
 
   const [phase,    setPhase]    = useState<'intro' | 'fading' | 'login'>('intro')
   const [mode,     setMode]     = useState<'login' | 'register'>('login')
@@ -158,8 +163,13 @@ export function LoginScreen() {
   }
 
   function handleDevSkip() {
+    const name = devName.trim()
+    try { localStorage.setItem(TESTER_NAME_STORE, name) } catch { /* ignore */ }
     useWorkspaceStore.getState().setActiveWorkspace('dev')
-    useAuthStore.setState({ user: { id: 'dev', email: 'dev@cynera.local' } as any, loading: false })
+    useAuthStore.setState({
+      user: { id: 'dev', email: 'tester@cultera.local', user_metadata: { full_name: name || 'Tester' } } as any,
+      loading: false,
+    })
   }
 
   function switchMode() {
@@ -346,8 +356,20 @@ export function LoginScreen() {
               </form>
             </div>
 
-            {/* Skip — bottom right */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Skip — bottom right (Tester-Modus: Name eingeben, dann überspringen) */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+              <input
+                value={devName}
+                onChange={e => setDevName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleDevSkip() }}
+                placeholder="Dein Name"
+                style={{
+                  fontSize: 10, color: 'rgba(255,255,255,0.75)',
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 5, padding: '4px 8px', outline: 'none',
+                  fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', width: 120,
+                }}
+              />
               <button
                 onClick={handleDevSkip}
                 style={{

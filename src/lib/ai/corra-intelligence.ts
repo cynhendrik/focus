@@ -123,9 +123,19 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
   ]
 
   if (openTodos.length > 0) {
-    lines.push('TODOS HEUTE/IN ARBEIT:')
+    lines.push('TODOS (HEUTE / ÜBERFÄLLIG / IN ARBEIT):')
+    const sTodayTodo = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     for (const t of openTodos) {
-      const prefix = t.bucket === 'in_progress' ? '[IN ARBEIT]' : '[HEUTE]'
+      // Status datumsbasiert (Kalendertage lokal) — nicht nur nach Bucket.
+      let prefix = '[HEUTE]'
+      if (t.bucket === 'in_progress') {
+        prefix = '[IN ARBEIT]'
+      } else if (t.dueDate) {
+        const dd = new Date(t.dueDate)
+        const sDue = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate())
+        const days = Math.round((sTodayTodo.getTime() - sDue.getTime()) / 86_400_000)
+        if (days > 0) prefix = `[ÜBERFÄLLIG ${days}T]`
+      }
       const cust   = t.customerId ? ` · ${accountName(t.customerId)}` : ''
       const type   = t.actionType ? ` (${t.actionType})` : ''
       lines.push(`- ${prefix} ${t.title}${cust}${type} · ID:${t.id}`)
@@ -167,10 +177,12 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
 
   if (dueFollowUps.length > 0) {
     lines.push('FOLLOW-UPS FÄLLIG:')
+    const sToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     for (const f of dueFollowUps) {
-      const days = Math.floor(
-        (today.getTime() - new Date(f.dueDate).getTime()) / 86_400_000,
-      )
+      // Kalendertage lokal (nicht UTC-Floor) — sonst off-by-one in CEST.
+      const dd = new Date(f.dueDate)
+      const sDue = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate())
+      const days = Math.round((sToday.getTime() - sDue.getTime()) / 86_400_000)
       const prefix = days > 0 ? `[ÜBERFÄLLIG ${days}T]` : '[HEUTE]'
       lines.push(`- ${prefix} ${accountName(f.customerId)} · „${f.title}" · ID:${f.id}`)
     }
@@ -212,27 +224,38 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
 
 export function parseCorraResponse(raw: string): CorraIntelligenceResponse {
   const trimmed = raw.trim()
-  const fenceMatch = /^```(?:json)?\s*([\s\S]*?)\s*```$/s.exec(trimmed)
-  const jsonStr = fenceMatch ? fenceMatch[1].trim() : trimmed
-  try {
-    const parsed: unknown = JSON.parse(jsonStr)
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      'text' in parsed &&
-      typeof (parsed as { text: unknown }).text === 'string'
-    ) {
-      const p = parsed as { text: string; widget?: unknown; actions?: unknown; focusCta?: unknown }
-      return {
-        text:     p.text,
-        widget:   typeof p.widget === 'string' && VALID_WIDGETS.has(p.widget)
-                    ? p.widget as CorraWidgetType
-                    : undefined,
-        actions:  Array.isArray(p.actions) ? (p.actions as CorraActionItem[]) : undefined,
-        focusCta: typeof p.focusCta === 'string' ? p.focusCta : undefined,
+
+  // JSON kann als reiner Text, in einem ```json-Block (auch mit Prosa davor/danach)
+  // oder eingebettet kommen. Wir sammeln Kandidaten und nehmen den ersten gültigen.
+  const candidates: string[] = []
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed)
+  if (fence) candidates.push(fence[1].trim())
+  candidates.push(trimmed)
+  const first = trimmed.indexOf('{')
+  const last = trimmed.lastIndexOf('}')
+  if (first !== -1 && last > first) candidates.push(trimmed.slice(first, last + 1))
+
+  for (const c of candidates) {
+    try {
+      const parsed: unknown = JSON.parse(c)
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        'text' in parsed &&
+        typeof (parsed as { text: unknown }).text === 'string'
+      ) {
+        const p = parsed as { text: string; widget?: unknown; actions?: unknown; focusCta?: unknown }
+        return {
+          text:     p.text,
+          widget:   typeof p.widget === 'string' && VALID_WIDGETS.has(p.widget)
+                      ? p.widget as CorraWidgetType
+                      : undefined,
+          actions:  Array.isArray(p.actions) ? (p.actions as CorraActionItem[]) : undefined,
+          focusCta: typeof p.focusCta === 'string' ? p.focusCta : undefined,
+        }
       }
-    }
-  } catch {}
+    } catch { /* nächster Kandidat */ }
+  }
   return { text: trimmed }
 }
 
@@ -247,7 +270,7 @@ DEINE AUFGABE:
 - Erinnere aktiv an fällige Lead-Follow-Ups und kalte Leads — kein Kontakt darf untergehen
 
 ANTWORT-FORMAT:
-Wenn deine Antwort actionable Items enthält (Rechnungen, Mails, Todos die bearbeitet werden sollen), antworte AUSSCHLIESSLICH als JSON — kein Text davor oder danach:
+Wenn deine Antwort actionable Items enthält (Rechnungen, Mails, Todos die bearbeitet werden sollen), antworte AUSSCHLIESSLICH als rohes JSON-Objekt — KEIN Markdown, KEINE \`\`\`-Codeblöcke, KEIN Fließtext und keine Aufzählung davor oder danach. Nur das JSON:
 {
   "text": "Deine Antwort als Fließtext (2-4 Sätze)",
   "actions": [
@@ -270,6 +293,9 @@ REGELN:
 - Zahlen immer mit konkreten Werten (€, Tage, Namen)
 - IDs EXAKT aus dem Kontext übernehmen (nach "ID:")
 - Nur Daten aus dem Kontext — keine Erfindungen
+- Du führst selbst KEINE Aktionen aus und legst nichts an, sendest oder erledigst nichts. Du SCHLÄGST Aktionen ausschließlich über das actions-Array vor — der Nutzer führt sie per Klick aus. Behaupte NIEMALS, etwas angelegt, erstellt, gesendet, beantwortet oder erledigt zu haben (kein "Ich habe … angelegt").
+- Rechne Datums-/Wochentagsangaben NICHT selbst aus und erfinde KEINE Wochentage. Die Kontext-Marker "[HEUTE]" und "[ÜBERFÄLLIG XT]" (X = Tage überfällig) dienen nur deiner Orientierung — gib sie NIEMALS wörtlich aus (keine eckigen Klammern). Formuliere menschlich: "heute" bzw. "X Tage überfällig". Das gilt auch für das "urgency"-Feld der actions.
+- Wenn der Nutzer nach offenen Aufgaben/Todos, Rechnungen, Follow-ups oder Mails fragt und es im Kontext welche gibt: gib sie IMMER als actions aus (JSON-Format) — nicht nur als Fließtext, auch bei nur einem Eintrag. Für ein bestehendes Todo: type "todo" mit der exakten ID aus dem Kontext.
 
 WIDGET-FELD (optional, nur wenn inhaltlich passend):
 Wenn deine Antwort primär Umsatz/Rechnungen/Finanzen zeigt → füge "widget": "revenue" ins JSON

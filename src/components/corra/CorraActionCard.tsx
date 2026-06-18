@@ -9,6 +9,8 @@ interface Props {
   actions:   CorraActionItem[]
   onExecute: (action: CorraActionItem) => Promise<void>
   onDismiss?: (id: string) => void
+  /** Persistierter Status je Aktion (erledigt/verworfen) — von CorraRoute gesteuert. */
+  statusMap?: Record<string, 'done' | 'dismissed'>
 }
 
 const container = {
@@ -34,27 +36,20 @@ const typeIcon: Record<string, string> = {
   todo:    '✅',
 }
 
-export function CorraActionCard({ actions, onExecute, onDismiss }: Props) {
-  const [status, setStatus] = useState<Record<string, ItemStatus>>(
-    () => Object.fromEntries(actions.map(a => [a.id, 'idle']))
-  )
+export function CorraActionCard({ actions, onExecute, onDismiss, statusMap }: Props) {
+  // Nur der transiente Lade-Zustand ist lokal; erledigt/verworfen kommt persistiert von oben.
+  const [loading, setLoading] = useState<Record<string, boolean>>({})
 
   const handleExecute = async (action: CorraActionItem) => {
-    setStatus(s => ({ ...s, [action.id]: 'loading' }))
+    setLoading(s => ({ ...s, [action.id]: true }))
     try {
       await onExecute(action)
-      setStatus(s => ({ ...s, [action.id]: 'done' }))
-    } catch {
-      setStatus(s => ({ ...s, [action.id]: 'idle' }))
+    } finally {
+      setLoading(s => ({ ...s, [action.id]: false }))
     }
   }
 
-  const handleDismiss = (id: string) => {
-    setStatus(s => ({ ...s, [id]: 'dismissed' }))
-    onDismiss?.(id)
-  }
-
-  const visible = actions.filter(a => status[a.id] !== 'dismissed')
+  const visible = actions.filter(a => statusMap?.[a.id] !== 'dismissed')
   if (visible.length === 0) return null
 
   return (
@@ -65,7 +60,9 @@ export function CorraActionCard({ actions, onExecute, onDismiss }: Props) {
       style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}
     >
       {visible.map(a => {
-        const s = status[a.id] ?? 'idle'
+        const s: ItemStatus = loading[a.id]
+          ? 'loading'
+          : statusMap?.[a.id] === 'done' ? 'done' : 'idle'
         return (
           <motion.div key={a.id} variants={item} style={{
             display: 'flex', alignItems: 'center', gap: 12,
@@ -101,7 +98,7 @@ export function CorraActionCard({ actions, onExecute, onDismiss }: Props) {
                   onClick={() => handleExecute(a)}
                   style={{
                     padding: '5px 12px', borderRadius: 7, border: 'none',
-                    background: s === 'loading' ? 'rgba(255,255,255,0.06)' : 'var(--accent)',
+                    background: s === 'loading' ? 'color-mix(in srgb, var(--fg) 8%, transparent)' : 'var(--accent)',
                     color: s === 'loading' ? 'var(--fg-dim)' : 'var(--accent-ink)',
                     fontSize: 11, fontWeight: 700, cursor: s === 'loading' ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',
@@ -111,7 +108,7 @@ export function CorraActionCard({ actions, onExecute, onDismiss }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDismiss(a.id)}
+                  onClick={() => onDismiss?.(a.id)}
                   style={{
                     padding: '5px 10px', borderRadius: 7,
                     border: '1px solid var(--border)', background: 'transparent',

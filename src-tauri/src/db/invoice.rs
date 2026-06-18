@@ -184,32 +184,96 @@ fn replace_items(conn: &Connection, invoice_id: &str, items: &[UpsertInvoiceItem
     Ok(())
 }
 
-fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, AppError> {
-    let start: i64 = conn.query_row(
-        "SELECT COALESCE(start_number, 1) FROM invoice_sequences WHERE workspace_id = ?1",
-        [workspace_id],
-        |r| r.get(0),
-    ).unwrap_or(1);
-    conn.execute(
-        "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) VALUES (?1, ?2, ?2)
-         ON CONFLICT(workspace_id) DO UPDATE SET next_number = next_number + 1",
-        rusqlite::params![workspace_id, start],
-    )?;
-    let n: i64 = conn.query_row(
-        "SELECT next_number FROM invoice_sequences WHERE workspace_id = ?1",
-        [workspace_id],
-        |r| r.get(0),
-    )?;
-    let year = chrono::Utc::now().format("%Y");
-    Ok(format!("{year}-{n:05}"))
+const DEFAULT_INVOICE_FORMAT: &str = "{YYYY}-{NNNNN}";
+
+/// Wendet eine Nummern-Vorlage an: {YYYY}=Jahr, {YY}=2-stellig, {MM}=Monat,
+/// {N…N}=Zähler (Stellen = Anzahl N). Beispiel "{YY}-{NNNN}", n=1 → "26-0001".
+fn apply_invoice_format(fmt: &str, now: &chrono::DateTime<chrono::Local>, n: i64) -> String {
+    let mut s = fmt
+        .replace("{YYYY}", &now.format("%Y").to_string())
+        .replace("{YY}", &now.format("%y").to_string())
+        .replace("{MM}", &now.format("%m").to_string());
+    loop {
+        let Some(start) = s.find("{N") else { break };
+        let Some(rel_end) = s[start..].find('}') else { break };
+        let token = &s[start + 1..start + rel_end];
+        if token.is_empty() || !token.chars().all(|c| c == 'N') { break; }
+        let width = token.len();
+        s.replace_range(start..start + rel_end + 1, &format!("{n:0width$}"));
+    }
+    s
 }
 
-pub fn get_invoice_sequence(conn: &Connection, workspace_id: &str) -> rusqlite::Result<(i64, i64)> {
+/// (zuletzt vergebene Nummer, Startnummer, Format, Jahr der laufenden Sequenz)
+fn read_sequence(conn: &Connection, workspace_id: &str) -> (i64, i64, String, i64) {
     conn.query_row(
-        "SELECT next_number, COALESCE(start_number, 1) FROM invoice_sequences WHERE workspace_id = ?1",
+        "SELECT next_number, COALESCE(start_number, 1), \
+                COALESCE(NULLIF(format, ''), '{YYYY}-{NNNNN}'), COALESCE(seq_year, 0) \
+         FROM invoice_sequences WHERE workspace_id = ?1",
         [workspace_id],
-        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
-    ).or(Ok((0, 1)))
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?, r.get::<_, i64>(3)?)),
+    ).unwrap_or((0, 1, DEFAULT_INVOICE_FORMAT.to_string(), 0))
+}
+
+/// Nächste zu vergebende Zählernummer (mit Jahres-Reset, nur bei Jahres-Token im Format).
+fn compute_next_counter(last: i64, start: i64, format: &str, seq_year: i64, cur_year: i64) -> i64 {
+    let has_year_token = format.contains("{YYYY}") || format.contains("{YY}");
+    if seq_year != 0 && seq_year != cur_year && has_year_token {
+        start
+    } else {
+        last + 1
+    }
+}
+
+fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, AppError> {
+    let now = chrono::Local::now();
+    let cur_year: i64 = now.format("%Y").to_string().parse().unwrap_or(0);
+    let (last, start, format, seq_year) = read_sequence(conn, workspace_id);
+    let to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    let number = apply_invoice_format(&format, &now, to_use);
+    conn.execute(
+        "INSERT INTO invoice_sequences (workspace_id, next_number, start_number, format, seq_year) \
+         VALUES (?1, ?2, ?3, ?4, ?5) \
+         ON CONFLICT(workspace_id) DO UPDATE SET next_number = ?2, seq_year = ?5",
+        rusqlite::params![workspace_id, to_use, start, format, cur_year],
+    )?;
+    Ok(number)
+}
+
+/// Liest die nächste Nummer, ohne den Zähler zu erhöhen (Formular-Vorschlag).
+pub fn peek_invoice_number(conn: &Connection, workspace_id: &str) -> String {
+    let now = chrono::Local::now();
+    let cur_year: i64 = now.format("%Y").to_string().parse().unwrap_or(0);
+    let (last, start, format, seq_year) = read_sequence(conn, workspace_id);
+    let to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    apply_invoice_format(&format, &now, to_use)
+}
+
+/// (zuletzt vergebene Nummer, Startnummer, Format)
+pub fn get_invoice_sequence(conn: &Connection, workspace_id: &str) -> rusqlite::Result<(i64, i64, String)> {
+    let (last, start, format, _yr) = read_sequence(conn, workspace_id);
+    Ok((last, start, format))
+}
+
+pub fn set_invoice_format(conn: &Connection, workspace_id: &str, format: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO invoice_sequences (workspace_id, next_number, start_number, format) \
+         VALUES (?1, 0, 1, ?2) \
+         ON CONFLICT(workspace_id) DO UPDATE SET format = ?2",
+        rusqlite::params![workspace_id, format],
+    )?;
+    Ok(())
+}
+
+pub fn invoice_number_exists(
+    conn: &Connection, workspace_id: &str, number: &str, exclude_id: Option<&str>,
+) -> rusqlite::Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM invoices WHERE workspace_id = ?1 AND number = ?2 AND id != COALESCE(?3, '')",
+        rusqlite::params![workspace_id, number, exclude_id],
+        |r| r.get(0),
+    )?;
+    Ok(count > 0)
 }
 
 pub fn set_invoice_start_number(conn: &Connection, workspace_id: &str, start: i64) -> rusqlite::Result<()> {
@@ -248,8 +312,13 @@ pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<Invoic
     // Assign invoice number immediately when creating a published (non-draft) invoice
     if !is_suggestion && status == "open" {
         let number = match payload.number.as_deref().filter(|s| !s.trim().is_empty()) {
-            Some(n) => n.to_string(),
-            None    => next_invoice_number(conn, &payload.workspace_id)?,
+            Some(n) => {
+                if invoice_number_exists(conn, &payload.workspace_id, n, None).unwrap_or(false) {
+                    return Err(AppError::Validation(format!("Rechnungsnummer {n} ist bereits vergeben.")));
+                }
+                n.to_string()
+            }
+            None => next_invoice_number(conn, &payload.workspace_id)?,
         };
         conn.execute(
             "UPDATE invoices SET number=?1 WHERE id=?2",
@@ -286,8 +355,13 @@ pub fn update(conn: &Connection, id: &str, payload: UpsertInvoicePayload) -> Res
         ).map_err(|_| AppError::NotFound(format!("Invoice {id} not found")))?;
         if current_number.is_none() {
             let number = match payload.number.as_deref().filter(|s| !s.trim().is_empty()) {
-                Some(n) => n.to_string(),
-                None    => next_invoice_number(conn, &payload.workspace_id)?,
+                Some(n) => {
+                    if invoice_number_exists(conn, &payload.workspace_id, n, Some(id)).unwrap_or(false) {
+                        return Err(AppError::Validation(format!("Rechnungsnummer {n} ist bereits vergeben.")));
+                    }
+                    n.to_string()
+                }
+                None => next_invoice_number(conn, &payload.workspace_id)?,
             };
             conn.execute(
                 "UPDATE invoices SET number=?1 WHERE id=?2",
@@ -461,16 +535,22 @@ pub fn get_finance_kpis(conn: &Connection, workspace_id: &str) -> Result<Finance
         |r| r.get(0),
     )?;
 
+    // "Offen" = unbezahlt & noch nicht fällig; "Überfällig" = unbezahlt & über
+    // Fälligkeit. Überfälligkeit wird aus due_date abgeleitet (Status wird nie auf
+    // 'overdue' gesetzt). date('now','localtime') statt UTC, damit CET-Rechnungen
+    // nicht einen Tag zu früh kippen.
     let (open_count, open_total): (i64, f64) = conn.query_row(
         "SELECT COUNT(*), COALESCE(SUM(total),0) FROM invoices
-         WHERE workspace_id=?1 AND status='open' AND is_suggestion=0",
+         WHERE workspace_id=?1 AND status IN ('open','overdue') AND is_suggestion=0
+           AND due_date >= date('now','localtime')",
         [workspace_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
 
     let (overdue_count, overdue_total): (i64, f64) = conn.query_row(
         "SELECT COUNT(*), COALESCE(SUM(total),0) FROM invoices
-         WHERE workspace_id=?1 AND status='overdue'",
+         WHERE workspace_id=?1 AND status IN ('open','overdue') AND is_suggestion=0
+           AND due_date < date('now','localtime')",
         [workspace_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
@@ -520,6 +600,50 @@ mod tests {
             [&now],
         ).unwrap();
         conn
+    }
+
+    #[test]
+    fn apply_invoice_format_tokens() {
+        use chrono::TimeZone;
+        let d = chrono::Local.with_ymd_and_hms(2026, 6, 15, 0, 0, 0).unwrap();
+        assert_eq!(apply_invoice_format("{YY}-{NNNN}", &d, 1), "26-0001");
+        assert_eq!(apply_invoice_format("{YYYY}-{NNNNN}", &d, 42), "2026-00042");
+        assert_eq!(apply_invoice_format("RE-{YY}{MM}-{NNN}", &d, 7), "RE-2606-007");
+    }
+
+    #[test]
+    fn compute_next_counter_logic() {
+        assert_eq!(compute_next_counter(5, 1, "{YYYY}-{NNNNN}", 2026, 2026), 6); // gleiches Jahr → weiter
+        assert_eq!(compute_next_counter(5, 1, "{YYYY}-{NNNNN}", 2026, 2027), 1); // Jahreswechsel + Token → Reset
+        assert_eq!(compute_next_counter(5, 1, "RE-{NNNNN}", 2026, 2027), 6);     // ohne Jahres-Token → weiter
+        assert_eq!(compute_next_counter(5, 1, "{YYYY}-{NNNNN}", 0, 2026), 6);    // Legacy (seq_year 0) → weiter
+        assert_eq!(compute_next_counter(0, 1, "{YYYY}-{NNNNN}", 0, 2026), 1);    // frisch → Start
+    }
+
+    #[test]
+    fn custom_format_peek_and_increment() {
+        let conn = setup();
+        set_invoice_format(&conn, "ws-1", "{YY}-{NNNN}").unwrap();
+        let yy = chrono::Local::now().format("%y").to_string();
+        // peek erhöht den Zähler nicht
+        assert_eq!(peek_invoice_number(&conn, "ws-1"), format!("{yy}-0001"));
+        assert_eq!(peek_invoice_number(&conn, "ws-1"), format!("{yy}-0001"));
+        // vergeben erhöht
+        assert_eq!(next_invoice_number(&conn, "ws-1").unwrap(), format!("{yy}-0001"));
+        assert_eq!(next_invoice_number(&conn, "ws-1").unwrap(), format!("{yy}-0002"));
+        // peek zeigt jetzt die nächste
+        assert_eq!(peek_invoice_number(&conn, "ws-1"), format!("{yy}-0003"));
+    }
+
+    #[test]
+    fn invoice_number_exists_detects_duplicate() {
+        let conn = setup();
+        let mut p = sample_payload(vec![]);
+        p.status = Some("open".into());
+        p.number = Some("RE-2026-001".into());
+        create(&conn, p).unwrap();
+        assert!(invoice_number_exists(&conn, "ws-1", "RE-2026-001", None).unwrap());
+        assert!(!invoice_number_exists(&conn, "ws-1", "RE-2026-999", None).unwrap());
     }
 
     fn sample_payload(items: Vec<UpsertInvoiceItemPayload>) -> UpsertInvoicePayload {

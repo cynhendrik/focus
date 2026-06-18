@@ -62,7 +62,7 @@ export function WorkflowPane({ customerId }: Props) {
           display: 'grid', gridTemplateColumns: 'minmax(440px, 1.2fr) minmax(360px, 1fr)',
           gap: 24, alignItems: 'start',
         }}>
-          <TasksListView customerId={customerId} defaultGroupBy="priority" />
+          <TasksListView customerId={customerId} defaultGroupBy="time" />
           <TasksBoardView customerId={customerId} showComposer={false} />
         </div>
       )}

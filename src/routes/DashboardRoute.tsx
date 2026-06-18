@@ -157,6 +157,7 @@ function WorkspaceView() {
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const upsertTodo = useTodosStore(s => s.upsert)
+  const crmUpsert  = useCrmStore(s => s.upsert)
   const showToast  = useToastStore(s => s.show)
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
@@ -186,12 +187,21 @@ function WorkspaceView() {
           }
           await upsertTodo(payload)
         }
+      } else if (item.type === 'lead_followup') {
+        // CRM-Follow-up als erledigt markieren (sonst kommt es wieder).
+        const fu = followUps.find(f => f.id === item.id)
+        if (fu) {
+          await crmUpsert({
+            id: fu.id, customerId: fu.customerId, title: fu.title,
+            dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
+          })
+        }
       }
     } catch {
       showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
     }
     advance()
-  }, [queueItems, queueIndex, todos, upsertTodo, advance, showToast])
+  }, [queueItems, queueIndex, todos, upsertTodo, followUps, crmUpsert, advance, showToast])
 
   const handleSkip = useCallback(() => advance(), [advance])
 
@@ -246,7 +256,7 @@ function WorkspaceView() {
   // Heute faellig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
-    const tasks = todos.filter(t => t.status !== 'done' && t.dueDate === todayIso).length
+    const tasks = todos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
     const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
   }, [todos, followUps, events, todayIso])
@@ -489,7 +499,9 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
   const todayIso = todayLocalIso()
   for (const t of todos) {
     if (t.status === 'done') continue
-    if (t.dueDate !== todayIso) continue
+    // Aufgabe zählt für heute, wenn fällig ODER für heute eingeplant (Composer
+    // setzt scheduledAt, nicht dueDate) — sonst verschwinden getippte Tasks.
+    if (t.dueDate !== todayIso && !(t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso)) continue
     items.push({
       id: `t-${t.id}`,
       time: '',
@@ -592,7 +604,7 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           width: 10, height: 10, borderRadius: 99,
           background: isNow ? 'var(--accent)' : 'transparent',
           border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
-          boxShadow: isNow ? '0 0 0 4px oklch($1264 / 0.16)' : 'none',
+          boxShadow: isNow ? '0 0 0 4px oklch(56% 0.19 264 / 0.16)' : 'none',
         }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
@@ -637,9 +649,13 @@ function InboxCard() {
   }, [customers])
 
   const sorted = useMemo(
-    () => [...emails].sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || '')),
+    () => [...emails].sort((a, b) =>
+      (Number(!!a.isRead) - Number(!!b.isRead)) ||   // ungelesene zuerst
+      (b.sentAt || '').localeCompare(a.sentAt || ''),
+    ),
     [emails],
   )
+  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
 
   return (
     <div style={{
@@ -660,10 +676,11 @@ function InboxCard() {
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10.5,
-            color: 'var(--fg-dim)', letterSpacing: '0.04em',
+            fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.04em',
+            color: unreadCount > 0 ? 'var(--accent)' : 'var(--fg-dim)',
+            fontWeight: unreadCount > 0 ? 700 : 400,
           }}>
-            {sorted.length} {sorted.length === 1 ? 'Mail' : 'Mails'}
+            {unreadCount > 0 ? `${unreadCount} ungelesen` : `${sorted.length} ${sorted.length === 1 ? 'Mail' : 'Mails'}`}
           </span>
           <button
             onClick={() => setAppView('mail')}
@@ -714,26 +731,34 @@ function InboxRow({
     ? `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`
     : time.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
 
+  const unread = !email.isRead
+
   return (
     <div
       onClick={onClick}
       style={{
-        display: 'grid', gridTemplateColumns: '1fr auto', gap: 12,
+        display: 'grid', gridTemplateColumns: '8px 1fr auto', gap: 10,
         alignItems: 'center', padding: '10px 8px', borderRadius: 10,
         cursor: 'pointer', transition: 'background 140ms',
+        opacity: unread ? 1 : 0.6,
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
+      <span style={{
+        width: 7, height: 7, borderRadius: '50%',
+        background: unread ? 'var(--accent)' : 'transparent',
+      }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--fg)',
+          fontSize: 13, fontWeight: unread ? 700 : 500,
+          color: unread ? 'var(--fg)' : 'var(--fg-muted)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {customerName ?? email.fromName ?? email.fromAddr}
         </span>
         <span style={{
-          fontSize: 11.5, color: 'var(--fg-muted)',
+          fontSize: 11.5, color: unread ? 'var(--fg-muted)' : 'var(--fg-dim)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {email.subject || '(ohne Betreff)'}
@@ -766,7 +791,11 @@ export function DashboardRoute() {
     loadToday(workspaceId)
   }, [workspaceId, loadFinance, loadToday])
 
-  const firstName = (user?.email?.split('@')[0] ?? 'User').replace(/^./, c => c.toUpperCase())
+  const firstName = (
+    ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
+    || user?.email?.split('@')[0]
+    || 'User'
+  ).replace(/^./, c => c.toUpperCase())
   const now = new Date()
   const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
 

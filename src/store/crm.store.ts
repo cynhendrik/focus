@@ -67,11 +67,14 @@ export const useCrmStore = create<CrmState>()((set) => ({
     try {
       const fu = await CrmService.upsert(payload)
       set(s => {
-        const exists = s.followUps.some(f => f.id === fu.id)
+        // Beide Listen aktualisieren — allFollowUps speist HEUTE & die CRM-Follow-ups-Ansicht.
+        const upd = (list: FollowUp[]) =>
+          list.some(f => f.id === fu.id)
+            ? list.map(f => f.id === fu.id ? fu : f)
+            : [...list, fu]
         return {
-          followUps: exists
-            ? s.followUps.map(f => f.id === fu.id ? fu : f)
-            : [...s.followUps, fu],
+          followUps: upd(s.followUps),
+          allFollowUps: upd(s.allFollowUps),
         }
       })
     } catch (err) {

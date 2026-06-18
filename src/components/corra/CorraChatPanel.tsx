@@ -11,9 +11,11 @@ interface Props {
   onSend:    (text: string) => void
   onExecute: (action: CorraActionItem) => Promise<void>
   onClear:   () => void
+  onDismiss?: (id: string) => void
+  actionStatus?: Record<string, 'done' | 'dismissed'>
 }
 
-export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }: Props) {
+export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear, onDismiss, actionStatus }: Props) {
   const [input, setInput]   = useState('')
   const bottomRef           = useRef<HTMLDivElement>(null)
   const textareaRef         = useRef<HTMLTextAreaElement>(null)
@@ -49,7 +51,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
       {/* Dot grid background */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)',
+        backgroundImage: 'radial-gradient(circle, color-mix(in srgb, var(--fg) 6%, transparent) 1px, transparent 1px)',
         backgroundSize: '22px 22px',
       }} />
 
@@ -64,7 +66,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
         <div style={{
           width: 8, height: 8, borderRadius: '50%',
           background: 'var(--accent)',
-          boxShadow: '0 0 8px oklch($1264 / 0.4)',
+          boxShadow: '0 0 8px color-mix(in srgb, var(--accent) 40%, transparent)',
         }} />
         <span style={{
           fontSize: 10, fontWeight: 700, color: 'var(--accent)',
@@ -76,7 +78,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
             <span style={{
               fontSize: 9, fontFamily: 'var(--font-mono)',
               color: 'var(--accent)', letterSpacing: '0.1em',
-              background: 'oklch($1264 / 0.1)',
+              background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
               padding: '2px 8px', borderRadius: 99,
             }}>
               {openCount} OFFEN
@@ -113,6 +115,8 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
                 key={msg.id ?? String(i)}
                 message={msg}
                 onExecute={onExecute}
+                onDismiss={onDismiss}
+                statusMap={actionStatus}
               />
             ))}
           </AnimatePresence>
@@ -182,7 +186,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear }
             disabled={!input.trim() || loading}
             style={{
               width: 34, height: 34, borderRadius: '50%', border: 'none', flexShrink: 0,
-              background: input.trim() && !loading ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              background: input.trim() && !loading ? 'var(--accent)' : 'color-mix(in srgb, var(--fg) 8%, transparent)',
               color: input.trim() && !loading ? 'var(--accent-ink)' : 'var(--fg-dim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',

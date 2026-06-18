@@ -30,6 +30,8 @@ pub struct Account {
     pub country: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,
+    /// USt-IdNr. des Kunden (für Reverse-Charge / EU-B2B-Rechnungen).
+    pub vat_id: Option<String>,
     // NULL = aktiv, Zeitstempel = archiviert (raus aus der aktiven Liste, History bleibt)
     pub archived_at: Option<String>,
     // Computed via JOIN, never stored on Account
@@ -62,6 +64,7 @@ pub struct UpsertAccountPayload {
     pub country: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,
+    pub vat_id: Option<String>,
 }
 
 fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
@@ -98,6 +101,7 @@ fn map_account_row(row: &rusqlite::Row) -> rusqlite::Result<Account> {
         phone:                row.get(26)?,
         pipeline_phase:       row.get(27)?,
         pipeline_phase_label: row.get(28)?,
+        vat_id:               row.get(29)?,
     })
 }
 
@@ -109,7 +113,8 @@ SELECT
     a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
     ps.name   AS pipeline_phase,
-    ps.label  AS pipeline_phase_label
+    ps.label  AS pipeline_phase_label,
+    a.vat_id
 FROM accounts a
 LEFT JOIN deals d ON d.id = COALESCE(
     a.primary_deal_id,
@@ -133,7 +138,8 @@ SELECT
     a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
     ps.name   AS pipeline_phase,
-    ps.label  AS pipeline_phase_label
+    ps.label  AS pipeline_phase_label,
+    a.vat_id
 FROM accounts a
 LEFT JOIN deals d ON d.id = COALESCE(
     a.primary_deal_id,
@@ -178,16 +184,16 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
         "INSERT INTO accounts (id, workspace_id, created_by, name, kind, industry, website,
                                status, priority, tags, goals, internal_notes,
                                pending_sync, social_links, primary_deal_id,
-                               street, zip, city, country, email, phone,
+                               street, zip, city, country, email, phone, vat_id,
                                created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?16,?17,?18,?19,?20,?21,?21)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,1,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?22)
          ON CONFLICT(id) DO UPDATE SET
            name=excluded.name, kind=excluded.kind, industry=excluded.industry,
            website=excluded.website, status=excluded.status, priority=excluded.priority,
            tags=excluded.tags, goals=excluded.goals, internal_notes=excluded.internal_notes,
            social_links=excluded.social_links, primary_deal_id=excluded.primary_deal_id,
            street=excluded.street, zip=excluded.zip, city=excluded.city, country=excluded.country,
-           email=excluded.email, phone=excluded.phone,
+           email=excluded.email, phone=excluded.phone, vat_id=excluded.vat_id,
            pending_sync=1, updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.name,
@@ -199,7 +205,7 @@ pub fn upsert(conn: &Connection, payload: UpsertAccountPayload) -> Result<Accoun
             payload.social_links.unwrap_or_else(|| "{}".to_string()),
             payload.primary_deal_id,
             payload.street, payload.zip, payload.city, payload.country,
-            payload.email, payload.phone,
+            payload.email, payload.phone, payload.vat_id,
             now,
         ],
     )?;
@@ -300,6 +306,7 @@ mod tests {
             country: None,
             email: None,
             phone: None,
+            vat_id: None,
         }
     }
 

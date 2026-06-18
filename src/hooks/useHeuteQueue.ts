@@ -7,10 +7,8 @@ import { useCalendarStore } from '@/store/calendar.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useLeadsStore } from '@/store/leads.store'
-import { fetchHeuteQueue, staticHeuteQueue } from '@/lib/ai/heute-queue'
+import { staticHeuteQueue } from '@/lib/ai/heute-queue'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
-import { MissingApiKeyError } from '@/lib/ai/briefing'
-import { log } from '@/lib/logger'
 
 export function useHeuteQueue() {
   const [items, setItems]     = useState<HeuteQueueItem[]>([])
@@ -28,17 +26,12 @@ export function useHeuteQueue() {
       followUps:      useCrmStore.getState().allFollowUps,
       leads:          useLeadsStore.getState().leads,
     }
-    try {
-      const queue = await fetchHeuteQueue(input)
-      setItems(queue.length > 0 ? queue : staticHeuteQueue(input))
-    } catch (e) {
-      if (!(e instanceof MissingApiKeyError)) {
-        log.warn('KORA queue failed, using static fallback', { e })
-      }
-      setItems(staticHeuteQueue(input))
-    } finally {
-      setLoading(false)
-    }
+    // Deterministische Priorisierung ohne LLM-Call. Die Reihenfolge ist dieselbe,
+    // die der KI-Prompt vorgegeben hatte (Mahnung→Follow-up→Mail→Todo); der
+    // Sonnet-Aufruf pro Mount hat nur teuer umformuliert. reason-Texte liefert
+    // staticHeuteQueue bereits selbst.
+    setItems(staticHeuteQueue(input))
+    setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])

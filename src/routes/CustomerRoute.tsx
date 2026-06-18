@@ -181,7 +181,7 @@ export function CustomerRoute({ customerId }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: 'var(--bg)', width: '100%', maxWidth: 1560, margin: '0 auto' }}>
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg)', width: '100%' }}>
       {/* Header */}
       <div className="detail-head">
         <button className="back" onClick={() => setSelected(null)}>
@@ -428,7 +428,7 @@ export function CustomerRoute({ customerId }: Props) {
                   position: 'absolute', left: 18, right: 18, bottom: -1,
                   height: 2, borderRadius: 2,
                   background: 'var(--accent)',
-                  boxShadow: '0 0 12px oklch($1264 / 0.5)',
+                  boxShadow: '0 0 12px oklch(56% 0.19 264 / 0.5)',
                 }} />
               )}
             </button>

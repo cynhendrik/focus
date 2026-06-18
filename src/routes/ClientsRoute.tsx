@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   UserPlus,
-  Search, ChevronRight, Archive,
+  Search, ChevronRight, Archive, Pin,
 } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
@@ -144,6 +144,9 @@ function OpenCountBadge({ customerId }: { customerId: string }) {
 const COL_TEMPLATE = '1.6fr 1fr 0.6fr 0.45fr 0.6fr 28px'
 
 function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) {
+  const pinnedIds = useClientPickerStore(s => s.pinnedIds)
+  const togglePin = useClientPickerStore(s => s.togglePin)
+  const pinned = pinnedIds.includes(row.customer.id)
   return (
     <div
       onClick={onOpen}
@@ -217,8 +220,23 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
         {relContactLabel(row.lastContactAt)}
       </div>
 
-      {/* Arrow */}
-      <ChevronRight size={16} style={{ color: 'var(--fg-dim)', justifySelf: 'end' }} />
+      {/* Pin + Arrow */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifySelf: 'end' }}>
+        <button
+          onClick={e => { e.stopPropagation(); togglePin(row.customer.id) }}
+          title={pinned ? 'Anheftung entfernen' : 'Kunde anheften'}
+          aria-label={pinned ? 'Anheftung entfernen' : 'Kunde anheften'}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer',
+            background: pinned ? 'var(--accent-soft)' : 'transparent',
+            color: pinned ? 'var(--accent)' : 'var(--fg-dim)',
+          }}
+        >
+          <Pin size={14} fill={pinned ? 'currentColor' : 'none'} />
+        </button>
+        <ChevronRight size={16} style={{ color: 'var(--fg-dim)' }} />
+      </div>
     </div>
   )
 }
@@ -303,7 +321,7 @@ function ClientBoard() {
 
   const [showModal, setShowModal]         = useState(false)
   const [search, setSearch]               = useState('')
-  const [sortKey, setSortKey]             = useState<ClientSortKey>('brauchen')
+  const [sortKey, setSortKey]             = useState<ClientSortKey>('name')
   const [showArchived, setShowArchived]   = useState(false)
 
   // Private Kunden (isPrivate=true oder Sentinel-ID) aus dem Geschäfts-CRM ausblenden.

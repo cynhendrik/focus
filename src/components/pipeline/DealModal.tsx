@@ -32,6 +32,8 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const lockedCustomer = presetCustomerId ? customers.find(c => c.id === presetCustomerId) : null
 
@@ -40,14 +42,17 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
   }, [stages])
 
   const handleSave = async () => {
-    if (!title.trim()) return
+    // Kunde ist Pflicht: account_id muss ein echtes Konto sein (NOT NULL FK).
+    // Ohne Kunde gäbe es sonst account_id=workspaceId → FOREIGN KEY constraint failed.
+    if (!title.trim() || !customerId) return
     setSaving(true)
+    setSaveError(null)
     const payload: UpsertDealPayload = {
       id: initial?.id,
       workspaceId,
       createdBy: user?.email ?? 'user',
-      accountId: customerId || workspaceId,
-      customerId: customerId || undefined,
+      accountId: customerId,
+      customerId: customerId,
       title: title.trim(),
       stage,
       value: value ? parseFloat(value) : undefined,
@@ -58,6 +63,8 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
     try {
       await upsert(payload)
       onClose()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err))
     } finally {
       setSaving(false)
     }
@@ -66,9 +73,13 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
   const handleDelete = async () => {
     if (!initial) return
     setDeleting(true)
+    setDeleteError(null)
     try {
       await remove(initial.id)
       onClose()
+    } catch (err) {
+      // Fehler nicht mehr verschlucken — sonst "hängt" das Modal ohne Hinweis.
+      setDeleteError(err instanceof Error ? err.message : String(err))
     } finally {
       setDeleting(false)
     }
@@ -99,7 +110,7 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Kunde — fixe Badge wenn aus Kundenprofil, sonst Dropdown mit Profilinfos */}
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Kunde</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Kunde *</label>
             {lockedCustomer ? (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -164,6 +175,16 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
             <input className="mock-input" type="date" value={expectedClose} onChange={e => setExpectedClose(e.target.value)} />
           </div>
         </div>
+
+        {(deleteError || saveError) && (
+          <div style={{
+            marginTop: 16, padding: '8px 12px', borderRadius: 8,
+            background: 'oklch(72% 0.18 25 / 0.12)', border: '1px solid oklch(72% 0.18 25 / 0.4)',
+            color: 'oklch(72% 0.18 25)', fontSize: 12, lineHeight: 1.4,
+          }}>
+            {deleteError ? `Löschen fehlgeschlagen: ${deleteError}` : `Speichern fehlgeschlagen: ${saveError}`}
+          </div>
+        )}
 
         <div style={{
           display: 'flex', gap: 8, alignItems: 'center',
@@ -230,7 +251,7 @@ export function DealModal({ initial, presetCustomerId, presetStage, onClose }: P
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={onClose} className="btn-secondary" style={{ fontSize: 12, padding: '7px 16px' }}>Abbrechen</button>
-            <button onClick={handleSave} disabled={saving || !title.trim()} className="btn-primary" style={{ fontSize: 12, padding: '7px 16px' }}>
+            <button onClick={handleSave} disabled={saving || !title.trim() || !customerId} className="btn-primary" style={{ fontSize: 12, padding: '7px 16px' }}>
               {saving ? 'Wird hinzugefügt…' : initial ? 'Speichern' : 'Zur Pipeline hinzufügen'}
             </button>
           </div>

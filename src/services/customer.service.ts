@@ -9,6 +9,7 @@ function accountToCustomer(a: Account): Customer {
     company: a.kind === 'company' ? a.name : undefined,
     email: a.email,
     phone: a.phone,
+    vatId: a.vatId,
     status: (a.status === 'prospect' ? 'lead' : a.status === 'churned' ? 'lost' : a.status) as Customer['status'],
     priority: (a.priority === 'vip' ? 'high' : a.priority) as Customer['priority'],
     tags: a.tags,
@@ -55,6 +56,7 @@ export const CustomerService = {
       country: payload.country,
       email: payload.email,
       phone: payload.phone,
+      vatId: payload.vatId,
     }
     return invoke<Account>('upsert_account', { payload: accountPayload }).then(accountToCustomer)
   },

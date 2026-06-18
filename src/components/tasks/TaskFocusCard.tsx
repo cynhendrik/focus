@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
@@ -16,6 +17,16 @@ const PRIO_LABEL: Record<TodoPriority, string> = {
 export function TaskFocusCard({ todo }: { todo: Todo }) {
   const accounts        = useAccountsStore(s => s.accounts)
   const toggleChecklist = useTodosStore(s => s.toggleChecklist)
+  const updateNotes     = useTodosStore(s => s.updateNotes)
+
+  const [note, setNote] = useState(todo.notes ?? '')
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => { setNote(todo.notes ?? '') }, [todo.id, todo.notes])
+  const onNoteChange = (v: string) => {
+    setNote(v)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => { void updateNotes(todo.id, v) }, 600)
+  }
   const customer = todo.customerId ? accounts.find(c => c.id === todo.customerId) : undefined
   const time = todo.scheduledAt
     ? new Date(todo.scheduledAt).toLocaleString('de', {
@@ -41,7 +52,7 @@ export function TaskFocusCard({ todo }: { todo: Todo }) {
         </span>
         {time && <span style={{ color: 'var(--fg-muted)' }}>{time}</span>}
         {customer && <span style={{ color: 'var(--accent-ink)' }}>● {customer.name}</span>}
-        {todo.aiSummary && <span style={{ color: 'var(--accent)', fontWeight: 600 }}>● Cy vorbereitet</span>}
+        {todo.aiSummary && <span style={{ color: 'var(--accent)', fontWeight: 600 }}>● KORA vorbereitet</span>}
       </div>
 
       <h1 style={{
@@ -67,7 +78,7 @@ export function TaskFocusCard({ todo }: { todo: Todo }) {
             marginBottom: 6,
           }}>
             <Sparkles size={12} />
-            Cy · Vorbereitet
+            KORA · Vorbereitet
           </div>
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--fg)', margin: 0 }}>
             {todo.aiSummary}
@@ -108,6 +119,23 @@ export function TaskFocusCard({ todo }: { todo: Todo }) {
           </div>
         </div>
       )}
+
+      <div>
+        <div className="card-label" style={{ marginBottom: 10 }}>Notiz</div>
+        <textarea
+          value={note}
+          onChange={e => onNoteChange(e.target.value)}
+          placeholder="Notiz / Vorbereitung zu dieser Aufgabe…"
+          rows={4}
+          style={{
+            width: '100%', resize: 'vertical', minHeight: 90, lineHeight: 1.55,
+            fontSize: 14, fontFamily: 'inherit', padding: '12px 14px',
+            borderRadius: 10, border: '1px solid var(--border)',
+            background: 'var(--surface)', color: 'var(--fg)', outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
     </div>
   )
 }

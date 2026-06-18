@@ -287,7 +287,7 @@ function NoteEditor({
       >
         <StickyCanvas stickies={stickies} onChange={handleStickiesChange} />
         <div style={{ maxWidth: 720 }}>
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} className="tt-editor" />
         </div>
       </div>
     </div>

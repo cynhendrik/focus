@@ -96,6 +96,23 @@ async fn focus_ai_chat(window: tauri::WebviewWindow, messages: Vec<Message>) -> 
     Ok(())
 }
 
+/// Kopiert ein Verzeichnis rekursiv (überschreibt vorhandene Dateien NICHT).
+/// Best effort — einzelne Kopierfehler werden ignoriert, damit ein gesperrtes
+/// Cache-File die Migration nicht abbricht.
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) {
+    if std::fs::create_dir_all(dst).is_err() { return; }
+    let Ok(entries) = std::fs::read_dir(src) else { return };
+    for entry in entries.flatten() {
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        match entry.file_type() {
+            Ok(ty) if ty.is_dir() => copy_dir_all(&from, &to),
+            Ok(_) => { if !to.exists() { let _ = std::fs::copy(&from, &to); } }
+            Err(_) => {}
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -105,6 +122,31 @@ fn main() {
                 .expect("App-Data-Verzeichnis nicht gefunden");
             std::fs::create_dir_all(&data_dir)
                 .expect("App-Data-Verzeichnis konnte nicht erstellt werden");
+
+            // ── Rebrand-Migration (com.cynera.focus → de.cultera.focus) ──────────
+            // Der Bundle-Identifier-Wechsel ändert die App-Verzeichnisse. Beim ersten
+            // Start mit neuem Identifier übernehmen wir die alten Daten verlustfrei:
+            //  • app_data_dir (Roaming): focus.db, emails.db, backups/
+            //  • app_local_data_dir (Local): WebView2-Profil = localStorage
+            // Kopie statt Verschieben — der alte Ordner bleibt als Sicherheitsnetz.
+            if !data_dir.join("focus.db").exists() {
+                const OLD_ID: &str = "com.cynera.focus";
+                if let Some(parent) = data_dir.parent() {
+                    let old = parent.join(OLD_ID);
+                    if old.join("focus.db").exists() {
+                        copy_dir_all(&old, &data_dir);
+                        eprintln!("[migration] Daten von {OLD_ID} übernommen → {}", data_dir.display());
+                    }
+                }
+                if let Ok(local) = app.path().app_local_data_dir() {
+                    if let Some(lparent) = local.parent() {
+                        let old_local = lparent.join(OLD_ID);
+                        if old_local.exists() {
+                            copy_dir_all(&old_local, &local);
+                        }
+                    }
+                }
+            }
 
             // Main app DB (SQLite — all domains)
             let db_path = data_dir.join("focus.db");
@@ -124,7 +166,8 @@ fn main() {
 
             let window = app.get_webview_window("main").unwrap();
             window.set_title("Cultera Focus").unwrap();
-            window.center().unwrap();
+            // Im Fenster-Vollbild (maximiert) starten.
+            window.maximize().unwrap();
 
             #[cfg(target_os = "macos")]
             {
@@ -234,7 +277,12 @@ fn main() {
             commands::follow_up::cmd_cancel_follow_ups_for_lead,
             commands::follow_up::cmd_mark_follow_up_sent,
             commands::follow_up::cmd_mark_follow_up_skipped,
+            commands::follow_up::cmd_mark_follow_up_done,
+            commands::follow_up::cmd_delete_follow_up,
             commands::follow_up::cmd_update_follow_up_draft,
+            commands::contract::cmd_get_contracts,
+            commands::contract::cmd_upsert_contract,
+            commands::contract::cmd_delete_contract,
             commands::invoice::get_invoices,
             commands::invoice::get_invoice,
             commands::invoice::create_invoice,
@@ -247,6 +295,9 @@ fn main() {
             commands::invoice::get_finance_kpis,
             commands::invoice::get_invoice_sequence,
             commands::invoice::set_invoice_start_number,
+            commands::invoice::peek_invoice_number,
+            commands::invoice::set_invoice_format,
+            commands::invoice::invoice_number_exists,
             commands::offer::get_offers,
             commands::offer::get_offer,
             commands::offer::create_offer,
@@ -281,10 +332,6 @@ fn main() {
             commands::notes::create_note_entry,
             commands::notes::update_note_entry,
             commands::notes::delete_note_entry,
-            commands::notes::get_note_docs,
-            commands::notes::create_note_doc,
-            commands::notes::update_note_doc,
-            commands::notes::delete_note_doc,
             commands::notes::get_note_folders,
             commands::notes::create_note_folder,
             commands::notes::update_note_folder,

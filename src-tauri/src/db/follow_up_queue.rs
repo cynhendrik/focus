@@ -126,6 +126,23 @@ pub fn mark_skipped(conn: &Connection, id: &str) -> Result<FollowUpQueueItem, Ap
         .map_err(AppError::from)
 }
 
+pub fn mark_done(conn: &Connection, id: &str) -> Result<FollowUpQueueItem, AppError> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let n = conn.execute(
+        "UPDATE follow_up_queue SET status='done', updated_at=?1 WHERE id=?2",
+        rusqlite::params![now, id],
+    )?;
+    if n == 0 { return Err(AppError::NotFound(format!("FollowUpQueueItem {id} not found"))); }
+    conn.query_row(&format!("{SELECT} WHERE id=?1"), [id], map_row)
+        .map_err(AppError::from)
+}
+
+pub fn delete_item(conn: &Connection, id: &str) -> Result<(), AppError> {
+    let n = conn.execute("DELETE FROM follow_up_queue WHERE id=?1", [id])?;
+    if n == 0 { return Err(AppError::NotFound(format!("FollowUpQueueItem {id} not found"))); }
+    Ok(())
+}
+
 pub fn update_draft(
     conn: &Connection,
     id: &str,
@@ -306,6 +323,35 @@ mod tests {
         let items = create_sequence(&conn, "ws-1", "lead-1", "act-1", "Test", None).unwrap();
         let skipped = mark_skipped(&conn, &items[0].id).unwrap();
         assert_eq!(skipped.status, "skipped");
+    }
+
+    #[test]
+    fn mark_done_updates_status() {
+        let conn = setup();
+        seed_account(&conn, "lead-1", "ws-1");
+        let items = create_sequence(&conn, "ws-1", "lead-1", "act-1", "Test", None).unwrap();
+        let done = mark_done(&conn, &items[0].id).unwrap();
+        assert_eq!(done.status, "done");
+        // done items must not appear in the due list
+        let due = get_due(&conn, "ws-1").unwrap();
+        assert!(!due.iter().any(|i| i.id == items[0].id));
+    }
+
+    #[test]
+    fn delete_item_removes_row() {
+        let conn = setup();
+        seed_account(&conn, "lead-1", "ws-1");
+        let items = create_sequence(&conn, "ws-1", "lead-1", "act-1", "Test", None).unwrap();
+        delete_item(&conn, &items[0].id).unwrap();
+        let remaining = get_for_lead(&conn, "lead-1").unwrap();
+        assert_eq!(remaining.len(), 3);
+        assert!(!remaining.iter().any(|i| i.id == items[0].id));
+    }
+
+    #[test]
+    fn delete_item_missing_id_errors() {
+        let conn = setup();
+        assert!(delete_item(&conn, "does-not-exist").is_err());
     }
 
     #[test]

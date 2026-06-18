@@ -111,8 +111,8 @@ interface AnthropicTextBlock { type: 'text'; text: string }
 interface AnthropicResponse  { content: Array<AnthropicTextBlock | { type: string }> }
 
 export async function generateCorraDraft(ctx: CorraContext): Promise<string> {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new MissingApiKeyError()
+  // Leerer Key → Rust fällt auf den eingebetteten Key zurück (Tester ohne eigenen Key).
+  const apiKey = getApiKey() ?? ''
 
   const userPrompt = buildUserPrompt(ctx)
   if (!userPrompt) return ''

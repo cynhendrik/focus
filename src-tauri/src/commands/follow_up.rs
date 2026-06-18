@@ -63,6 +63,22 @@ pub fn cmd_mark_follow_up_skipped(
 }
 
 #[tauri::command]
+pub fn cmd_mark_follow_up_done(
+    db: State<'_, DbPool>,
+    id: String,
+) -> Result<FollowUpQueueItem, AppError> {
+    db::follow_up_queue::mark_done(&db.conn(), &id)
+}
+
+#[tauri::command]
+pub fn cmd_delete_follow_up(
+    db: State<'_, DbPool>,
+    id: String,
+) -> Result<(), AppError> {
+    db::follow_up_queue::delete_item(&db.conn(), &id)
+}
+
+#[tauri::command]
 pub fn cmd_update_follow_up_draft(
     db: State<'_, DbPool>,
     id: String,

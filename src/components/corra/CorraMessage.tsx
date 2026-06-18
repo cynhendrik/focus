@@ -7,9 +7,11 @@ import type { CorraMessage as CorraMessageType, CorraActionItem } from '@/lib/ai
 interface Props {
   message:   CorraMessageType
   onExecute: (action: CorraActionItem) => Promise<void>
+  onDismiss?: (id: string) => void
+  statusMap?: Record<string, 'done' | 'dismissed'>
 }
 
-export function CorraMessage({ message, onExecute }: Props) {
+export function CorraMessage({ message, onExecute, onDismiss, statusMap }: Props) {
   const isUser = message.role === 'user'
 
   return (
@@ -44,8 +46,8 @@ export function CorraMessage({ message, onExecute }: Props) {
         <div style={{
           padding: isUser ? '10px 14px' : undefined,
           borderRadius: isUser ? '12px 0 12px 12px' : undefined,
-          background: isUser ? 'oklch($1264 / 0.08)' : undefined,
-          border: isUser ? '1px solid oklch($1264 / 0.25)' : undefined,
+          background: isUser ? 'color-mix(in srgb, var(--accent) 10%, transparent)' : undefined,
+          border: isUser ? '1px solid color-mix(in srgb, var(--accent) 28%, transparent)' : undefined,
           fontSize: 13, lineHeight: 1.65, color: 'var(--fg)',
         }}>
           <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -62,6 +64,8 @@ export function CorraMessage({ message, onExecute }: Props) {
             <CorraActionCard
               actions={message.actions}
               onExecute={onExecute}
+              onDismiss={onDismiss}
+              statusMap={statusMap}
             />
           )}
         </div>

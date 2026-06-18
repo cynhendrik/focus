@@ -8,6 +8,7 @@ import { useCompanyStore } from '@/store/company.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
+import { isOverdue } from '@/lib/invoice-status'
 import { generateCorraDraft } from '@/lib/ai/corra'
 import { MailService } from '@/services/mail.service'
 import { FinanceService } from '@/services/finance.service'
@@ -192,7 +193,7 @@ export function MahnwesenPanel() {
   // Berechne Mahnstatus für jede überfällige Rechnung
   const overdueItems = useMemo(() => {
     return invoices
-      .filter(i => i.status === 'overdue' && !i.isSuggestion)
+      .filter(i => isOverdue(i) && !i.isSuggestion)
       .map(inv => {
         const state = getDunningState(inv, allTodos)
         const account = accounts.find(a => a.id === inv.accountId)

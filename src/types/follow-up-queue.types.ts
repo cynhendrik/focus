@@ -1,4 +1,4 @@
-export type FollowUpStatus = 'pending' | 'sent' | 'cancelled' | 'skipped'
+export type FollowUpStatus = 'pending' | 'sent' | 'cancelled' | 'skipped' | 'done'
 export type FollowUpTemplateKey = 'value' | 'social_proof' | 'question' | 'urgency' | 'none'
 
 export interface FollowUpQueueItem {
