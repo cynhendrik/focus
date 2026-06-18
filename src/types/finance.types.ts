@@ -46,6 +46,26 @@ export interface InvoiceWithItems {
   items: InvoiceItem[]
 }
 
+export interface Payment {
+  id: string
+  workspaceId: string
+  invoiceId: string
+  amount: number
+  paidAt: string
+  method?: string
+  note?: string
+  createdAt: string
+}
+
+export interface CreatePaymentPayload {
+  workspaceId: string
+  invoiceId: string
+  amount: number
+  paidAt: string
+  method?: string
+  note?: string
+}
+
 export interface UpsertInvoicePayload {
   id?: string
   workspaceId: string

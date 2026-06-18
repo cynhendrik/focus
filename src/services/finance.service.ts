@@ -3,6 +3,7 @@ import type {
   Invoice, InvoiceWithItems, UpsertInvoicePayload,
   Offer, OfferWithItems, UpsertOfferPayload,
   FinanceKpis, InvoiceStatus,
+  Payment, CreatePaymentPayload,
 } from '@/types/finance.types'
 
 export const FinanceService = {
@@ -77,5 +78,19 @@ export const FinanceService = {
   },
   getOffersByAccount(accountId: string): Promise<Offer[]> {
     return invoke('get_offers_by_account', { accountId })
+  },
+
+  // ── Payments (Zahlungs-Journal) ─────────────────────────────────────────────
+  addPayment(payload: CreatePaymentPayload): Promise<Payment> {
+    return invoke('cmd_add_payment', { payload })
+  },
+  getPayments(invoiceId: string): Promise<Payment[]> {
+    return invoke('cmd_get_payments', { invoiceId })
+  },
+  getPaymentsByWorkspace(workspaceId: string): Promise<Payment[]> {
+    return invoke('cmd_get_payments_by_workspace', { workspaceId })
+  },
+  deletePayment(id: string): Promise<void> {
+    return invoke('cmd_delete_payment', { id })
   },
 }

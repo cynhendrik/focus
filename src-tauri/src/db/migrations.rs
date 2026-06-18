@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 31;
+const CURRENT_VERSION: u32 = 32;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -758,6 +758,25 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 );
                 CREATE INDEX IF NOT EXISTS idx_contracts_workspace
                     ON contracts(workspace_id, status);
+            "#)?;
+            Ok(())
+        }
+        32 => {
+            // Zahlungs-Journal: echte Zahlungseingänge (Teilzahlungen) statt nur
+            // binär bezahlt/offen.
+            conn.execute_batch(r#"
+                CREATE TABLE IF NOT EXISTS payments (
+                    id           TEXT PRIMARY KEY,
+                    workspace_id TEXT NOT NULL,
+                    invoice_id   TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+                    amount       REAL NOT NULL,
+                    paid_at      TEXT NOT NULL,
+                    method       TEXT,
+                    note         TEXT,
+                    created_at   TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
+                CREATE INDEX IF NOT EXISTS idx_payments_workspace ON payments(workspace_id, paid_at);
             "#)?;
             Ok(())
         }

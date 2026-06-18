@@ -9,6 +9,7 @@ import type {
   Invoice, InvoiceWithItems, UpsertInvoicePayload,
   Offer, OfferWithItems, UpsertOfferPayload,
   FinanceKpis, InvoiceStatus,
+  Payment, CreatePaymentPayload,
 } from '@/types/finance.types'
 
 async function tryAutoSaveToAblage(invoice: Invoice): Promise<void> {
@@ -48,6 +49,7 @@ type ActiveTab = 'invoices' | 'offers' | 'kpis'
 interface FinanceState {
   invoices: Invoice[]
   offers: Offer[]
+  payments: Payment[]
   kpis: FinanceKpis | null
   selectedInvoice: InvoiceWithItems | null
   selectedOffer: OfferWithItems | null
@@ -69,6 +71,10 @@ interface FinanceState {
   approveInvoiceSuggestion: (id: string, approvedBy: string, workspaceId: string) => Promise<void>
   updateInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<void>
 
+  loadPayments: (workspaceId: string) => Promise<void>
+  addPayment: (payload: CreatePaymentPayload) => Promise<void>
+  deletePayment: (id: string, workspaceId: string) => Promise<void>
+
   createOffer: (payload: UpsertOfferPayload) => Promise<OfferWithItems>
   updateOffer: (id: string, payload: UpsertOfferPayload) => Promise<void>
   deleteOffer: (id: string) => Promise<void>
@@ -81,6 +87,7 @@ interface FinanceState {
 export const useFinanceStore = create<FinanceState>()((set, get) => ({
   invoices: [],
   offers: [],
+  payments: [],
   kpis: null,
   selectedInvoice: null,
   selectedOffer: null,
@@ -92,11 +99,12 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   loadAll: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const [invoices, offers] = await Promise.all([
+      const [invoices, offers, payments] = await Promise.all([
         FinanceService.getInvoices(workspaceId),
         FinanceService.getOffers(workspaceId),
+        FinanceService.getPaymentsByWorkspace(workspaceId),
       ])
-      set({ invoices, offers, isLoading: false })
+      set({ invoices, offers, payments, isLoading: false })
     } catch (err) {
       log.error('loadAll finance failed', { err })
       set({ isLoading: false, error: String(err) })
@@ -172,6 +180,34 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     if (status === 'paid' || status === 'open') {
       tryAutoSaveToAblage(updated)
     }
+  },
+
+  loadPayments: async (workspaceId) => {
+    try {
+      const payments = await FinanceService.getPaymentsByWorkspace(workspaceId)
+      set({ payments })
+    } catch (err) {
+      log.error('loadPayments failed', { err })
+    }
+  },
+
+  addPayment: async (payload) => {
+    await FinanceService.addPayment(payload)
+    // Rechnungen + Zahlungen neu laden — Status kann auf "bezahlt" kippen.
+    const [invoices, payments] = await Promise.all([
+      FinanceService.getInvoices(payload.workspaceId),
+      FinanceService.getPaymentsByWorkspace(payload.workspaceId),
+    ])
+    set({ invoices, payments })
+  },
+
+  deletePayment: async (id, workspaceId) => {
+    await FinanceService.deletePayment(id)
+    const [invoices, payments] = await Promise.all([
+      FinanceService.getInvoices(workspaceId),
+      FinanceService.getPaymentsByWorkspace(workspaceId),
+    ])
+    set({ invoices, payments })
   },
 
   createOffer: async (payload) => {

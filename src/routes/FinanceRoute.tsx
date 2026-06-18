@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package } from 'lucide-react'
+import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useAccountsStore } from '@/store/accounts.store'
@@ -13,10 +13,11 @@ import { OfferForm } from '@/components/finance/OfferForm'
 import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
 import { MahnwesenPanel } from '@/components/finance/MahnwesenPanel'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
+import { PaymentModal } from '@/components/finance/PaymentModal'
 // PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
 // react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceService } from '@/services/finance.service'
-import { isOverdue } from '@/lib/invoice-status'
+import { isOverdue, paidAmount, displayInvoiceStatus, remaining, todayLocalISO } from '@/lib/invoice-status'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -67,11 +68,11 @@ function periodLabel(period: Period, from?: string, to?: string) {
 }
 
 const STATUS_TONE: Record<string, string> = {
-  draft: '', open: 'warn', paid: 'ok', overdue: 'bad', cancelled: '',
+  draft: '', open: 'warn', paid: 'ok', overdue: 'bad', cancelled: '', partly: 'accent',
   sent: 'accent', accepted: 'ok', rejected: 'bad',
 }
 const STATUS_LABEL: Record<string, string> = {
-  draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', overdue: 'Überfällig', cancelled: 'Storniert',
+  draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', overdue: 'Überfällig', cancelled: 'Storniert', partly: 'Teilbezahlt',
   sent: 'Versendet', accepted: 'Angenommen', rejected: 'Abgelehnt',
 }
 const INVOICE_FILTERS: { value: InvoiceFilter; label: string }[] = [
@@ -308,9 +309,9 @@ function RowBtn({ icon, label, onClick, tone }: {
 }
 
 function StatPill({ label, value, count, tone }: {
-  label: string; value: number; count?: number; tone?: 'warn' | 'bad'
+  label: string; value: number; count?: number; tone?: 'warn' | 'bad' | 'ok'
 }) {
-  const col = tone === 'bad' ? 'var(--danger)' : tone === 'warn' ? 'var(--warn)' : 'var(--fg-muted)'
+  const col = tone === 'bad' ? 'var(--danger)' : tone === 'warn' ? 'var(--warn)' : tone === 'ok' ? 'var(--ok)' : 'var(--fg-muted)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <span style={{ fontSize: 10, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.07em', textTransform: 'uppercase' }}>
@@ -334,6 +335,7 @@ export function FinanceRoute() {
   const loadAll               = useFinanceStore(s => s.loadAll)
   const invoices              = useFinanceStore(s => s.invoices)
   const offers                = useFinanceStore(s => s.offers)
+  const payments              = useFinanceStore(s => s.payments)
   const deleteInvoice         = useFinanceStore(s => s.deleteInvoice)
   const deleteOffer           = useFinanceStore(s => s.deleteOffer)
   const approveInvoiceSuggestion  = useFinanceStore(s => s.approveInvoiceSuggestion)
@@ -363,6 +365,7 @@ export function FinanceRoute() {
   const [previewData,      setPreviewData]      = useState<{ data: InvoiceWithItems; account: NonNullable<ReturnType<typeof accounts['find']>> } | null>(null)
   const [previewLoading,   setPreviewLoading]   = useState<string | null>(null)
   const [stornoInv,        setStornoInv]        = useState<Invoice | null>(null)
+  const [paymentInvoice,   setPaymentInvoice]   = useState<Invoice | null>(null)
   const [showBatchExport,  setShowBatchExport]  = useState(false)
 
   // Gauge animation — go from 0 to real value after mount/change
@@ -413,6 +416,13 @@ export function FinanceRoute() {
   // Überfälligkeit wird aus dueDate abgeleitet (Status wird nie auf 'overdue' gesetzt).
   const openInvoices    = useMemo(() => realInvoices.filter(i => i.status === 'open' && !isOverdue(i)), [realInvoices])
   const overdueInvoices = useMemo(() => realInvoices.filter(i => isOverdue(i)), [realInvoices])
+  // Cockpit: offene/überfällige Beträge = Restbeträge (minus erfasste Zahlungen).
+  const openTotal    = useMemo(() => openInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [openInvoices, payments])
+  const overdueTotal = useMemo(() => overdueInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [overdueInvoices, payments])
+  const cashInMonth  = useMemo(() => {
+    const m = todayLocalISO().slice(0, 7) // YYYY-MM
+    return payments.reduce((s, p) => p.paidAt.slice(0, 7) === m ? s + p.amount : s, 0)
+  }, [payments])
   const yearRevenue     = useMemo(() =>
     realInvoices.filter(i => i.status === 'paid' && inPeriod(i.date, 'jahr'))
       .reduce((s, i) => s + i.total, 0),
@@ -591,14 +601,19 @@ export function FinanceRoute() {
         {/* Secondary metrics */}
         <div style={{ display: 'flex', gap: 40 }}>
           <StatPill
+            label="Diesen Monat erhalten"
+            value={cashInMonth}
+            tone="ok"
+          />
+          <StatPill
             label="Offen"
-            value={openInvoices.reduce((s, i) => s + i.total, 0)}
+            value={openTotal}
             count={openInvoices.length}
             tone="warn"
           />
           <StatPill
             label="Überfällig"
-            value={overdueInvoices.reduce((s, i) => s + i.total, 0)}
+            value={overdueTotal}
             count={overdueInvoices.length}
             tone="bad"
           />
@@ -783,8 +798,18 @@ export function FinanceRoute() {
                   </td>
                   <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
                   <td style={td}>{(() => {
-                    const s = isOverdue(inv) ? 'overdue' : inv.status
-                    return <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                    const paid = paidAmount(payments, inv.id)
+                    const s = displayInvoiceStatus(inv, paid)
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                        {s === 'partly' && (
+                          <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmt(remaining(inv, paid))} offen
+                          </span>
+                        )}
+                      </span>
+                    )
                   })()}</td>
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -803,8 +828,8 @@ export function FinanceRoute() {
                           onClick={() => approveInvoiceSuggestion(inv.id, user?.id ?? '', workspaceId)} />
                       )}
                       {isAdmin && inv.status === 'open' && (
-                        <RowBtn icon={<CheckCircle size={12} />} label="Bezahlt" tone="ok"
-                          onClick={() => updateInvoiceStatus(inv.id, 'paid')} />
+                        <RowBtn icon={<Banknote size={12} />} label="Zahlung" tone="ok"
+                          onClick={() => setPaymentInvoice(inv)} />
                       )}
                       {isAdmin && inv.status !== 'cancelled' && (
                         <RowBtn icon={<XCircle size={12} />} label="Stornieren" tone="bad"
@@ -845,6 +870,9 @@ export function FinanceRoute() {
           onClose={() => setShowBatchExport(false)}
         />
       )}
+      {paymentInvoice && (
+        <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} />
+      )}
       {previewData && profile && (
         <InvoicePreview
           data={previewData.data}
@@ -858,6 +886,14 @@ export function FinanceRoute() {
           invoice={stornoInv}
           onCancel={() => setStornoInv(null)}
           onConfirm={async (reason, createGutschrift) => {
+            // Entwurf hat keine Nummer/keinen versendeten Beleg → echtes Löschen
+            // statt nur "storniert" (sonst bleibt eine sinnlose Karteileiche).
+            if (stornoInv.status === 'draft') {
+              await deleteInvoice(stornoInv.id)
+              await loadAll(workspaceId)
+              setStornoInv(null)
+              return
+            }
             await updateInvoiceStatus(stornoInv.id, 'cancelled')
             if (createGutschrift) {
               const full = await FinanceService.getInvoice(stornoInv.id)
@@ -925,7 +961,7 @@ function StornoModal({ invoice, onCancel, onConfirm }: StornoModalProps) {
           <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700 }}>Rechnung stornieren</h3>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)' }}>
             {isDraft
-              ? `Entwurf ${invoice.number ?? ''} wird gelöscht / storniert. Da noch nicht versendet, ist keine Gutschrift nötig.`
+              ? `Entwurf wird endgültig gelöscht. Da noch nicht versendet, ist keine Gutschrift nötig.`
               : `Rechnung ${invoice.number ?? ''} wird storniert.`}
           </p>
         </div>

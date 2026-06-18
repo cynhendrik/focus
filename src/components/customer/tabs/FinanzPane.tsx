@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { FileText, Tag, Clock, ChevronRight, Download } from 'lucide-react'
+import { FileText, Tag, Clock, ChevronRight, Download, Banknote } from 'lucide-react'
 import { FinanceService } from '@/services/finance.service'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAuftraege }   from '@/store/auftraege.store'
@@ -9,7 +9,8 @@ import { useUiStore }        from '@/store/ui.store'
 import { useCompanyStore }   from '@/store/company.store'
 import { useAccountsStore }  from '@/store/accounts.store'
 import { useToastStore }     from '@/store/toast.store'
-import { isOverdue }         from '@/lib/invoice-status'
+import { isOverdue, paidAmount, remaining, displayInvoiceStatus } from '@/lib/invoice-status'
+import { PaymentModal }      from '@/components/finance/PaymentModal'
 import type { Invoice, Offer } from '@/types/finance.types'
 import type { Zeiteintrag }   from '@/types/auftrag.types'
 
@@ -33,11 +34,11 @@ function dueDateISO() {
 }
 
 const STATUS_TONE: Record<string, string> = {
-  draft: '', open: 'warn', paid: 'ok', overdue: 'bad',
+  draft: '', open: 'warn', paid: 'ok', overdue: 'bad', partly: 'info',
   sent: 'info', accepted: 'ok', rejected: 'bad',
 }
 const STATUS_LABEL: Record<string, string> = {
-  draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', overdue: 'Überfällig',
+  draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', overdue: 'Überfällig', partly: 'Teilbezahlt',
   sent: 'Versendet', accepted: 'Angenommen', rejected: 'Abgelehnt',
 }
 
@@ -95,9 +96,13 @@ export function FinanzPane({ customerId }: Props) {
   const workspaceId       = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const userId            = useAuthStore(s => s.user?.id) ?? ''
   const setAppView        = useUiStore(s => s.setAppView)
+  const payments          = useFinanceStore(s => s.payments)
+  const loadPayments      = useFinanceStore(s => s.loadPayments)
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    if (workspaceId) loadPayments(workspaceId)
     Promise.all([
       FinanceService.getInvoicesByAccount(customerId),
       FinanceService.getOffersByAccount(customerId),
@@ -105,7 +110,7 @@ export function FinanzPane({ customerId }: Props) {
       setInvoices(inv)
       setOffers(off)
     }).finally(() => setLoading(false))
-  }, [customerId])
+  }, [customerId, workspaceId, loadPayments])
 
   // Group unbilled entries by Auftrag
   const groups: AuftragGroup[] = useMemo(() => {
@@ -296,14 +301,32 @@ export function FinanzPane({ customerId }: Props) {
                   <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.dueDate)}</td>
                   <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
                   <td style={tdS}>{(() => {
-                    const s = isOverdue(inv) ? 'overdue' : inv.status
-                    return <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                    const paid = paidAmount(payments, inv.id)
+                    const s = displayInvoiceStatus(inv, paid)
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+                        {s === 'partly' && (
+                          <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmt(remaining(inv, paid))} offen
+                          </span>
+                        )}
+                      </span>
+                    )
                   })()}</td>
                   <td style={{ ...tdS, textAlign: 'right' }}>
-                    <button onClick={() => downloadInvoice(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
-                      <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
-                    </button>
+                    <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+                      {inv.status !== 'draft' && inv.status !== 'cancelled' && (
+                        <button onClick={() => setPaymentInvoice(inv)} title="Zahlung erfassen"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 11 }}>
+                          <Banknote size={12} /> Zahlung
+                        </button>
+                      )}
+                      <button onClick={() => downloadInvoice(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
+                        <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -343,6 +366,10 @@ export function FinanzPane({ customerId }: Props) {
           </table>
         </div>
       </Section>
+
+      {paymentInvoice && (
+        <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} />
+      )}
     </div>
   )
 }

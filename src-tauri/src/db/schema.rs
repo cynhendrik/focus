@@ -368,6 +368,19 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             sort_order  INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS payments (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            invoice_id   TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            amount       REAL NOT NULL,
+            paid_at      TEXT NOT NULL,
+            method       TEXT,
+            note         TEXT,
+            created_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
+        CREATE INDEX IF NOT EXISTS idx_payments_workspace ON payments(workspace_id, paid_at);
+
         CREATE TABLE IF NOT EXISTS offers (
             id                   TEXT PRIMARY KEY,
             workspace_id         TEXT NOT NULL DEFAULT '',
