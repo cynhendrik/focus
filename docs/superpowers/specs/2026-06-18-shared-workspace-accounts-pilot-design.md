@@ -53,6 +53,12 @@ Attribution.**
 
 **4) Beitritts-Code** + Login (Login existiert).
 
+**5) Zuweisung & Sichtbarkeit.** To-dos sind einer Person zuweisbar
+(`assignee`); das **Heute-Modul** zeigt jedem primär seine zugewiesenen +
+nicht zugewiesene Aufgaben, mit Umschalter „meine / alle". **Finanzen/Umsatz**
+sind für Mitarbeiter standardmäßig verborgen; der Owner kann es pro Person
+freischalten (`workspace_members.can_view_finance`).
+
 ### Reihenfolge der Umsetzung (innerhalb des Piloten)
 
 Wir bauen **nicht** alle Tabellen gleichzeitig blind. Das Fundament wird zuerst
@@ -74,6 +80,8 @@ je für sich testbare Schritte.
 - Mail (IMAP ist ohnehin pro Nutzer), Verträge, Notizen-Module-Stickies,
   Kalender — kommen später.
 - Präsenz / „wer ist online" / Live-Cursor.
+- Vollständiges Rollen-/Rechtesystem. Es gibt nur die eine Stufe
+  „Finanzen sichtbar ja/nein" pro Mitglied.
 - Volles Audit-Log jeder Aktion. Attribution beschränkt sich auf
   erstellt / zuletzt bearbeitet / Aufgabe-erledigt; keine Rechnungs-Attribution.
 - Feldweises Merge / CRDT — es gilt **last-write-wins** über `updated_at`.
@@ -89,9 +97,13 @@ je für sich testbare Schritte.
 4. Notizen/Objekte tragen ein Badge „erstellt von <Kürzel>" und „zuletzt von
    <Kürzel>". Schließt der Mitarbeiter eine **Aufgabe** ab, erscheint dort
    „erledigt von <Kürzel>".
-5. Ein Nutzer sieht **nur** Daten der Workspaces, in denen er Mitglied ist
+5. Der Owner weist dem Mitarbeiter eine Aufgabe zu → sie erscheint in dessen
+   Heute; im Umschalter „alle" sieht der Owner die Aufgaben beider.
+6. Der Mitarbeiter sieht **keine** Umsatz-KPIs und keinen Finanzen-Tab, solange
+   der Owner ihn nicht freigeschaltet hat.
+7. Ein Nutzer sieht **nur** Daten der Workspaces, in denen er Mitglied ist
    (RLS verifiziert).
-6. Solo-Workspaces funktionieren unverändert offline weiter.
+8. Solo-Workspaces funktionieren unverändert offline weiter.
 
 ## Architektur — Überblick
 
@@ -190,6 +202,25 @@ Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
   `sync_queue` gepuffert und beim Reconnect via `flush_pending` nachgeschoben
   (last-write-wins). Best-effort, kein Merge.
 
+### 10. Zuweisung & Heute (To-dos)
+- `todos` bekommt `assignee_id` (nullable). Setzen über einen kleinen
+  Zuweisungs-Picker (Workspace-Mitglieder) an der Aufgabe.
+- Das **Heute-Modul** (`useHeuteQueue`) filtert im Shared-Workspace auf
+  `assignee_id = self OR assignee_id IS NULL`; Umschalter „meine / alle" hebt
+  den Filter auf. Im Solo-Modus unverändert.
+- `assignee` ist unabhängig von `created_by`/`completed_by` (zuständig ≠
+  Ersteller ≠ Erlediger).
+
+### 11. Finanz-Sichtbarkeit (minimale Rechte)
+- `workspace_members.can_view_finance boolean` (Owner implizit `true`).
+- Owner-UI: pro Mitglied in den Workspace-Einstellungen umschaltbar.
+- Wirkung: Umsatz-KPIs (Dashboard/Heute) und der Finanzen-Tab werden
+  ausgeblendet, wenn der aktive Nutzer kein `can_view_finance` hat. Beim
+  späteren Teilen der Finanztabellen wird derselbe Check **auch per RLS**
+  durchgesetzt (nicht nur UI), damit Member ohne Recht keine Rechnungszeilen
+  laden können.
+- Kein vollständiges Rollensystem — eine Stufe, bewusst minimal.
+
 ## Datenfluss — Beispiel (A schreibt Notiz, B sieht sie + Badge)
 
 1. A (shared WS) schreibt im Notizen-Tab eine Notiz → `notes.store` →
@@ -227,9 +258,11 @@ Cloud, ist im Gateway gekapselt — kein `if (shared)` in der UI.
   Accounts-Schritt muss zeigen, dass das Gateway-Muster sauber bleibt, bevor wir
   es fächern.
 - **RLS korrekt** ist sicherheitskritisch (sonst Datenleck über Workspaces).
-- **Neue Attribut-Felder** (`updated_by` auf Pilot-Tabellen, `completed_by` bei
-  `todos`) müssen in Backend (SQLite-Schema + Migrationen) und Supabase
-  konsistent ergänzt werden.
+- **Neue Felder** (`updated_by` auf Pilot-Tabellen, `completed_by` + `assignee_id`
+  bei `todos`, `can_view_finance` auf `workspace_members`) müssen in Backend
+  (SQLite-Schema + Migrationen) und Supabase konsistent ergänzt werden.
+- **Finanz-Sichtbarkeit** muss spätestens beim Teilen der Finanztabellen per
+  RLS abgesichert sein, nicht nur in der UI.
 - **Eingebetteter Anthropic-Key** (separates Thema, Memory) wird durch
   Multi-User heikler, ist aber nicht Teil dieses Piloten.
 - **localStorage-Reste** (Aufträge/Zeit, Journal) sind nicht im Scope und
