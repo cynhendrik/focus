@@ -59,7 +59,7 @@
       "endpoints": [
         "https://github.com/cynhendrik/focus/releases/latest/download/latest.json"
       ],
-      "pubkey": "PLATZHALTER_PUBKEY_AUS_PREREQUISITE_SCHRITT_2"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZFQTcxMkE3QkE1Q0FGMkIKUldRcnIxeTZweEtuL3JSaTRrK0t2cVdacFUwNzI2MWwvUDQyWWFaQ0dUMHZ3c0NKdEV0Z3JqWUwK"
     }
   }
 }
