@@ -62,6 +62,8 @@ const QuickCaptureModal   = lazy(() => named(import('@/components/layout/QuickCa
 import { useLeadsStore }        from '@/store/leads.store'
 import { useCalendarStore }     from '@/store/calendar.store'
 import { DownloadToast }        from '@/components/ui/DownloadToast'
+import { UpdateBanner }         from '@/components/ui/UpdateBanner'
+import { checkForUpdate }       from '@/services/updater'
 import { ToastViewport }       from '@/components/ui/Toast'
 
 import { RouteSwitch }         from '@/components/layout/RouteSwitch'
@@ -113,6 +115,14 @@ export default function App() {
     const t1 = setTimeout(() => setSplashPhase('exiting'), 3200)
     const t2 = setTimeout(() => setSplashPhase('done'), 3800)
     return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
+  // Auto-Update: ~3 s nach Start prüfen, danach alle 6 h. No-op außerhalb Tauri.
+  useEffect(() => {
+    const SIX_HOURS = 6 * 60 * 60 * 1000
+    const first = setTimeout(() => { void checkForUpdate() }, 3000)
+    const iv = setInterval(() => { void checkForUpdate() }, SIX_HOURS)
+    return () => { clearTimeout(first); clearInterval(iv) }
   }, [])
 
   useEffect(() => { initAuth() }, [initAuth])
@@ -282,6 +292,7 @@ export default function App() {
       <Suspense fallback={null}><QuickCaptureModal /></Suspense>
       <ZeitPanel />
       <DownloadToast />
+      <UpdateBanner />
       <ToastViewport />
       <Suspense fallback={null}><GlobalQuickComposer /></Suspense>
       <HelpDrawer />
