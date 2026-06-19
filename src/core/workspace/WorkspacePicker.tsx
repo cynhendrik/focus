@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useWorkspaceStore, type Workspace } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { JoinWorkspaceForm } from './JoinWorkspaceForm'
 
 function WorkspaceCard({ workspace, onSelect }: { workspace: Workspace; onSelect: () => void }) {
   return (
@@ -80,6 +81,10 @@ export function WorkspacePicker() {
           </div>
           {error && <p className="text-xs text-red-400">{error}</p>}
         </form>
+
+        <div className="mt-6 pt-6 border-t border-[var(--border)]">
+          <JoinWorkspaceForm />
+        </div>
 
         <button
           onClick={signOut}
