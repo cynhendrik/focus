@@ -97,7 +97,7 @@ describe('useWorkspaceStore', () => {
       data: { session: null },
       error: null,
     } as any)
-    useWorkspaceStore.setState({ workspaces: [{ id: 'x', name: 'X', logo_url: null, role: 'owner', isShared: false }] })
+    useWorkspaceStore.setState({ workspaces: [{ id: 'x', name: 'X', logo_url: null, role: 'owner', isShared: false, join_code: null }] })
     await useWorkspaceStore.getState().loadWorkspaces()
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(0)
   })
@@ -129,5 +129,32 @@ describe('joinWorkspaceByCode', () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Ungültiger Code' } } as any)
     await expect(useWorkspaceStore.getState().joinWorkspaceByCode('zzz999'))
       .rejects.toThrow('Ungültiger Code')
+  })
+})
+
+describe('createWorkspace', () => {
+  it('schreibt einen generierten join_code mit', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: { id: 'u1' } }, error: null } as any)
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: null }, error: null } as any)
+
+    let captured: any = null
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({
+        insert: vi.fn((row: any) => { captured = row; return {
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { id: 'ws-new' }, error: null }),
+          }),
+        } }),
+      } as any)
+      .mockReturnValueOnce({
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      } as any)
+
+    await useWorkspaceStore.getState().createWorkspace('Neue Agentur')
+
+    expect(captured.name).toBe('Neue Agentur')
+    expect(captured.join_code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-new')
   })
 })

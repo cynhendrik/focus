@@ -8,6 +8,7 @@ export interface Workspace {
   logo_url: string | null
   role: 'owner' | 'member'
   isShared: boolean
+  join_code: string | null
 }
 
 /** Pro Workspace true, wenn mehr als ein Mitglied existiert. */
@@ -66,7 +67,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const { data, error } = await supabase
           .from('workspace_members')
-          .select('workspace_id, role, workspaces(id, name, logo_url)')
+          .select('workspace_id, role, workspaces(id, name, logo_url, join_code)')
           .eq('user_id', uid)
 
         if (error) throw error
@@ -76,6 +77,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           name: m.workspaces.name,
           logo_url: m.workspaces.logo_url,
           role: m.role as 'owner' | 'member',
+          join_code: m.workspaces.join_code ?? null,
         }))
 
         const ids = base.map((w) => w.id)
@@ -112,7 +114,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const { data: ws, error: wsErr } = await supabase
           .from('workspaces')
-          .insert({ name, created_by: user.id })
+          .insert({ name, created_by: user.id, join_code: generateJoinCode() })
           .select()
           .single()
         if (wsErr) throw wsErr
