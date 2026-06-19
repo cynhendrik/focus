@@ -37,4 +37,11 @@ describe('UpdateBanner', () => {
     render(<UpdateBanner />)
     expect(screen.getByRole('button', { name: /neu starten/i })).toBeTruthy()
   })
+
+  it('zeigt im error-Zustand die Fehlermeldung + Schließen-Button', () => {
+    useUpdateStore.getState().setError('netz weg')
+    render(<UpdateBanner />)
+    expect(screen.getByText(/netz weg/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /schließen/i })).toBeTruthy()
+  })
 })
