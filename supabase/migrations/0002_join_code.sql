@@ -1,7 +1,8 @@
 -- 0002_join_code.sql — Beitritts-Code für Workspaces (Shared-Workspace Pilot, Subsystem B)
 -- MANUELL im Supabase SQL-Editor anwenden (Projekt mqbjmquscjtytpjebosw).
--- Annahme aus 0001: workspace_members.workspace_id ist TEXT, workspaces.id ist uuid.
--- Falls das reale Schema abweicht, die ::text-Casts unten anpassen.
+-- Schema (verifiziert via information_schema): workspaces.id, workspaces.join_code,
+-- workspace_members.workspace_id und workspace_members.user_id sind ALLE text.
+-- auth.uid() ist uuid → beim Vergleich/Insert auf die text-Spalten mit ::text casten.
 
 -- 1. Spalte
 alter table public.workspaces add column if not exists join_code text unique;
@@ -34,13 +35,13 @@ end $$;
 -- 3. RPC: per Code beitreten. SECURITY DEFINER, damit der (noch nicht berechtigte)
 --    Beitretende den Workspace per Code finden und seine Mitgliedschaft anlegen kann.
 create or replace function public.join_workspace_by_code(p_code text)
-returns uuid
+returns text
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  ws_id uuid;
+  ws_id text;
 begin
   select id into ws_id from public.workspaces where join_code = p_code;
   if ws_id is null then
@@ -50,10 +51,10 @@ begin
   -- nur einfügen, wenn die Mitgliedschaft noch nicht existiert. So entstehen auch bei
   -- mehrfachem Beitritt keine Duplikate (die sonst die isShared-Mitgliederzahl verfälschen).
   insert into public.workspace_members (workspace_id, user_id, role)
-  select ws_id::text, auth.uid(), 'member'
+  select ws_id, auth.uid()::text, 'member'
   where not exists (
     select 1 from public.workspace_members
-    where workspace_id = ws_id::text and user_id = auth.uid()
+    where workspace_id = ws_id and user_id = auth.uid()::text
   );
   return ws_id;
 end $$;
@@ -71,8 +72,8 @@ drop policy if exists ws_update_owner on public.workspaces;
 create policy ws_update_owner on public.workspaces
   for update
   using (
-    id::text in (
+    id in (
       select workspace_id from public.workspace_members
-      where user_id = auth.uid() and role = 'owner'
+      where user_id = auth.uid()::text and role = 'owner'
     )
   );
