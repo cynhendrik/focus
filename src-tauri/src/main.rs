@@ -115,6 +115,8 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Init SQLite email database
             let data_dir = app.path()
