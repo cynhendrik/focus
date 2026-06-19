@@ -1,6 +1,6 @@
 [package]
 name = "focus"
-version = "2.0.0"
+version = "1.0.0"
 description = "Cultera Focus — Business Management Desktop App"
 authors = ["Cultera"]
 edition = "2021"
