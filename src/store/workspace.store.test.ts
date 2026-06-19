@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useWorkspaceStore, deriveShared } from './workspace.store'
+import { useWorkspaceStore, deriveShared, generateJoinCode } from './workspace.store'
 
 describe('deriveShared', () => {
   it('markiert Workspaces mit >1 Mitglied als shared', () => {
@@ -100,5 +100,14 @@ describe('useWorkspaceStore', () => {
     useWorkspaceStore.setState({ workspaces: [{ id: 'x', name: 'X', logo_url: null, role: 'owner', isShared: false }] })
     await useWorkspaceStore.getState().loadWorkspaces()
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(0)
+  })
+})
+
+describe('generateJoinCode', () => {
+  it('liefert 6 Zeichen aus dem sicheren Alphabet (ohne 0/O/1/I)', () => {
+    for (let n = 0; n < 50; n++) {
+      const code = generateJoinCode()
+      expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    }
   })
 })

@@ -22,6 +22,17 @@ export function deriveShared(
   return out
 }
 
+const JOIN_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+/** Kurzer, verbal teilbarer Beitritts-Code: 6 Zeichen, ohne Verwechsler (0/O/1/I). */
+export function generateJoinCode(length = 6): string {
+  let out = ''
+  for (let i = 0; i < length; i++) {
+    out += JOIN_CODE_ALPHABET[Math.floor(Math.random() * JOIN_CODE_ALPHABET.length)]
+  }
+  return out
+}
+
 interface WorkspaceState {
   workspaces: Workspace[]
   activeWorkspaceId: string | null
