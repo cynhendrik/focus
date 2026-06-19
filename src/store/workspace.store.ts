@@ -83,9 +83,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         set({ workspaces })
 
+        // Die persistierte activeWorkspaceId kann veraltet sein (z. B. eine alte
+        // 'dev'-Id oder ein Workspace, dem der Nutzer nicht mehr angehört). Passt
+        // sie zu keinem geladenen Workspace, zurücksetzen: bei genau einem
+        // Workspace automatisch wählen, sonst null (dann greift der Picker).
         const { activeWorkspaceId } = get()
-        if (workspaces.length === 1 && !activeWorkspaceId) {
-          set({ activeWorkspaceId: workspaces[0].id })
+        const validActive = workspaces.some((w) => w.id === activeWorkspaceId)
+        if (!validActive) {
+          set({ activeWorkspaceId: workspaces.length === 1 ? workspaces[0].id : null })
         }
       },
 
