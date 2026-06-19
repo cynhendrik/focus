@@ -52,5 +52,13 @@
         "displayLanguageSelector": false
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/cynhendrik/focus/releases/latest/download/latest.json"
+      ],
+      "pubkey": "PLATZHALTER_PUBKEY_AUS_PREREQUISITE_SCHRITT_2"
+    }
   }
 }
