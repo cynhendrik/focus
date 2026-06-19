@@ -3,6 +3,7 @@ vi.mock('@/services/finance.service', () => ({
   FinanceService: {
     getInvoices: vi.fn(), getOffers: vi.fn(), getPaymentsByWorkspace: vi.fn(), getInvoice: vi.fn(),
     createInvoice: vi.fn(), updateInvoice: vi.fn(), deleteInvoice: vi.fn(),
+    updateInvoiceStatus: vi.fn(), approveInvoiceSuggestion: vi.fn(),
   },
 }))
 vi.mock('@/store/workspace.store', () => ({ useWorkspaceStore: { getState: vi.fn() } }))
@@ -13,6 +14,9 @@ const invoiceRow = {
 }
 // Overridable result for insert() terminal awaits; reset in beforeEach.
 let insertResult: { data: null; error: null | { message: string } } = { data: null, error: null }
+// Overridable result for single(); reset in beforeEach. Lets the finalize path return
+// a current-invoice row with number:null so the RPC branch runs.
+let singleResult: { data: any; error: null | { message: string } } = { data: invoiceRow, error: null }
 const chain: any = {
   select: vi.fn(() => chain),
   eq: vi.fn(() => chain),
@@ -20,12 +24,14 @@ const chain: any = {
   update: vi.fn(() => chain),
   delete: vi.fn(() => chain),
   order: vi.fn().mockResolvedValue({ data: [], error: null }),
-  single: vi.fn().mockResolvedValue({ data: invoiceRow, error: null }),
+  single: vi.fn(() => Promise.resolve(singleResult)),
   // Make the chain awaitable for terminal builders (insert, update().eq(), delete().eq()).
   // insert resolves the overridable insertResult so error paths can be exercised.
   then: (resolve: (v: { data: null; error: null | { message: string } }) => unknown) => resolve(insertResult),
 }
-vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(() => chain) } }))
+vi.mock('@/lib/supabase', () => ({
+  supabase: { from: vi.fn(() => chain), rpc: vi.fn().mockResolvedValue({ data: '2026-00001', error: null }) },
+}))
 
 import { FinanceService } from '@/services/finance.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -36,6 +42,7 @@ describe('FinanceGateway read routing', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     insertResult = { data: null, error: null }
+    singleResult = { data: invoiceRow, error: null }
   })
   it('getInvoices solo → FinanceService', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
@@ -115,6 +122,19 @@ describe('FinanceGateway read routing', () => {
       workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd',
       subtotal: 0, taxAmount: 0, total: 0, items: [],
     } as any)).rejects.toEqual({ message: 'boom' })
+  })
+  it('updateInvoiceStatus shared → open ohne Nummer ruft RPC', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    singleResult = { data: { workspace_id: 'ws1', number: null }, error: null }
+    await FinanceGateway.updateInvoiceStatus('i1', 'open')
+    expect((supabase as any).rpc).toHaveBeenCalledWith('allocate_invoice_number', expect.any(Object))
+  })
+  it('updateInvoiceStatus solo → FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.updateInvoiceStatus).mockResolvedValueOnce({ id: 'i1' } as any)
+    await FinanceGateway.updateInvoiceStatus('i1', 'open')
+    expect(FinanceService.updateInvoiceStatus).toHaveBeenCalledWith('i1', 'open')
+    expect((supabase as any).rpc).not.toHaveBeenCalled()
   })
   it('deleteInvoice shared → supabase delete', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)

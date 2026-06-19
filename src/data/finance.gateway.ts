@@ -119,6 +119,40 @@ export const FinanceGateway = {
     return this.getInvoice(id)
   },
 
+  async updateInvoiceStatus(id: string, status: InvoiceStatus): Promise<Invoice> {
+    if (!shared()) return FinanceService.updateInvoiceStatus(id, status)
+    const now = new Date().toISOString()
+    const patch: Record<string, unknown> = { status, updated_at: now }
+    // Beim ERSTEN Übergang auf 'open' eine Nummer vergeben (GoBD), falls noch keine.
+    if (status === 'open') {
+      const { data: cur, error: curErr } = await supabase.from('invoices')
+        .select('workspace_id, number').eq('id', id).single()
+      if (curErr) throw curErr
+      if (cur && !cur.number) {
+        const { data: number, error: rpcErr } = await supabase
+          .rpc('allocate_invoice_number', { ws_id: cur.workspace_id })
+        if (rpcErr) throw rpcErr
+        patch.number = number
+      }
+    }
+    const { data, error } = await supabase.from('invoices').update(patch).eq('id', id).select('*').single()
+    if (error) throw error
+    return invoiceRowToInvoice(data)
+  },
+
+  async approveInvoiceSuggestion(id: string, approvedBy: string, workspaceId: string): Promise<Invoice> {
+    if (!shared()) return FinanceService.approveInvoiceSuggestion(id, approvedBy, workspaceId)
+    const now = new Date().toISOString()
+    const { data: number, error: rpcErr } = await supabase
+      .rpc('allocate_invoice_number', { ws_id: workspaceId })
+    if (rpcErr) throw rpcErr
+    const { data, error } = await supabase.from('invoices')
+      .update({ number, status: 'open', is_suggestion: false, approved_by: approvedBy, updated_at: now })
+      .eq('id', id).select('*').single()
+    if (error) throw error
+    return invoiceRowToInvoice(data)
+  },
+
   async deleteInvoice(id: string): Promise<void> {
     if (!shared()) return FinanceService.deleteInvoice(id)
     const { error } = await supabase.from('invoices').delete().eq('id', id)
