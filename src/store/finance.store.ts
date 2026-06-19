@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { FinanceService } from '@/services/finance.service'
+import { FinanceGateway } from '@/data/finance.gateway'
 // getInvoicePdfBytes is imported lazily at call time. This store is in the main
 // bundle, so a static import here would drag the heavy react-pdf lib into the
 // initial load even though PDFs are only generated on demand.
@@ -100,9 +101,9 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const [invoices, offers, payments] = await Promise.all([
-        FinanceService.getInvoices(workspaceId),
-        FinanceService.getOffers(workspaceId),
-        FinanceService.getPaymentsByWorkspace(workspaceId),
+        FinanceGateway.getInvoices(workspaceId),
+        FinanceGateway.getOffers(workspaceId),
+        FinanceGateway.getPaymentsByWorkspace(workspaceId),
       ])
       set({ invoices, offers, payments, isLoading: false })
     } catch (err) {
@@ -122,7 +123,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
   selectInvoice: async (id) => {
     try {
-      const selectedInvoice = await FinanceService.getInvoice(id)
+      const selectedInvoice = await FinanceGateway.getInvoice(id)
       set({ selectedInvoice })
     } catch (err) {
       log.error('selectInvoice failed', { err })
@@ -132,7 +133,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
   selectOffer: async (id) => {
     try {
-      const selectedOffer = await FinanceService.getOffer(id)
+      const selectedOffer = await FinanceGateway.getOffer(id)
       set({ selectedOffer })
     } catch (err) {
       log.error('selectOffer failed', { err })
@@ -184,7 +185,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
 
   loadPayments: async (workspaceId) => {
     try {
-      const payments = await FinanceService.getPaymentsByWorkspace(workspaceId)
+      const payments = await FinanceGateway.getPaymentsByWorkspace(workspaceId)
       set({ payments })
     } catch (err) {
       log.error('loadPayments failed', { err })
@@ -195,8 +196,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     await FinanceService.addPayment(payload)
     // Rechnungen + Zahlungen neu laden — Status kann auf "bezahlt" kippen.
     const [invoices, payments] = await Promise.all([
-      FinanceService.getInvoices(payload.workspaceId),
-      FinanceService.getPaymentsByWorkspace(payload.workspaceId),
+      FinanceGateway.getInvoices(payload.workspaceId),
+      FinanceGateway.getPaymentsByWorkspace(payload.workspaceId),
     ])
     set({ invoices, payments })
   },
@@ -204,8 +205,8 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   deletePayment: async (id, workspaceId) => {
     await FinanceService.deletePayment(id)
     const [invoices, payments] = await Promise.all([
-      FinanceService.getInvoices(workspaceId),
-      FinanceService.getPaymentsByWorkspace(workspaceId),
+      FinanceGateway.getInvoices(workspaceId),
+      FinanceGateway.getPaymentsByWorkspace(workspaceId),
     ])
     set({ invoices, payments })
   },

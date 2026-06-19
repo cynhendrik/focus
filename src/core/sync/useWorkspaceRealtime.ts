@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useFinanceStore } from '@/store/finance.store'
 import { accountRowToLead } from '@/data/accounts.mapper'
 import { log } from '@/lib/logger'
 
@@ -40,6 +41,16 @@ export function useWorkspaceRealtime() {
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
-    return () => { supabase.removeChannel(channel) }
+    const finance = supabase
+      .channel(`ws-finance-${activeWorkspaceId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: `workspace_id=eq.${activeWorkspaceId}` },
+          () => { useFinanceStore.getState().loadAll(activeWorkspaceId); useFinanceStore.getState().loadKpis(activeWorkspaceId) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `workspace_id=eq.${activeWorkspaceId}` },
+          () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `workspace_id=eq.${activeWorkspaceId}` },
+          () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(finance) }
   }, [activeWorkspaceId, isShared])
 }
