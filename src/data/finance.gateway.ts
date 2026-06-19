@@ -148,7 +148,7 @@ export const FinanceGateway = {
     if (rpcErr) throw rpcErr
     const { data, error } = await supabase.from('invoices')
       .update({ number, status: 'open', is_suggestion: false, approved_by: approvedBy, updated_at: now })
-      .eq('id', id).select('*').single()
+      .eq('id', id).eq('is_suggestion', true).select('*').single()
     if (error) throw error
     return invoiceRowToInvoice(data)
   },

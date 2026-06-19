@@ -123,11 +123,31 @@ describe('FinanceGateway read routing', () => {
       subtotal: 0, taxAmount: 0, total: 0, items: [],
     } as any)).rejects.toEqual({ message: 'boom' })
   })
-  it('updateInvoiceStatus shared → open ohne Nummer ruft RPC', async () => {
+  it('updateInvoiceStatus shared → open ohne Nummer ruft RPC und wendet Nummer an', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
     singleResult = { data: { workspace_id: 'ws1', number: null }, error: null }
+    vi.mocked((supabase as any).rpc).mockResolvedValueOnce({ data: '2026-00001', error: null })
     await FinanceGateway.updateInvoiceStatus('i1', 'open')
     expect((supabase as any).rpc).toHaveBeenCalledWith('allocate_invoice_number', expect.any(Object))
+    expect(chain.update).toHaveBeenCalledWith(expect.objectContaining({ number: '2026-00001' }))
+  })
+  it('approveInvoiceSuggestion shared → RPC + update patch', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    vi.mocked((supabase as any).rpc).mockResolvedValueOnce({ data: '2026-00002', error: null })
+    await FinanceGateway.approveInvoiceSuggestion('i1', 'approver', 'ws1')
+    expect((supabase as any).rpc).toHaveBeenCalledWith('allocate_invoice_number', expect.any(Object))
+    expect(chain.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'open', is_suggestion: false, approved_by: 'approver', number: '2026-00002',
+    }))
+    expect(chain.eq).toHaveBeenCalledWith('is_suggestion', true)
+    expect(FinanceService.approveInvoiceSuggestion).not.toHaveBeenCalled()
+  })
+  it('approveInvoiceSuggestion solo → FinanceService, kein RPC', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.approveInvoiceSuggestion).mockResolvedValueOnce({ id: 'i1' } as any)
+    await FinanceGateway.approveInvoiceSuggestion('i1', 'approver', 'ws1')
+    expect(FinanceService.approveInvoiceSuggestion).toHaveBeenCalledWith('i1', 'approver', 'ws1')
+    expect((supabase as any).rpc).not.toHaveBeenCalled()
   })
   it('updateInvoiceStatus solo → FinanceService', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
