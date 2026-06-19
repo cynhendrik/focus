@@ -60,6 +60,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Tester-Build: lokaler Modus (kein Login), Supabase als Platzhalter.
           # (Diese Werte liegen lokal in src-tauri/.cargo/config.toml, das gitignored ist.)
           VITE_LOCAL_MODE: 'true'
