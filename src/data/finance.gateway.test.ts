@@ -3,7 +3,17 @@ vi.mock('@/services/finance.service', () => ({
   FinanceService: { getInvoices: vi.fn(), getOffers: vi.fn(), getPaymentsByWorkspace: vi.fn(), getInvoice: vi.fn() },
 }))
 vi.mock('@/store/workspace.store', () => ({ useWorkspaceStore: { getState: vi.fn() } }))
-const chain = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockResolvedValue({ data: [], error: null }) }
+const invoiceRow = {
+  id: 'inv1', workspace_id: 'ws1', created_by: 'u1', account_id: 'acc1', date: '2026-01-01',
+  due_date: '2026-01-31', status: 'draft', tax_mode: 'net', subtotal: 100, tax_amount: 19, total: 119,
+  created_at: '2026-01-01', updated_at: '2026-01-01',
+}
+const chain = {
+  select: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+  single: vi.fn().mockResolvedValue({ data: invoiceRow, error: null }),
+}
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(() => chain) } }))
 
 import { FinanceService } from '@/services/finance.service'
@@ -25,5 +35,40 @@ describe('FinanceGateway read routing', () => {
     await FinanceGateway.getInvoices('ws1')
     expect(supabase.from).toHaveBeenCalledWith('invoices')
     expect(FinanceService.getInvoices).not.toHaveBeenCalled()
+  })
+
+  it('getInvoice shared → supabase.invoices + invoice_items', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    const res = await FinanceGateway.getInvoice('inv1')
+    expect(supabase.from).toHaveBeenCalledWith('invoices')
+    expect(supabase.from).toHaveBeenCalledWith('invoice_items')
+    expect(FinanceService.getInvoice).not.toHaveBeenCalled()
+    expect(res.invoice.id).toBe('inv1')
+    expect(res.items).toEqual([])
+  })
+
+  it('getInvoice solo → FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.getInvoice).mockResolvedValueOnce({ invoice: {} as any, items: [] })
+    await FinanceGateway.getInvoice('inv1')
+    expect(FinanceService.getInvoice).toHaveBeenCalledWith('inv1')
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('getPaymentsByWorkspace shared → supabase.payments ordered by paid_at', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.getPaymentsByWorkspace('ws1')
+    expect(supabase.from).toHaveBeenCalledWith('payments')
+    expect(chain.eq).toHaveBeenCalledWith('workspace_id', 'ws1')
+    expect(chain.order).toHaveBeenCalledWith('paid_at', { ascending: false })
+    expect(FinanceService.getPaymentsByWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('getPaymentsByWorkspace solo → FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.getPaymentsByWorkspace).mockResolvedValueOnce([])
+    await FinanceGateway.getPaymentsByWorkspace('ws1')
+    expect(FinanceService.getPaymentsByWorkspace).toHaveBeenCalledWith('ws1')
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })
