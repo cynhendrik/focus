@@ -158,3 +158,41 @@ describe('createWorkspace', () => {
     expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-new')
   })
 })
+
+describe('regenerateJoinCode', () => {
+  it('setzt einen neuen Code per Update und aktualisiert den lokalen State', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    useWorkspaceStore.setState({
+      workspaces: [{ id: 'ws1', name: 'A', logo_url: null, role: 'owner', isShared: false, join_code: 'OLD234' }],
+      activeWorkspaceId: 'ws1',
+    })
+    const eq = vi.fn().mockResolvedValue({ error: null })
+    const update = vi.fn().mockReturnValue({ eq })
+    vi.mocked(supabase.from).mockReturnValueOnce({ update } as any)
+
+    const code = await useWorkspaceStore.getState().regenerateJoinCode('ws1')
+
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(update).toHaveBeenCalledWith({ join_code: code })
+    expect(eq).toHaveBeenCalledWith('id', 'ws1')
+    expect(useWorkspaceStore.getState().workspaces[0].join_code).toBe(code)
+  })
+
+  it('würfelt bei Unique-Kollision genau einmal neu', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    useWorkspaceStore.setState({
+      workspaces: [{ id: 'ws1', name: 'A', logo_url: null, role: 'owner', isShared: false, join_code: 'OLD234' }],
+      activeWorkspaceId: 'ws1',
+    })
+    const eqFail = vi.fn().mockResolvedValue({ error: { code: '23505', message: 'duplicate' } })
+    const eqOk   = vi.fn().mockResolvedValue({ error: null })
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({ update: vi.fn().mockReturnValue({ eq: eqFail }) } as any)
+      .mockReturnValueOnce({ update: vi.fn().mockReturnValue({ eq: eqOk }) } as any)
+
+    const code = await useWorkspaceStore.getState().regenerateJoinCode('ws1')
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
+    expect(eqFail).toHaveBeenCalledTimes(1)
+    expect(eqOk).toHaveBeenCalledTimes(1)
+  })
+})

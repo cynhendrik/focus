@@ -42,6 +42,7 @@ interface WorkspaceState {
   loadWorkspaces: () => Promise<void>
   createWorkspace: (name: string) => Promise<void>
   joinWorkspaceByCode: (code: string) => Promise<void>
+  regenerateJoinCode: (workspaceId: string) => Promise<string>
   setActiveWorkspace: (id: string) => void
   setPendingCount: (count: number) => void
   setOnline: (online: boolean) => void
@@ -135,6 +136,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (error) throw new Error(error.message || 'Beitritt fehlgeschlagen')
         await get().loadWorkspaces()
         if (typeof data === 'string') set({ activeWorkspaceId: data })
+      },
+
+      regenerateJoinCode: async (workspaceId) => {
+        // Einmaliger Retry bei Unique-Kollision auf join_code.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const code = generateJoinCode()
+          const { error } = await supabase
+            .from('workspaces')
+            .update({ join_code: code })
+            .eq('id', workspaceId)
+          if (!error) {
+            set((s) => ({
+              workspaces: s.workspaces.map((w) =>
+                w.id === workspaceId ? { ...w, join_code: code } : w),
+            }))
+            return code
+          }
+          if (error.code !== '23505') throw new Error(error.message || 'Code-Aktualisierung fehlgeschlagen')
+        }
+        throw new Error('Konnte keinen eindeutigen Code erzeugen')
       },
 
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
