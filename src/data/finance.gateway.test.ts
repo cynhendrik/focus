@@ -121,7 +121,7 @@ describe('FinanceGateway read routing', () => {
     await expect(FinanceGateway.createInvoice({
       workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd',
       subtotal: 0, taxAmount: 0, total: 0, items: [],
-    } as any)).rejects.toEqual({ message: 'boom' })
+    } as any)).rejects.toThrow('boom')
   })
   it('updateInvoiceStatus shared → open ohne Nummer ruft RPC und wendet Nummer an', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)

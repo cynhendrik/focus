@@ -7,6 +7,13 @@ import {
 } from './finance.mapper'
 import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload } from '@/types/finance.types'
 
+/** Supabase-Fehler in eine lesbare Error werfen (sonst zeigt die UI "[object Object]"). */
+function fail(error: { message?: string; details?: string; hint?: string; code?: string } | null): never {
+  const e = error ?? {}
+  const msg = [e.message, e.details, e.hint].filter(Boolean).join(' — ') || 'Unbekannter Supabase-Fehler'
+  throw new Error(e.code ? `${msg} (${e.code})` : msg)
+}
+
 function shared(): boolean {
   return useWorkspaceStore.getState().isActiveWorkspaceShared()
 }
@@ -18,7 +25,7 @@ export const FinanceGateway = {
     if (statusFilter === 'suggestions') q = q.eq('is_suggestion', true)
     else if (statusFilter) q = q.eq('status', statusFilter)
     const { data, error } = await q.order('created_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(invoiceRowToInvoice)
   },
 
@@ -28,8 +35,8 @@ export const FinanceGateway = {
       supabase.from('invoices').select('*').eq('id', id).single(),
       supabase.from('invoice_items').select('*').eq('invoice_id', id).order('sort_order', { ascending: true }),
     ])
-    if (invRes.error) throw invRes.error
-    if (itemRes.error) throw itemRes.error
+    if (invRes.error) fail(invRes.error)
+    if (itemRes.error) fail(itemRes.error)
     return { invoice: invoiceRowToInvoice(invRes.data), items: (itemRes.data ?? []).map(invoiceItemRowToItem) }
   },
 
@@ -37,7 +44,7 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.getInvoicesByAccount(accountId)
     const { data, error } = await supabase.from('invoices').select('*')
       .eq('account_id', accountId).order('created_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(invoiceRowToInvoice)
   },
 
@@ -45,7 +52,7 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.getOffers(workspaceId)
     const { data, error } = await supabase.from('offers').select('*')
       .eq('workspace_id', workspaceId).order('created_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(offerRowToOffer)
   },
 
@@ -55,8 +62,8 @@ export const FinanceGateway = {
       supabase.from('offers').select('*').eq('id', id).single(),
       supabase.from('offer_items').select('*').eq('offer_id', id).order('sort_order', { ascending: true }),
     ])
-    if (offRes.error) throw offRes.error
-    if (itemRes.error) throw itemRes.error
+    if (offRes.error) fail(offRes.error)
+    if (itemRes.error) fail(itemRes.error)
     return { offer: offerRowToOffer(offRes.data), items: (itemRes.data ?? []).map(offerItemRowToItem) }
   },
 
@@ -64,7 +71,7 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.getOffersByAccount(accountId)
     const { data, error } = await supabase.from('offers').select('*')
       .eq('account_id', accountId).order('created_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(offerRowToOffer)
   },
 
@@ -72,7 +79,7 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.getPaymentsByWorkspace(workspaceId)
     const { data, error } = await supabase.from('payments').select('*')
       .eq('workspace_id', workspaceId).order('paid_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(paymentRowToPayment)
   },
 
@@ -80,7 +87,7 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.getPayments(invoiceId)
     const { data, error } = await supabase.from('payments').select('*')
       .eq('invoice_id', invoiceId).order('paid_at', { ascending: false })
-    if (error) throw error
+    if (error) fail(error)
     return (data ?? []).map(paymentRowToPayment)
   },
 
@@ -90,12 +97,12 @@ export const FinanceGateway = {
     const now = new Date().toISOString()
     const row = invoicePayloadToRow(payload, { id, now })
     const { error: invErr } = await supabase.from('invoices').insert(row)
-    if (invErr) throw invErr
+    if (invErr) fail(invErr)
     if (payload.items.length > 0) {
       const itemRows = payload.items.map(it =>
         invoiceItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), invoiceId: id }))
       const { error: itErr } = await supabase.from('invoice_items').insert(itemRows)
-      if (itErr) throw itErr
+      if (itErr) fail(itErr)
     }
     return this.getInvoice(id)
   },
@@ -106,15 +113,15 @@ export const FinanceGateway = {
     const row = invoicePayloadToRow(payload, { id, now })
     delete (row as any).id
     const { error: invErr } = await supabase.from('invoices').update(row).eq('id', id)
-    if (invErr) throw invErr
+    if (invErr) fail(invErr)
     // Hinweis: delete+reinsert der Positionen ist nicht transaktional. Schlägt der Reinsert fehl, bleiben die Positionen leer (für Entwürfe behebbar; atomarer RPC = Backlog).
     const { error: delErr } = await supabase.from('invoice_items').delete().eq('invoice_id', id)
-    if (delErr) throw delErr
+    if (delErr) fail(delErr)
     if (payload.items.length > 0) {
       const itemRows = payload.items.map(it =>
         invoiceItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), invoiceId: id }))
       const { error: itErr } = await supabase.from('invoice_items').insert(itemRows)
-      if (itErr) throw itErr
+      if (itErr) fail(itErr)
     }
     return this.getInvoice(id)
   },
@@ -127,16 +134,16 @@ export const FinanceGateway = {
     if (status === 'open') {
       const { data: cur, error: curErr } = await supabase.from('invoices')
         .select('workspace_id, number').eq('id', id).single()
-      if (curErr) throw curErr
+      if (curErr) fail(curErr)
       if (cur && !cur.number) {
         const { data: number, error: rpcErr } = await supabase
           .rpc('allocate_invoice_number', { ws_id: cur.workspace_id })
-        if (rpcErr) throw rpcErr
+        if (rpcErr) fail(rpcErr)
         patch.number = number
       }
     }
     const { data, error } = await supabase.from('invoices').update(patch).eq('id', id).select('*').single()
-    if (error) throw error
+    if (error) fail(error)
     return invoiceRowToInvoice(data)
   },
 
@@ -145,17 +152,17 @@ export const FinanceGateway = {
     const now = new Date().toISOString()
     const { data: number, error: rpcErr } = await supabase
       .rpc('allocate_invoice_number', { ws_id: workspaceId })
-    if (rpcErr) throw rpcErr
+    if (rpcErr) fail(rpcErr)
     const { data, error } = await supabase.from('invoices')
       .update({ number, status: 'open', is_suggestion: false, approved_by: approvedBy, updated_at: now })
       .eq('id', id).eq('is_suggestion', true).select('*').single()
-    if (error) throw error
+    if (error) fail(error)
     return invoiceRowToInvoice(data)
   },
 
   async deleteInvoice(id: string): Promise<void> {
     if (!shared()) return FinanceService.deleteInvoice(id)
     const { error } = await supabase.from('invoices').delete().eq('id', id)
-    if (error) throw error
+    if (error) fail(error)
   },
 }
