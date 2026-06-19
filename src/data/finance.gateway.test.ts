@@ -137,9 +137,9 @@ describe('FinanceGateway read routing', () => {
     await FinanceGateway.approveInvoiceSuggestion('i1', 'approver', 'ws1')
     expect((supabase as any).rpc).toHaveBeenCalledWith('allocate_invoice_number', expect.any(Object))
     expect(chain.update).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'open', is_suggestion: false, approved_by: 'approver', number: '2026-00002',
+      status: 'open', is_suggestion: 0, approved_by: 'approver', number: '2026-00002',
     }))
-    expect(chain.eq).toHaveBeenCalledWith('is_suggestion', true)
+    expect(chain.eq).toHaveBeenCalledWith('is_suggestion', 1)
     expect(FinanceService.approveInvoiceSuggestion).not.toHaveBeenCalled()
   })
   it('approveInvoiceSuggestion solo → FinanceService, kein RPC', async () => {

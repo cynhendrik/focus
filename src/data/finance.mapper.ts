@@ -61,7 +61,7 @@ export function invoicePayloadToRow(
     status: p.status ?? 'draft', tax_mode: p.taxMode ?? 'standard',
     subtotal: p.subtotal, tax_amount: p.taxAmount, total: p.total,
     bank_info: p.bankInfo ?? '{}', notes: p.notes ?? null,
-    is_suggestion: p.isSuggestion ?? false, suggested_by: p.suggestedBy ?? null,
+    is_suggestion: (p.isSuggestion ?? false) ? 1 : 0, suggested_by: p.suggestedBy ?? null,
     updated_at: ctx.now,
   }
 }

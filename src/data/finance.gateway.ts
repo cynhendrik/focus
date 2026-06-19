@@ -22,7 +22,7 @@ export const FinanceGateway = {
   async getInvoices(workspaceId: string, statusFilter?: InvoiceStatus | 'suggestions'): Promise<Invoice[]> {
     if (!shared()) return FinanceService.getInvoices(workspaceId, statusFilter)
     let q = supabase.from('invoices').select('*').eq('workspace_id', workspaceId)
-    if (statusFilter === 'suggestions') q = q.eq('is_suggestion', true)
+    if (statusFilter === 'suggestions') q = q.eq('is_suggestion', 1)
     else if (statusFilter) q = q.eq('status', statusFilter)
     const { data, error } = await q.order('created_at', { ascending: false })
     if (error) fail(error)
@@ -154,8 +154,8 @@ export const FinanceGateway = {
       .rpc('allocate_invoice_number', { ws_id: workspaceId })
     if (rpcErr) fail(rpcErr)
     const { data, error } = await supabase.from('invoices')
-      .update({ number, status: 'open', is_suggestion: false, approved_by: approvedBy, updated_at: now })
-      .eq('id', id).eq('is_suggestion', true).select('*').single()
+      .update({ number, status: 'open', is_suggestion: 0, approved_by: approvedBy, updated_at: now })
+      .eq('id', id).eq('is_suggestion', 1).select('*').single()
     if (error) fail(error)
     return invoiceRowToInvoice(data)
   },

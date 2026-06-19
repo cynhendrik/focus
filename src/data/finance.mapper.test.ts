@@ -36,9 +36,16 @@ describe('finance payload→row', () => {
       { id:'i1', now:'2026-01-01T00:00:00Z' })
     expect(r.id).toBe('i1'); expect(r.workspace_id).toBe('ws1'); expect(r.account_id).toBe('a1')
     expect(r.status).toBe('draft'); expect(r.tax_mode).toBe('standard')
-    expect(r.bank_info).toBe('{}'); expect(r.is_suggestion).toBe(false)
+    expect(r.bank_info).toBe('{}'); expect(r.is_suggestion).toBe(0)
     expect(r.number).toBeNull(); expect(r.updated_at).toBe('2026-01-01T00:00:00Z')
     expect(r).not.toHaveProperty('created_at')
+  })
+  it('invoicePayloadToRow setzt is_suggestion=1 bei true', () => {
+    const r = invoicePayloadToRow(
+      { workspaceId:'ws1', createdBy:'u1', accountId:'a1', date:'2026-01-01', dueDate:'2026-01-15',
+        subtotal:100, taxAmount:19, total:119, isSuggestion:true, items:[] },
+      { id:'i1', now:'2026-01-01T00:00:00Z' })
+    expect(r.is_suggestion).toBe(1)
   })
   it('invoiceItemPayloadToRow mappt + invoice_id', () => {
     const r = invoiceItemPayloadToRow(
