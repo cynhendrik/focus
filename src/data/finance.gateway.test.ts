@@ -11,6 +11,8 @@ const invoiceRow = {
   due_date: '2026-01-31', status: 'draft', tax_mode: 'net', subtotal: 100, tax_amount: 19, total: 119,
   created_at: '2026-01-01', updated_at: '2026-01-01',
 }
+// Overridable result for insert() terminal awaits; reset in beforeEach.
+let insertResult: { data: null; error: null | { message: string } } = { data: null, error: null }
 const chain: any = {
   select: vi.fn(() => chain),
   eq: vi.fn(() => chain),
@@ -20,7 +22,8 @@ const chain: any = {
   order: vi.fn().mockResolvedValue({ data: [], error: null }),
   single: vi.fn().mockResolvedValue({ data: invoiceRow, error: null }),
   // Make the chain awaitable for terminal builders (insert, update().eq(), delete().eq()).
-  then: (resolve: (v: { data: null; error: null }) => unknown) => resolve({ data: null, error: null }),
+  // insert resolves the overridable insertResult so error paths can be exercised.
+  then: (resolve: (v: { data: null; error: null | { message: string } }) => unknown) => resolve(insertResult),
 }
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(() => chain) } }))
 
@@ -30,7 +33,10 @@ import { supabase } from '@/lib/supabase'
 import { FinanceGateway } from './finance.gateway'
 
 describe('FinanceGateway read routing', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    insertResult = { data: null, error: null }
+  })
   it('getInvoices solo → FinanceService', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
     vi.mocked(FinanceService.getInvoices).mockResolvedValueOnce([])
@@ -91,6 +97,24 @@ describe('FinanceGateway read routing', () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
     await FinanceGateway.createInvoice({ workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd', subtotal: 0, taxAmount: 0, total: 0, items: [] })
     expect(supabase.from).toHaveBeenCalledWith('invoices')
+  })
+  it('createInvoice shared with items → inserts invoices + invoice_items', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.createInvoice({
+      workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd',
+      subtotal: 10, taxAmount: 0, total: 10,
+      items: [{ title: 'P', quantity: 1, unitPrice: 10, taxRate: 19, total: 10, sortOrder: 0 }],
+    } as any)
+    expect(supabase.from).toHaveBeenCalledWith('invoices')
+    expect(supabase.from).toHaveBeenCalledWith('invoice_items')
+  })
+  it('createInvoice shared invoices insert error → rejects', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    insertResult = { data: null, error: { message: 'boom' } }
+    await expect(FinanceGateway.createInvoice({
+      workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd',
+      subtotal: 0, taxAmount: 0, total: 0, items: [],
+    } as any)).rejects.toEqual({ message: 'boom' })
   })
   it('deleteInvoice shared → supabase delete', async () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)

@@ -107,6 +107,7 @@ export const FinanceGateway = {
     delete (row as any).id
     const { error: invErr } = await supabase.from('invoices').update(row).eq('id', id)
     if (invErr) throw invErr
+    // Hinweis: delete+reinsert der Positionen ist nicht transaktional. Schlägt der Reinsert fehl, bleiben die Positionen leer (für Entwürfe behebbar; atomarer RPC = Backlog).
     const { error: delErr } = await supabase.from('invoice_items').delete().eq('invoice_id', id)
     if (delErr) throw delErr
     if (payload.items.length > 0) {
