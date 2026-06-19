@@ -40,6 +40,7 @@ interface WorkspaceState {
   isOnline: boolean
   loadWorkspaces: () => Promise<void>
   createWorkspace: (name: string) => Promise<void>
+  joinWorkspaceByCode: (code: string) => Promise<void>
   setActiveWorkspace: (id: string) => void
   setPendingCount: (count: number) => void
   setOnline: (online: boolean) => void
@@ -123,6 +124,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         await get().loadWorkspaces()
         set({ activeWorkspaceId: ws.id })
+      },
+
+      joinWorkspaceByCode: async (code) => {
+        const { data, error } = await supabase.rpc('join_workspace_by_code', {
+          p_code: code.trim().toUpperCase(),
+        })
+        if (error) throw new Error(error.message || 'Beitritt fehlgeschlagen')
+        await get().loadWorkspaces()
+        if (typeof data === 'string') set({ activeWorkspaceId: data })
       },
 
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),

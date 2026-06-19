@@ -111,3 +111,23 @@ describe('generateJoinCode', () => {
     }
   })
 })
+
+describe('joinWorkspaceByCode', () => {
+  it('ruft die RPC, lädt neu und aktiviert den beigetretenen Workspace', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'ws-joined', error: null } as any)
+    vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({ data: { session: null }, error: null } as any)
+
+    await useWorkspaceStore.getState().joinWorkspaceByCode('abc234')
+
+    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith('join_workspace_by_code', { p_code: 'ABC234' })
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('ws-joined')
+  })
+
+  it('wirft eine lesbare Fehlermeldung bei ungültigem Code', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Ungültiger Code' } } as any)
+    await expect(useWorkspaceStore.getState().joinWorkspaceByCode('zzz999'))
+      .rejects.toThrow('Ungültiger Code')
+  })
+})
