@@ -46,16 +46,27 @@ begin
   if ws_id is null then
     raise exception 'Ungültiger Code';
   end if;
+  -- Idempotent OHNE Abhängigkeit von einem Unique-Constraint auf (workspace_id, user_id):
+  -- nur einfügen, wenn die Mitgliedschaft noch nicht existiert. So entstehen auch bei
+  -- mehrfachem Beitritt keine Duplikate (die sonst die isShared-Mitgliederzahl verfälschen).
   insert into public.workspace_members (workspace_id, user_id, role)
-  values (ws_id::text, auth.uid(), 'member')
-  on conflict do nothing;
+  select ws_id::text, auth.uid(), 'member'
+  where not exists (
+    select 1 from public.workspace_members
+    where workspace_id = ws_id::text and user_id = auth.uid()
+  );
   return ws_id;
 end $$;
 
 grant execute on function public.join_workspace_by_code(text) to authenticated;
 
--- 4. RLS: Owner darf workspaces (u.a. join_code) aktualisieren ("neu generieren").
+-- 4. RLS: Workspace-Updates (Name, Logo, join_code) NUR durch Owner.
+--    WICHTIG: 0001 definiert ein breiteres `ws_update` (jedes Mitglied darf updaten).
+--    Permissive Policies werden ge-OR-t — die Owner-Beschränkung greift also nur,
+--    wenn wir das breite `ws_update` hier ersetzen. (Im Pilot sind Workspace-
+--    Einstellungen ohnehin Owner-Sache.)
 alter table public.workspaces enable row level security;
+drop policy if exists ws_update on public.workspaces;
 drop policy if exists ws_update_owner on public.workspaces;
 create policy ws_update_owner on public.workspaces
   for update
