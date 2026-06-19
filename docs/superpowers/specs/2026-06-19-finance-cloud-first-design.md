@@ -94,6 +94,13 @@ Spiegelt das lokale Schema (`schema.rs`): `id, workspace_id, invoice_id→invoic
 - **Berechtigungs-Lecks:** Entwurf-RLS muss „nur eigene, nicht finalisierte" exakt treffen, sonst sieht ein Mitarbeiter doch Umsatz.
 - **Gateway-Umfang:** ~27 Methoden — wird in Unter-Module gesplittet; Stores entsprechend umstellen.
 
+## Abhängigkeiten & angrenzende Punkte (geprüft)
+- **`company_settings` (Firmen-/Bank-/Steuerdaten):** wird fürs Rechnungs-PDF/Branding gebraucht, liegt aber lokal **ohne `workspace_id`**. Pro Workspace cloud-fähig machen (`workspace_id` + RLS) — als kleiner Begleitschritt dieser Domäne, sonst steht eine Rechnung auf Gerät B ohne Briefkopf. (`bank_info` wird pro Rechnung gesnapshottet → daten-seitig unkritisch, nur Darstellung.)
+- **Storno/Gutschrift:** über `createInvoice` (negative Gegenrechnung mit eigener Nummer) + dieselbe Allocate-Funktion abgedeckt — kein Sonderpfad, nur sicherstellen, dass das Storno eine Nummer bekommt.
+- **Mahnwesen:** liest überfällige Rechnungen → funktioniert automatisch, sobald `invoices` in der Cloud sind (Lesepfad). Der Mahn-Refactor selbst bleibt separat.
+- **PDF-Dateien (`pdf_path`):** → Supabase Storage, gehört zur Domäne „Dateien". Bis dahin bleibt das PDF gerätelokal generiert. Bewusst deferred.
+- **`accounts` vs. `customers`:** `invoices.account_id` → `accounts` (per FK verifiziert). Die separate `customers`-Tabelle in Supabase ist vermutlich Altlast der anderen App → bei der Verifikation prüfen/ignorieren.
+
 ## Reihenfolge (für den späteren Plan)
 1. Verifikation + `payments` anlegen + RLS/Realtime einschalten.
 2. Mapper + Gateway (invoices) + Store-Umstellung + Realtime.
