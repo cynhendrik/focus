@@ -4,6 +4,7 @@ import { useCompanyStore } from '@/store/company.store'
 import { useUiStore } from '@/store/ui.store'
 import type { CompanyProfile } from '@/types/company.types'
 import { InvoiceNumberSettings } from './InvoiceNumberSettings'
+import { JoinCodeRow } from '@/core/workspace/JoinCodeRow'
 
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false)
@@ -98,8 +99,9 @@ export function WorkspaceSettings({ workspaceId }: Props) {
           </label>
           <Field label="" value={val('name')} onChange={f('name')} placeholder="Muster GmbH" />
         </div>
-        <div style={{ padding: '16px 20px' }}>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <CopyField label="Workspace ID" value={workspaceId} />
+          <JoinCodeRow />
         </div>
       </div>
 
