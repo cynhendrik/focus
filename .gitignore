@@ -9,6 +9,7 @@ src-tauri/.cargo/config.toml
 
 # Tauri-Updater-Signaturschlüssel (privat) — niemals committen
 *.key
+*.key.pub
 
 # Claude / Superpowers session scratch
 .claude/worktrees/
