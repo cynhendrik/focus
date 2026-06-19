@@ -3,8 +3,9 @@ import { FinanceService } from '@/services/finance.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import {
   invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, offerItemRowToItem, paymentRowToPayment,
+  invoicePayloadToRow, invoiceItemPayloadToRow,
 } from './finance.mapper'
-import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus } from '@/types/finance.types'
+import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload } from '@/types/finance.types'
 
 function shared(): boolean {
   return useWorkspaceStore.getState().isActiveWorkspaceShared()
@@ -81,5 +82,45 @@ export const FinanceGateway = {
       .eq('invoice_id', invoiceId).order('paid_at', { ascending: false })
     if (error) throw error
     return (data ?? []).map(paymentRowToPayment)
+  },
+
+  async createInvoice(payload: UpsertInvoicePayload): Promise<InvoiceWithItems> {
+    if (!shared()) return FinanceService.createInvoice(payload)
+    const id = payload.id ?? crypto.randomUUID()
+    const now = new Date().toISOString()
+    const row = invoicePayloadToRow(payload, { id, now })
+    const { error: invErr } = await supabase.from('invoices').insert(row)
+    if (invErr) throw invErr
+    if (payload.items.length > 0) {
+      const itemRows = payload.items.map(it =>
+        invoiceItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), invoiceId: id }))
+      const { error: itErr } = await supabase.from('invoice_items').insert(itemRows)
+      if (itErr) throw itErr
+    }
+    return this.getInvoice(id)
+  },
+
+  async updateInvoice(id: string, payload: UpsertInvoicePayload): Promise<InvoiceWithItems> {
+    if (!shared()) return FinanceService.updateInvoice(id, payload)
+    const now = new Date().toISOString()
+    const row = invoicePayloadToRow(payload, { id, now })
+    delete (row as any).id
+    const { error: invErr } = await supabase.from('invoices').update(row).eq('id', id)
+    if (invErr) throw invErr
+    const { error: delErr } = await supabase.from('invoice_items').delete().eq('invoice_id', id)
+    if (delErr) throw delErr
+    if (payload.items.length > 0) {
+      const itemRows = payload.items.map(it =>
+        invoiceItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), invoiceId: id }))
+      const { error: itErr } = await supabase.from('invoice_items').insert(itemRows)
+      if (itErr) throw itErr
+    }
+    return this.getInvoice(id)
+  },
+
+  async deleteInvoice(id: string): Promise<void> {
+    if (!shared()) return FinanceService.deleteInvoice(id)
+    const { error } = await supabase.from('invoices').delete().eq('id', id)
+    if (error) throw error
   },
 }

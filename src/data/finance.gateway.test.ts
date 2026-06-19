@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/services/finance.service', () => ({
-  FinanceService: { getInvoices: vi.fn(), getOffers: vi.fn(), getPaymentsByWorkspace: vi.fn(), getInvoice: vi.fn() },
+  FinanceService: {
+    getInvoices: vi.fn(), getOffers: vi.fn(), getPaymentsByWorkspace: vi.fn(), getInvoice: vi.fn(),
+    createInvoice: vi.fn(), updateInvoice: vi.fn(), deleteInvoice: vi.fn(),
+  },
 }))
 vi.mock('@/store/workspace.store', () => ({ useWorkspaceStore: { getState: vi.fn() } }))
 const invoiceRow = {
@@ -8,11 +11,16 @@ const invoiceRow = {
   due_date: '2026-01-31', status: 'draft', tax_mode: 'net', subtotal: 100, tax_amount: 19, total: 119,
   created_at: '2026-01-01', updated_at: '2026-01-01',
 }
-const chain = {
-  select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnThis(),
+const chain: any = {
+  select: vi.fn(() => chain),
+  eq: vi.fn(() => chain),
+  insert: vi.fn(() => chain),
+  update: vi.fn(() => chain),
+  delete: vi.fn(() => chain),
   order: vi.fn().mockResolvedValue({ data: [], error: null }),
   single: vi.fn().mockResolvedValue({ data: invoiceRow, error: null }),
+  // Make the chain awaitable for terminal builders (insert, update().eq(), delete().eq()).
+  then: (resolve: (v: { data: null; error: null }) => unknown) => resolve({ data: null, error: null }),
 }
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(() => chain) } }))
 
@@ -70,5 +78,23 @@ describe('FinanceGateway read routing', () => {
     await FinanceGateway.getPaymentsByWorkspace('ws1')
     expect(FinanceService.getPaymentsByWorkspace).toHaveBeenCalledWith('ws1')
     expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('createInvoice solo → FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.createInvoice).mockResolvedValueOnce({ invoice: { id: 'i1' }, items: [] } as any)
+    await FinanceGateway.createInvoice({ workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd', subtotal: 0, taxAmount: 0, total: 0, items: [] })
+    expect(FinanceService.createInvoice).toHaveBeenCalled()
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+  it('createInvoice shared → supabase invoices insert', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.createInvoice({ workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', date: 'd', dueDate: 'd', subtotal: 0, taxAmount: 0, total: 0, items: [] })
+    expect(supabase.from).toHaveBeenCalledWith('invoices')
+  })
+  it('deleteInvoice shared → supabase delete', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.deleteInvoice('i1')
+    expect(supabase.from).toHaveBeenCalledWith('invoices')
   })
 })
