@@ -142,13 +142,13 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   clearSelectedOffer: () => set({ selectedOffer: null }),
 
   createInvoice: async (payload) => {
-    const result = await FinanceService.createInvoice(payload)
+    const result = await FinanceGateway.createInvoice(payload)
     set(s => ({ invoices: [result.invoice, ...s.invoices] }))
     return result
   },
 
   updateInvoice: async (id, payload) => {
-    const result = await FinanceService.updateInvoice(id, payload)
+    const result = await FinanceGateway.updateInvoice(id, payload)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? result.invoice : i),
       selectedInvoice: s.selectedInvoice?.invoice.id === id ? result : s.selectedInvoice,
@@ -156,7 +156,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   deleteInvoice: async (id) => {
-    await FinanceService.deleteInvoice(id)
+    await FinanceGateway.deleteInvoice(id)
     set(s => ({
       invoices: s.invoices.filter(i => i.id !== id),
       selectedInvoice: s.selectedInvoice?.invoice.id === id ? null : s.selectedInvoice,
@@ -164,7 +164,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   approveInvoiceSuggestion: async (id, approvedBy, workspaceId) => {
-    const approved = await FinanceService.approveInvoiceSuggestion(id, approvedBy, workspaceId)
+    const approved = await FinanceGateway.approveInvoiceSuggestion(id, approvedBy, workspaceId)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? approved : i),
     }))
@@ -173,7 +173,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   updateInvoiceStatus: async (id, status) => {
-    const updated = await FinanceService.updateInvoiceStatus(id, status)
+    const updated = await FinanceGateway.updateInvoiceStatus(id, status)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? updated : i),
     }))
