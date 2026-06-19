@@ -1,4 +1,4 @@
-import type { Invoice, InvoiceItem, Offer, OfferItem, Payment } from '@/types/finance.types'
+import type { Invoice, InvoiceItem, Offer, OfferItem, Payment, UpsertInvoicePayload, UpsertInvoiceItemPayload } from '@/types/finance.types'
 
 /** Supabase-`invoices`-Zeile → Invoice-Domänentyp. */
 export function invoiceRowToInvoice(r: any): Invoice {
@@ -48,5 +48,31 @@ export function paymentRowToPayment(r: any): Payment {
   return {
     id: r.id, workspaceId: r.workspace_id, invoiceId: r.invoice_id, amount: r.amount,
     paidAt: r.paid_at, method: r.method ?? undefined, note: r.note ?? undefined, createdAt: r.created_at,
+  }
+}
+
+/** UpsertInvoicePayload → invoices-Row (ohne created_at = DB-Default; ohne items). */
+export function invoicePayloadToRow(
+  p: UpsertInvoicePayload, ctx: { id: string; now: string },
+): Record<string, unknown> {
+  return {
+    id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy, account_id: p.accountId,
+    deal_id: p.dealId ?? null, number: p.number ?? null, date: p.date, due_date: p.dueDate,
+    status: p.status ?? 'draft', tax_mode: p.taxMode ?? 'standard',
+    subtotal: p.subtotal, tax_amount: p.taxAmount, total: p.total,
+    bank_info: p.bankInfo ?? '{}', notes: p.notes ?? null,
+    is_suggestion: p.isSuggestion ?? false, suggested_by: p.suggestedBy ?? null,
+    updated_at: ctx.now,
+  }
+}
+
+/** UpsertInvoiceItemPayload → invoice_items-Row. */
+export function invoiceItemPayloadToRow(
+  it: UpsertInvoiceItemPayload, ctx: { id: string; invoiceId: string },
+): Record<string, unknown> {
+  return {
+    id: ctx.id, invoice_id: ctx.invoiceId, title: it.title, description: it.description ?? null,
+    quantity: it.quantity, unit_price: it.unitPrice, tax_rate: it.taxRate, total: it.total,
+    sort_order: it.sortOrder, item_date: it.itemDate ?? null, unit: it.unit ?? null,
   }
 }

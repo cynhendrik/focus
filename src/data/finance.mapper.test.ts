@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, paymentRowToPayment } from './finance.mapper'
+import { invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, paymentRowToPayment, invoicePayloadToRow, invoiceItemPayloadToRow } from './finance.mapper'
 
 describe('finance.mapper', () => {
   it('invoiceRowToInvoice mappt snake→camel', () => {
@@ -25,5 +25,26 @@ describe('finance.mapper', () => {
     const p = paymentRowToPayment({ id:'p1', workspace_id:'ws1', invoice_id:'i1', amount:50,
       paid_at:'2026-01-10', method:'bank', note:null, created_at:'2026-01-10T00:00:00Z' })
     expect(p.invoiceId).toBe('i1'); expect(p.amount).toBe(50)
+  })
+})
+
+describe('finance payload→row', () => {
+  it('invoicePayloadToRow setzt defaults + snake_case', () => {
+    const r = invoicePayloadToRow(
+      { workspaceId:'ws1', createdBy:'u1', accountId:'a1', date:'2026-01-01', dueDate:'2026-01-15',
+        subtotal:100, taxAmount:19, total:119, items:[] },
+      { id:'i1', now:'2026-01-01T00:00:00Z' })
+    expect(r.id).toBe('i1'); expect(r.workspace_id).toBe('ws1'); expect(r.account_id).toBe('a1')
+    expect(r.status).toBe('draft'); expect(r.tax_mode).toBe('standard')
+    expect(r.bank_info).toBe('{}'); expect(r.is_suggestion).toBe(false)
+    expect(r.number).toBeNull(); expect(r.updated_at).toBe('2026-01-01T00:00:00Z')
+    expect(r).not.toHaveProperty('created_at')
+  })
+  it('invoiceItemPayloadToRow mappt + invoice_id', () => {
+    const r = invoiceItemPayloadToRow(
+      { title:'Pos', quantity:2, unitPrice:50, taxRate:19, total:100, sortOrder:0 },
+      { id:'it1', invoiceId:'i1' })
+    expect(r.invoice_id).toBe('i1'); expect(r.unit_price).toBe(50); expect(r.tax_rate).toBe(19)
+    expect(r.description).toBeNull()
   })
 })
