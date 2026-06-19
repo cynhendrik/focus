@@ -7,6 +7,9 @@ src-tauri/.cargo/config.toml
 .env
 .env.local
 
+# Tauri-Updater-Signaturschlüssel (privat) — niemals committen
+*.key
+
 # Claude / Superpowers session scratch
 .claude/worktrees/
 .superpowers/brainstorm/
