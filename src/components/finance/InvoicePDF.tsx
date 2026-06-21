@@ -7,6 +7,9 @@ import type { CompanyProfile } from '@/types/company.types'
 import type { Account } from '@/types/account.types'
 import { useDownloadToastStore } from '@/store/download-toast.store'
 import { computeTaxRateGroups } from '@/lib/invoice-tax'
+import { buildCiiXml } from '@/lib/erechnung/cii-invoice'
+import { embedFacturX } from '@/lib/erechnung/facturx-embed'
+import { checkErechnungReadiness } from '@/lib/erechnung/erechnung-readiness'
 
 interface Props {
   data: InvoiceWithItems
@@ -295,7 +298,15 @@ export async function getInvoicePdfBytes(
 ): Promise<Uint8Array> {
   const blob = await pdf(<InvoicePDFDoc data={data} profile={profile} account={account} />).toBlob()
   const buf = await blob.arrayBuffer()
-  return new Uint8Array(buf)
+  const visualPdf = new Uint8Array(buf)
+  // ZUGFeRD/Factur-X: CII-XML erzeugen und einbetten. Schlägt das fehl, liefern
+  // wir das reine Sicht-PDF zurück (besser eine PDF ohne XML als gar keine).
+  try {
+    const xml = buildCiiXml(data, profile, account)
+    return await embedFacturX(visualPdf, xml)
+  } catch {
+    return visualPdf
+  }
 }
 
 // Keep internal alias for existing callers
@@ -313,6 +324,15 @@ export async function downloadInvoicePDF(data: InvoiceWithItems, profile: Compan
     toast.setSaving()
     const savedTo = await invoke<string>('save_pdf', { bytes: Array.from(bytes), suggestedName: filename })
     toast.setDone(savedTo)
+    const missing = checkErechnungReadiness(profile, account)
+    if (missing.length > 0) {
+      const { useToastStore } = await import('@/store/toast.store')
+      useToastStore.getState().show({
+        message: `E-Rechnung unvollständig — fehlt: ${missing.join(', ')}. In Einstellungen ergänzen.`,
+        variant: 'info',
+        durationMs: 9000,
+      })
+    }
   } catch {
     toast.setError('Fehler beim Speichern')
   }
