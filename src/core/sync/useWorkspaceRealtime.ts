@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFinanceStore } from '@/store/finance.store'
+import { useActivitiesStore } from '@/store/activities.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -30,6 +31,8 @@ export function useWorkspaceRealtime() {
           () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `workspace_id=eq.${activeWorkspaceId}` },
           () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `workspace_id=eq.${activeWorkspaceId}` },
+          () => { useActivitiesStore.getState().loadOpenFollowups(activeWorkspaceId) })
       .subscribe()
 
     return () => { supabase.removeChannel(channel); supabase.removeChannel(finance) }
