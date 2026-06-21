@@ -70,6 +70,7 @@ export interface Activity {
   payload?: string
   status: string
   dueAt?: string
+  assignee?: string
   createdAt: string
   updatedAt: string
 }
@@ -86,6 +87,7 @@ export interface CreateActivityPayload {
   durationMinutes?: number
   status?: string
   dueAt?: string
+  assignee?: string
   direction?: 'in' | 'out'
 }
 
@@ -94,4 +96,5 @@ export interface UpdateActivityPayload {
   body?: string
   status?: string
   dueAt?: string
+  assignee?: string
 }

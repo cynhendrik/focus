@@ -47,3 +47,28 @@ describe('activities.mapper', () => {
     expect(p).toEqual({ status: 'done', updated_at: '2026-06-02T00:00:00Z' })
   })
 })
+
+describe('activities.mapper — assignee', () => {
+  it('activityPayloadToRow schreibt assignee', () => {
+    const r = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', type: 'task', assignee: 'u2' } as any,
+      { id: 'a1', now: '2026-06-01T00:00:00Z' },
+    )
+    expect(r.assignee).toBe('u2')
+  })
+  it('activityPayloadToRow ohne assignee → null', () => {
+    const r = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', type: 'task' } as any,
+      { id: 'a1', now: '2026-06-01T00:00:00Z' },
+    )
+    expect(r.assignee).toBeNull()
+  })
+  it('activityUpdateToPatch nimmt assignee nur wenn gesetzt', () => {
+    expect(activityUpdateToPatch({ assignee: 'u2' } as any, 'NOW').assignee).toBe('u2')
+    expect('assignee' in activityUpdateToPatch({ title: 'x' } as any, 'NOW')).toBe(false)
+  })
+  it('activityRowToActivity liest assignee', () => {
+    const a = activityRowToActivity({ id: 'a1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1', type: 'task', payload: {}, status: 'open', assignee: 'u2', created_at: '', updated_at: '' })
+    expect((a as any).assignee).toBe('u2')
+  })
+})

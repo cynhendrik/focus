@@ -13,6 +13,7 @@ export function activityRowToActivity(r: any): Activity {
     type: r.type, title: r.title ?? undefined, body: r.body ?? undefined,
     payload: typeof r.payload === 'string' ? r.payload : JSON.stringify(r.payload ?? {}),
     status: r.status ?? 'open', dueAt: r.due_at ?? undefined,
+    assignee: r.assignee ?? undefined,
     createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -26,6 +27,7 @@ export function activityPayloadToRow(
     account_id: p.accountId, customer_id: p.customerId ?? null,
     type: p.type, title: p.title ?? null, body: p.body ?? null,
     payload: parseObj(p.payload), status: p.status ?? 'open', due_at: p.dueAt ?? null,
+    assignee: p.assignee ?? null,
     created_at: ctx.now, updated_at: ctx.now,
   }
 }
@@ -39,6 +41,7 @@ export function activityUpdateToPatch(
   if (p.body !== undefined) patch.body = p.body
   if (p.status !== undefined) patch.status = p.status
   if (p.dueAt !== undefined) patch.due_at = p.dueAt
+  if (p.assignee !== undefined) patch.assignee = p.assignee
   if (p.payload !== undefined) patch.payload = parseObj(p.payload)
   return patch
 }
