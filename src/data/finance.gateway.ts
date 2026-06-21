@@ -3,9 +3,9 @@ import { FinanceService } from '@/services/finance.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import {
   invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, offerItemRowToItem, paymentRowToPayment,
-  invoicePayloadToRow, invoiceItemPayloadToRow, offerPayloadToRow, offerItemPayloadToRow,
+  invoicePayloadToRow, invoiceItemPayloadToRow, offerPayloadToRow, offerItemPayloadToRow, paymentPayloadToRow,
 } from './finance.mapper'
-import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload, UpsertOfferPayload } from '@/types/finance.types'
+import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload, UpsertOfferPayload, CreatePaymentPayload } from '@/types/finance.types'
 
 /** Supabase-Fehler in eine lesbare Error werfen (sonst zeigt die UI "[object Object]"). */
 function fail(error: { message?: string; details?: string; hint?: string; code?: string } | null): never {
@@ -209,6 +209,22 @@ export const FinanceGateway = {
     const { error: itErr } = await supabase.from('offer_items').delete().eq('offer_id', id)
     if (itErr) fail(itErr)
     const { error } = await supabase.from('offers').delete().eq('id', id)
+    if (error) fail(error)
+  },
+
+  async addPayment(payload: CreatePaymentPayload): Promise<Payment> {
+    if (!shared()) return FinanceService.addPayment(payload)
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const row = paymentPayloadToRow(payload, { id, now })
+    const { data, error } = await supabase.from('payments').insert(row).select('*').single()
+    if (error) fail(error)
+    return paymentRowToPayment(data)
+  },
+
+  async deletePayment(id: string): Promise<void> {
+    if (!shared()) return FinanceService.deletePayment(id)
+    const { error } = await supabase.from('payments').delete().eq('id', id)
     if (error) fail(error)
   },
 }

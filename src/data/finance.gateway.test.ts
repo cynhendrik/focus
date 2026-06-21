@@ -189,3 +189,25 @@ describe('FinanceGateway offers write', () => {
     expect(supabase.from).toHaveBeenCalledWith('offers')
   })
 })
+
+describe('FinanceGateway payments write', () => {
+  beforeEach(() => { vi.clearAllMocks(); insertResult = { data: null, error: null } })
+  const pay = { workspaceId: 'ws1', invoiceId: 'inv1', amount: 50, paidAt: '2026-06-02' }
+  it('addPayment (solo) ruft FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.addPayment).mockResolvedValueOnce({} as any)
+    await FinanceGateway.addPayment(pay as any)
+    expect(FinanceService.addPayment).toHaveBeenCalled()
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+  it('addPayment (shared) schreibt nach supabase.payments', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.addPayment(pay as any)
+    expect(supabase.from).toHaveBeenCalledWith('payments')
+  })
+  it('deletePayment (shared) löscht aus supabase.payments', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.deletePayment('p1')
+    expect(supabase.from).toHaveBeenCalledWith('payments')
+  })
+})
