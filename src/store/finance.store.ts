@@ -193,7 +193,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   addPayment: async (payload) => {
-    await FinanceService.addPayment(payload)
+    await FinanceGateway.addPayment(payload)
     // Rechnungen + Zahlungen neu laden — Status kann auf "bezahlt" kippen.
     const [invoices, payments] = await Promise.all([
       FinanceGateway.getInvoices(payload.workspaceId),
@@ -203,7 +203,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   deletePayment: async (id, workspaceId) => {
-    await FinanceService.deletePayment(id)
+    await FinanceGateway.deletePayment(id)
     const [invoices, payments] = await Promise.all([
       FinanceGateway.getInvoices(workspaceId),
       FinanceGateway.getPaymentsByWorkspace(workspaceId),
@@ -212,13 +212,13 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   createOffer: async (payload) => {
-    const result = await FinanceService.createOffer(payload)
+    const result = await FinanceGateway.createOffer(payload)
     set(s => ({ offers: [result.offer, ...s.offers] }))
     return result
   },
 
   updateOffer: async (id, payload) => {
-    const result = await FinanceService.updateOffer(id, payload)
+    const result = await FinanceGateway.updateOffer(id, payload)
     set(s => ({
       offers: s.offers.map(o => o.id === id ? result.offer : o),
       selectedOffer: s.selectedOffer?.offer.id === id ? result : s.selectedOffer,
@@ -226,7 +226,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   deleteOffer: async (id) => {
-    await FinanceService.deleteOffer(id)
+    await FinanceGateway.deleteOffer(id)
     set(s => ({
       offers: s.offers.filter(o => o.id !== id),
       selectedOffer: s.selectedOffer?.offer.id === id ? null : s.selectedOffer,
@@ -234,7 +234,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   convertOfferToInvoice: async (offerId, workspaceId, createdBy) => {
-    const result = await FinanceService.convertOfferToInvoice(offerId, workspaceId, createdBy)
+    const result = await FinanceGateway.convertOfferToInvoice(offerId, workspaceId, createdBy)
     set(s => ({
       invoices: [result.invoice, ...s.invoices],
       offers: s.offers.map(o => o.id === offerId ? { ...o, status: 'accepted' as const, convertedInvoiceId: result.invoice.id } : o),
