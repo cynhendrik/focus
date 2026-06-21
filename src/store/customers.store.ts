@@ -1,12 +1,13 @@
 import { create } from 'zustand'
-import { CustomerService } from '@/services/customer.service'
+import { AccountsGateway } from '@/data/accounts.gateway'
+import { accountToCustomer, customerPayloadToAccountPayload } from '@/data/customers.mapper'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useMailStore } from '@/store/mail.store'
 import { log } from '@/lib/logger'
 import type { Customer, UpsertCustomerPayload } from '@/types/customer.types'
 import type { AppError } from '@/types/error.types'
-import { isAppError, formatError } from '@/types/error.types'
+import { toAppError } from '@/types/error.types'
 
 interface CustomersState {
   customers: Customer[]
@@ -45,11 +46,12 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
     const workspaceId = getWorkspaceId()
     set({ isLoading: true, error: null })
     try {
-      const customers = await CustomerService.getAll(workspaceId)
+      const accounts = await AccountsGateway.getAccounts(workspaceId)
+      const customers = accounts.map(accountToCustomer)
       set({ customers, isLoading: false })
       log.info('Customers loaded', { count: customers.length })
     } catch (err) {
-      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      const error = toAppError(err)
       set({ isLoading: false, error })
       log.error('Failed to load customers', { error })
     }
@@ -59,7 +61,10 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
     const workspaceId = getWorkspaceId()
     const createdBy = getCreatedBy()
     try {
-      const updated = await CustomerService.upsert({ ...payload, workspaceId, createdBy })
+      const account = await AccountsGateway.upsertAccount(
+        customerPayloadToAccountPayload({ ...payload, workspaceId, createdBy }),
+      )
+      const updated = accountToCustomer(account)
       set(s => ({ customers: upsertById(s.customers, updated) }))
       // Kunde angelegt/geändert → Mail-Zuordnungen neu bewerten. IMMER feuern
       // (auch beim Entfernen der E-Mail, damit alte Zuordnungen wieder abfallen).
@@ -70,7 +75,7 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
         void useMailStore.getState().rematchCustomers(JSON.stringify(refs)).catch(() => {})
       }
     } catch (err) {
-      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      const error = toAppError(err)
       set({ error })
       log.error('Failed to upsert customer', { error })
       throw err
@@ -80,10 +85,10 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
   remove: async (id) => {
     const workspaceId = getWorkspaceId()
     try {
-      await CustomerService.delete(id, workspaceId)
+      await AccountsGateway.deleteAccount(id, workspaceId)
       set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
     } catch (err) {
-      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      const error = toAppError(err)
       set({ error })
       log.error('Failed to delete customer', { id, error })
       throw err
@@ -92,10 +97,11 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
 
   setArchived: async (id, archived) => {
     try {
-      const updated = await CustomerService.setArchived(id, archived)
+      const account = await AccountsGateway.setArchived(id, archived)
+      const updated = accountToCustomer(account)
       set(s => ({ customers: upsertById(s.customers, updated) }))
     } catch (err) {
-      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      const error = toAppError(err)
       set({ error })
       log.error('Failed to (un)archive customer', { id, archived, error })
       throw err

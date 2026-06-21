@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { accountRowToLead, leadPayloadToAccountRow } from './accounts.mapper'
+import { accountRowToAccount, accountPayloadToRow } from './accounts.mapper'
 
 const row = {
   id: 'l1', workspace_id: 'ws1', created_by: 'u1', name: 'Max',
@@ -97,5 +98,97 @@ describe('accounts.mapper', () => {
     expect(r).not.toHaveProperty('last_activity_at')
     expect(r).not.toHaveProperty('next_follow_up_at')
     expect(r).not.toHaveProperty('created_at')
+  })
+})
+
+describe('accounts.mapper — generic account', () => {
+  const arow = {
+    id: 'a1', workspace_id: 'ws1', created_by: 'u1', name: 'ACME AG',
+    kind: 'company', industry: 'IT', website: null, status: 'aktiv', priority: 'normal',
+    tags: ['vip'], goals: ['wachsen'], health_score: null, internal_notes: null,
+    is_private: false, social_links: '{}', primary_deal_id: null,
+    lead_score: 12, score_factors: { strong_interest: 50 },
+    street: null, zip: null, city: null, country: null,
+    email: 'a@b.de', phone: null, vat_id: 'DE1', archived_at: null,
+    account_type: 'client',
+    created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z',
+  }
+
+  it('accountRowToAccount mappt snake_case → camelCase', () => {
+    const a = accountRowToAccount(arow)
+    expect(a.workspaceId).toBe('ws1')
+    expect(a.createdBy).toBe('u1')
+    expect(a.kind).toBe('company')
+    expect(a.tags).toEqual(['vip'])
+    expect(a.goals).toEqual(['wachsen'])
+    expect(a.scoreFactors).toEqual({ strong_interest: 50 })
+    expect(a.isPrivate).toBe(false)
+    expect(a.vatId).toBe('DE1')
+    expect(a.pipelinePhase).toBeUndefined()   // kein Deals-JOIN in der Cloud
+  })
+
+  it('accountRowToAccount liest tags/score_factors auch als JSON-String (text-Spalten)', () => {
+    const a = accountRowToAccount({ ...arow, tags: '["a","b"]', score_factors: '{"x":1}' })
+    expect(a.tags).toEqual(['a', 'b'])
+    expect(a.scoreFactors).toEqual({ x: 1 })
+  })
+
+  it('accountRowToAccount: is_private smallint 1 → true', () => {
+    expect(accountRowToAccount({ ...arow, is_private: 1 }).isPrivate).toBe(true)
+  })
+
+  it('accountRowToAccount liest goals auch als JSON-String', () => {
+    const a = accountRowToAccount({ ...arow, goals: '["g1","g2"]' })
+    expect(a.goals).toEqual(['g1', 'g2'])
+  })
+
+  it('accountRowToAccount: is_private smallint 0 → false', () => {
+    expect(accountRowToAccount({ ...arow, is_private: 0 }).isPrivate).toBe(false)
+  })
+
+  it('accountPayloadToRow setzt account_type=client, created_by, defaults', () => {
+    const r = accountPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', name: 'ACME AG' },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r.id).toBe('a1')
+    expect(r.account_type).toBe('client')
+    expect(r.created_by).toBe('u1')
+    expect(r.kind).toBe('company')      // default
+    expect(r.status).toBe('aktiv')      // default
+    expect(r.priority).toBe('normal')   // default
+    expect(r.updated_at).toBe('2026-01-03T00:00:00Z')
+  })
+
+  it('accountPayloadToRow enthält kein created_at (DB-Default)', () => {
+    const r = accountPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', name: 'X' },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r).not.toHaveProperty('created_at')
+    expect(r).not.toHaveProperty('pipeline_phase')
+  })
+
+  it('accountPayloadToRow: tags=text-JSON-String, goals+social_links=jsonb-Werte', () => {
+    const r = accountPayloadToRow(
+      {
+        workspaceId: 'ws1', createdBy: 'u1', name: 'X',
+        tags: ['a', 'b'], goals: ['g1'], socialLinks: '{"instagram":"@x"}',
+      },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r.tags).toBe('["a","b"]')                 // text-Spalte → JSON-String
+    expect(r.goals).toEqual(['g1'])                  // jsonb → native Array
+    expect(r.social_links).toEqual({ instagram: '@x' }) // jsonb → Objekt, nicht String
+  })
+
+  it('accountPayloadToRow: leere Defaults (tags="[]", social_links={})', () => {
+    const r = accountPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', name: 'X' },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r.tags).toBe('[]')
+    expect(r.goals).toEqual([])
+    expect(r.social_links).toEqual({})
   })
 })

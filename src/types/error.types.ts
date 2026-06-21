@@ -26,3 +26,7 @@ export function formatError(error: unknown): string {
   if (error instanceof Error) return error.message
   return String(error)
 }
+
+export function toAppError(err: unknown): AppError {
+  return isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+}
