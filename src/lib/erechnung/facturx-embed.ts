@@ -1,4 +1,4 @@
-import { PDFDocument, AFRelationship, PDFName, PDFString, PDFHexString } from 'pdf-lib'
+import { PDFDocument, AFRelationship, PDFName, PDFNumber, PDFString } from 'pdf-lib'
 
 const FX_FILENAME = 'factur-x.xml'
 
@@ -44,8 +44,16 @@ function buildXmp(): string {
 /**
  * Bettet das CII-XML als Factur-X-Anhang in ein vorhandenes PDF ein und setzt
  * die PDF/A-3-/Factur-X-XMP-Metadaten. Liefert die neuen PDF-Bytes.
+ *
+ * @param iccBytes Optionales sRGB-ICC-Profil. Wenn vorhanden, wird ein gültiger
+ *   PDF/A-OutputIntent mit eingebettetem Zielprofil ergänzt (für strikte
+ *   PDF/A-3-Konformität). Fehlt es, verhält sich die Funktion wie zuvor.
  */
-export async function embedFacturX(pdfBytes: Uint8Array, ciiXml: string): Promise<Uint8Array> {
+export async function embedFacturX(
+  pdfBytes: Uint8Array,
+  ciiXml: string,
+  iccBytes?: Uint8Array,
+): Promise<Uint8Array> {
   const doc = await PDFDocument.load(pdfBytes)
   // `Uint8Array.from` normalisiert die TextEncoder-Ausgabe auf den hier sichtbaren
   // Uint8Array-Realm — sonst schlägt pdf-libs instanceof-Prüfung unter jsdom fehl.
@@ -68,8 +76,25 @@ export async function embedFacturX(pdfBytes: Uint8Array, ciiXml: string): Promis
   const metaRef = doc.context.register(metaStream)
   doc.catalog.set(PDFName.of('Metadata'), metaRef)
 
+  // PDF/A-OutputIntent mit eingebettetem sRGB-ICC-Profil (best-effort).
+  if (iccBytes && iccBytes.length > 0) {
+    // ICC als Flate-komprimierter Stream; /N 3 = drei Farbkomponenten (RGB).
+    const iccNorm = Uint8Array.from(iccBytes)
+    const iccStream = doc.context.flateStream(iccNorm, {
+      N: PDFNumber.of(3),
+    })
+    const iccRef = doc.context.register(iccStream)
+
+    const outputIntent = doc.context.obj({
+      Type: PDFName.of('OutputIntent'),
+      S: PDFName.of('GTS_PDFA1'),
+      OutputConditionIdentifier: PDFString.of('sRGB'),
+      Info: PDFString.of('sRGB IEC61966-2.1'),
+      DestOutputProfile: iccRef,
+    })
+    const outputIntentRef = doc.context.register(outputIntent)
+    doc.catalog.set(PDFName.of('OutputIntents'), doc.context.obj([outputIntentRef]))
+  }
+
   return doc.save()
 }
-
-// Hinweis: PDFString/PDFHexString importiert für evtl. spätere OutputIntent-Erweiterung (Task 9b).
-void PDFString; void PDFHexString

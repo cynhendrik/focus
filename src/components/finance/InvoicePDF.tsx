@@ -1,5 +1,5 @@
 import {
-  Document, Page, Text, View, StyleSheet, pdf, Image,
+  Document, Page, Text, View, StyleSheet, pdf, Image, Font,
 } from '@react-pdf/renderer'
 import { invoke } from '@tauri-apps/api/core'
 import type { InvoiceWithItems } from '@/types/finance.types'
@@ -10,6 +10,20 @@ import { computeTaxRateGroups } from '@/lib/invoice-tax'
 import { buildCiiXml } from '@/lib/erechnung/cii-invoice'
 import { embedFacturX } from '@/lib/erechnung/facturx-embed'
 import { checkErechnungReadiness } from '@/lib/erechnung/erechnung-readiness'
+import fontRegular from '@/assets/fonts/LiberationSans-Regular.ttf'
+import fontBold from '@/assets/fonts/LiberationSans-Bold.ttf'
+import iccUrl from '@/assets/icc/sRGB-v2-micro.icc?url'
+
+// Eingebetteter Font für PDF/A-3-Konformität (keine versteckte Helvetica-Abhängigkeit).
+// LiberationSans ist metrisch zu Arial/Helvetica kompatibel → Layout bleibt unverändert.
+const PDF_FONT = 'InvoiceSans'
+Font.register({
+  family: PDF_FONT,
+  fonts: [
+    { src: fontRegular, fontWeight: 'normal' },
+    { src: fontBold, fontWeight: 'bold' },
+  ],
+})
 
 interface Props {
   data: InvoiceWithItems
@@ -33,26 +47,26 @@ function InitialsBadge({ name }: { name?: string }) {
     .join('')
   return (
     <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Helvetica-Bold' }}>{initials}</Text>
+      <Text style={{ color: '#fff', fontSize: 16, fontFamily: PDF_FONT, fontWeight: 'bold' }}>{initials}</Text>
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  page:        { padding: '14mm 16mm', fontSize: 9.5, fontFamily: 'Helvetica', color: '#111' },
+  page:        { padding: '14mm 16mm', fontSize: 9.5, fontFamily: PDF_FONT, color: '#111' },
   header:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  company:     { fontSize: 13, fontFamily: 'Helvetica-Bold', marginBottom: 2 },
+  company:     { fontSize: 13, fontFamily: PDF_FONT, fontWeight: 'bold', marginBottom: 2 },
   companyMeta: { fontSize: 8.5, color: '#555', lineHeight: 1.5 },
-  docTitle:    { fontSize: 22, fontFamily: 'Helvetica-Bold', letterSpacing: -0.5 },
-  docNumber:   { fontSize: 9, color: '#999', fontFamily: 'Helvetica', marginTop: 2 },
+  docTitle:    { fontSize: 22, fontFamily: PDF_FONT, fontWeight: 'bold', letterSpacing: -0.5 },
+  docNumber:   { fontSize: 9, color: '#999', fontFamily: PDF_FONT, marginTop: 2 },
   rule:        { height: 1.5, backgroundColor: '#e0e0e0', marginBottom: 14 },
   twoCol:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 20 },
   label:       { fontSize: 7.5, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.9, marginBottom: 3 },
   metaBlock:   { flexDirection: 'column', gap: 10, minWidth: 130 },
   metaItem:    { flexDirection: 'column' },
-  metaVal:     { fontSize: 9, fontFamily: 'Helvetica' },
+  metaVal:     { fontSize: 9, fontFamily: PDF_FONT },
   intro:       { fontSize: 9, color: '#444', marginBottom: 14, lineHeight: 1.5 },
-  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#d8d8d8', paddingBottom: 5, marginBottom: 2, fontFamily: 'Helvetica-Bold', fontSize: 8 },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#d8d8d8', paddingBottom: 5, marginBottom: 2, fontFamily: PDF_FONT, fontWeight: 'bold', fontSize: 8 },
   row:         { flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.5, borderColor: '#eeeeee' },
   colDesc:     { flex: 3 },
   colNum:      { flex: 1, textAlign: 'right' },
@@ -67,8 +81,8 @@ const s = StyleSheet.create({
   totalLabel:  { width: 110, textAlign: 'right', color: '#666' },
   totalValue:  { width: 80, textAlign: 'right' },
   grandRow:    { flexDirection: 'row', justifyContent: 'flex-end', gap: 28, marginTop: 4 },
-  grandLabel:  { width: 110, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
-  grandValue:  { width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  grandLabel:  { width: 110, textAlign: 'right', fontFamily: PDF_FONT, fontWeight: 'bold' },
+  grandValue:  { width: 80, textAlign: 'right', fontFamily: PDF_FONT, fontWeight: 'bold' },
   divider:     { height: 0.5, backgroundColor: '#d0d0d0', width: 220, alignSelf: 'flex-end', marginVertical: 4 },
   kleinBox:    { marginTop: 16, borderTopWidth: 0.5, borderColor: '#e4e4e4', paddingTop: 12, paddingLeft: 10, paddingRight: 10, paddingBottom: 10, backgroundColor: '#f9f9f9' },
   kleinText:   { fontSize: 8.5, color: '#666', fontStyle: 'italic', lineHeight: 1.6 },
@@ -156,7 +170,7 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
         <View style={s.twoCol}>
           <View style={{ flex: 1 }}>
             <Text style={s.label}>Rechnungsempfänger</Text>
-            <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 10, marginBottom: 2 }}>{account.name}</Text>
+            <Text style={{ fontFamily: PDF_FONT, fontWeight: 'bold', fontSize: 10, marginBottom: 2 }}>{account.name}</Text>
             {address && <Text style={{ fontSize: 8.5, color: '#555', lineHeight: 1.5 }}>{address}</Text>}
             {account.vatId && <Text style={{ fontSize: 8.5, color: '#555', marginTop: 2 }}>USt-IdNr.: {account.vatId}</Text>}
           </View>
@@ -261,14 +275,14 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
               <View style={s.paySection}>
                 <Text style={s.payText}>
                   {'Bitte überweisen Sie den Rechnungsbetrag von '}
-                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{fmt(invoice.total)}</Text>
+                  <Text style={{ fontFamily: PDF_FONT, fontWeight: 'bold' }}>{fmt(invoice.total)}</Text>
                   {' bis zum '}
-                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{fmtDate(invoice.dueDate)}</Text>
+                  <Text style={{ fontFamily: PDF_FONT, fontWeight: 'bold' }}>{fmtDate(invoice.dueDate)}</Text>
                   {' unter Angabe der Rechnungsnummer als Verwendungszweck auf folgendes Konto:'}
                 </Text>
                 <Text style={s.payBank}>
                   {bankName ? `${bankName}  ·  ` : ''}
-                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>IBAN: {iban}</Text>
+                  <Text style={{ fontFamily: PDF_FONT, fontWeight: 'bold' }}>IBAN: {iban}</Text>
                 </Text>
               </View>
             )
@@ -299,11 +313,15 @@ export async function getInvoicePdfBytes(
   const blob = await pdf(<InvoicePDFDoc data={data} profile={profile} account={account} />).toBlob()
   const buf = await blob.arrayBuffer()
   const visualPdf = new Uint8Array(buf)
+  // sRGB-ICC-Profil für den PDF/A-3-OutputIntent laden (best-effort; fehlt es,
+  // wird das PDF ohne OutputIntent erzeugt — kein harter Fehler).
+  let icc: Uint8Array | undefined
+  try { icc = new Uint8Array(await (await fetch(iccUrl)).arrayBuffer()) } catch { icc = undefined }
   // ZUGFeRD/Factur-X: CII-XML erzeugen und einbetten. Schlägt das fehl, liefern
   // wir das reine Sicht-PDF zurück (besser eine PDF ohne XML als gar keine).
   try {
     const xml = buildCiiXml(data, profile, account)
-    return await embedFacturX(visualPdf, xml)
+    return await embedFacturX(visualPdf, xml, icc)
   } catch {
     return visualPdf
   }
