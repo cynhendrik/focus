@@ -52,7 +52,7 @@ export async function embedFacturX(pdfBytes: Uint8Array, ciiXml: string): Promis
   const xmlBytes = Uint8Array.from(new TextEncoder().encode(ciiXml))
 
   await doc.attach(xmlBytes, FX_FILENAME, {
-    mimeType: 'application/xml',
+    mimeType: 'text/xml',
     description: 'Factur-X / ZUGFeRD invoice data',
     afRelationship: AFRelationship.Alternative,
     creationDate: new Date(),
