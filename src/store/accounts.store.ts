@@ -5,7 +5,7 @@ import { useAuthStore } from './auth.store'
 import { log } from '@/lib/logger'
 import type { Account, UpsertAccountPayload } from '@/types/account.types'
 import type { AppError } from '@/types/error.types'
-import { isAppError, formatError } from '@/types/error.types'
+import { toAppError } from '@/types/error.types'
 
 interface AccountsState {
   accounts: Account[]
@@ -23,9 +23,6 @@ function upsertById(list: Account[], updated: Account): Account[] {
   return [...list, updated]
 }
 
-function toAppError(err: unknown): AppError {
-  return isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
-}
 
 export const useAccountsStore = create<AccountsState>()((set) => ({
   accounts: [],
@@ -38,6 +35,7 @@ export const useAccountsStore = create<AccountsState>()((set) => ({
     try {
       const accounts = await AccountsGateway.getAccounts(workspaceId)
       set({ accounts, isLoading: false })
+      log.info('Accounts loaded', { count: accounts.length })
     } catch (err) {
       const error = toAppError(err)
       set({ isLoading: false, error })
@@ -48,19 +46,40 @@ export const useAccountsStore = create<AccountsState>()((set) => ({
   upsert: async (payload) => {
     const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
     const createdBy = useAuthStore.getState().user?.id ?? ''
-    const updated = await AccountsGateway.upsertAccount({ ...payload, workspaceId, createdBy })
-    set(s => ({ accounts: upsertById(s.accounts, updated) }))
-    return updated
+    try {
+      const updated = await AccountsGateway.upsertAccount({ ...payload, workspaceId, createdBy })
+      set(s => ({ accounts: upsertById(s.accounts, updated) }))
+      return updated
+    } catch (err) {
+      const error = toAppError(err)
+      set({ error })
+      log.error('Failed to upsert account', { error })
+      throw err
+    }
   },
 
   remove: async (id) => {
     const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-    await AccountsGateway.deleteAccount(id, workspaceId)
-    set(s => ({ accounts: s.accounts.filter(a => a.id !== id) }))
+    try {
+      await AccountsGateway.deleteAccount(id, workspaceId)
+      set(s => ({ accounts: s.accounts.filter(a => a.id !== id) }))
+    } catch (err) {
+      const error = toAppError(err)
+      set({ error })
+      log.error('Failed to delete account', { id, error })
+      throw err
+    }
   },
 
   setPrimaryDeal: async (accountId, dealId) => {
-    const updated = await AccountsGateway.setPrimaryDeal(accountId, dealId)
-    set(s => ({ accounts: upsertById(s.accounts, updated) }))
+    try {
+      const updated = await AccountsGateway.setPrimaryDeal(accountId, dealId)
+      set(s => ({ accounts: upsertById(s.accounts, updated) }))
+    } catch (err) {
+      const error = toAppError(err)
+      set({ error })
+      log.error('Failed to set primary deal', { accountId, error })
+      throw err
+    }
   },
 }))

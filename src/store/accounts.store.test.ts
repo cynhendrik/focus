@@ -29,7 +29,7 @@ const acc: Account = {
 describe('useAccountsStore', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useAccountsStore.setState({ accounts: [], isLoading: false })
+    useAccountsStore.setState({ accounts: [], isLoading: false, error: null })
   })
 
   it('init lädt Accounts über das Gateway', async () => {
@@ -54,5 +54,21 @@ describe('useAccountsStore', () => {
     await useAccountsStore.getState().remove('a1')
     expect(AccountsGateway.deleteAccount).toHaveBeenCalledWith('a1', 'ws1')
     expect(useAccountsStore.getState().accounts).toHaveLength(0)
+  })
+
+  it('init setzt error wenn das Gateway wirft', async () => {
+    vi.mocked(AccountsGateway.getAccounts).mockRejectedValueOnce(new Error('boom'))
+    await useAccountsStore.getState().init()
+    expect(useAccountsStore.getState().error).not.toBeNull()
+    expect(useAccountsStore.getState().isLoading).toBe(false)
+    expect(useAccountsStore.getState().accounts).toEqual([])
+  })
+
+  it('setPrimaryDeal ruft Gateway und aktualisiert den Account', async () => {
+    vi.mocked(AccountsGateway.setPrimaryDeal).mockResolvedValueOnce({ ...acc, primaryDealId: 'd1' })
+    useAccountsStore.setState({ accounts: [acc], isLoading: false, error: null })
+    await useAccountsStore.getState().setPrimaryDeal('a1', 'd1')
+    expect(AccountsGateway.setPrimaryDeal).toHaveBeenCalledWith('a1', 'd1')
+    expect(useAccountsStore.getState().accounts[0].primaryDealId).toBe('d1')
   })
 })
