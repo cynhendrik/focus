@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
-import { ActivitiesService } from '@/services/activities.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
 import { useCustomersStore } from '@/store/customers.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -795,8 +795,8 @@ function DraftEditorModal({
     try {
       // Save latest draft edits first
       await updateDraft(item.id, subject || null, body || null)
-      // Create email_out activity directly via service to get the returned Activity
-      const activity = await ActivitiesService.create({
+      // Create email_out activity via gateway (solo/shared aware) to get the returned Activity
+      const activity = await ActivitiesGateway.create({
         workspaceId,
         createdBy: user?.email ?? 'user',
         accountId: item.leadId,

@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useUiStore } from '@/store/ui.store'
 import { useToastStore } from '@/store/toast.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
-import { ActivitiesService } from '@/services/activities.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
 import { LeadStagesManager } from '@/components/leads/LeadStagesManager'
 import { QualifyModal } from '@/components/leads/QualifyModal'
 import { DisqualifyModal } from '@/components/leads/DisqualifyModal'
@@ -94,7 +94,7 @@ export function FollowUpModal({
     setError(null)
     try {
       await Promise.all(leads.map(lead =>
-        ActivitiesService.create({
+        ActivitiesGateway.create({
           workspaceId,
           createdBy: user?.id ?? '',
           accountId: lead.id,

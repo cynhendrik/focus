@@ -9,6 +9,7 @@ import { isAppError, formatError } from '@/types/error.types'
 interface ActivitiesState {
   activities: Activity[]
   followups: Activity[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
@@ -21,11 +22,12 @@ interface ActivitiesState {
 export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   activities: [],
   followups: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ currentCustomerId: customerId, isLoading: true, error: null })
     try {
       const activities = await ActivitiesGateway.getByCustomer(customerId)
       set({ activities, isLoading: false })

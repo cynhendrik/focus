@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useActivitiesStore } from '@/store/activities.store'
+import { useNotesStore } from '@/store/notes.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -32,7 +33,13 @@ export function useWorkspaceRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `workspace_id=eq.${activeWorkspaceId}` },
           () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `workspace_id=eq.${activeWorkspaceId}` },
-          () => { useActivitiesStore.getState().loadOpenFollowups(activeWorkspaceId) })
+          () => {
+            const actState = useActivitiesStore.getState()
+            actState.loadOpenFollowups(activeWorkspaceId)
+            if (actState.currentCustomerId) actState.loadForCustomer(actState.currentCustomerId)
+            const notesState = useNotesStore.getState()
+            if (notesState.currentCustomerId) notesState.loadForCustomer(notesState.currentCustomerId)
+          })
       .subscribe()
 
     return () => { supabase.removeChannel(channel); supabase.removeChannel(finance) }

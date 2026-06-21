@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useToastStore } from '@/store/toast.store'
 import { CrmService } from '@/services/crm.service'
-import { ActivitiesService } from '@/services/activities.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
 import type { Lead, LeadSource, LeadStage } from '@/types/lead.types'
 import type { FollowUp } from '@/types/crm.types'
 
@@ -239,7 +239,7 @@ function AktivitaetenTab({ lead, workspaceId }: {
     if (!title.trim()) return
     setSaving(true)
     try {
-      await ActivitiesService.create({
+      await ActivitiesGateway.create({
         workspaceId, createdBy: userId, accountId: lead.id,
         type: 'task', title: title.trim(),
         dueAt: date || undefined,

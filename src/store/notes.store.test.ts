@@ -18,7 +18,7 @@ const noteActivity = (over: Partial<Activity> = {}): Activity => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useNotesStore.setState({ notes: [], isLoading: false, error: null })
+  useNotesStore.setState({ notes: [], currentCustomerId: null, isLoading: false, error: null })
 })
 
 describe('useNotesStore', () => {
@@ -34,6 +34,12 @@ describe('useNotesStore', () => {
     expect(notes[0].id).toBe('n1')
     expect(notes[0].noteType).toBe('telefon')
     expect(notes[0].pinned).toBe(true)
+  })
+
+  it('loadForCustomer: setzt currentCustomerId', async () => {
+    vi.mocked(ActivitiesGateway.getByAccount).mockResolvedValueOnce([])
+    await useNotesStore.getState().loadForCustomer('c42')
+    expect(useNotesStore.getState().currentCustomerId).toBe('c42')
   })
 
   it('upsert (neu): ruft create und fügt Note hinzu', async () => {

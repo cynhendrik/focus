@@ -10,6 +10,7 @@ import { isAppError, formatError } from '@/types/error.types'
 
 interface NotesState {
   notes: Note[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
@@ -25,11 +26,12 @@ function upsertById(list: Note[], updated: Note): Note[] {
 
 export const useNotesStore = create<NotesState>()((set) => ({
   notes: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ currentCustomerId: customerId, isLoading: true, error: null })
     try {
       const acts = await ActivitiesGateway.getByAccount(customerId)
       set({ notes: acts.filter(a => a.type === 'note').map(activityToNote), isLoading: false })
