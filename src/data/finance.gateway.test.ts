@@ -188,6 +188,13 @@ describe('FinanceGateway offers write', () => {
     await FinanceGateway.deleteOffer('o1')
     expect(supabase.from).toHaveBeenCalledWith('offers')
   })
+  it('updateOffer (shared) aktualisiert offers + ersetzt offer_items, ohne status/number', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.updateOffer('o1', offerPayload as any)
+    expect(supabase.from).toHaveBeenCalledWith('offers')
+    expect(supabase.from).toHaveBeenCalledWith('offer_items')
+    expect(FinanceService.updateOffer).not.toHaveBeenCalled()
+  })
 })
 
 describe('FinanceGateway payments write', () => {
