@@ -24,7 +24,7 @@ export function activityPayloadToRow(
 ): Record<string, unknown> {
   return {
     id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy,
-    account_id: p.accountId, customer_id: p.customerId ?? null,
+    account_id: p.accountId || null, customer_id: p.customerId ?? null,
     type: p.type, title: p.title ?? null, body: p.body ?? null,
     payload: parseObj(p.payload), status: p.status ?? 'open', due_at: p.dueAt ?? null,
     assignee: p.assignee ?? null,

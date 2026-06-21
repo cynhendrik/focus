@@ -72,3 +72,20 @@ describe('activities.mapper — assignee', () => {
     expect((a as any).assignee).toBe('u2')
   })
 })
+
+describe('activities.mapper — account_id empty→null (FK safety)', () => {
+  it('leerer accountId wird zu null (FK activities_account_id_fkey)', () => {
+    const r = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: '', type: 'task' } as any,
+      { id: 'a1', now: '2026-06-01T00:00:00Z' },
+    )
+    expect(r.account_id).toBeNull()
+  })
+  it('echter accountId bleibt erhalten', () => {
+    const r = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'acc1', type: 'task' } as any,
+      { id: 'a1', now: '2026-06-01T00:00:00Z' },
+    )
+    expect(r.account_id).toBe('acc1')
+  })
+})
