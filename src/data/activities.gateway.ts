@@ -49,7 +49,7 @@ export const ActivitiesGateway = {
     return activityRowToActivity(data)
   },
 
-  async update(id: string, payload: UpdateActivityPayload): Promise<Activity> {
+  async update(id: string, payload: UpdateActivityPayload & { payload?: string }): Promise<Activity> {
     if (!shared()) return invoke<Activity>('update_activity', { id, payload })
     const now = new Date().toISOString()
     const patch = activityUpdateToPatch(payload, now)

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ActivitiesService } from '@/services/activities.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
 import { useCrmStore } from '@/store/crm.store'
 import { log } from '@/lib/logger'
 import type { Activity, CreateActivityPayload, UpdateActivityPayload } from '@/types/pipeline.types'
@@ -27,7 +27,7 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   loadForCustomer: async (customerId) => {
     set({ isLoading: true, error: null })
     try {
-      const activities = await ActivitiesService.getByCustomer(customerId)
+      const activities = await ActivitiesGateway.getByCustomer(customerId)
       set({ activities, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -39,7 +39,7 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   loadOpenFollowups: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const followups = await ActivitiesService.getOpenFollowups(workspaceId)
+      const followups = await ActivitiesGateway.getOpenFollowups(workspaceId)
       set({ followups, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -51,7 +51,7 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   create: async (payload) => {
     set({ error: null })
     try {
-      const activity = await ActivitiesService.create(payload)
+      const activity = await ActivitiesGateway.create(payload)
       set(s => ({
         activities: [activity, ...s.activities],
         followups: payload.type === 'followup' && (payload.status ?? 'open') === 'open'
@@ -68,7 +68,7 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   update: async (id, payload) => {
     set({ error: null })
     try {
-      const updated = await ActivitiesService.update(id, payload)
+      const updated = await ActivitiesGateway.update(id, payload)
       set(s => ({
         activities: s.activities.map(a => a.id === id ? updated : a),
         followups: s.followups.map(a => a.id === id ? updated : a),
@@ -82,7 +82,7 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
   remove: async (id) => {
     set({ error: null })
     try {
-      await ActivitiesService.delete(id)
+      await ActivitiesGateway.delete(id)
       set(s => ({
         activities: s.activities.filter(a => a.id !== id),
         followups: s.followups.filter(a => a.id !== id),

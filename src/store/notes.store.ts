@@ -1,5 +1,8 @@
 import { create } from 'zustand'
-import { NoteService } from '@/services/note.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
+import { activityToNote, notePayloadToActivityPayload } from '@/data/notes.mapper'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { log } from '@/lib/logger'
 import type { Note, UpsertNotePayload } from '@/types/note.types'
 import type { AppError } from '@/types/error.types'
@@ -28,8 +31,8 @@ export const useNotesStore = create<NotesState>()((set) => ({
   loadForCustomer: async (customerId) => {
     set({ isLoading: true, error: null })
     try {
-      const notes = await NoteService.getByCustomer(customerId)
-      set({ notes, isLoading: false })
+      const acts = await ActivitiesGateway.getByAccount(customerId)
+      set({ notes: acts.filter(a => a.type === 'note').map(activityToNote), isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ isLoading: false, error })
@@ -39,7 +42,26 @@ export const useNotesStore = create<NotesState>()((set) => ({
 
   upsert: async (payload) => {
     try {
-      const updated = await NoteService.upsert(payload)
+      let updated: Note
+      if (payload.id) {
+        const activity = await ActivitiesGateway.update(payload.id, {
+          title: payload.title,
+          body: payload.content ?? undefined,
+          payload: JSON.stringify({
+            note_type: payload.noteType ?? 'gespraech',
+            waiting_reply: payload.waitingReply ?? false,
+            pinned: payload.pinned ?? false,
+          }),
+        })
+        updated = activityToNote(activity)
+      } else {
+        const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+        const createdBy = useAuthStore.getState().user?.id ?? ''
+        const activity = await ActivitiesGateway.create(
+          notePayloadToActivityPayload(payload, { workspaceId, createdBy }),
+        )
+        updated = activityToNote(activity)
+      }
       set(s => ({ notes: upsertById(s.notes, updated) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -49,7 +71,7 @@ export const useNotesStore = create<NotesState>()((set) => ({
 
   remove: async (id) => {
     try {
-      await NoteService.delete(id)
+      await ActivitiesGateway.delete(id)
       set(s => ({ notes: s.notes.filter(n => n.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
