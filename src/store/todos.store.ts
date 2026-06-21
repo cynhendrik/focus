@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { TodoService } from '@/services/todo.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
+import { activityToTodo, todoToCreatePayload, todoToUpdatePayload } from '@/data/todos.mapper'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -92,7 +93,7 @@ export async function deleteTodoLinkedToEvent(eventId: string): Promise<void> {
   const todo = state.allTodos.find(t => t.calendarEventId === eventId)
   if (!todo) return
   try {
-    await TodoService.delete(todo.id)
+    await ActivitiesGateway.delete(todo.id)
     useTodosStore.setState(s => ({
       todos:    s.todos.filter(t => t.id !== todo.id),
       allTodos: s.allTodos.filter(t => t.id !== todo.id),
@@ -105,6 +106,7 @@ export async function deleteTodoLinkedToEvent(eventId: string): Promise<void> {
 interface TodosState {
   todos: Todo[]
   allTodos: Todo[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
 
@@ -154,22 +156,24 @@ function todoToPayload(t: Todo): UpsertTodoPayload {
 export const useTodosStore = create<TodosState>()((set, get) => ({
   todos: [],
   allTodos: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadAll: async (workspaceId) => {
     try {
-      const allTodos = await TodoService.getAll(workspaceId)
-      set({ allTodos })
+      const acts = await ActivitiesGateway.getOpenTasks(workspaceId)
+      set({ allTodos: acts.map(activityToTodo) })
     } catch (err) {
       log.error('Failed to load all todos', { err })
     }
   },
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, currentCustomerId: customerId })
     try {
-      const todos = await TodoService.getByCustomer(customerId)
+      const acts = await ActivitiesGateway.getByAccount(customerId)
+      const todos = acts.filter(a => a.type === 'task').map(activityToTodo)
       // Merge into allTodos so global views (filtered by customerId) see ALL of this
       // customer's tasks — including done/in_progress — not just the open ones from loadAll.
       set(s => {
@@ -185,7 +189,12 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
 
   upsert: async (payload) => {
     try {
-      const updated = await TodoService.upsert(payload)
+      const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
+      const createdBy = useAuthStore.getState().user?.id ?? ''
+      const a = payload.id
+        ? await ActivitiesGateway.update(payload.id, todoToUpdatePayload(payload))
+        : await ActivitiesGateway.create(todoToCreatePayload(payload, { workspaceId, createdBy }))
+      const updated = activityToTodo(a)
       set(s => ({
         todos:    upsertById(s.todos, updated),
         allTodos: upsertById(s.allTodos, updated),
@@ -201,7 +210,7 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
     try {
       const existing = get().allTodos.find(t => t.id === id)
       if (existing) await deleteLinkedEvent(existing)
-      await TodoService.delete(id)
+      await ActivitiesGateway.delete(id)
       set(s => ({
         todos:    s.todos.filter(t => t.id !== id),
         allTodos: s.allTodos.filter(t => t.id !== id),
