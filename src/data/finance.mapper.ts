@@ -1,4 +1,4 @@
-import type { Invoice, InvoiceItem, Offer, OfferItem, Payment, UpsertInvoicePayload, UpsertInvoiceItemPayload } from '@/types/finance.types'
+import type { Invoice, InvoiceItem, Offer, OfferItem, Payment, UpsertInvoicePayload, UpsertInvoiceItemPayload, UpsertOfferPayload, UpsertOfferItemPayload, CreatePaymentPayload } from '@/types/finance.types'
 
 /** Supabase-`invoices`-Zeile → Invoice-Domänentyp. */
 export function invoiceRowToInvoice(r: any): Invoice {
@@ -74,5 +74,38 @@ export function invoiceItemPayloadToRow(
     id: ctx.id, invoice_id: ctx.invoiceId, title: it.title, description: it.description ?? null,
     quantity: it.quantity, unit_price: it.unitPrice, tax_rate: it.taxRate, total: it.total,
     sort_order: it.sortOrder, item_date: it.itemDate ?? null, unit: it.unit ?? null,
+  }
+}
+
+/** UpsertOfferPayload → offers-Row (ohne number = kommt per RPC; ohne created_at = DB-Default). */
+export function offerPayloadToRow(
+  p: UpsertOfferPayload, ctx: { id: string; now: string },
+): Record<string, unknown> {
+  return {
+    id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy, account_id: p.accountId,
+    title: p.title, status: p.status ?? 'draft', valid_until: p.validUntil,
+    tax_mode: p.taxMode ?? 'standard', subtotal: p.subtotal, tax_amount: p.taxAmount, total: p.total,
+    notes: p.notes ?? null, updated_at: ctx.now,
+  }
+}
+
+/** UpsertOfferItemPayload → offer_items-Row. */
+export function offerItemPayloadToRow(
+  it: UpsertOfferItemPayload, ctx: { id: string; offerId: string },
+): Record<string, unknown> {
+  return {
+    id: ctx.id, offer_id: ctx.offerId, title: it.title, description: it.description ?? null,
+    quantity: it.quantity, unit_price: it.unitPrice, tax_rate: it.taxRate, total: it.total,
+    sort_order: it.sortOrder, item_date: it.itemDate ?? null, unit: it.unit ?? null,
+  }
+}
+
+/** CreatePaymentPayload → payments-Row (ohne created_at = DB-Default). */
+export function paymentPayloadToRow(
+  p: CreatePaymentPayload, ctx: { id: string; now: string },
+): Record<string, unknown> {
+  return {
+    id: ctx.id, workspace_id: p.workspaceId, invoice_id: p.invoiceId, amount: p.amount,
+    paid_at: p.paidAt, method: p.method ?? null, note: p.note ?? null,
   }
 }

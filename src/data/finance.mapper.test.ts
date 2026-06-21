@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, paymentRowToPayment, invoicePayloadToRow, invoiceItemPayloadToRow } from './finance.mapper'
+import { offerPayloadToRow, offerItemPayloadToRow, paymentPayloadToRow } from './finance.mapper'
 
 describe('finance.mapper', () => {
   it('invoiceRowToInvoice mappt snake→camel', () => {
@@ -53,5 +54,47 @@ describe('finance payload→row', () => {
       { id:'it1', invoiceId:'i1' })
     expect(r.invoice_id).toBe('i1'); expect(r.unit_price).toBe(50); expect(r.tax_rate).toBe(19)
     expect(r.description).toBeNull()
+  })
+})
+
+describe('finance.mapper — offer/payment write', () => {
+  it('offerPayloadToRow: Defaults + ohne created_at/number/id-Sonderfall', () => {
+    const r = offerPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', title: 'Angebot', validUntil: '2026-07-01', subtotal: 100, taxAmount: 19, total: 119, items: [] },
+      { id: 'o1', now: '2026-06-01T00:00:00Z' },
+    )
+    expect(r.id).toBe('o1')
+    expect(r.workspace_id).toBe('ws1')
+    expect(r.account_id).toBe('a1')
+    expect(r.status).toBe('draft')        // default
+    expect(r.tax_mode).toBe('standard')   // default
+    expect(r.valid_until).toBe('2026-07-01')
+    expect(r.updated_at).toBe('2026-06-01T00:00:00Z')
+    expect(r).not.toHaveProperty('created_at')
+    expect(r).not.toHaveProperty('number')  // Nummer kommt separat (RPC) im Gateway
+  })
+
+  it('offerItemPayloadToRow: inkl. item_date/unit', () => {
+    const r = offerItemPayloadToRow(
+      { title: 'Pos', quantity: 2, unitPrice: 50, taxRate: 19, total: 119, sortOrder: 0, unit: 'Std', itemDate: '2026-06-01' },
+      { id: 'i1', offerId: 'o1' },
+    )
+    expect(r.offer_id).toBe('o1')
+    expect(r.unit).toBe('Std')
+    expect(r.item_date).toBe('2026-06-01')
+    expect(r.unit_price).toBe(50)
+  })
+
+  it('paymentPayloadToRow: Felder + null-Defaults', () => {
+    const r = paymentPayloadToRow(
+      { workspaceId: 'ws1', invoiceId: 'inv1', amount: 50, paidAt: '2026-06-02' },
+      { id: 'p1', now: '2026-06-02T00:00:00Z' },
+    )
+    expect(r.id).toBe('p1')
+    expect(r.invoice_id).toBe('inv1')
+    expect(r.amount).toBe(50)
+    expect(r.paid_at).toBe('2026-06-02')
+    expect(r.method).toBeNull()
+    expect(r.note).toBeNull()
   })
 })
