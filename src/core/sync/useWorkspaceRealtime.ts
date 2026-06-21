@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useNotesStore } from '@/store/notes.store'
+import { useTodosStore } from '@/store/todos.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -39,6 +40,9 @@ export function useWorkspaceRealtime() {
             if (actState.currentCustomerId) actState.loadForCustomer(actState.currentCustomerId)
             const notesState = useNotesStore.getState()
             if (notesState.currentCustomerId) notesState.loadForCustomer(notesState.currentCustomerId)
+            useTodosStore.getState().loadAll(activeWorkspaceId)
+            const todoState = useTodosStore.getState()
+            if (todoState.currentCustomerId) todoState.loadForCustomer(todoState.currentCustomerId)
           })
       .subscribe()
 
