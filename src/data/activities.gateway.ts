@@ -39,6 +39,15 @@ export const ActivitiesGateway = {
     return (data ?? []).map(activityRowToActivity)
   },
 
+  async getOpenTasks(workspaceId: string): Promise<Activity[]> {
+    if (!shared()) return invoke<Activity[]>('get_open_tasks', { workspaceId })
+    const { data, error } = await supabase.from('activities').select('*')
+      .eq('workspace_id', workspaceId).eq('type', 'task').eq('status', 'open')
+      .order('due_at', { ascending: true, nullsFirst: false })
+    if (error) fail(error)
+    return (data ?? []).map(activityRowToActivity)
+  },
+
   async create(payload: CreateActivityPayload): Promise<Activity> {
     if (!shared()) return invoke<Activity>('create_activity', { payload })
     const id = crypto.randomUUID()

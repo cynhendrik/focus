@@ -54,3 +54,20 @@ describe('ActivitiesGateway', () => {
     expect(chain.delete).toHaveBeenCalled()
   })
 })
+
+describe('ActivitiesGateway.getOpenTasks', () => {
+  beforeEach(() => vi.clearAllMocks())
+  it('solo → invoke(get_open_tasks)', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(invoke).mockResolvedValueOnce([])
+    await ActivitiesGateway.getOpenTasks('ws1')
+    expect(invoke).toHaveBeenCalledWith('get_open_tasks', { workspaceId: 'ws1' })
+  })
+  it('shared → supabase activities mit type=task + status=open', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await ActivitiesGateway.getOpenTasks('ws1')
+    expect(supabase.from).toHaveBeenCalledWith('activities')
+    expect(chain.eq).toHaveBeenCalledWith('type', 'task')
+    expect(chain.eq).toHaveBeenCalledWith('status', 'open')
+  })
+})
