@@ -16,7 +16,7 @@ import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import { PaymentModal } from '@/components/finance/PaymentModal'
 // PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
 // react-pdf lib stays out of the main bundle and loads only on export.
-import { FinanceService } from '@/services/finance.service'
+import { FinanceGateway } from '@/data/finance.gateway'
 import { isOverdue, paidAmount, displayInvoiceStatus, remaining, todayLocalISO } from '@/lib/invoice-status'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
@@ -393,9 +393,12 @@ export function FinanceRoute() {
   const openPreview = async (inv: Invoice) => {
     setPreviewLoading(inv.id)
     try {
-      const full = await FinanceService.getInvoice(inv.id)
+      const full = await FinanceGateway.getInvoice(inv.id)
       const acc = accounts.find(a => a.id === inv.accountId)
       if (acc) setPreviewData({ data: full, account: acc })
+      else useToastStore.getState().show({ message: 'Kunde zu dieser Rechnung nicht gefunden.', variant: 'error' })
+    } catch (e) {
+      useToastStore.getState().show({ message: `Vorschau fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
     } finally {
       setPreviewLoading(null)
     }
@@ -666,9 +669,15 @@ export function FinanceRoute() {
                   <td style={{ ...td, textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                       <RowBtn icon={<Download size={12} />} label="PDF" onClick={async () => {
-                        const full = await FinanceService.getOffer(offer.id)
-                        const acc = accounts.find(a => a.id === offer.accountId)
-                        if (acc) { const { downloadOfferPDF } = await import('@/components/finance/OfferPDF'); await downloadOfferPDF(full, profile, acc) }
+                        try {
+                          const acc = accounts.find(a => a.id === offer.accountId)
+                          if (!acc) { useToastStore.getState().show({ message: 'Kunde zu diesem Angebot nicht gefunden — Download nicht möglich.', variant: 'error' }); return }
+                          const full = await FinanceGateway.getOffer(offer.id)
+                          const { downloadOfferPDF } = await import('@/components/finance/OfferPDF')
+                          await downloadOfferPDF(full, profile, acc)
+                        } catch (e) {
+                          useToastStore.getState().show({ message: `Download fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+                        }
                       }} />
                       {offer.status === 'accepted' && (
                         <RowBtn icon={<ChevronRight size={12} />} label="→ Rechnung" tone="accent"
@@ -819,9 +828,15 @@ export function FinanceRoute() {
                         onClick={() => openPreview(inv)}
                       />
                       <RowBtn icon={<Download size={12} />} label="PDF" onClick={async () => {
-                        const full = await FinanceService.getInvoice(inv.id)
-                        const acc = accounts.find(a => a.id === inv.accountId)
-                        if (acc) { const { downloadInvoicePDF } = await import('@/components/finance/InvoicePDF'); await downloadInvoicePDF(full, profile, acc) }
+                        try {
+                          const acc = accounts.find(a => a.id === inv.accountId)
+                          if (!acc) { useToastStore.getState().show({ message: 'Kunde zu dieser Rechnung nicht gefunden — Download nicht möglich.', variant: 'error' }); return }
+                          const full = await FinanceGateway.getInvoice(inv.id)
+                          const { downloadInvoicePDF } = await import('@/components/finance/InvoicePDF')
+                          await downloadInvoicePDF(full, profile, acc)
+                        } catch (e) {
+                          useToastStore.getState().show({ message: `Download fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+                        }
                       }} />
                       {isAdmin && inv.isSuggestion && (
                         <RowBtn icon={<CheckCircle size={12} />} label="Freigeben" tone="ok"
@@ -896,7 +911,7 @@ export function FinanceRoute() {
             }
             await updateInvoiceStatus(stornoInv.id, 'cancelled')
             if (createGutschrift) {
-              const full = await FinanceService.getInvoice(stornoInv.id)
+              const full = await FinanceGateway.getInvoice(stornoInv.id)
               await createInvoice({
                 workspaceId,
                 createdBy: user?.id ?? '',
@@ -1055,7 +1070,7 @@ function BatchExportModal({ invoices, accounts, profile, onClose }: BatchExportM
     try {
       const loaded: Array<{ data: InvoiceWithItems; account: Account }> = []
       for (const inv of eligible) {
-        const full = await FinanceService.getInvoice(inv.id)
+        const full = await FinanceGateway.getInvoice(inv.id)
         const acc  = accounts.find((a: Account) => a.id === inv.accountId)
         if (acc) loaded.push({ data: full, account: acc })
       }
