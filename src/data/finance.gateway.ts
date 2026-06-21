@@ -3,9 +3,9 @@ import { FinanceService } from '@/services/finance.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import {
   invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, offerItemRowToItem, paymentRowToPayment,
-  invoicePayloadToRow, invoiceItemPayloadToRow,
+  invoicePayloadToRow, invoiceItemPayloadToRow, offerPayloadToRow, offerItemPayloadToRow,
 } from './finance.mapper'
-import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload } from '@/types/finance.types'
+import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload, UpsertOfferPayload } from '@/types/finance.types'
 
 /** Supabase-Fehler in eine lesbare Error werfen (sonst zeigt die UI "[object Object]"). */
 function fail(error: { message?: string; details?: string; hint?: string; code?: string } | null): never {
@@ -163,6 +163,52 @@ export const FinanceGateway = {
   async deleteInvoice(id: string): Promise<void> {
     if (!shared()) return FinanceService.deleteInvoice(id)
     const { error } = await supabase.from('invoices').delete().eq('id', id)
+    if (error) fail(error)
+  },
+
+  async createOffer(payload: UpsertOfferPayload): Promise<OfferWithItems> {
+    if (!shared()) return FinanceService.createOffer(payload)
+    const id = payload.id ?? crypto.randomUUID()
+    const now = new Date().toISOString()
+    const { data: number, error: numErr } = await supabase.rpc('allocate_offer_number', { ws_id: payload.workspaceId })
+    if (numErr) fail(numErr)
+    const row = { ...offerPayloadToRow(payload, { id, now }), number }
+    const { error: offErr } = await supabase.from('offers').insert(row)
+    if (offErr) fail(offErr)
+    if (payload.items.length > 0) {
+      const itemRows = payload.items.map(it => offerItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), offerId: id }))
+      const { error: itErr } = await supabase.from('offer_items').insert(itemRows)
+      if (itErr) fail(itErr)
+    }
+    return this.getOffer(id)
+  },
+
+  async updateOffer(id: string, payload: UpsertOfferPayload): Promise<OfferWithItems> {
+    if (!shared()) return FinanceService.updateOffer(id, payload)
+    const now = new Date().toISOString()
+    // status & number bewusst NICHT anfassen (mirror Rust update).
+    const patch = {
+      account_id: payload.accountId, title: payload.title, valid_until: payload.validUntil,
+      tax_mode: payload.taxMode ?? 'standard', subtotal: payload.subtotal,
+      tax_amount: payload.taxAmount, total: payload.total, notes: payload.notes ?? null, updated_at: now,
+    }
+    const { error: offErr } = await supabase.from('offers').update(patch).eq('id', id)
+    if (offErr) fail(offErr)
+    const { error: delErr } = await supabase.from('offer_items').delete().eq('offer_id', id)
+    if (delErr) fail(delErr)
+    if (payload.items.length > 0) {
+      const itemRows = payload.items.map(it => offerItemPayloadToRow(it, { id: it.id ?? crypto.randomUUID(), offerId: id }))
+      const { error: itErr } = await supabase.from('offer_items').insert(itemRows)
+      if (itErr) fail(itErr)
+    }
+    return this.getOffer(id)
+  },
+
+  async deleteOffer(id: string): Promise<void> {
+    if (!shared()) return FinanceService.deleteOffer(id)
+    const { error: itErr } = await supabase.from('offer_items').delete().eq('offer_id', id)
+    if (itErr) fail(itErr)
+    const { error } = await supabase.from('offers').delete().eq('id', id)
     if (error) fail(error)
   },
 }

@@ -4,6 +4,9 @@ vi.mock('@/services/finance.service', () => ({
     getInvoices: vi.fn(), getOffers: vi.fn(), getPaymentsByWorkspace: vi.fn(), getInvoice: vi.fn(),
     createInvoice: vi.fn(), updateInvoice: vi.fn(), deleteInvoice: vi.fn(),
     updateInvoiceStatus: vi.fn(), approveInvoiceSuggestion: vi.fn(),
+    createOffer: vi.fn(), updateOffer: vi.fn(), deleteOffer: vi.fn(),
+    addPayment: vi.fn(), deletePayment: vi.fn(),
+    getOffer: vi.fn(), convertOfferToInvoice: vi.fn(),
   },
 }))
 vi.mock('@/store/workspace.store', () => ({ useWorkspaceStore: { getState: vi.fn() } }))
@@ -160,5 +163,29 @@ describe('FinanceGateway read routing', () => {
     vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
     await FinanceGateway.deleteInvoice('i1')
     expect(supabase.from).toHaveBeenCalledWith('invoices')
+  })
+})
+
+describe('FinanceGateway offers write', () => {
+  beforeEach(() => { vi.clearAllMocks(); insertResult = { data: null, error: null }; singleResult = { data: { id: 'o1', workspace_id: 'ws1', account_id: 'a1', title: 'A', status: 'draft', valid_until: '2026-07-01', tax_mode: 'standard', subtotal: 0, tax_amount: 0, total: 0, created_at: '', updated_at: '' }, error: null } })
+  const offerPayload = { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', title: 'A', validUntil: '2026-07-01', subtotal: 0, taxAmount: 0, total: 0, items: [] }
+
+  it('createOffer (solo) ruft FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.createOffer).mockResolvedValueOnce({ offer: {} as any, items: [] })
+    await FinanceGateway.createOffer(offerPayload as any)
+    expect(FinanceService.createOffer).toHaveBeenCalled()
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+  it('createOffer (shared) allokiert Nummer + schreibt nach supabase', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.createOffer(offerPayload as any)
+    expect(supabase.rpc).toHaveBeenCalledWith('allocate_offer_number', { ws_id: 'ws1' })
+    expect(supabase.from).toHaveBeenCalledWith('offers')
+  })
+  it('deleteOffer (shared) löscht aus supabase', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await FinanceGateway.deleteOffer('o1')
+    expect(supabase.from).toHaveBeenCalledWith('offers')
   })
 })
