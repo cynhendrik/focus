@@ -42,9 +42,11 @@ describe('applyAccountsRealtimeChange', () => {
   })
 
   it('DELETE entfernt aus allen drei Stores', () => {
+    useLeadsStore.setState({ leads: [{ id: 'a1' } as any], isLoading: false, error: null })
     useAccountsStore.setState({ accounts: [{ id: 'a1' } as any], isLoading: false, error: null } as any)
     useCustomersStore.setState({ customers: [{ id: 'a1' } as any], isLoading: false, error: null })
     applyAccountsRealtimeChange({ eventType: 'DELETE', new: null, old: { id: 'a1' } })
+    expect(useLeadsStore.getState().leads).toHaveLength(0)
     expect(useAccountsStore.getState().accounts).toHaveLength(0)
     expect(useCustomersStore.getState().customers).toHaveLength(0)
   })
