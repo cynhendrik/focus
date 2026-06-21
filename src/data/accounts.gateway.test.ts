@@ -115,4 +115,28 @@ describe('AccountsGateway generic accounts', () => {
     await AccountsGateway.setArchived('a1', true)
     expect(invoke).toHaveBeenCalledWith('cmd_set_account_archived', { id: 'a1', archived: true })
   })
+
+  it('setArchived (shared) schreibt archived_at nach supabase.accounts', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await AccountsGateway.setArchived('a1', true)
+    expect(supabase.from).toHaveBeenCalledWith('accounts')
+    expect(supaChain.update).toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('setPrimaryDeal (solo) ruft invoke(cmd_set_primary_deal)', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(invoke).mockResolvedValueOnce({ id: 'a1' })
+    await AccountsGateway.setPrimaryDeal('a1', 'd1')
+    expect(invoke).toHaveBeenCalledWith('cmd_set_primary_deal', { accountId: 'a1', dealId: 'd1' })
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('setPrimaryDeal (shared) schreibt primary_deal_id nach supabase.accounts', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await AccountsGateway.setPrimaryDeal('a1', 'd1')
+    expect(supabase.from).toHaveBeenCalledWith('accounts')
+    expect(supaChain.update).toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled()
+  })
 })
