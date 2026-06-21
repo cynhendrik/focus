@@ -227,4 +227,29 @@ export const FinanceGateway = {
     const { error } = await supabase.from('payments').delete().eq('id', id)
     if (error) fail(error)
   },
+
+  async convertOfferToInvoice(offerId: string, workspaceId: string, createdBy: string): Promise<InvoiceWithItems> {
+    if (!shared()) return FinanceService.convertOfferToInvoice(offerId, workspaceId, createdBy)
+    const { offer, items } = await this.getOffer(offerId)
+    const today = new Date()
+    const due = new Date(today.getTime() + 14 * 86_400_000)
+    const ymd = (d: Date) => d.toISOString().slice(0, 10)
+    const payload: UpsertInvoicePayload = {
+      workspaceId, createdBy, accountId: offer.accountId,
+      date: ymd(today), dueDate: ymd(due), status: 'draft', taxMode: offer.taxMode,
+      subtotal: offer.subtotal, taxAmount: offer.taxAmount, total: offer.total,
+      notes: offer.notes, isSuggestion: false,
+      items: items.map(i => ({
+        title: i.title, description: i.description, quantity: i.quantity, unitPrice: i.unitPrice,
+        taxRate: i.taxRate, total: i.total, sortOrder: i.sortOrder,
+      })),
+    }
+    const result = await this.createInvoice(payload)
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('offers')
+      .update({ status: 'accepted', converted_invoice_id: result.invoice.id, updated_at: now })
+      .eq('id', offerId)
+    if (error) fail(error)
+    return result
+  },
 }

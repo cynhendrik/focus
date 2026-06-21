@@ -211,3 +211,21 @@ describe('FinanceGateway payments write', () => {
     expect(supabase.from).toHaveBeenCalledWith('payments')
   })
 })
+
+describe('FinanceGateway convertOfferToInvoice', () => {
+  beforeEach(() => { vi.clearAllMocks(); insertResult = { data: null, error: null } })
+  it('convert (solo) ruft FinanceService', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(FinanceService.convertOfferToInvoice).mockResolvedValueOnce({ invoice: {} as any, items: [] })
+    await FinanceGateway.convertOfferToInvoice('o1', 'ws1', 'u1')
+    expect(FinanceService.convertOfferToInvoice).toHaveBeenCalledWith('o1', 'ws1', 'u1')
+  })
+  it('convert (shared) liest Offer, erstellt Rechnung, markiert Offer accepted', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    // getOffer → single() liefert offer; createInvoice nutzt insert (then→insertResult ok); getInvoice → single()
+    singleResult = { data: { id: 'o1', workspace_id: 'ws1', account_id: 'a1', title: 'A', status: 'draft', valid_until: '2026-07-01', tax_mode: 'standard', subtotal: 100, tax_amount: 19, total: 119, created_at: '', updated_at: '' }, error: null }
+    const res = await FinanceGateway.convertOfferToInvoice('o1', 'ws1', 'u1')
+    expect(supabase.from).toHaveBeenCalledWith('offers')   // markiert accepted
+    expect(res).toBeDefined()
+  })
+})
