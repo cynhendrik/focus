@@ -137,6 +137,15 @@ describe('accounts.mapper — generic account', () => {
     expect(accountRowToAccount({ ...arow, is_private: 1 }).isPrivate).toBe(true)
   })
 
+  it('accountRowToAccount liest goals auch als JSON-String', () => {
+    const a = accountRowToAccount({ ...arow, goals: '["g1","g2"]' })
+    expect(a.goals).toEqual(['g1', 'g2'])
+  })
+
+  it('accountRowToAccount: is_private smallint 0 → false', () => {
+    expect(accountRowToAccount({ ...arow, is_private: 0 }).isPrivate).toBe(false)
+  })
+
   it('accountPayloadToRow setzt account_type=client, created_by, defaults', () => {
     const r = accountPayloadToRow(
       { workspaceId: 'ws1', createdBy: 'u1', name: 'ACME AG' },
