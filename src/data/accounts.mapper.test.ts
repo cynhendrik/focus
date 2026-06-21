@@ -168,4 +168,27 @@ describe('accounts.mapper — generic account', () => {
     expect(r).not.toHaveProperty('created_at')
     expect(r).not.toHaveProperty('pipeline_phase')
   })
+
+  it('accountPayloadToRow: tags=text-JSON-String, goals+social_links=jsonb-Werte', () => {
+    const r = accountPayloadToRow(
+      {
+        workspaceId: 'ws1', createdBy: 'u1', name: 'X',
+        tags: ['a', 'b'], goals: ['g1'], socialLinks: '{"instagram":"@x"}',
+      },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r.tags).toBe('["a","b"]')                 // text-Spalte → JSON-String
+    expect(r.goals).toEqual(['g1'])                  // jsonb → native Array
+    expect(r.social_links).toEqual({ instagram: '@x' }) // jsonb → Objekt, nicht String
+  })
+
+  it('accountPayloadToRow: leere Defaults (tags="[]", social_links={})', () => {
+    const r = accountPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', name: 'X' },
+      { id: 'a1', now: '2026-01-03T00:00:00Z' },
+    )
+    expect(r.tags).toBe('[]')
+    expect(r.goals).toEqual([])
+    expect(r.social_links).toEqual({})
+  })
 })

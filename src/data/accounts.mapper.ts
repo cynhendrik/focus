@@ -66,6 +66,15 @@ function asNumberRecord(v: unknown): Record<string, number> {
   return {}
 }
 
+/** Domänen-`socialLinks` (JSON-String) → Objekt für die jsonb-Spalte `social_links`. */
+function asJsonObject(v: unknown): Record<string, unknown> {
+  if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>
+  if (typeof v === 'string') {
+    try { const p = JSON.parse(v); return p && typeof p === 'object' && !Array.isArray(p) ? p : {} } catch { return {} }
+  }
+  return {}
+}
+
 /** Supabase-`accounts`-Zeile (account_type != 'lead') → Account-Domänentyp. */
 export function accountRowToAccount(r: any): Account {
   return {
@@ -118,10 +127,11 @@ export function accountPayloadToRow(
     website: p.website ?? null,
     status: p.status ?? 'aktiv',
     priority: p.priority ?? 'normal',
-    tags: p.tags ?? [],
+    // Schema-Drift: tags ist `text` (JSON-String), goals + social_links sind `jsonb` (native Werte).
+    tags: JSON.stringify(p.tags ?? []),
     goals: p.goals ?? [],
     internal_notes: p.internalNotes ?? null,
-    social_links: p.socialLinks ?? '{}',
+    social_links: asJsonObject(p.socialLinks),
     primary_deal_id: p.primaryDealId ?? null,
     street: p.street ?? null,
     zip: p.zip ?? null,
