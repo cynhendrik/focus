@@ -9,14 +9,17 @@ vi.mock('@/store/workspace.store', () => ({
 vi.mock('@/store/auth.store', () => ({
   useAuthStore: { getState: () => ({ user: { id: 'u1' } }) },
 }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 
 const supaChain: any = {
   select: vi.fn().mockReturnThis(),
   eq: vi.fn().mockReturnThis(),
+  or: vi.fn().mockReturnThis(),
   order: vi.fn().mockResolvedValue({ data: [], error: null }),
   update: vi.fn().mockReturnThis(),
+  upsert: vi.fn().mockReturnThis(),
   in: vi.fn().mockReturnThis(),
-  // make the chain awaitable so `.update().in().eq()` resolves to { error: null }
+  single: vi.fn().mockResolvedValue({ data: { id: 'a1', workspace_id: 'ws1', created_by: 'u1', name: 'X', account_type: 'client', created_at: '', updated_at: '' }, error: null }),
   then: (resolve: (v: { error: null }) => unknown) => resolve({ error: null }),
 }
 vi.mock('@/lib/supabase', () => ({
@@ -26,6 +29,7 @@ vi.mock('@/lib/supabase', () => ({
 import { LeadsService } from '@/services/leads.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { supabase } from '@/lib/supabase'
+import { invoke } from '@tauri-apps/api/core'
 import { AccountsGateway } from './accounts.gateway'
 
 describe('AccountsGateway routing', () => {
@@ -67,5 +71,48 @@ describe('AccountsGateway routing', () => {
     await AccountsGateway.bulkUpdate({ ids: ['a'], status: 'warm' })
     expect(supabase.from).toHaveBeenCalledWith('accounts')
     expect(LeadsService.bulkUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('AccountsGateway generic accounts', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('getAccounts (solo) ruft invoke(get_accounts)', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(invoke).mockResolvedValueOnce([])
+    await AccountsGateway.getAccounts('ws1')
+    expect(invoke).toHaveBeenCalledWith('get_accounts', { workspaceId: 'ws1' })
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('getAccounts (shared) liest aus supabase.accounts mit Lead-Ausschluss', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await AccountsGateway.getAccounts('ws1')
+    expect(supabase.from).toHaveBeenCalledWith('accounts')
+    expect(supaChain.or).toHaveBeenCalledWith('account_type.is.null,account_type.neq.lead')
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('upsertAccount (solo) ruft invoke(upsert_account)', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(invoke).mockResolvedValueOnce({ id: 'a1' })
+    await AccountsGateway.upsertAccount({ workspaceId: 'ws1', createdBy: 'u1', name: 'X' })
+    expect(invoke).toHaveBeenCalledWith('upsert_account', { payload: expect.objectContaining({ name: 'X' }) })
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('upsertAccount (shared) schreibt nach supabase.accounts', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => true } as any)
+    await AccountsGateway.upsertAccount({ workspaceId: 'ws1', createdBy: 'u1', name: 'X' })
+    expect(supabase.from).toHaveBeenCalledWith('accounts')
+    expect(supaChain.upsert).toHaveBeenCalled()
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('setArchived (solo) ruft invoke(cmd_set_account_archived)', async () => {
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({ isActiveWorkspaceShared: () => false } as any)
+    vi.mocked(invoke).mockResolvedValueOnce({ id: 'a1' })
+    await AccountsGateway.setArchived('a1', true)
+    expect(invoke).toHaveBeenCalledWith('cmd_set_account_archived', { id: 'a1', archived: true })
   })
 })

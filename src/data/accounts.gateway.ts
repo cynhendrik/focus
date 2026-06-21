@@ -2,8 +2,10 @@ import { supabase } from '@/lib/supabase'
 import { LeadsService } from '@/services/leads.service'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
-import { accountRowToLead, leadPayloadToAccountRow } from './accounts.mapper'
+import { invoke } from '@tauri-apps/api/core'
+import { accountRowToLead, leadPayloadToAccountRow, accountRowToAccount, accountPayloadToRow } from './accounts.mapper'
 import type { Lead, UpsertLeadPayload, PipelineStage, BulkUpdateLeadsPayload } from '@/types/lead.types'
+import type { Account, UpsertAccountPayload } from '@/types/account.types'
 
 function shared(): boolean {
   return useWorkspaceStore.getState().isActiveWorkspaceShared()
@@ -81,5 +83,57 @@ export const AccountsGateway = {
       .in('id', payload.ids)
       .eq('account_type', 'lead')
     if (error) throw error
+  },
+
+  async getAccounts(workspaceId: string): Promise<Account[]> {
+    if (!shared()) return invoke<Account[]>('get_accounts', { workspaceId })
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .or('account_type.is.null,account_type.neq.lead')
+      .order('name', { ascending: true })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(accountRowToAccount).filter(a => !a.isPrivate)
+  },
+
+  async upsertAccount(payload: UpsertAccountPayload): Promise<Account> {
+    if (!shared()) return invoke<Account>('upsert_account', { payload })
+    const id = payload.id ?? crypto.randomUUID()
+    const now = new Date().toISOString()
+    const row = accountPayloadToRow(payload, { id, now })
+    const { data, error } = await supabase
+      .from('accounts')
+      .upsert(row, { onConflict: 'id' })
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+    return accountRowToAccount(data)
+  },
+
+  async setArchived(id: string, archived: boolean): Promise<Account> {
+    if (!shared()) return invoke<Account>('cmd_set_account_archived', { id, archived })
+    const now = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('accounts')
+      .update({ archived_at: archived ? now : null, updated_at: now })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+    return accountRowToAccount(data)
+  },
+
+  async setPrimaryDeal(accountId: string, dealId: string | null): Promise<Account> {
+    if (!shared()) return invoke<Account>('cmd_set_primary_deal', { accountId, dealId })
+    const now = new Date().toISOString()
+    const { data, error } = await supabase
+      .from('accounts')
+      .update({ primary_deal_id: dealId, updated_at: now })
+      .eq('id', accountId)
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+    return accountRowToAccount(data)
   },
 }
