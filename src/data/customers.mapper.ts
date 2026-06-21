@@ -54,5 +54,6 @@ export function customerPayloadToAccountPayload(p: UpsertCustomerPayload): Upser
     email: p.email,
     phone: p.phone,
     vatId: p.vatId,
+    // Hinweis: contactPerson hat kein Account-Äquivalent → wird nicht persistiert (pre-existing).
   }
 }

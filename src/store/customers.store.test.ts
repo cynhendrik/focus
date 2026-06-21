@@ -48,7 +48,9 @@ describe('useCustomersStore', () => {
     vi.mocked(AccountsGateway.upsertAccount).mockResolvedValueOnce(acc)
     const { useCustomersStore } = await import('./customers.store')
     await useCustomersStore.getState().upsert({ name: 'ACME AG' })
-    expect(AccountsGateway.upsertAccount).toHaveBeenCalled()
+    expect(AccountsGateway.upsertAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'ACME AG', kind: 'individual', workspaceId: 'ws-1', createdBy: 'u-1' }),
+    )
     expect(useCustomersStore.getState().customers).toHaveLength(1)
   })
 
