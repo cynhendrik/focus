@@ -17,7 +17,7 @@ export function accountToCustomer(a: Account): Customer {
     workspaceId: a.workspaceId,
     industry: a.industry,
     goals: a.goals,
-    socialLinks: a.socialLinks,
+    socialLinks: a.socialLinks, // verbatim; Account.website wird bewusst nicht hier eingemischt
     internalNotes: a.internalNotes,
     street: a.street,
     zip: a.zip,
@@ -25,6 +25,7 @@ export function accountToCustomer(a: Account): Customer {
     country: a.country,
     leadScore: a.leadScore,
     scoreFactors: a.scoreFactors,
+    // Hinweis: contactPerson hat kein Account-Äquivalent → wird hier nicht gesetzt.
     archivedAt: a.archivedAt ?? null,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
