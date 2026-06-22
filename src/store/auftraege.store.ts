@@ -1,16 +1,10 @@
 import { create } from 'zustand'
+import { AuftraegeGateway, KEY_AUFTRAEGE, KEY_ZEITEINTRAEGE } from '@/data/auftraege.gateway'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import { log } from '@/lib/logger'
 import type { Auftrag, Zeiteintrag, CreateAuftragPayload, AddZeiteintragPayload } from '@/types/auftrag.types'
 
-const KEY_AUFTRAEGE     = 'cynera-auftraege-v1'
-const KEY_ZEITEINTRAEGE = 'cynera-zeiteintraege-v1'
-
-function load<T>(key: string): T[] {
-  try { return JSON.parse(localStorage.getItem(key) ?? '[]') } catch { return [] }
-}
-
-function save<T>(key: string, data: T[]) {
-  localStorage.setItem(key, JSON.stringify(data))
-}
+const MIGRATED_KEY = 'cynera-auftraege-migrated-v1'
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -30,7 +24,9 @@ export interface UnbilledSummary {
 interface AuftraegeState {
   auftraege:     Auftrag[]
   zeiteintraege: Zeiteintrag[]
+  loaded:        boolean
 
+  loadAuftraege:        (workspaceId: string) => Promise<void>
   createAuftrag:        (payload: CreateAuftragPayload) => void
   updateAuftrag:        (id: string, partial: Partial<Pick<Auftrag, 'title' | 'defaultHourlyRate' | 'notes' | 'status'>>) => void
   deleteAuftrag:        (id: string) => void
@@ -43,9 +39,40 @@ interface AuftraegeState {
   unbilledMinutes:    (auftragId: string) => number
 }
 
+function lsGet<T>(key: string): T[] {
+  try { return JSON.parse(localStorage.getItem(key) ?? '[]') } catch { return [] }
+}
+
 export const useAuftraege = create<AuftraegeState>()((set, get) => ({
-  auftraege:     load<Auftrag>(KEY_AUFTRAEGE),
-  zeiteintraege: load<Zeiteintrag>(KEY_ZEITEINTRAEGE),
+  auftraege:     [],
+  zeiteintraege: [],
+  loaded:        false,
+
+  async loadAuftraege(workspaceId) {
+    try {
+      let data = await AuftraegeGateway.loadAll(workspaceId)
+
+      // Einmalige Migration localStorage → Cloud (nur shared, Cloud leer, noch nicht migriert).
+      if (useWorkspaceStore.getState().isActiveWorkspaceShared()
+          && data.auftraege.length === 0 && data.zeiteintraege.length === 0
+          && localStorage.getItem(MIGRATED_KEY) !== '1') {
+        const legacyA = lsGet<Auftrag>(KEY_AUFTRAEGE)
+        const legacyZ = lsGet<Zeiteintrag>(KEY_ZEITEINTRAEGE)
+        if (legacyA.length > 0 || legacyZ.length > 0) {
+          for (const a of legacyA) await AuftraegeGateway.upsertAuftrag(a).catch(e => log.error('Auftrag-Migration', { e }))
+          for (const z of legacyZ) await AuftraegeGateway.upsertZeiteintrag(z).catch(e => log.error('Zeiteintrag-Migration', { e }))
+          data = await AuftraegeGateway.loadAll(workspaceId)
+          log.info('Aufträge aus localStorage migriert', { auftraege: legacyA.length, zeiteintraege: legacyZ.length })
+        }
+        localStorage.setItem(MIGRATED_KEY, '1')
+      }
+
+      set({ auftraege: data.auftraege, zeiteintraege: data.zeiteintraege, loaded: true })
+    } catch (err) {
+      log.error('Aufträge laden fehlgeschlagen', { err })
+      set({ loaded: true })
+    }
+  },
 
   createAuftrag(payload) {
     const auftrag: Auftrag = {
@@ -53,25 +80,22 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
       status: 'active',
       createdAt: new Date().toISOString(),
     }
-    const next = [auftrag, ...get().auftraege]
-    save(KEY_AUFTRAEGE, next)
-    set({ auftraege: next })
+    set({ auftraege: [auftrag, ...get().auftraege] })
+    void AuftraegeGateway.upsertAuftrag(auftrag).catch(e => log.error('Auftrag speichern', { e }))
   },
 
   updateAuftrag(id, partial) {
-    const next = get().auftraege.map(a => a.id === id ? { ...a, ...partial } : a)
-    save(KEY_AUFTRAEGE, next)
-    set({ auftraege: next })
+    let updated: Auftrag | undefined
+    set(s => ({ auftraege: s.auftraege.map(a => { if (a.id !== id) return a; updated = { ...a, ...partial }; return updated }) }))
+    if (updated) void AuftraegeGateway.upsertAuftrag(updated).catch(e => log.error('Auftrag speichern', { e }))
   },
 
   deleteAuftrag(id) {
-    const auftraege = get().auftraege.filter(a => a.id !== id)
-    const zeiteintraege = get().zeiteintraege.map(z =>
-      z.auftragId === id ? { ...z, auftragId: null } : z
-    )
-    save(KEY_AUFTRAEGE, auftraege)
-    save(KEY_ZEITEINTRAEGE, zeiteintraege)
-    set({ auftraege, zeiteintraege })
+    set(s => ({
+      auftraege: s.auftraege.filter(a => a.id !== id),
+      zeiteintraege: s.zeiteintraege.map(z => z.auftragId === id ? { ...z, auftragId: null } : z),
+    }))
+    void AuftraegeGateway.deleteAuftrag(id).catch(e => log.error('Auftrag löschen', { e }))
   },
 
   addZeiteintrag(payload) {
@@ -79,34 +103,26 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
       id: `ze_${uid()}`, ...payload,
       billed: false, invoiceId: null,
     }
-    const next = [entry, ...get().zeiteintraege]
-    save(KEY_ZEITEINTRAEGE, next)
-    set({ zeiteintraege: next })
+    set({ zeiteintraege: [entry, ...get().zeiteintraege] })
+    void AuftraegeGateway.upsertZeiteintrag(entry).catch(e => log.error('Zeiteintrag speichern', { e }))
   },
 
   removeZeiteintrag(id) {
-    const next = get().zeiteintraege.filter(z => z.id !== id)
-    save(KEY_ZEITEINTRAEGE, next)
-    set({ zeiteintraege: next })
+    set(s => ({ zeiteintraege: s.zeiteintraege.filter(z => z.id !== id) }))
+    void AuftraegeGateway.deleteZeiteintrag(id).catch(e => log.error('Zeiteintrag löschen', { e }))
   },
 
   markBilledForAccount(accountId, invoiceId) {
-    const zeiteintraege = get().zeiteintraege.map(z =>
-      z.accountId === accountId && !z.billed
-        ? { ...z, billed: true, invoiceId }
-        : z
-    )
-    save(KEY_ZEITEINTRAEGE, zeiteintraege)
-    set({ zeiteintraege })
+    set(s => ({
+      zeiteintraege: s.zeiteintraege.map(z => z.accountId === accountId && !z.billed ? { ...z, billed: true, invoiceId } : z),
+    }))
+    void AuftraegeGateway.markBilledForAccount(accountId, invoiceId).catch(e => log.error('Abrechnung markieren', { e }))
   },
 
   markBilledEntries(entryIds, invoiceId) {
     const idSet = new Set(entryIds)
-    const zeiteintraege = get().zeiteintraege.map(z =>
-      idSet.has(z.id) ? { ...z, billed: true, invoiceId } : z
-    )
-    save(KEY_ZEITEINTRAEGE, zeiteintraege)
-    set({ zeiteintraege })
+    set(s => ({ zeiteintraege: s.zeiteintraege.map(z => idSet.has(z.id) ? { ...z, billed: true, invoiceId } : z) }))
+    void AuftraegeGateway.markBilled(entryIds, invoiceId).catch(e => log.error('Abrechnung markieren', { e }))
   },
 
   unbilledForAccount(accountId) {
@@ -123,3 +139,13 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
       .reduce((s, z) => s + z.minutes, 0)
   },
 }))
+
+// Trigger: laden bei App-Start und Workspace-Wechsel (ersetzt das alte synchrone
+// localStorage-Hydrieren; kein App.tsx-Eingriff nötig).
+const initialWs = useWorkspaceStore.getState().activeWorkspaceId
+if (initialWs) void useAuftraege.getState().loadAuftraege(initialWs)
+useWorkspaceStore.subscribe((s, prev) => {
+  if (s.activeWorkspaceId && s.activeWorkspaceId !== prev.activeWorkspaceId) {
+    void useAuftraege.getState().loadAuftraege(s.activeWorkspaceId)
+  }
+})
