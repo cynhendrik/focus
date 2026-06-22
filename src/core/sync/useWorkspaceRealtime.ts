@@ -15,6 +15,7 @@ import { useVertraege } from '@/store/vertraege.store'
 import { useAuftraege } from '@/store/auftraege.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -74,6 +75,16 @@ export function useWorkspaceRealtime() {
         { event: '*', schema: 'public', table: 'workspace_members', filter: `workspace_id=eq.${activeWorkspaceId}` },
         // Rollen-/Capability-Änderung (RBAC) live übernehmen — lädt role+capabilities neu.
         () => { useWorkspaceStore.getState().loadWorkspaces() },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'note_entries', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => { const ns = useNotesModuleStore.getState(); if (ns.activeAccountId) ns.loadForAccount(ns.activeAccountId) },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'note_folders', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => { const ns = useNotesModuleStore.getState(); if (ns.activeAccountId) ns.loadForAccount(ns.activeAccountId) },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
