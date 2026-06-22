@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase'
+import type { Role, Capability } from '@/lib/capabilities'
 
 export interface Workspace {
   id: string
   name: string
   logo_url: string | null
-  role: 'owner' | 'member'
+  role: Role
+  capabilities: Capability[]
   isShared: boolean
   join_code: string | null
 }
@@ -68,7 +70,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         const { data, error } = await supabase
           .from('workspace_members')
-          .select('workspace_id, role, workspaces(id, name, logo_url, join_code)')
+          .select('workspace_id, role, capabilities, workspaces(id, name, logo_url, join_code)')
           .eq('user_id', uid)
 
         if (error) throw error
@@ -77,7 +79,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           id: m.workspaces.id,
           name: m.workspaces.name,
           logo_url: m.workspaces.logo_url,
-          role: m.role as 'owner' | 'member',
+          role: (m.role ?? 'member') as Role,
+          capabilities: (m.capabilities ?? []) as Capability[],
           join_code: m.workspaces.join_code ?? null,
         }))
 
