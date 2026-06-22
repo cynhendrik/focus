@@ -1,31 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Search, X, User, Briefcase, Mail, CheckSquare, Bell, ArrowRight,
+  Search, X, User, UserPlus, Briefcase, Mail, CheckSquare, Bell, Receipt, Command, ArrowRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { useCustomersStore } from '@/store/customers.store'
+import { useLeadsStore } from '@/store/leads.store'
 import { useDealsStore } from '@/store/deals.store'
+import { useFinanceStore } from '@/store/finance.store'
 import { useMailStore } from '@/store/mail.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
 import { usePipelineStore } from '@/store/pipeline.store'
-import { useUiStore } from '@/store/ui.store'
+import { useUiStore, type AppView } from '@/store/ui.store'
 
 import type { Customer } from '@/types/customer.types'
-import type { Deal, PipelineStage } from '@/types/pipeline.types'
-import type { EmailHeader } from '@/types/mail.types'
-import type { Todo } from '@/types/todo.types'
-import type { FollowUp } from '@/types/crm.types'
+import type { PipelineStage } from '@/types/pipeline.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Global Spotlight — keyword search across customers, deals, mails, tasks,
-// follow-ups. Type to filter, arrows to navigate, Enter to jump.
+// Global Spotlight + Command-Palette — durchsucht Kunden, Leads, Deals, Rechnungen,
+// Mails, Tasks, Follow-ups und bietet Navigations-Befehle ("Gehe zu …").
+// Tippen filtert, Pfeile navigieren, Enter springt. Leeres Suchfeld zeigt die
+// Befehle als Schnell-Navigation.
 //
-// Scope decision (Stufe 1): only entity classes that are already loaded
-// workspace-wide. Notizen/Aktivitäten-Suche kommt in einem zweiten Schritt
-// sobald wir einen `get_activities_by_workspace`-Backend-Befehl haben.
+// Scope: nur workspace-weit bereits geladene Entitäten. Notizen-/Aktivitäten-
+// Volltextsuche kommt separat (braucht einen workspace-weiten Aktivitäts-Index).
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -33,15 +33,15 @@ interface Props {
   onClose: () => void
 }
 
-type ResultKind = 'customer' | 'deal' | 'mail' | 'task' | 'followup'
+type ResultKind = 'command' | 'customer' | 'lead' | 'deal' | 'invoice' | 'mail' | 'task' | 'followup'
 
 interface Hit {
   kind:      ResultKind
   id:        string         // stable for keyboard nav
-  primary:   string         // main label (e.g. customer name)
-  secondary: string         // sub label (e.g. company / status)
-  meta?:     string         // right-side hint (e.g. stage, date)
-  openWhere: { customerId?: string; appView?: 'mail' | 'invoices' | 'pipeline' }
+  primary:   string         // main label
+  secondary: string         // sub label
+  meta?:     string         // right-side hint
+  run:       () => void      // was beim Öffnen passiert
 }
 
 interface Group {
@@ -52,14 +52,19 @@ interface Group {
 }
 
 const GROUP_META: Record<ResultKind, { label: string; icon: LucideIcon; color: string }> = {
-  customer: { label: 'Kunden',      icon: User,      color: 'oklch(78% 0.13 200)' },
-  deal:     { label: 'Deals',       icon: Briefcase, color: 'oklch(75% 0.17 150)' },
-  mail:     { label: 'Mails',       icon: Mail,      color: 'oklch(78% 0.13 210)' },
-  task:     { label: 'Tasks',       icon: CheckSquare, color: 'oklch(78% 0.16 65)' },
-  followup: { label: 'Follow-ups',  icon: Bell,      color: 'oklch(82% 0.16 70)'  },
+  command:  { label: 'Befehle',     icon: Command,     color: 'oklch(72% 0.02 260)' },
+  customer: { label: 'Kunden',      icon: User,        color: 'oklch(78% 0.13 200)' },
+  lead:     { label: 'Leads',       icon: UserPlus,    color: 'oklch(80% 0.15 145)' },
+  deal:     { label: 'Deals',       icon: Briefcase,   color: 'oklch(75% 0.17 150)' },
+  invoice:  { label: 'Rechnungen',  icon: Receipt,     color: 'oklch(80% 0.13 90)'  },
+  mail:     { label: 'Mails',       icon: Mail,        color: 'oklch(78% 0.13 210)' },
+  task:     { label: 'Tasks',       icon: CheckSquare, color: 'oklch(78% 0.16 65)'  },
+  followup: { label: 'Follow-ups',  icon: Bell,        color: 'oklch(82% 0.16 70)'  },
 }
 
-const GROUP_ORDER: ResultKind[] = ['customer', 'deal', 'mail', 'task', 'followup']
+// Entitäten ranken über den Befehlen, wenn gesucht wird; bei leerem Feld zeigen
+// wir nur die Befehle.
+const GROUP_ORDER: ResultKind[] = ['customer', 'lead', 'deal', 'invoice', 'mail', 'task', 'followup', 'command']
 
 const MAX_PER_GROUP = 5
 
@@ -77,17 +82,26 @@ function relDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
 }
 
+function eur(n: number, currency = 'EUR'): string {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CommandPalette({ open, onClose }: Props) {
-  const customers   = useCustomersStore(s => s.customers)
-  const deals       = useDealsStore(s => s.deals)
-  const allEmails   = useMailStore(s => s.emails)
-  const allTodos    = useTodosStore(s => s.allTodos)
+  const customers    = useCustomersStore(s => s.customers)
+  const leads        = useLeadsStore(s => s.leads)
+  const deals        = useDealsStore(s => s.deals)
+  const invoices     = useFinanceStore(s => s.invoices)
+  const allEmails    = useMailStore(s => s.emails)
+  const allTodos     = useTodosStore(s => s.allTodos)
   const allFollowUps = useCrmStore(s => s.allFollowUps)
-  const stages      = usePipelineStore(s => s.stages)
-  const setSelected = useUiStore(s => s.setSelectedCustomer)
-  const setAppView  = useUiStore(s => s.setAppView)
+  const stages       = usePipelineStore(s => s.stages)
+
+  const setSelected      = useUiStore(s => s.setSelectedCustomer)
+  const openCustomerAt   = useUiStore(s => s.openCustomerAt)
+  const setAppView       = useUiStore(s => s.setAppView)
+  const setLeverageLead  = useUiStore(s => s.setSelectedLeverageLeadId)
 
   const [query, setQuery]       = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
@@ -114,26 +128,62 @@ export function CommandPalette({ open, onClose }: Props) {
     return m
   }, [customers])
 
+  // Navigations-Befehle: appView-Werte gespiegelt aus der NavSidebar.
+  const commands = useMemo<{ label: string; view: AppView; lead?: boolean }[]>(() => [
+    { label: 'Heute',          view: 'dashboard' },
+    { label: 'Kunden',         view: 'clients' },
+    { label: 'Leads',          view: 'leverage_leads' },
+    { label: 'Pipeline',       view: 'leverage_pipeline' },
+    { label: 'Follow-ups',     view: 'leverage_inbox' },
+    { label: 'Finanzen',       view: 'invoices' },
+    { label: 'Kalender',       view: 'calendar' },
+    { label: 'Mail',           view: 'mail' },
+    { label: 'Zeiterfassung',  view: 'zeitmanagement' },
+    { label: 'Einstellungen',  view: 'settings' },
+  ], [])
+
   const groups: Group[] = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return []
 
-    // CUSTOMERS
+    // BEFEHLE — bei leerem Feld alle, sonst nach Label gefiltert.
+    const commandHits: Hit[] = commands
+      .filter(c => q === '' || includesCI(c.label, q) || includesCI('gehe zu', q))
+      .map<Hit>(c => ({
+        kind: 'command',
+        id: `cmd-${c.view}`,
+        primary: `Gehe zu ${c.label}`,
+        secondary: '',
+        run: () => { setSelected(null); setAppView(c.view) },
+      }))
+
+    if (q === '') {
+      return commandHits.length ? [{ kind: 'command', label: GROUP_META.command.label, icon: GROUP_META.command.icon, hits: commandHits }] : []
+    }
+
+    // KUNDEN
     const customerHits: Hit[] = customers
       .filter(c =>
-        includesCI(c.name, q) ||
-        includesCI(c.company, q) ||
-        includesCI(c.email, q) ||
-        includesCI(c.phone, q) ||
+        includesCI(c.name, q) || includesCI(c.company, q) ||
+        includesCI(c.email, q) || includesCI(c.phone, q) ||
         (c.tags ?? []).some(t => includesCI(t, q)),
       )
       .slice(0, MAX_PER_GROUP)
-      .map(c => ({
-        kind: 'customer',
-        id: c.id,
-        primary: c.name,
-        secondary: c.company ?? c.status,
-        openWhere: { customerId: c.id },
+      .map<Hit>(c => ({
+        kind: 'customer', id: c.id, primary: c.name, secondary: c.company ?? c.status,
+        run: () => setSelected(c.id),
+      }))
+
+    // LEADS
+    const leadHits: Hit[] = leads
+      .filter(l =>
+        includesCI(l.name, q) || includesCI(l.companyName, q) ||
+        includesCI(l.email, q) || includesCI(l.phone, q),
+      )
+      .slice(0, MAX_PER_GROUP)
+      .map<Hit>(l => ({
+        kind: 'lead', id: l.id, primary: l.name,
+        secondary: l.companyName ?? l.leadStatus,
+        run: () => { setLeverageLead(l.id); setAppView('leverage_lead_detail') },
       }))
 
     // DEALS
@@ -143,27 +193,38 @@ export function CommandPalette({ open, onClose }: Props) {
       .map<Hit>(d => {
         const stage = stageByName.get(d.stage)
         const cust  = customerById.get(d.accountId)
-        const val   = d.value
-          ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: d.currency ?? 'EUR', maximumFractionDigits: 0 }).format(d.value)
-          : undefined
+        const val   = d.value ? eur(d.value, d.currency ?? 'EUR') : undefined
         const metaParts = [stage?.label, val].filter(Boolean) as string[]
         return {
-          kind: 'deal',
-          id: d.id,
-          primary: d.title,
-          secondary: cust?.name ?? '—',
+          kind: 'deal', id: d.id, primary: d.title, secondary: cust?.name ?? '—',
           meta: metaParts.length ? metaParts.join(' · ') : undefined,
-          openWhere: { customerId: d.accountId },
+          run: () => setSelected(d.accountId),
         }
       })
 
-    // MAILS — subject + from + customer name
+    // RECHNUNGEN — Nummer + Kundenname; öffnet den Kunden im Finanzen-Tab.
+    const invoiceHits: Hit[] = invoices
+      .filter(inv => {
+        const cust = customerById.get(inv.accountId)
+        return includesCI(inv.number, q) || includesCI(cust?.name, q) || includesCI(cust?.company, q)
+      })
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, MAX_PER_GROUP)
+      .map<Hit>(inv => {
+        const cust = customerById.get(inv.accountId)
+        return {
+          kind: 'invoice',
+          id: inv.id,
+          primary: inv.number ? `Rechnung ${inv.number}` : 'Rechnung (Entwurf)',
+          secondary: cust?.name ?? '—',
+          meta: eur(inv.total, 'EUR'),
+          run: () => openCustomerAt(inv.accountId, 'finanzen'),
+        }
+      })
+
+    // MAILS
     const mailHits: Hit[] = allEmails
-      .filter(e =>
-        includesCI(e.subject, q) ||
-        includesCI(e.fromName, q) ||
-        includesCI(e.fromAddr, q),
-      )
+      .filter(e => includesCI(e.subject, q) || includesCI(e.fromName, q) || includesCI(e.fromAddr, q))
       .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
       .slice(0, MAX_PER_GROUP)
       .map<Hit>(e => {
@@ -171,12 +232,9 @@ export function CommandPalette({ open, onClose }: Props) {
         const senderLabel = e.fromName || e.fromAddr
         const subParts = [senderLabel, cust?.name].filter(Boolean) as string[]
         return {
-          kind: 'mail',
-          id: e.id,
-          primary: e.subject || '(Kein Betreff)',
-          secondary: subParts.join(' · '),
-          meta: relDate(e.sentAt),
-          openWhere: { appView: 'mail', customerId: e.customerId ?? undefined },
+          kind: 'mail', id: e.id, primary: e.subject || '(Kein Betreff)',
+          secondary: subParts.join(' · '), meta: relDate(e.sentAt),
+          run: () => { setAppView('mail') },
         }
       })
 
@@ -187,12 +245,9 @@ export function CommandPalette({ open, onClose }: Props) {
       .map<Hit>(t => {
         const cust = t.customerId ? customerById.get(t.customerId) : undefined
         return {
-          kind: 'task',
-          id: t.id,
-          primary: t.title,
-          secondary: cust?.name ?? '—',
+          kind: 'task', id: t.id, primary: t.title, secondary: cust?.name ?? '—',
           meta: t.status === 'done' ? 'erledigt' : t.dueDate ? relDate(t.dueDate) : undefined,
-          openWhere: { customerId: t.customerId },
+          run: () => { if (t.customerId) setSelected(t.customerId) },
         }
       })
 
@@ -203,40 +258,39 @@ export function CommandPalette({ open, onClose }: Props) {
       .map<Hit>(f => {
         const cust = customerById.get(f.customerId)
         return {
-          kind: 'followup',
-          id: f.id,
-          primary: f.title,
-          secondary: cust?.name ?? '—',
+          kind: 'followup', id: f.id, primary: f.title, secondary: cust?.name ?? '—',
           meta: f.status === 'erledigt' ? 'erledigt' : f.dueDate ? relDate(f.dueDate) : undefined,
-          openWhere: { customerId: f.customerId },
+          run: () => setSelected(f.customerId),
         }
       })
 
-    const out: Group[] = []
     const buckets: Record<ResultKind, Hit[]> = {
+      command:  commandHits,
       customer: customerHits,
+      lead:     leadHits,
       deal:     dealHits,
+      invoice:  invoiceHits,
       mail:     mailHits,
       task:     taskHits,
       followup: followupHits,
     }
+    const out: Group[] = []
     for (const kind of GROUP_ORDER) {
       const hits = buckets[kind]
       if (hits.length === 0) continue
       out.push({ kind, label: GROUP_META[kind].label, icon: GROUP_META[kind].icon, hits })
     }
     return out
-  }, [query, customers, deals, allEmails, allTodos, allFollowUps, stageByName, customerById])
+  }, [query, commands, customers, leads, deals, invoices, allEmails, allTodos, allFollowUps,
+      stageByName, customerById, setSelected, openCustomerAt, setAppView, setLeverageLead])
 
   // Flat list for keyboard navigation
   const flatHits = useMemo(() => groups.flatMap(g => g.hits), [groups])
 
-  // Clamp activeIdx when results change
   useEffect(() => {
     if (activeIdx >= flatHits.length) setActiveIdx(Math.max(0, flatHits.length - 1))
   }, [flatHits.length, activeIdx])
 
-  // Scroll active item into view
   useEffect(() => {
     const list = listRef.current
     if (!list) return
@@ -244,14 +298,7 @@ export function CommandPalette({ open, onClose }: Props) {
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIdx])
 
-  const openHit = (h: Hit) => {
-    if (h.openWhere.customerId) {
-      setSelected(h.openWhere.customerId)
-    } else if (h.openWhere.appView) {
-      setAppView(h.openWhere.appView)
-    }
-    onClose()
-  }
+  const openHit = (h: Hit) => { h.run(); onClose() }
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape')   { e.preventDefault(); onClose(); return }
@@ -312,14 +359,11 @@ export function CommandPalette({ open, onClose }: Props) {
                 value={query}
                 onChange={e => { setQuery(e.target.value); setActiveIdx(0) }}
                 onKeyDown={handleKey}
-                placeholder="Suche Kunden, Deals, Mails, Tasks, Follow-ups…"
+                placeholder="Suche Kunden, Leads, Rechnungen, Mails … oder „Gehe zu …"
                 style={{
                   flex: 1, minWidth: 0,
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--fg)',
-                  fontSize: 15,
-                  letterSpacing: '-0.01em',
+                  background: 'transparent', border: 'none',
+                  color: 'var(--fg)', fontSize: 15, letterSpacing: '-0.01em',
                 }}
               />
               {query && (
@@ -334,16 +378,7 @@ export function CommandPalette({ open, onClose }: Props) {
             </div>
 
             {/* Results */}
-            <div
-              ref={listRef}
-              style={{
-                flex: 1, overflowY: 'auto',
-                padding: '6px 8px 8px',
-              }}
-            >
-              {query.trim() === '' && (
-                <EmptyHint message="Tippe zum Suchen — alle Kunden, Deals, Mails, Tasks." />
-              )}
+            <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '6px 8px 8px' }}>
               {query.trim() !== '' && flatHits.length === 0 && (
                 <EmptyHint message={`Keine Treffer für "${query.trim()}".`} />
               )}
@@ -377,11 +412,8 @@ export function CommandPalette({ open, onClose }: Props) {
               padding: '8px 18px',
               borderTop: '1px solid var(--border)',
               background: 'oklch(100% 0 0 / 0.015)',
-              fontSize: 10.5,
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.04em',
-              color: 'var(--fg-dim)',
-              flexShrink: 0,
+              fontSize: 10.5, fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.04em', color: 'var(--fg-dim)', flexShrink: 0,
             }}>
               <FooterHint k="↑↓" label="navigieren" />
               <FooterHint k="↵"  label="öffnen" />
@@ -432,43 +464,34 @@ function ResultRow({
       style={{
         display: 'grid',
         gridTemplateColumns: '1fr auto auto',
-        alignItems: 'center',
-        gap: 12,
-        width: '100%',
-        padding: '8px 12px',
-        borderRadius: 8,
+        alignItems: 'center', gap: 12, width: '100%',
+        padding: '8px 12px', borderRadius: 8,
         background: active ? 'oklch(100% 0 0 / 0.07)' : 'transparent',
-        border: 'none',
-        textAlign: 'left',
-        cursor: 'pointer',
+        border: 'none', textAlign: 'left', cursor: 'pointer',
         transition: 'background 120ms ease',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <span style={{
-          fontSize: 13, fontWeight: 500,
-          color: 'var(--fg)',
-          letterSpacing: '-0.005em',
+          fontSize: 13, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.005em',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {hit.primary}
         </span>
-        <span style={{
-          fontSize: 11.5,
-          color: 'var(--fg-muted)',
-          letterSpacing: '-0.005em',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          marginTop: 1,
-        }}>
-          {hit.secondary}
-        </span>
+        {hit.secondary && (
+          <span style={{
+            fontSize: 11.5, color: 'var(--fg-muted)', letterSpacing: '-0.005em',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+          }}>
+            {hit.secondary}
+          </span>
+        )}
       </div>
 
       {hit.meta && (
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          color: 'var(--fg-dim)', letterSpacing: '0.02em',
-          whiteSpace: 'nowrap',
+          color: 'var(--fg-dim)', letterSpacing: '0.02em', whiteSpace: 'nowrap',
         }}>
           {hit.meta}
         </span>
@@ -490,11 +513,8 @@ function ResultRow({
 function EmptyHint({ message }: { message: string }) {
   return (
     <div style={{
-      padding: '36px 16px',
-      textAlign: 'center',
-      fontSize: 12.5,
-      color: 'var(--fg-dim)',
-      fontStyle: 'italic',
+      padding: '36px 16px', textAlign: 'center',
+      fontSize: 12.5, color: 'var(--fg-dim)', fontStyle: 'italic',
     }}>
       {message}
     </div>
@@ -506,11 +526,8 @@ function FooterHint({ k, label }: { k: string; label: string }) {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       <kbd style={{
         fontFamily: 'var(--font-mono)', fontSize: 9.5,
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border)',
-        borderRadius: 4,
-        padding: '1px 5px',
-        color: 'var(--fg-muted)',
+        background: 'var(--surface-2)', border: '1px solid var(--border)',
+        borderRadius: 4, padding: '1px 5px', color: 'var(--fg-muted)',
       }}>
         {k}
       </kbd>
@@ -518,7 +535,3 @@ function FooterHint({ k, label }: { k: string; label: string }) {
     </span>
   )
 }
-
-// Suppress unused-typecheck for now — Customer/Deal/etc. are used via the store hooks.
-// (TypeScript would otherwise flag these as unused imports under verbatimModuleSyntax.)
-type _Unused = Customer | Deal | EmailHeader | Todo | FollowUp
