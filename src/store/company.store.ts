@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CompanyService } from '@/services/company.service'
+import { CompanyGateway } from '@/data/company.gateway'
 import { log } from '@/lib/logger'
 import type { CompanyProfile, CompanyModules } from '@/types/company.types'
 import type { AppError } from '@/types/error.types'
@@ -28,7 +28,7 @@ export const useCompanyStore = create<CompanyState>()((set) => ({
   load: async () => {
     set({ isLoading: true, error: null })
     try {
-      const s = await CompanyService.get()
+      const s = await CompanyGateway.get()
       const isAdmin = s.profile.userRole !== 'employee'
       set({ profile: s.profile, modules: s.modules, crmConfig: s.crmConfig, isLoading: false, isAdmin })
     } catch (err) {
@@ -40,7 +40,7 @@ export const useCompanyStore = create<CompanyState>()((set) => ({
 
   saveProfile: async (profile) => {
     try {
-      const s = await CompanyService.update({ profile: JSON.stringify(profile) })
+      const s = await CompanyGateway.update({ profile: JSON.stringify(profile) })
       const isAdmin = s.profile.userRole !== 'employee'
       set({ profile: s.profile, isAdmin })
     } catch (err) {
@@ -51,7 +51,7 @@ export const useCompanyStore = create<CompanyState>()((set) => ({
 
   saveModules: async (modules) => {
     try {
-      const s = await CompanyService.update({ modules: JSON.stringify(modules) })
+      const s = await CompanyGateway.update({ modules: JSON.stringify(modules) })
       set({ modules: s.modules })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }

@@ -16,6 +16,7 @@ import { useAuftraege } from '@/store/auftraege.store'
 import { usePipelineStore } from '@/store/pipeline.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useNotesModuleStore } from '@/store/notes-module.store'
+import { useCompanyStore } from '@/store/company.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -85,6 +86,11 @@ export function useWorkspaceRealtime() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'note_folders', filter: `workspace_id=eq.${activeWorkspaceId}` },
         () => { const ns = useNotesModuleStore.getState(); if (ns.activeAccountId) ns.loadForAccount(ns.activeAccountId) },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'company_settings', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => { useCompanyStore.getState().load() },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
