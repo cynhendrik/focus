@@ -10,6 +10,7 @@ interface CrmState {
   followUps: FollowUp[]
   allFollowUps: FollowUp[]
   lastActivity: AccountActivityDate[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
@@ -23,6 +24,7 @@ export const useCrmStore = create<CrmState>()((set) => ({
   followUps: [],
   allFollowUps: [],
   lastActivity: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
@@ -52,7 +54,7 @@ export const useCrmStore = create<CrmState>()((set) => ({
   },
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, currentCustomerId: customerId })
     try {
       const followUps = await CrmService.getByCustomer(customerId)
       set({ followUps, isLoading: false })

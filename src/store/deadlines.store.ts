@@ -7,6 +7,7 @@ import { isAppError, formatError } from '@/types/error.types'
 
 interface DeadlinesState {
   deadlines: Deadline[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
@@ -22,11 +23,12 @@ function upsertById(list: Deadline[], updated: Deadline): Deadline[] {
 
 export const useDeadlinesStore = create<DeadlinesState>()((set) => ({
   deadlines: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, currentCustomerId: customerId })
     try {
       const deadlines = await DeadlineService.getByCustomer(customerId)
       set({ deadlines, isLoading: false })

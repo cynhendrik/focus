@@ -5,6 +5,8 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useNotesStore } from '@/store/notes.store'
 import { useTodosStore } from '@/store/todos.store'
+import { useDeadlinesStore } from '@/store/deadlines.store'
+import { useCrmStore } from '@/store/crm.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -43,6 +45,12 @@ export function useWorkspaceRealtime() {
             useTodosStore.getState().loadAll(activeWorkspaceId)
             const todoState = useTodosStore.getState()
             if (todoState.currentCustomerId) todoState.loadForCustomer(todoState.currentCustomerId)
+            // Deadlines (= activities type='task') and per-customer follow-ups
+            // (crmStore) are separate stores over the same table — keep them fresh too.
+            const deadlinesState = useDeadlinesStore.getState()
+            if (deadlinesState.currentCustomerId) deadlinesState.loadForCustomer(deadlinesState.currentCustomerId)
+            const crmState = useCrmStore.getState()
+            if (crmState.currentCustomerId) crmState.loadForCustomer(crmState.currentCustomerId)
           })
       .subscribe()
 
