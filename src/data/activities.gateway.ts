@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { activityRowToActivity, activityPayloadToRow, activityUpdateToPatch } from './activities.mapper'
 import type { Activity, CreateActivityPayload, UpdateActivityPayload } from '@/types/pipeline.types'
+import type { AccountActivityDate } from '@/types/crm.types'
 
 function shared(): boolean {
   return useWorkspaceStore.getState().isActiveWorkspaceShared()
@@ -71,5 +72,23 @@ export const ActivitiesGateway = {
     if (!shared()) { await invoke<void>('delete_activity', { id }); return }
     const { error } = await supabase.from('activities').delete().eq('id', id)
     if (error) fail(error)
+  },
+
+  /** Letztes Aktivitätsdatum je Account (GROUP BY account_id, MAX(created_at)). */
+  async getLastActivityDates(workspaceId: string): Promise<AccountActivityDate[]> {
+    if (!shared()) return invoke<AccountActivityDate[]>('get_last_activity_dates', { workspaceId })
+    const { data, error } = await supabase.from('activities').select('account_id, created_at')
+      .eq('workspace_id', workspaceId).not('account_id', 'is', null)
+    if (error) fail(error)
+    const maxByAccount = new Map<string, string>()
+    for (const r of data ?? []) {
+      const acc = r.account_id as string
+      const ca = r.created_at as string
+      const cur = maxByAccount.get(acc)
+      if (!cur || ca > cur) maxByAccount.set(acc, ca)
+    }
+    return [...maxByAccount.entries()]
+      .map(([accountId, lastActivityAt]) => ({ accountId, lastActivityAt }))
+      .sort((a, b) => (a.lastActivityAt ?? '').localeCompare(b.lastActivityAt ?? ''))
   },
 }
