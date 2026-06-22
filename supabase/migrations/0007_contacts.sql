@@ -1,42 +1,24 @@
--- ============================================================================
--- contacts — Cloud-first-Scheibe (Kontakte)
--- ============================================================================
--- Die Tabelle existierte bisher nur lokal (SQLite). Spalten spiegeln das lokale
--- Schema (src-tauri/src/db/contact.rs): alle text, is_primary boolean. created_at
--- bekommt einen Default, da das Gateway-Upsert die Spalte beim Update bewusst
--- weglässt (Original bleibt erhalten, Insert nutzt den Default) — vgl. 0006.
--- account_id ohne harte FK: aktivitäten-Lehre — leere FK-Werte werden als NULL
--- geschrieben; kein Cloud-FK, um Typ-/Reihenfolge-Probleme zu vermeiden.
--- ============================================================================
+-- 0007_contacts.sql — Kontakte cloud-first: RLS + created_at/updated_at-Defaults
+-- ANGEWANDT 2026-06-22 via Management-API (Projekt mqbjmquscjtytpjebosw).
+--
+-- Befund beim Live-Check: die `contacts`-Tabelle existierte in Supabase BEREITS
+-- als Auto-Spiegel des lokalen SQLite-Schemas (alle Spalten text, is_primary &
+-- pending_sync smallint, created_at/updated_at text). Nicht neu anlegen — nur die
+-- additiven Fixes, damit der Cloud-Pfad (ContactsGateway) funktioniert:
+--
+-- 1) RLS aktiv + Policy nach dem Projekt-Muster `is_workspace_member(workspace_id)`
+--    (NICHT current_workspace_ids() aus 0001 — die Funktion existiert live nicht;
+--    0001 war ein nie so angewandter Entwurf, real heißt sie is_workspace_member).
+-- 2) created_at/updated_at brauchen Defaults: contactPayloadToRow lässt created_at
+--    weg (DB-Default beim Insert, Erhalt beim Update — accounts-Muster). Ohne Default
+--    schlüge der Insert mit 23502 fehl (NOT NULL). Konsistent zu accounts/invoices.
 
-create table if not exists public.contacts (
-  id                text primary key,
-  workspace_id      text not null,
-  created_by        text not null,
-  account_id        text,
-  first_name        text not null,
-  last_name         text,
-  email             text,
-  phone             text,
-  role              text,
-  is_primary        boolean not null default false,
-  avatar_url        text,
-  linkedin_url      text,
-  decision_power    text,
-  preferred_channel text,
-  notes             text,
-  birthday          text,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
-);
-
-create index if not exists contacts_account_id_idx   on public.contacts (account_id);
-create index if not exists contacts_workspace_id_idx on public.contacts (workspace_id);
-
--- RLS: lesen/schreiben nur in eigenen Workspaces (Muster aus 0001).
 alter table public.contacts enable row level security;
-drop policy if exists contacts_ws_all on public.contacts;
-create policy contacts_ws_all on public.contacts
+
+drop policy if exists "workspace member" on public.contacts;
+create policy "workspace member" on public.contacts
   for all
-  using (workspace_id in (select public.current_workspace_ids()))
-  with check (workspace_id in (select public.current_workspace_ids()));
+  using (is_workspace_member(workspace_id));
+
+alter table public.contacts alter column created_at set default (now())::text;
+alter table public.contacts alter column updated_at set default (now())::text;

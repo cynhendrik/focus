@@ -49,7 +49,7 @@ describe('contacts.mapper', () => {
     expect(row).toEqual({
       id: 'c1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1',
       first_name: 'Anna', last_name: 'Müller', email: 'anna@test.de', phone: '+49 30 1',
-      role: 'CEO', is_primary: true, avatar_url: 'http://a/x.png',
+      role: 'CEO', is_primary: 1, avatar_url: 'http://a/x.png',
       linkedin_url: 'https://linkedin.com/in/anna', decision_power: 'high',
       preferred_channel: 'phone', notes: 'Mag Thai', birthday: '1985-03-12',
       updated_at: '2026-06-22T10:00:00Z',
@@ -63,7 +63,7 @@ describe('contacts.mapper', () => {
     }
     const row = contactPayloadToRow(p, { id: 'c2', now: '2026-06-22T10:00:00Z' })
     expect(row.account_id).toBeNull()
-    expect(row.is_primary).toBe(false)
+    expect(row.is_primary).toBe(0)
     expect(row.last_name).toBeNull()
   })
 })

@@ -26,8 +26,10 @@ export function contactRowToContact(r: any): Contact {
 
 /**
  * UpsertContactPayload → `contacts`-Row für `supabase.from('contacts').upsert(...)`.
- * created_at wird bewusst ausgelassen: DB-Default `now()` beim Insert, beim Update
- * (onConflict id) bleibt der Originalwert erhalten. Leerer accountId → null (FK-Sicherheit).
+ * created_at wird bewusst ausgelassen: DB-Default `(now())::text` beim Insert, beim
+ * Update (onConflict id) bleibt der Originalwert erhalten. Leerer accountId → null
+ * (FK-Sicherheit). is_primary ist in der Cloud `smallint` (0/1, wie das lokale
+ * SQLite-Schema) — daher 0/1 statt boolean senden.
  */
 export function contactPayloadToRow(
   p: UpsertContactPayload,
@@ -43,7 +45,7 @@ export function contactPayloadToRow(
     email: p.email ?? null,
     phone: p.phone ?? null,
     role: p.role ?? null,
-    is_primary: p.isPrimary ?? false,
+    is_primary: p.isPrimary ? 1 : 0,
     avatar_url: p.avatarUrl ?? null,
     linkedin_url: p.linkedinUrl ?? null,
     decision_power: p.decisionPower ?? null,
