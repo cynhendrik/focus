@@ -69,6 +69,12 @@ export function useWorkspaceRealtime() {
         { event: '*', schema: 'public', table: 'lead_stages', filter: `workspace_id=eq.${activeWorkspaceId}` },
         () => { useLeadStagesStore.getState().load(activeWorkspaceId) },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'workspace_members', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        // Rollen-/Capability-Änderung (RBAC) live übernehmen — lädt role+capabilities neu.
+        () => { useWorkspaceStore.getState().loadWorkspaces() },
+      )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
     const finance = supabase
