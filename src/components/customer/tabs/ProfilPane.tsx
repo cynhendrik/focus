@@ -13,6 +13,7 @@ export function ProfilPane({ customerId }: Props) {
 
   const [form, setForm]         = useState<Partial<Customer>>({})
   const [goalInput, setGoalInput] = useState('')
+  const [tagInput, setTagInput]   = useState('')
 
   useEffect(() => {
     if (customer) setForm(customer)
@@ -60,6 +61,18 @@ export function ProfilPane({ customerId }: Props) {
 
   const removeGoal = (i: number) => {
     save({ goals: (form.goals ?? []).filter((_, idx) => idx !== i) })
+  }
+
+  const addTag = () => {
+    const t = tagInput.trim()
+    if (!t) return
+    const existing = form.tags ?? []
+    if (!existing.some(x => x.toLowerCase() === t.toLowerCase())) save({ tags: [...existing, t] })
+    setTagInput('')
+  }
+
+  const removeTag = (i: number) => {
+    save({ tags: (form.tags ?? []).filter((_, idx) => idx !== i) })
   }
 
   const field = (label: string, node: React.ReactNode) => (
@@ -132,6 +145,32 @@ export function ProfilPane({ customerId }: Props) {
               </span>
             ))}
           </div>
+        </div>
+      ))}
+
+      {/* Tags */}
+      {field('Tags', (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addTag()}
+              placeholder="Tag hinzufügen…"
+              className="flex-1 text-sm px-3 py-2 rounded-lg bg-[var(--bg1)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <button onClick={addTag} className="px-3 py-2 rounded-lg bg-primary text-white text-sm">+</button>
+          </div>
+          {(form.tags ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {(form.tags ?? []).map((t, i) => (
+                <span key={i} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[var(--surface-2)] border border-[var(--border)] text-[var(--fg-2)]">
+                  {t}
+                  <button onClick={() => removeTag(i)} className="hover:text-red-400 ml-0.5">✕</button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 

@@ -186,6 +186,24 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
           }}>
             {row.customer.industry || row.customer.company || '—'}
           </div>
+          {(row.customer.tags ?? []).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+              {(row.customer.tags ?? []).slice(0, 3).map(t => (
+                <span key={t} style={{
+                  fontSize: 10, padding: '1px 7px', borderRadius: 99,
+                  background: 'var(--surface-3)', border: '1px solid var(--border)',
+                  color: 'var(--fg-muted)', whiteSpace: 'nowrap',
+                }}>
+                  {t}
+                </span>
+              ))}
+              {(row.customer.tags ?? []).length > 3 && (
+                <span style={{ fontSize: 10, color: 'var(--fg-dim)' }}>
+                  +{(row.customer.tags ?? []).length - 3}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -323,6 +341,7 @@ function ClientBoard() {
   const [search, setSearch]               = useState('')
   const [sortKey, setSortKey]             = useState<ClientSortKey>('name')
   const [showArchived, setShowArchived]   = useState(false)
+  const [tagFilter, setTagFilter]         = useState<string | null>(null)
 
   // Private Kunden (isPrivate=true oder Sentinel-ID) aus dem Geschäfts-CRM ausblenden.
   // Archiv ist eine eigene Sicht: aktiv ODER archiviert, nie gemischt.
@@ -346,15 +365,25 @@ function ClientBoard() {
 
   const needsAttention = useMemo(() => countNeedsAttention(allRows), [allRows])
 
+  // Alle vergebenen Tags (für die Filter-Leiste).
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of customers) for (const t of c.tags ?? []) set.add(t)
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [customers])
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return allRows
-    return allRows.filter(r =>
-      r.customer.name.toLowerCase().includes(q) ||
-      (r.customer.company ?? '').toLowerCase().includes(q) ||
-      (r.customer.industry ?? '').toLowerCase().includes(q),
-    )
-  }, [allRows, search])
+    return allRows.filter(r => {
+      if (tagFilter && !(r.customer.tags ?? []).includes(tagFilter)) return false
+      if (!q) return true
+      return (
+        r.customer.name.toLowerCase().includes(q) ||
+        (r.customer.company ?? '').toLowerCase().includes(q) ||
+        (r.customer.industry ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [allRows, search, tagFilter])
 
   const sortedRows = useMemo(() => sortClientRows(filteredRows, sortKey), [filteredRows, sortKey])
 
@@ -487,6 +516,43 @@ function ClientBoard() {
 
       {/* ZULETZT strip */}
       <ZuletztStrip recent={recentForStrip} onOpen={id => openCustomerAt(id, 'ueberblick')} />
+
+      {/* Tag-Filter */}
+      {allTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          {allTags.map(t => {
+            const active = tagFilter === t
+            return (
+              <button
+                key={t}
+                onClick={() => setTagFilter(active ? null : t)}
+                style={{
+                  fontSize: 11.5, padding: '3px 10px', borderRadius: 99, cursor: 'pointer',
+                  fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  background: active ? 'var(--accent)' : 'var(--surface-2)',
+                  color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  transition: 'background 120ms, color 120ms, border-color 120ms',
+                }}
+              >
+                {t}
+              </button>
+            )
+          })}
+          {tagFilter && (
+            <button
+              onClick={() => setTagFilter(null)}
+              style={{
+                fontSize: 11.5, padding: '3px 8px', borderRadius: 99, cursor: 'pointer',
+                fontFamily: 'inherit', background: 'transparent', border: 'none',
+                color: 'var(--fg-dim)', whiteSpace: 'nowrap',
+              }}
+            >
+              ✕ Filter
+            </button>
+          )}
+        </div>
+      )}
 
       {/* List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
