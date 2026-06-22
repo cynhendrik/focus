@@ -38,12 +38,13 @@ const MODULES: ModuleDef[] = [
     description: 'Termine und Meetings verwalten, mit Aufgaben verknüpfen.',
     icon: Calendar, color: 'oklch(65% 0.16 200)', defaultOn: true,
   },
-  {
-    key: 'kampagnen',
-    label: 'Kampagnen',
-    description: 'Serienmail-Kampagnen an Kundensegmente planen und versenden.',
-    icon: Megaphone, color: 'oklch(62% 0.18 320)', defaultOn: false,
-  },
+  // Kampagnen vorerst ausgeblendet (späteres Marketing-Tool im SaaS) — Modul/Code bleiben liegen.
+  // {
+  //   key: 'kampagnen',
+  //   label: 'Kampagnen',
+  //   description: 'Serienmail-Kampagnen an Kundensegmente planen und versenden.',
+  //   icon: Megaphone, color: 'oklch(62% 0.18 320)', defaultOn: false,
+  // },
   {
     key: 'corra',
     label: 'KORA KI',

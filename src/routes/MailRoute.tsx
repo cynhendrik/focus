@@ -326,7 +326,8 @@ export function MailRoute() {
 
   const TABS: { id: MailTab; label: string }[] = [
     { id: 'inbox', label: 'Inbox' },
-    { id: 'campaigns', label: 'Kampagnen' },
+    // Kampagnen vorerst ausgeblendet (späteres Marketing-Tool im SaaS) — Code/Rust bleiben liegen.
+    // { id: 'campaigns', label: 'Kampagnen' },
   ]
 
   const activeAccount = accounts.find(a => a.id === selectedAccountId)
