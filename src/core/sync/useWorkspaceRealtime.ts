@@ -9,6 +9,7 @@ import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useContactsStore } from '@/store/contacts.store'
 import { useDealsStore } from '@/store/deals.store'
+import { useCalendarStore } from '@/store/calendar.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -42,6 +43,15 @@ export function useWorkspaceRealtime() {
           const ds = useDealsStore.getState()
           ds.loadAll(activeWorkspaceId)
           if (ds.currentCustomerId) ds.loadForCustomer(ds.currentCustomerId)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'calendar_events', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => {
+          const cal = useCalendarStore.getState()
+          cal.load(activeWorkspaceId)
+          cal.loadToday(activeWorkspaceId)
         },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))

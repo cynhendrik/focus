@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { CalendarService } from '@/services/calendar.service'
+import { CalendarGateway } from '@/data/calendar.gateway'
 import { log } from '@/lib/logger'
 import type { CalendarEvent, UpsertCalendarEventPayload } from '@/types/calendar.types'
 
@@ -68,7 +68,7 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
     const { from, to } = rangeForDate(currentDate, view)
     set({ isLoading: true, error: null })
     try {
-      const events = await CalendarService.getEvents(workspaceId, from, to)
+      const events = await CalendarGateway.getEvents(workspaceId, from, to)
       set({ events, isLoading: false })
     } catch (err) {
       log.error('calendar load failed', { err })
@@ -82,7 +82,7 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
     const to   = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59))
     set({ isTodayLoading: true })
     try {
-      const todayEvents = await CalendarService.getEvents(workspaceId, from, to)
+      const todayEvents = await CalendarGateway.getEvents(workspaceId, from, to)
       set({ todayEvents: todayEvents.sort((a, b) => a.startAt.localeCompare(b.startAt)), isTodayLoading: false })
     } catch (err) {
       log.error('calendar loadToday failed', { err })
@@ -95,7 +95,7 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
       ? (get().events.find(e => e.id === payload.id)?.startAt)
       : undefined
 
-    const event = await CalendarService.upsert(payload)
+    const event = await CalendarGateway.upsert(payload)
     set(s => {
       const filtered      = s.events.filter(e => e.id !== event.id)
       const filteredToday = s.todayEvents.filter(e => e.id !== event.id)
@@ -120,7 +120,7 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
   },
 
   remove: async (id, workspaceId, opts) => {
-    await CalendarService.delete(id, workspaceId)
+    await CalendarGateway.delete(id, workspaceId)
     set(s => ({
       events:      s.events.filter(e => e.id !== id),
       todayEvents: s.todayEvents.filter(e => e.id !== id),
