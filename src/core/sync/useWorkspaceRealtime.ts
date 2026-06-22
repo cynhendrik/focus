@@ -13,6 +13,8 @@ import { useDealsStore } from '@/store/deals.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useVertraege } from '@/store/vertraege.store'
 import { useAuftraege } from '@/store/auftraege.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -56,6 +58,16 @@ export function useWorkspaceRealtime() {
           cal.load(activeWorkspaceId)
           cal.loadToday(activeWorkspaceId)
         },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'pipeline_stages', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => { usePipelineStore.getState().load(activeWorkspaceId) },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'lead_stages', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => { useLeadStagesStore.getState().load(activeWorkspaceId) },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
