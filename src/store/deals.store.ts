@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { DealsService } from '@/services/deals.service'
+import { DealsGateway } from '@/data/deals.gateway'
 import { log } from '@/lib/logger'
 import type { Deal, UpsertDealPayload } from '@/types/pipeline.types'
 import type { AppError } from '@/types/error.types'
@@ -8,6 +8,7 @@ import { isAppError, formatError } from '@/types/error.types'
 interface DealsState {
   deals: Deal[]
   customerDeals: Deal[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadAll: (workspaceId: string) => Promise<void>
@@ -20,13 +21,14 @@ interface DealsState {
 export const useDealsStore = create<DealsState>()((set, get) => ({
   deals: [],
   customerDeals: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadAll: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const deals = await DealsService.getByWorkspace(workspaceId)
+      const deals = await DealsGateway.getByWorkspace(workspaceId)
       set({ deals, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -36,9 +38,9 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
   },
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, currentCustomerId: customerId })
     try {
-      const customerDeals = await DealsService.getByCustomer(customerId)
+      const customerDeals = await DealsGateway.getByCustomer(customerId)
       set({ customerDeals, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -50,7 +52,7 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
   upsert: async (payload) => {
     set({ error: null })
     try {
-      const deal = await DealsService.upsert(payload)
+      const deal = await DealsGateway.upsert(payload)
       set(s => {
         const exists = s.deals.some(d => d.id === deal.id)
         const updatedDeals = exists
@@ -71,7 +73,7 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
   remove: async (id) => {
     set({ error: null })
     try {
-      await DealsService.delete(id)
+      await DealsGateway.delete(id)
       set(s => ({
         deals: s.deals.filter(d => d.id !== id),
         customerDeals: s.customerDeals.filter(d => d.id !== id),
@@ -89,7 +91,7 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
       customerDeals: s.customerDeals.map(d => d.id === dealId ? { ...d, stage } : d),
     }))
     try {
-      const updated = await DealsService.updateStage(dealId, stage)
+      const updated = await DealsGateway.updateStage(dealId, stage)
       set(s => ({
         deals: s.deals.map(d => d.id === dealId ? updated : d),
         customerDeals: s.customerDeals.map(d => d.id === dealId ? updated : d),
