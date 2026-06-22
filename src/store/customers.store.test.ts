@@ -8,8 +8,9 @@ vi.mock('@/data/accounts.gateway', () => ({
     setArchived: vi.fn(),
   },
 }))
+const { rematchCustomers } = vi.hoisted(() => ({ rematchCustomers: vi.fn().mockResolvedValue(0) }))
 vi.mock('@/store/mail.store', () => ({
-  useMailStore: { getState: () => ({ rematchCustomers: vi.fn().mockResolvedValue(undefined) }) },
+  useMailStore: { getState: () => ({ rematchCustomers }) },
 }))
 vi.mock('@/store/workspace.store', () => ({
   useWorkspaceStore: { getState: () => ({ activeWorkspaceId: 'ws-1' }) },
@@ -42,6 +43,13 @@ describe('useCustomersStore', () => {
     expect(AccountsGateway.getAccounts).toHaveBeenCalledWith('ws-1')
     expect(useCustomersStore.getState().customers[0].id).toBe('c1')
     expect(useCustomersStore.getState().customers[0].company).toBe('ACME AG')
+  })
+
+  it('init feuert proaktiv rematchCustomers mit den geladenen Kunden', async () => {
+    vi.mocked(AccountsGateway.getAccounts).mockResolvedValueOnce([acc])
+    const { useCustomersStore } = await import('./customers.store')
+    await useCustomersStore.getState().init()
+    expect(rematchCustomers).toHaveBeenCalledWith(JSON.stringify([{ id: 'c1', email: null }]))
   })
 
   it('upsert ruft Gateway und fügt Customer hinzu', async () => {

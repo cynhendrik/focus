@@ -37,6 +37,17 @@ function getCreatedBy(): string {
   return useAuthStore.getState().user?.id ?? ''
 }
 
+/**
+ * Mail↔Kunde-Zuordnungen gegen die übergebene (aktiver-Workspace-)Kundenliste neu
+ * bewerten. Fire-and-forget — blockiert nie das Laden/Speichern. Wird beim Laden
+ * (init) UND bei Kundenänderungen ausgelöst, damit die lokalen Postfächer immer am
+ * aktiven Workspace ausgerichtet sind (kein Matching gegen fremde Workspaces).
+ */
+function rematchMail(customers: Customer[]): void {
+  const refs = customers.map(c => ({ id: c.id, email: c.email ?? null }))
+  void useMailStore.getState().rematchCustomers(JSON.stringify(refs)).catch(() => {})
+}
+
 export const useCustomersStore = create<CustomersState>()((set) => ({
   customers: [],
   isLoading: false,
@@ -50,6 +61,7 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
       const customers = accounts.map(accountToCustomer)
       set({ customers, isLoading: false })
       log.info('Customers loaded', { count: customers.length })
+      rematchMail(customers)
     } catch (err) {
       const error = toAppError(err)
       set({ isLoading: false, error })
@@ -66,14 +78,9 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
       )
       const updated = accountToCustomer(account)
       set(s => ({ customers: upsertById(s.customers, updated) }))
-      // Kunde angelegt/geändert → Mail-Zuordnungen neu bewerten. IMMER feuern
-      // (auch beim Entfernen der E-Mail, damit alte Zuordnungen wieder abfallen).
-      // Fire-and-forget, blockiert das Speichern nicht.
-      {
-        const refs = useCustomersStore.getState().customers
-          .map(c => ({ id: c.id, email: c.email ?? null }))
-        void useMailStore.getState().rematchCustomers(JSON.stringify(refs)).catch(() => {})
-      }
+      // Kunde angelegt/geändert → Mail-Zuordnungen neu bewerten (auch beim Entfernen
+      // der E-Mail, damit alte Zuordnungen wieder abfallen).
+      rematchMail(useCustomersStore.getState().customers)
     } catch (err) {
       const error = toAppError(err)
       set({ error })
@@ -87,6 +94,8 @@ export const useCustomersStore = create<CustomersState>()((set) => ({
     try {
       await AccountsGateway.deleteAccount(id, workspaceId)
       set(s => ({ customers: s.customers.filter(c => c.id !== id) }))
+      // Gelöschter Kunde → seine Mail-Zuordnungen fallen ab.
+      rematchMail(useCustomersStore.getState().customers)
     } catch (err) {
       const error = toAppError(err)
       set({ error })
