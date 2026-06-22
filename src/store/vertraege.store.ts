@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { FinanceService } from '@/services/finance.service'
-import { VertraegeService } from '@/services/vertraege.service'
+import { VertraegeGateway } from '@/data/vertraege.gateway'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { log } from '@/lib/logger'
 import { addInterval, calcVertragTotals } from '@/types/vertrag.types'
@@ -23,7 +23,7 @@ function wsId(): string { return useWorkspaceStore.getState().activeWorkspaceId 
  *  try/catch fängt auch synchrone invoke-Würfe (z.B. außerhalb von Tauri/Tests). */
 function persist(v: Vertrag) {
   try {
-    VertraegeService.upsert({ ...v, workspaceId: wsId() })
+    VertraegeGateway.upsert({ ...v, workspaceId: wsId() })
       .catch(err => log.error('Vertrag speichern fehlgeschlagen', { id: v.id, err }))
   } catch (err) {
     log.error('Vertrag speichern fehlgeschlagen', { id: v.id, err })
@@ -46,7 +46,7 @@ export const useVertraege = create<VertraegeState>()((set, get) => ({
 
   async loadVertraege(workspaceId) {
     try {
-      let rows = await VertraegeService.getAll(workspaceId)
+      let rows = await VertraegeGateway.getAll(workspaceId)
 
       // Einmalige Migration localStorage → DB (nur wenn DB leer & noch nicht migriert).
       if (rows.length === 0 && localStorage.getItem(MIGRATED_KEY) !== '1') {
@@ -54,10 +54,10 @@ export const useVertraege = create<VertraegeState>()((set, get) => ({
         try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? '[]') } catch { legacy = [] }
         if (legacy.length > 0) {
           for (const v of legacy) {
-            await VertraegeService.upsert({ ...v, workspaceId })
+            await VertraegeGateway.upsert({ ...v, workspaceId })
               .catch(err => log.error('Vertrag-Migration fehlgeschlagen', { id: v.id, err }))
           }
-          rows = await VertraegeService.getAll(workspaceId)
+          rows = await VertraegeGateway.getAll(workspaceId)
           log.info('Verträge aus localStorage migriert', { count: legacy.length })
         }
         localStorage.setItem(MIGRATED_KEY, '1')
@@ -96,7 +96,7 @@ export const useVertraege = create<VertraegeState>()((set, get) => ({
   deleteVertrag(id) {
     set(s => ({ vertraege: s.vertraege.filter(v => v.id !== id) }))
     try {
-      VertraegeService.delete(id)
+      VertraegeGateway.delete(id)
         .catch(err => log.error('Vertrag löschen fehlgeschlagen', { id, err }))
     } catch (err) {
       log.error('Vertrag löschen fehlgeschlagen', { id, err })

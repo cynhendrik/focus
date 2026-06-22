@@ -11,6 +11,7 @@ import { useTimeStore } from '@/store/time.store'
 import { useContactsStore } from '@/store/contacts.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useCalendarStore } from '@/store/calendar.store'
+import { useVertraege } from '@/store/vertraege.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -65,6 +66,8 @@ export function useWorkspaceRealtime() {
           () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments', filter: `workspace_id=eq.${activeWorkspaceId}` },
           () => { useFinanceStore.getState().loadAll(activeWorkspaceId) })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vertraege', filter: `workspace_id=eq.${activeWorkspaceId}` },
+          () => { useVertraege.getState().loadVertraege(activeWorkspaceId) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `workspace_id=eq.${activeWorkspaceId}` },
           () => {
             const actState = useActivitiesStore.getState()
