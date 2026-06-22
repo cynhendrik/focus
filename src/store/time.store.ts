@@ -7,6 +7,7 @@ import { isAppError, formatError } from '@/types/error.types'
 
 interface TimeState {
   entries: TimeEntry[]
+  currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
   loadForCustomer: (customerId: string) => Promise<void>
@@ -16,11 +17,12 @@ interface TimeState {
 
 export const useTimeStore = create<TimeState>()((set) => ({
   entries: [],
+  currentCustomerId: null,
   isLoading: false,
   error: null,
 
   loadForCustomer: async (customerId) => {
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null, currentCustomerId: customerId })
     try {
       const entries = await TimeService.getByCustomer(customerId)
       set({ entries, isLoading: false })

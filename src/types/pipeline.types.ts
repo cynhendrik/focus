@@ -56,6 +56,7 @@ export interface UpsertDealPayload {
 }
 
 export type ActivityType = 'call' | 'meeting' | 'email' | 'note' | 'followup' | 'task'
+  | 'file' | 'time_entry' | 'stage_change'
   | 'email_out' | 'email_in' | 'dm' | 'system_event'
 
 export interface Activity {

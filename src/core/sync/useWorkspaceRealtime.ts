@@ -7,6 +7,7 @@ import { useNotesStore } from '@/store/notes.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useTimeStore } from '@/store/time.store'
 import { useContactsStore } from '@/store/contacts.store'
 import { useDealsStore } from '@/store/deals.store'
 import { useCalendarStore } from '@/store/calendar.store'
@@ -80,6 +81,8 @@ export function useWorkspaceRealtime() {
             if (deadlinesState.currentCustomerId) deadlinesState.loadForCustomer(deadlinesState.currentCustomerId)
             const crmState = useCrmStore.getState()
             if (crmState.currentCustomerId) crmState.loadForCustomer(crmState.currentCustomerId)
+            const timeState = useTimeStore.getState()
+            if (timeState.currentCustomerId) timeState.loadForCustomer(timeState.currentCustomerId)
           })
       .subscribe()
 
