@@ -62,9 +62,12 @@ OR (cap = ANY(capabilities))
   wenn der lokale Modus Mitglieder kennt; im Solo-Modus irrelevant (siehe unten).
 
 ### 2. SQL-Helper `has_capability(ws text, cap text) returns boolean`
-`security invoker`, `stable`. Prüft die obige Logik gegen `workspace_members` für
-`auth.uid()`. Wird von allen RLS-Policies genutzt. Bestehende `is_workspace_member`
-bleibt für CRM-Tabellen (kein Capability-Gate dort).
+`security definer`, `stable` (DEFINER zwingend: die Funktion wird in einer
+`workspace_members`-Policy genutzt und liest selbst aus `workspace_members` —
+DEFINER umgeht die innere RLS und verhindert Rekursion, wie `is_workspace_member`).
+Prüft die obige Logik gegen `workspace_members` für `auth.uid()`. Wird von allen
+capability-gated RLS-Policies genutzt. Bestehende `is_workspace_member` bleibt für
+CRM-Tabellen (kein Capability-Gate dort).
 
 ### 3. RLS-Policies (Supabase) — die echte Grenze
 - **`vertraege`**: Policy `own data` ersetzen durch
