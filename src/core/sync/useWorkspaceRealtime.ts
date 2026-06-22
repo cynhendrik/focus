@@ -7,6 +7,7 @@ import { useNotesStore } from '@/store/notes.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useContactsStore } from '@/store/contacts.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -24,6 +25,14 @@ export function useWorkspaceRealtime() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'accounts', filter: `workspace_id=eq.${activeWorkspaceId}` },
         (payload) => applyAccountsRealtimeChange(payload as any),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contacts', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => {
+          const cs = useContactsStore.getState()
+          if (cs.currentAccountId) cs.loadByAccount(cs.currentAccountId)
+        },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 

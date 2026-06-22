@@ -1,11 +1,12 @@
 import { create } from 'zustand'
-import { invoke } from '@tauri-apps/api/core'
+import { ContactsGateway } from '@/data/contacts.gateway'
 import { useWorkspaceStore } from './workspace.store'
 import { useAuthStore } from './auth.store'
 import type { Contact, UpsertContactPayload } from '@/types/contact.types'
 
 interface ContactsState {
   contacts: Contact[]
+  currentAccountId: string | null
   isLoading: boolean
   loadByAccount: (accountId: string) => Promise<void>
   upsert: (payload: Omit<UpsertContactPayload, 'workspaceId' | 'createdBy'>) => Promise<Contact>
@@ -14,12 +15,13 @@ interface ContactsState {
 
 export const useContactsStore = create<ContactsState>()((set) => ({
   contacts: [],
+  currentAccountId: null,
   isLoading: false,
 
   loadByAccount: async (accountId) => {
-    set({ isLoading: true })
+    set({ isLoading: true, currentAccountId: accountId })
     try {
-      const contacts = await invoke<Contact[]>('get_contacts', { accountId })
+      const contacts = await ContactsGateway.getByAccount(accountId)
       set({ contacts, isLoading: false })
     } catch {
       set({ isLoading: false })
@@ -29,7 +31,7 @@ export const useContactsStore = create<ContactsState>()((set) => ({
   upsert: async (payload) => {
     const workspaceId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
     const createdBy = useAuthStore.getState().user?.id ?? ''
-    const updated = await invoke<Contact>('upsert_contact', { payload: { ...payload, workspaceId, createdBy } })
+    const updated = await ContactsGateway.upsert({ ...payload, workspaceId, createdBy })
     set(s => {
       const idx = s.contacts.findIndex(c => c.id === updated.id)
       if (idx >= 0) { const next = [...s.contacts]; next[idx] = updated; return { contacts: next } }
@@ -39,7 +41,7 @@ export const useContactsStore = create<ContactsState>()((set) => ({
   },
 
   remove: async (id) => {
-    await invoke<void>('delete_contact', { id })
+    await ContactsGateway.delete(id)
     set(s => ({ contacts: s.contacts.filter(c => c.id !== id) }))
   },
 }))
