@@ -22,6 +22,7 @@ import { useMailStore } from '@/store/mail.store'
 import { useContactsStore } from '@/store/contacts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useCapability } from '@/hooks/useCapability'
 import { FinanceService } from '@/services/finance.service'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { ProfilPane } from '@/components/customer/tabs/ProfilPane'
@@ -57,6 +58,7 @@ export function CustomerRoute({ customerId }: Props) {
 
   const workspaceId    = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const user           = useAuthStore(s => s.user)
+  const canFinances    = useCapability('finances')
   const createActivity = useActivitiesStore(s => s.create)
   const removeCustomer = useCustomersStore(s => s.remove)
   const setArchived    = useCustomersStore(s => s.setArchived)
@@ -176,7 +178,7 @@ export function CustomerRoute({ customerId }: Props) {
       case 'dokumente':     return <DateienPane       customerId={customerId} />
       case 'kommunikation': // legacy-redirect
       case 'verlauf':       return <TimelinePane      customerId={customerId} />
-      case 'finanzen':      return <FinanzPane        customerId={customerId} />
+      case 'finanzen':      return canFinances ? <FinanzPane customerId={customerId} /> : null
     }
   }
 
@@ -387,7 +389,7 @@ export function CustomerRoute({ customerId }: Props) {
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg)',
       }}>
-        {TAB_DEFS.map(t => {
+        {TAB_DEFS.filter(t => t.id !== 'finanzen' || canFinances).map(t => {
           const Ic     = t.icon
           const active = activeTab === t.id
           const badge  = tabBadges[t.id]

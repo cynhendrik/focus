@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useCompanyStore } from '@/store/company.store'
+import { useCapability } from '@/hooks/useCapability'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -355,6 +356,7 @@ export function FinanceRoute() {
   const vertraege      = useVertraege(s => s.vertraege)
   const showToast      = useToastStore(s => s.show)
   const userId         = useAuthStore(s => s.user?.id) ?? ''
+  const canContracts   = useCapability('contracts')
   const [period,        setPeriod]        = useState<Period>('monat')
   const [customFrom,    setCustomFrom]    = useState('')
   const [customTo,      setCustomTo]      = useState('')
@@ -506,7 +508,7 @@ export function FinanceRoute() {
         {([
           { key: 'uebersicht', label: 'Übersicht' },
           { key: 'mahnwesen',  label: 'Mahnwesen', badge: overdueInvoices.length || undefined },
-          { key: 'vertraege',  label: 'Verträge',  badge: vertraege.filter(v => v.status === 'active').length || undefined },
+          ...(canContracts ? [{ key: 'vertraege' as const, label: 'Verträge', badge: vertraege.filter(v => v.status === 'active').length || undefined }] : []),
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -539,7 +541,7 @@ export function FinanceRoute() {
 
       {/* Mahnwesen Tab */}
       {financeTab === 'mahnwesen' && <MahnwesenPanel />}
-      {financeTab === 'vertraege' && <VertraegeTab />}
+      {financeTab === 'vertraege' && canContracts && <VertraegeTab />}
 
       {/* ── Umsatz (nur im Übersicht-Tab) ────────────────────────────────── */}
       {financeTab === 'uebersicht' && <>

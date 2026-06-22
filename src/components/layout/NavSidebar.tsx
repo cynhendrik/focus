@@ -1,5 +1,6 @@
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useCapability } from '@/hooks/useCapability'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
@@ -68,6 +69,7 @@ export function NavSidebar() {
   const mod = (key: keyof typeof modules, defaultOn = true) => {
     const v = modules[key]; return v === undefined ? defaultOn : !!v
   }
+  const canFinances = useCapability('finances')
 
   const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
   const displayName = ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
@@ -120,7 +122,7 @@ export function NavSidebar() {
         onClick={() => setAppView('dashboard')} kbd="H" />
       {mod('crm')      && <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
         onClick={() => setAppView('clients')} kbd="C" />}
-      {mod('finanzen') && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
+      {mod('finanzen') && canFinances && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
 
       {/* ── AKQUISE — Leads → Deals, der Weg zum Neukunden ─────────────── */}
