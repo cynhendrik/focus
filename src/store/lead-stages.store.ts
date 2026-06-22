@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { LeadStagesService } from '@/services/lead-stages.service'
+import { LeadStagesGateway } from '@/data/lead-stages.gateway'
 import { log } from '@/lib/logger'
 import type { LeadStage, UpsertLeadStagePayload } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
@@ -25,7 +25,7 @@ export const useLeadStagesStore = create<LeadStagesState>()((set, get) => ({
   load: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const stages = await LeadStagesService.getAll(workspaceId)
+      const stages = await LeadStagesGateway.getAll(workspaceId)
       set({ stages, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -37,7 +37,7 @@ export const useLeadStagesStore = create<LeadStagesState>()((set, get) => ({
   upsertStage: async (payload) => {
     set({ error: null })
     try {
-      const stage = await LeadStagesService.upsert(payload)
+      const stage = await LeadStagesGateway.upsert(payload)
       set(s => {
         const exists = s.stages.some(st => st.id === stage.id)
         const updated = exists
@@ -54,7 +54,7 @@ export const useLeadStagesStore = create<LeadStagesState>()((set, get) => ({
   removeStage: async (id, workspaceId) => {
     set({ error: null })
     try {
-      await LeadStagesService.delete(id, workspaceId)
+      await LeadStagesGateway.delete(id, workspaceId)
       set(s => ({ stages: s.stages.filter(st => st.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -73,7 +73,7 @@ export const useLeadStagesStore = create<LeadStagesState>()((set, get) => ({
         .filter(Boolean),
     }))
     try {
-      await LeadStagesService.reorder(workspaceId, orderedIds)
+      await LeadStagesGateway.reorder(workspaceId, orderedIds)
     } catch (err) {
       set({ stages: prev }); throw err
     }

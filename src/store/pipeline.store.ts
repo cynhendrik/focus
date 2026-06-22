@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { PipelineService } from '@/services/pipeline.service'
+import { PipelineStagesGateway } from '@/data/pipeline-stages.gateway'
 import { log } from '@/lib/logger'
 import type { PipelineStage, UpsertPipelineStagePayload } from '@/types/pipeline.types'
 import type { AppError } from '@/types/error.types'
@@ -27,7 +27,7 @@ export const usePipelineStore = create<PipelineState>()((set, get) => ({
   load: async (workspaceId) => {
     set({ isLoading: true, error: null })
     try {
-      const stages = await PipelineService.getAll(workspaceId)
+      const stages = await PipelineStagesGateway.getAll(workspaceId)
       set({ stages, isLoading: false })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -39,7 +39,7 @@ export const usePipelineStore = create<PipelineState>()((set, get) => ({
   upsertStage: async (payload) => {
     set({ error: null })
     try {
-      const stage = await PipelineService.upsert(payload)
+      const stage = await PipelineStagesGateway.upsert(payload)
       set(s => {
         const exists = s.stages.some(st => st.id === stage.id)
         const updated = exists
@@ -56,7 +56,7 @@ export const usePipelineStore = create<PipelineState>()((set, get) => ({
   removeStage: async (id, workspaceId) => {
     set({ error: null })
     try {
-      await PipelineService.delete(id, workspaceId)
+      await PipelineStagesGateway.delete(id, workspaceId)
       set(s => ({ stages: s.stages.filter(st => st.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -75,7 +75,7 @@ export const usePipelineStore = create<PipelineState>()((set, get) => ({
         .filter(Boolean),
     }))
     try {
-      await PipelineService.reorder(workspaceId, orderedIds)
+      await PipelineStagesGateway.reorder(workspaceId, orderedIds)
     } catch (err) {
       set({ stages: prev })
       throw err
