@@ -11,10 +11,12 @@ schließt sich aber nicht von selbst. Zwei konkrete Bruchstellen:
 
 1. **Stufen-Bug (Kernproblem):** Die Mahnstufe wird in `getDunningState`
    (`src/hooks/useOverdueTaskSync.ts`) aus *abgeschlossenen* `send_reminder`-To-dos
-   abgeleitet. Das `MahnwesenPanel` schließt beim Versand aber **kein** To-do ab
-   (kein Treffer auf `send_reminder`/`done` in `MahnwesenPanel.tsx`). Folge: man sendet,
-   die Engine merkt es sich nicht, die Stufe bleibt hängen, der Cooldown startet nie →
-   kein Weiterdrehen.
+   abgeleitet. Aber: der Hook `useOverdueTaskSync()`, der diese To-dos anlegen würde,
+   ist **nirgends gemountet** (nur `getDunningState` wird vom `MahnwesenPanel` genutzt).
+   Es entstehen also überhaupt keine `send_reminder`-To-dos, und das Panel legt beim
+   Versand auch keins an → die abgeleitete Stufe steht für *jede* überfällige Rechnung
+   dauerhaft auf 0 („Zahlungserinnerung"), der Cooldown startet nie, der Kreislauf
+   dreht nicht weiter.
 2. **Kein Anstoß:** Eine Mahnung geht nur raus, wenn der Nutzer aktiv den
    Finanzen→Mahnwesen-Tab öffnet und „Senden" klickt. Es fehlt ein zentraler Nudge.
 
@@ -26,7 +28,9 @@ Zusätzlich fehlen Mahngebühren und ein expliziter „eskaliert"-Zustand.
   `FinanceRoute` Tab `mahnwesen`, **nicht** tot) mit Einzel- + `sendAll`-Versand;
   echter SMTP-Versand (`mail.service.ts` → Tauri `email_send`) inkl. PDF-Anhang;
   KORA-Mahntext (`generateCorraDraft`); Überfälligkeits-Ableitung (`isOverdue`,
-  GoBD-sauber nie persistiert); `useOverdueTaskSync` legt `send_reminder`-To-dos an;
+  GoBD-sauber nie persistiert); `getDunningState` + Cooldowns 7/14/21 vorhanden, aber
+  der erzeugende Hook `useOverdueTaskSync()` ist ungenutzt/nicht gemountet (→ keine
+  Reminder-To-dos, Stufe bleibt 0);
   Zahlungserfassung + Auto-`paid` bei 100 % (`payment.rs`); cloud-fähig über
   `finance.gateway.ts` (Supabase wenn shared, sonst lokal).
 - **Datenmodell:** `Invoice.status: 'draft' | 'open' | 'paid' | 'overdue' | 'cancelled'`
@@ -56,7 +60,7 @@ Rechnung offen + überfällig (isOverdue)
                  └─► [Alle senden]/einzeln → dunning.service.sendReminder(invoice, level)
                       ├─ KORA-Text + Rechnungs-PDF (wie bisher)
                       ├─ SMTP-Versand (wie bisher)
-                      └─ ✅ send_reminder-To-do auf 'done' + Gebühren-Snapshot in tags  ← BUGFIX
+                      └─ ✅ abgeschlossenes send_reminder-To-do anlegen + fee:<cent>-Tag  ← BUGFIX
                            └─► Stufe zählt hoch, Cooldown startet
   └─► Zahlung erfasst → status = paid → Kreislauf geschlossen
   └─► nach 2. Mahnung unbezahlt → phase = escalated → "Braucht Entscheidung"
@@ -72,9 +76,10 @@ Zentrale, testbare Mahn-Logik — aus `MahnwesenPanel` extrahiert und erweitert.
 
 - `sendReminder(invoice, level)`:
   Kontakt-Mail laden → KORA-Text → Rechnungs-PDF (optional) → `MailService.sendEmail`
-  → **bei Erfolg:** zugehöriges `send_reminder`-To-do auf `status:'done'` setzen
-  (bzw. ein abgeschlossenes anlegen, falls keins existiert) und den berechneten
-  Gebühren-Snapshot als Tag `fee:<cent>` ergänzen. Wirft bei Versand-Fehler.
+  → **bei Erfolg:** ein **abgeschlossenes** `send_reminder`-To-do anlegen
+  (`status:'done'`, `bucket:'done'`, `sourceRef: invoice.id`) mit dem berechneten
+  Gebühren-Snapshot als Tag `fee:<cent>`. Das ist das Protokoll-Artefakt, aus dem
+  `getDunningState` die Stufe ableitet. Wirft bei Versand-Fehler (dann kein To-do).
 - `dueReminders(invoices, todos, accounts, config)`: Selektor → Liste der jetzt
   fälligen Mahnungen (`phase === 'due'`), sortiert (höchste Stufe zuerst, dann älteste).
 - `escalatedInvoices(...)`: Selektor → Rechnungen mit `phase === 'escalated'`.
@@ -87,16 +92,17 @@ Zentrale, testbare Mahn-Logik — aus `MahnwesenPanel` extrahiert und erweitert.
   `canCreate` bleibt erhalten (= `phase === 'due'`), für Abwärtskompatibilität der Tests.
 - Ab Stufe ≥ `MAX_AUTO_LEVEL + 1` → `phase = 'escalated'`.
 
-### `useOverdueTaskSync` (angepasst)
-- Das `send_reminder`-To-do bleibt das **Protokoll-Artefakt** für die Stufen-Ableitung:
-  es wird weiterhin (genau eins offen pro fälliger Stufe) angelegt und beim Versand
-  abgeschlossen.
-- **Sichtbarkeit:** Diese `send_reminder`-To-dos werden aus der normalen „Heute"-
-  Aufgabenliste **ausgefiltert** (per `actionType === 'send_reminder'`) — die
-  Heute-Karte ist ihre einzige sichtbare Oberfläche. Damit: eine Karte statt N
-  sichtbarer To-dos → weniger Fragmentierung, Stufen-Trail bleibt intakt.
-  (Konkret: die Stelle prüfen, die `bucket: 'today'`-To-dos rendert, und
-  `send_reminder` dort ausschließen.)
+### `useOverdueTaskSync` (toter Hook — wird entfernt)
+- Der Hook `useOverdueTaskSync()` ist nicht gemountet und legt keine To-dos an.
+  Er wird **entfernt** (YAGNI). `getDunningState`, `DunningState` und
+  `shouldCreateReminderTask` bleiben in der Datei (vom Panel + Test genutzt) und
+  werden um `phase` erweitert.
+- **Sichtbarkeit (gelöst durch Design, kein Ausfiltern nötig):** Es entstehen nie
+  *offene* `send_reminder`-To-dos — der `dunning.service` legt beim Versand nur
+  *abgeschlossene* an. Alle „Heute"-Listen filtern `status !== 'done'`, sehen diese
+  also nie. Eine Karte ist die einzige sichtbare Oberfläche; der Stufen-Trail
+  (abgeschlossene To-dos) bleibt intakt. Keine der vielen Today-Filter-Stellen
+  (NavSidebar, Widgets, CyPlanPanel …) muss angefasst werden.
 
 ### UI
 - `DunningNudgeCard.tsx` (neu): auf dem Heute-Dashboard; zeigt Anzahl + Summe fälliger
@@ -106,14 +112,17 @@ Zentrale, testbare Mahn-Logik — aus `MahnwesenPanel` extrahiert und erweitert.
   oben [Alle senden]. Zeilen ohne Kunden-Mail klar als „nicht sendbar" markiert.
 - `MahnwesenPanel.tsx`: bleibt als Detailansicht, nutzt jetzt `dunning.service`
   (eigene Sende-Logik entfällt). Zeigt zusätzlich den „eskaliert"-Bereich.
-- Settings → Finanzen: Editor für `dunningConfig` (drei Gebühren-Felder).
+- Settings → Finanzen: drei Gebühren-Felder (Stufe 0/1/2).
 
 ### Settings / Persistenz
-- `dunningConfig` als JSON in den Company-Settings — analog zum bestehenden
-  `modules` / `crmConfig`-Muster (`company.store` + `CompanyGateway`).
-  Form: `{ fees: [0, 5, 10] }` (Euro, Stufe 0/1/2).
+- Gebühren-Defaults als **`dunningFees?: number[]`** in `CompanyProfile` (Euro, Stufe
+  0/1/2; Default `[0, 5, 10]`). Persistiert über das vorhandene `saveProfile`
+  (`JSON.stringify(profile)` → `CompanyGateway.update({ profile })`) — funktioniert
+  lokal (Rust) **und** shared (Supabase) ohne neue Tabelle/Migration. Editiert wird's
+  in der bestehenden Company-Profil-Maske (wo schon `zahlungszielTage` etc. gepflegt
+  werden).
 - Gebühren-Snapshot pro Versand in `Todo.tags` (`fee:<cent>`), audit-stabil:
-  spätere Config-Änderung schreibt Historie nicht um.
+  spätere Default-Änderung schreibt Historie nicht um.
 
 ## Gebühren-Modell (bewusste Vereinfachung)
 
@@ -163,7 +172,9 @@ Mitternacht bei laufender App.
 - **Neu:** `src/services/dunning.service.ts`, `src/components/finance/DunningNudgeCard.tsx`,
   `src/components/finance/DunningReviewModal.tsx`,
   `src/services/__tests__/dunning.service.test.ts`.
-- **Geändert:** `src/hooks/useOverdueTaskSync.ts` (`phase`, Karte-statt-Flut),
+- **Geändert:** `src/hooks/useOverdueTaskSync.ts` (`getDunningState` um `phase`
+  erweitert; toten Hook `useOverdueTaskSync()` entfernen),
   `src/components/finance/MahnwesenPanel.tsx` (nutzt Service, „eskaliert"-Bereich),
-  `src/store/company.store.ts` + Settings-UI (`dunningConfig`),
-  Heute-Dashboard (Karte einhängen).
+  `src/types/company.types.ts` (`CompanyProfile.dunningFees`),
+  Company-Profil-Settings-Maske (drei Gebühren-Felder),
+  `src/routes/DashboardRoute.tsx` (Karte einhängen).
