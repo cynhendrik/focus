@@ -2,13 +2,13 @@ import { Fragment } from 'react'
 
 interface SplashScreenProps { exiting: boolean }
 
-const WORDS = ['You', "don't", 'find', 'yourself,', 'you', 'create', 'yourself.']
+const WORDS = ['you', "don't", 'find', 'yourself,', 'you', 'create', 'yourself.']
 
 export function SplashScreen({ exiting }: SplashScreenProps) {
   return (
     <div className={`splash ${exiting ? 'splash--exit' : ''}`}>
       <div className="splash__stage">
-        <h1 className="splash__headline" aria-label="You don't find yourself, you create yourself.">
+        <h1 className="splash__headline" aria-label="you don't find yourself, you create yourself.">
           {WORDS.map((word, i) => (
             <Fragment key={i}>
               <span
