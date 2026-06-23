@@ -312,8 +312,8 @@ button:focus:not(:focus-visible) { outline: none; }
 .sidebar {
   display: flex;
   flex-direction: column;
-  padding: 18px 14px;
-  gap: 6px;
+  padding: 14px 13px 16px;
+  gap: 2px;
   border-right: 1px solid var(--border);
   background: linear-gradient(180deg, oklch(100% 0 0 / 0.015), transparent 30%);
   position: relative;
@@ -321,27 +321,41 @@ button:focus:not(:focus-visible) { outline: none; }
   overflow: hidden; /* verhindert horizontales Wackeln waehrend collapse-Transition */
 }
 
-/* ── Collapsed-Variante: nur Icons, Labels/Badges/Kbds verbergen ──────────── */
-.sidebar[data-collapsed="true"] { padding: 18px 8px; }
-.sidebar[data-collapsed="true"] .sidebar-brand { padding: 8px 4px 18px; justify-content: center; }
-.sidebar[data-collapsed="true"] .sidebar-brand-text { display: none; }
-.sidebar[data-collapsed="true"] .nav-item { justify-content: center; padding: 10px 6px; }
-.sidebar[data-collapsed="true"] .nav-item > span:not(.nav-badge):not(.nav-kbd) { display: none; }
-.sidebar[data-collapsed="true"] .nav-item .nav-kbd { display: none; }
-.sidebar[data-collapsed="true"] .nav-item .nav-badge {
-  position: absolute; top: 4px; right: 4px;
-  margin: 0; padding: 0; min-width: 8px; min-height: 8px;
-  font-size: 0; line-height: 0; border-radius: 99px;
+/* ── Kopf: Workspace + Einklappen, auf einer Linie ───────────────────────── */
+.nav-head { display: flex; align-items: center; gap: 6px; padding: 4px 0 6px; }
+/* WorkspaceSwitcher fuellt den Kopf — Avatar/Chevron aus, Name ist der Anker */
+.nav-head .ws-switcher { flex: 1; min-width: 0; padding: 0; }
+.nav-head .ws-trigger { padding: 7px 9px; background: transparent; border-color: transparent; }
+.nav-head .ws-trigger:hover { background: var(--surface-2); border-color: transparent; }
+.nav-head .ws-trigger[data-open='true'] { background: var(--surface-2); border-color: var(--border); }
+.nav-head .ws-avatar, .nav-head .ws-chevron { display: none; }
+
+/* ── Collapsed-Variante: schmale Icon-Rail ────────────────────────────────── */
+.sidebar[data-collapsed="true"] { padding: 14px 8px 16px; align-items: center; }
+.sidebar[data-collapsed="true"] .nav-head { justify-content: center; padding: 4px 0 6px; width: 100%; }
+.sidebar[data-collapsed="true"] .nav-head .ws-switcher { display: none; }
+.sidebar[data-collapsed="true"] .nav-section-label { display: none; }
+.sidebar[data-collapsed="true"] .nav-foot-divider { width: 46px; margin: 8px auto; }
+
+.sidebar[data-collapsed="true"] .nav-item {
+  grid-template-columns: 1fr; gap: 0; width: 46px; height: 46px; padding: 0;
+  justify-items: center; border-radius: 13px;
 }
-.sidebar[data-collapsed="true"] .nav-item[data-active="true"]::before {
-  left: -8px; height: 14px;
+.sidebar[data-collapsed="true"] .nav-item__label,
+.sidebar[data-collapsed="true"] .nav-kbd,
+.sidebar[data-collapsed="true"] .nav-item__slot { display: none; }
+.sidebar[data-collapsed="true"] .nav-item[data-active="true"] {
+  background: var(--surface-3); box-shadow: inset 0 0 0 1px oklch(100% 0 0 / 0.05);
 }
-.sidebar[data-collapsed="true"] .nav-section { display: none; }
-.sidebar[data-collapsed="true"] .nav-capture { padding: 10px 6px; justify-content: center; }
-.sidebar[data-collapsed="true"] .nav-capture span { display: none; }
-.sidebar[data-collapsed="true"] .sidebar-bottom { flex-direction: column; gap: 2px; }
-.sidebar[data-collapsed="true"] .sidebar-profile { justify-content: center; padding: 6px 4px; }
-.sidebar[data-collapsed="true"] .sidebar-user-name { display: none; }
+.sidebar[data-collapsed="true"] .nav-item[data-active="true"]::before { display: none; }
+.sidebar[data-collapsed="true"] .nav-badge {
+  position: absolute; top: 7px; right: 9px;
+  min-width: 7px; width: 7px; height: 7px; padding: 0;
+  font-size: 0; line-height: 0; background: var(--accent); border-radius: 99px;
+}
+.sidebar[data-collapsed="true"] .nav-badge--a { background: var(--accent); color: transparent; }
+.sidebar[data-collapsed="true"] .sidebar-profile { justify-content: center; padding: 6px; width: 46px; }
+.sidebar[data-collapsed="true"] .sidebar-profile__body { display: none; }
 
 /* Toggle-Button — klein, dezent, rechts-aligned (im expanded Mode).
    Im collapsed Mode zentriert sich der Button mit. */
@@ -472,112 +486,106 @@ button:focus:not(:focus-visible) { outline: none; }
   background: oklch(100% 0 0 / 0.03);
 }
 
-.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 8px 8px 18px; }
-.sidebar-brand-logo {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: transparent;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-.sidebar-brand-text strong { font-size: 14.5px; font-weight: 600; letter-spacing: -0.02em; }
-.sidebar-brand-text span { font-size: 10.5px; color: var(--fg-dim); font-family: var(--font-mono); letter-spacing: 0.04em; margin-top: 2px; }
-
-
+/* ── Navigations-Item: striktes Raster Icon · Label · Badge/Kbd ───────────── */
 .nav-item {
-  display: flex; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
   width: 100%; text-align: left;
-  padding: 8px 10px; border-radius: 10px;
-  font-size: 13.5px; color: var(--fg-2);
-  cursor: pointer;
-  transition: background 180ms ease, color 180ms ease;
+  height: 39px; padding: 0 11px; border-radius: 11px;
+  color: var(--fg-muted); cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
   position: relative; user-select: none;
 }
-.nav-item:hover { background: oklch(100% 0 0 / 0.04); color: var(--fg); }
-.nav-item[data-active="true"] { background: var(--surface-2); color: var(--fg); box-shadow: var(--shadow-1); }
+.nav-item > svg { width: 18px; height: 18px; justify-self: center; color: currentColor; }
+.nav-item__label {
+  font-size: 13.5px; font-weight: 500; letter-spacing: -0.005em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nav-item:hover { background: var(--surface-2); color: var(--fg); }
+.nav-item[data-active="true"] { background: var(--surface-2); color: var(--fg); }
+.nav-item[data-active="true"] > svg { color: var(--accent-text); }
+.nav-item[data-active="true"] .nav-item__label { color: var(--fg); font-weight: 600; }
 .nav-item[data-active="true"]::before {
-  content: ""; position: absolute; left: -14px; top: 50%;
-  transform: translateY(-50%); width: 3px; height: 18px;
-  background: var(--accent); border-radius: 0 4px 4px 0;
+  content: ""; position: absolute; left: -13px; top: 9px; bottom: 9px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--accent);
 }
 .nav-item .nav-kbd {
-  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
-  color: var(--fg-dim); padding: 1px 5px; border-radius: 4px;
-  background: oklch(100% 0 0 / 0.04);
+  justify-self: end; font-family: var(--font-mono); font-size: 10px;
+  color: var(--fg-dim); opacity: 0; transition: opacity 120ms;
 }
+.nav-item:hover .nav-kbd { opacity: 0.65; }
 .nav-item .nav-badge {
-  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
-  font-weight: 600; color: var(--accent-ink); background: var(--accent);
-  padding: 1px 6px; border-radius: 99px;
+  justify-self: end; min-width: 19px; height: 19px; padding: 0 6px; border-radius: 99px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: var(--fg-muted); background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center;
 }
+.nav-item .nav-badge--a { color: var(--accent-text); background: var(--accent-soft); }
+.nav-item__slot { width: 1px; }
 
-.nav-item--primary { font-weight: 700; }
-
-/* CORRA Card — prominent AI entry in sidebar */
+/* KORA — leuchtende Hero-Karte, der KI-Assistent ueber allem */
 .nav-corra-card {
-  margin: 2px 0 6px;
-  padding: 13px 14px;
-  border-radius: 14px;
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: background 160ms, border-color 160ms;
-  position: relative;
-  overflow: hidden;
-  text-align: left;
-  width: 100%;
+  position: relative; display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left;
+  margin: 6px 2px 8px; padding: 13px 14px;
+  border-radius: 15px; cursor: pointer; overflow: hidden;
+  background: linear-gradient(135deg, rgb(59 109 244 / 0.26), rgb(59 109 244 / 0.05) 70%);
+  border: 1px solid rgb(59 109 244 / 0.34);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
 }
 .nav-corra-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 25%, oklch(100% 0 0 / 0.2) 50%, transparent 75%);
-  transform: translateX(-150%);
-  animation: corraShimmer 5s ease-in-out infinite;
-  pointer-events: none;
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120px 60px at 18% 0%, rgb(122 160 255 / 0.22), transparent 70%);
 }
 .nav-corra-card:hover {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  transform: translateY(-1px); border-color: rgb(59 109 244 / 0.6);
+  box-shadow: 0 10px 28px -12px rgb(59 109 244 / 0.65);
 }
 .nav-corra-card[data-active="true"] {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  border-color: rgb(59 109 244 / 0.7);
+  box-shadow: 0 8px 24px -12px rgb(59 109 244 / 0.6);
 }
-
-.nav-corra-card__icon { display: none; }
+.nav-corra-card__icon {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 11px; color: #fff;
+  background: linear-gradient(150deg, #5b86ff, #3B6DF4);
+  box-shadow: 0 6px 18px rgb(59 109 244 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
 .nav-corra-card__body {
-  display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1;
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1;
 }
 .nav-corra-card__title {
-  font-size: 13.5px; font-weight: 700; color: var(--accent-ink);
-  letter-spacing: -0.01em; line-height: 1.2;
+  font-size: 14px; font-weight: 700; color: var(--fg);
+  letter-spacing: -0.01em; line-height: 1;
 }
 .nav-corra-card__sub {
-  font-size: 10px; color: var(--accent-ink); opacity: 0.7;
-  font-family: var(--font-mono); letter-spacing: 0.05em;
+  font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-text); line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .nav-corra-card__badge {
-  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
-  color: var(--accent-ink); background: color-mix(in oklch, var(--accent-ink) 15%, transparent);
-  padding: 2px 7px; border-radius: 99px; flex-shrink: 0;
+  flex-shrink: 0; min-width: 21px; height: 21px; padding: 0 6px; border-radius: 99px;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 800;
+  color: var(--accent); background: #fff;
+  display: flex; align-items: center; justify-content: center;
 }
 
-/* Collapsed */
+/* Collapsed — KORA bleibt als leuchtendes Akzent-Icon mit Badge-Dot praesent */
 .sidebar[data-collapsed="true"] .nav-corra-card {
-  padding: 10px 6px; justify-content: center;
+  width: 46px; height: 46px; padding: 0; margin: 6px 0 10px;
+  justify-content: center; overflow: visible; border-radius: 13px;
+  background: linear-gradient(150deg, #5b86ff, #3B6DF4);
+  border-color: transparent; box-shadow: 0 6px 20px rgb(59 109 244 / 0.55);
 }
-.sidebar[data-collapsed="true"] .nav-corra-card__sub,
-.sidebar[data-collapsed="true"] .nav-corra-card__badge { display: none; }
-.sidebar[data-collapsed="true"] .nav-corra-card__title { font-size: 11px; }
-
-@keyframes corraShimmer {
-  0%      { transform: translateX(-150%); }
-  35%     { transform: translateX(200%); }
-  100%    { transform: translateX(200%); }
+.sidebar[data-collapsed="true"] .nav-corra-card::after { display: none; }
+.sidebar[data-collapsed="true"] .nav-corra-card:hover { transform: translateY(-1px); }
+.sidebar[data-collapsed="true"] .nav-corra-card__icon {
+  width: auto; height: auto; border-radius: 0; background: none; box-shadow: none;
+}
+.sidebar[data-collapsed="true"] .nav-corra-card__body { display: none; }
+.sidebar[data-collapsed="true"] .nav-corra-card__badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 17px; height: 17px; padding: 0 5px; font-size: 9px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
 }
 
 .nav-capture {
@@ -596,29 +604,33 @@ button:focus:not(:focus-visible) { outline: none; }
 .smart-list-item:hover .smart-list-actions { opacity: 1; }
 .smart-list-item[data-active="true"] .smart-list-actions { opacity: 1; }
 
-/* Profil + Einklappen — gemeinsame Zeile am Ende der Sidebar */
-.sidebar-bottom {
-  display: flex; align-items: center; gap: 4px;
-  padding: 2px 0 0;
-}
+/* Fuss: Spacer + Trenner + Profil */
+.nav-spacer { flex: 1; min-height: 16px; }
+.nav-foot-divider { height: 1px; background: var(--border); opacity: 0.6; margin: 8px 9px; }
+
 .sidebar-profile {
-  flex: 1; display: flex; align-items: center; gap: 8px;
-  padding: 6px 6px; border-radius: 9px;
-  cursor: pointer; min-width: 0;
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; margin-top: 4px; border-radius: 12px;
+  cursor: pointer; min-width: 0; text-align: left;
   transition: background 140ms ease;
 }
-.sidebar-profile:hover { background: oklch(100% 0 0 / 0.06); }
+.sidebar-profile:hover { background: var(--surface-2); }
 [data-theme="light"] .sidebar-profile:hover { background: oklch(0% 0 0 / 0.05); }
+.sidebar-profile__body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 
 .sidebar-user-avatar {
-  width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
-  background: oklch(28% 0 0);
-  color: oklch(65% 0 0); font-weight: 700; font-size: 10px;
+  width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
+  background: var(--accent-soft); color: var(--accent-text);
+  font-family: var(--font-mono); font-weight: 700; font-size: 10px;
   display: flex; align-items: center; justify-content: center;
 }
 .sidebar-user-name {
-  font-size: 12.5px; font-weight: 500; color: var(--fg-2);
+  font-size: 12.5px; font-weight: 500; color: var(--fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.sidebar-user-mail {
+  font-size: 10px; color: var(--fg-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
 }
 
 /* ========== Topbar ========== */
@@ -1731,9 +1743,9 @@ div:hover > .file-delete-btn {
 
 /* Nav-Sektion Label — ersetzt Divider, viel sauberer */
 .nav-section-label {
-  padding: 12px 10px 3px;
-  font-size: 9.5px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 13px 11px 5px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--fg-dim); font-family: var(--font-mono);
   user-select: none;
 }

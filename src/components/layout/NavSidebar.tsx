@@ -17,24 +17,28 @@ import {
 import type { LucideIcon } from 'lucide-react'
 
 function NavItem({
-  icon: Ic, label, active, onClick, badge, kbd,
+  icon: Ic, label, active, onClick, badge, badgeAccent, kbd,
 }: {
   icon: LucideIcon; label: string; active: boolean; onClick: () => void
-  badge?: number; kbd?: string
+  badge?: number; badgeAccent?: boolean; kbd?: string
 }) {
   return (
     <button
       type="button"
       className="nav-item"
       data-active={String(active)}
+      data-label={label}
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
       title={label}
     >
-      <Ic size={16} />
-      <span>{label}</span>
-      {badge ? <span className="nav-badge">{badge}</span> : null}
-      {kbd && !badge ? <span className="nav-kbd">{kbd}</span> : null}
+      <Ic size={18} strokeWidth={1.75} />
+      <span className="nav-item__label">{label}</span>
+      {badge != null
+        ? <span className={badgeAccent ? 'nav-badge nav-badge--a' : 'nav-badge'}>{badge}</span>
+        : kbd
+          ? <span className="nav-kbd">{kbd}</span>
+          : <span className="nav-item__slot" />}
     </button>
   )
 }
@@ -81,28 +85,20 @@ export function NavSidebar() {
   return (
     <aside className="sidebar" data-collapsed={collapsed ? 'true' : 'false'}>
 
-      {/* Brand */}
-      <div className="sidebar-brand" data-tauri-drag-region>
-        <div className="sidebar-brand-logo">
-          <svg width="28" height="28" viewBox="0 0 160 160">
-            <rect width="160" height="160" rx="36" fill="#3B6DF4"/>
-            <g fill="#FFFFFF" transform="translate(1 0) skewX(-14)">
-              <rect x="78" y="36" width="56" height="23" rx="11"/>
-              <rect x="56" y="69" width="56" height="23" rx="11"/>
-              <rect x="68" y="102" width="33" height="23" rx="11"/>
-            </g>
-          </svg>
-        </div>
-        <div className="sidebar-brand-text">
-          <strong>Focus</strong>
-          <span>CULTERA · 2026</span>
-        </div>
+      {/* Kopf: Workspace + Einklappen — auf einer Linie */}
+      <div className="nav-head">
+        <WorkspaceSwitcher />
+        <button
+          type="button"
+          className="sidebar-collapse-btn"
+          onClick={toggleSidebar}
+          title={collapsed ? 'Ausklappen' : 'Einklappen'}
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
       </div>
 
-      {/* Workspace-Switcher — wählen / erstellen / beitreten */}
-      <WorkspaceSwitcher />
-
-      {/* KORA — der Dirigent über allem */}
+      {/* KORA — leuchtende Hero-Karte, der Dirigent über allem */}
       <button
         type="button"
         className="nav-corra-card"
@@ -110,18 +106,18 @@ export function NavSidebar() {
         onClick={() => setAppView('corra')}
         title="KORA Intelligence (⌘K)"
       >
-        <div className="nav-corra-card__icon">
-          <Sparkles size={15} />
-        </div>
-        <div className="nav-corra-card__body">
+        <span className="nav-corra-card__icon">
+          <Sparkles size={19} strokeWidth={2} />
+        </span>
+        <span className="nav-corra-card__body">
           <span className="nav-corra-card__title">KORA</span>
-          <span className="nav-corra-card__sub">KI-ASSISTENT</span>
-        </div>
+          <span className="nav-corra-card__sub">KI-Assistent</span>
+        </span>
         {corraBadge ? <span className="nav-corra-card__badge">{corraBadge}</span> : null}
       </button>
 
-      {/* ── WORKSPACE ─────────────────────────────────────────────────── */}
-      {!collapsed && <SectionLabel>Workspace</SectionLabel>}
+      {/* ── MENÜ ──────────────────────────────────────────────────────── */}
+      {!collapsed && <SectionLabel>Menü</SectionLabel>}
       <NavItem icon={Home}       label="Heute"    active={appView === 'dashboard'}
         onClick={() => setAppView('dashboard')} kbd="H" />
       {mod('crm')      && <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
@@ -143,11 +139,12 @@ export function NavSidebar() {
       {/* ── KOMMUNIKATION ─────────────────────────────────────────────── */}
       {(mod('mail') || mod('kalender')) && !collapsed && <SectionLabel>Kommunikation</SectionLabel>}
       {mod('mail')     && <NavItem icon={Mail}     label="Mail"     active={appView === 'posteingang' || appView === 'mail'}
-        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} />}
+        onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} badgeAccent />}
       {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
 
-      <div style={{ flex: 1 }} />
+      <div className="nav-spacer" />
+      <div className="nav-foot-divider" />
 
       <NavItem icon={HelpCircle} label="Hilfe" active={false}
         onClick={() => setHelpOpen(true)} />
@@ -155,26 +152,19 @@ export function NavSidebar() {
       <NavItem icon={Settings} label="Einstellungen" active={appView === 'settings' || appView === 'integrations'}
         onClick={() => setAppView('settings')} />
 
-      {/* Profil + Einklappen */}
-      <div className="sidebar-bottom">
-        <button
-          type="button"
-          className="sidebar-profile"
-          onClick={() => setAppView('profile')}
-          title="Profil & Workspace"
-        >
-          <div className="sidebar-user-avatar">{initials}</div>
-          {!collapsed && <span className="sidebar-user-name">{displayName}</span>}
-        </button>
-        <button
-          type="button"
-          className="sidebar-collapse-btn"
-          onClick={toggleSidebar}
-          title={collapsed ? 'Ausklappen' : 'Einklappen'}
-        >
-          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-        </button>
-      </div>
+      {/* Profil */}
+      <button
+        type="button"
+        className="sidebar-profile"
+        onClick={() => setAppView('profile')}
+        title="Profil & Workspace"
+      >
+        <div className="sidebar-user-avatar">{initials}</div>
+        <span className="sidebar-profile__body">
+          <span className="sidebar-user-name">{displayName}</span>
+          {user?.email && <span className="sidebar-user-mail">{user.email}</span>}
+        </span>
+      </button>
 
     </aside>
   )
