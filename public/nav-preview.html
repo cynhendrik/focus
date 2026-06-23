@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cultera · Nav-Konzept</title>
+<style>
+  @font-face { font-family:"Geist"; src:url("/fonts/Geist-VariableFont_wght.ttf") format("truetype"); font-weight:100 900; font-display:swap; }
+  @font-face { font-family:"Geist Mono"; src:url("/fonts/GeistMono-VariableFont_wght.ttf") format("truetype"); font-weight:100 900; font-display:swap; }
+
+  :root{
+    --sans:"Geist",ui-sans-serif,system-ui,sans-serif;
+    --mono:"Geist Mono",ui-monospace,monospace;
+    --surface:oklch(23% 0.008 270);
+    --surface-2:oklch(27% 0.009 270);
+    --surface-3:oklch(31% 0.01 270);
+    --border:oklch(35% 0.011 270);
+    --fg:oklch(98% 0 0);
+    --fg-muted:oklch(66% 0.008 270);
+    --fg-dim:oklch(48% 0.008 270);
+    --accent:#3B6DF4;
+    --accent-soft:rgb(59 109 244 / 0.16);
+    --accent-text:#7AA0FF;
+    --shadow:0 24px 60px -16px rgb(0 0 0 / 0.6), 0 6px 18px -8px rgb(0 0 0 / 0.45);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; font-family:var(--sans); color:var(--fg);
+    background:
+      radial-gradient(1000px 560px at 22% -8%, oklch(87% 0.012 270), transparent 58%),
+      oklch(82% 0.013 270);
+    background-attachment:fixed;
+  }
+  .page{ max-width:1080px; margin:0 auto; padding:50px 30px 90px; }
+  .page-head h1{ font-size:25px; font-weight:650; letter-spacing:-0.02em; color:oklch(21% 0.01 270); margin:0 0 6px; }
+  .page-head p{ font-size:13.5px; color:oklch(40% 0.01 270); margin:0 0 36px; max-width:680px; line-height:1.55; }
+
+  .stage{ display:flex; gap:34px; align-items:flex-start; }
+  .frame{ }
+  .frame > .cap{ font-size:11px; font-family:var(--mono); letter-spacing:0.14em; text-transform:uppercase; color:oklch(42% 0.01 270); margin:0 0 11px 4px; }
+
+  /* window shell */
+  .sb{ background:var(--surface); border:1px solid oklch(40% 0.01 270 / 0.5); border-radius:20px; box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column; }
+  .sb--exp{ width:282px; }
+  .sb--col{ width:78px; }
+  .dots{ display:flex; gap:7px; padding:15px 17px 0; }
+  .dots i{ width:11px;height:11px;border-radius:50%; }
+  .dots i:nth-child(1){background:#ED6A5E;} .dots i:nth-child(2){background:#F4BF50;} .dots i:nth-child(3){background:#61C554;}
+  .body{ display:flex; flex-direction:column; flex:1; padding:8px 13px 16px; min-height:640px; }
+  .col .body{ padding:8px 0 16px; align-items:center; }
+
+  /* Workspace row */
+  .ws{ display:flex; align-items:center; gap:10px; padding:11px 9px 9px; }
+  .logo{ width:24px; height:24px; flex-shrink:0; }
+  .ws__txt{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .ws__name{ font-size:13px; font-weight:650; letter-spacing:-0.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ws__meta{ font-size:10px; color:var(--fg-dim); }
+  .ws__chev{ color:var(--fg-dim); display:flex; }
+  .collapse{ color:var(--fg-dim); display:flex; cursor:pointer; padding:5px; border-radius:8px; }
+  .collapse:hover{ background:var(--surface-2); color:var(--fg); }
+
+  /* KORA — Hero */
+  .kora{
+    position:relative; display:flex; align-items:center; gap:12px; margin:6px 4px 10px; padding:13px 14px;
+    border-radius:15px; cursor:pointer; overflow:hidden;
+    background:linear-gradient(135deg, rgb(59 109 244 / 0.26), rgb(59 109 244 / 0.05) 70%);
+    border:1px solid rgb(59 109 244 / 0.34);
+    transition:transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .kora::after{ content:""; position:absolute; inset:0; background:radial-gradient(120px 60px at 18% 0%, rgb(122 160 255 / 0.22), transparent 70%); pointer-events:none; }
+  .kora:hover{ transform:translateY(-1px); border-color:rgb(59 109 244 / 0.6); box-shadow:0 10px 28px -12px rgb(59 109 244 / 0.65); }
+  .kora__icon{ width:36px;height:36px;border-radius:11px;flex-shrink:0; display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(150deg,#5b86ff,#3B6DF4); color:#fff; box-shadow:0 6px 18px rgb(59 109 244 / 0.6), inset 0 1px 0 rgb(255 255 255 /.25); }
+  .kora__icon svg{ width:19px;height:19px;stroke-width:2; }
+  .kora__b{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .kora__t{ font-size:14px; font-weight:700; letter-spacing:-0.01em; line-height:1; }
+  .kora__s{ font-family:var(--mono); font-size:8.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--accent-text); line-height:1; }
+  .kora__badge{ min-width:21px;height:21px;padding:0 6px;border-radius:99px; background:#fff; color:var(--accent); font-family:var(--mono); font-size:10.5px; font-weight:800; display:flex;align-items:center;justify-content:center; }
+
+  /* collapsed KORA icon */
+  .kora-ic{ width:44px;height:44px;border-radius:13px; margin:6px 0 12px; display:flex;align-items:center;justify-content:center; position:relative;
+    background:linear-gradient(150deg,#5b86ff,#3B6DF4); color:#fff; box-shadow:0 6px 20px rgb(59 109 244 / 0.6); cursor:pointer; }
+  .kora-ic svg{ width:20px;height:20px;stroke-width:2; }
+  .kora-ic .dot{ position:absolute; top:-3px; right:-3px; min-width:17px;height:17px;padding:0 5px;border-radius:99px; background:#fff;color:var(--accent); font-family:var(--mono);font-size:9px;font-weight:800; display:flex;align-items:center;justify-content:center; box-shadow:0 2px 6px rgb(0 0 0 /.3); }
+
+  /* sections + items */
+  .seclabel{ font-family:var(--mono); font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--fg-dim); padding:13px 11px 6px; }
+  .item{ display:grid; grid-template-columns:20px 1fr auto; align-items:center; gap:12px; height:39px; padding:0 11px; border-radius:11px; cursor:pointer; color:var(--fg-muted); position:relative; transition:background .12s, color .12s; }
+  .item svg{ width:18px;height:18px;stroke-width:1.75;justify-self:center; }
+  .item .lbl{ font-size:13.5px; font-weight:500; letter-spacing:-0.005em; }
+  .item:hover{ background:var(--surface-2); color:var(--fg); }
+  .item[data-active]{ background:var(--surface-2); color:var(--fg); }
+  .item[data-active] svg{ color:var(--accent-text); }
+  .item[data-active] .lbl{ color:var(--fg); font-weight:600; }
+  .item[data-active]::before{ content:""; position:absolute; left:-13px; top:9px; bottom:9px; width:3px; border-radius:0 3px 3px 0; background:var(--accent); }
+  .badge{ min-width:19px;height:19px;padding:0 6px;border-radius:99px; background:var(--surface-3); color:var(--fg-muted); font-family:var(--mono); font-size:10px; font-weight:600; display:flex;align-items:center;justify-content:center; }
+  .badge--a{ background:var(--accent-soft); color:var(--accent-text); }
+  .kbd{ font-family:var(--mono); font-size:10px; color:var(--fg-dim); opacity:0; transition:opacity .12s; }
+  .item:hover .kbd{ opacity:.65; }
+
+  .spacer{ flex:1; min-height:18px; }
+  .divider{ height:1px; background:var(--border); margin:8px 9px; opacity:.6; }
+  .userpill{ display:flex;align-items:center;gap:10px;padding:9px 10px;margin-top:4px;border-radius:12px;cursor:pointer; }
+  .userpill:hover{ background:var(--surface-2); }
+  .uav{ width:28px;height:28px;border-radius:9px;background:var(--accent-soft);color:var(--accent-text);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700; }
+  .uname{ font-size:12.5px;font-weight:500; } .umail{ font-size:10px;color:var(--fg-dim); overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px; }
+
+  /* collapsed items */
+  .col .ws{ justify-content:center; padding:11px 0 6px; }
+  .col .item{ grid-template-columns:1fr; width:46px;height:46px;justify-items:center; padding:0; border-radius:13px; position:relative; }
+  .col .item[data-active]{ background:var(--surface-3); box-shadow:inset 0 0 0 1px oklch(100% 0 0 /.05); }
+  .col .item[data-active]::before{ display:none; }
+  .col .item[data-active] svg{ color:var(--accent-text); }
+  .col .ndot{ position:absolute; top:7px; right:9px; width:7px;height:7px;border-radius:99px;background:var(--accent); }
+  .col .seclabel, .col .lbl, .col .badge, .col .kbd, .col .userpill .uname, .col .userpill .umail{ display:none; }
+  .col .userpill{ justify-content:center; }
+  .col .divider{ width:46px; margin:8px auto; }
+  .col .secgap{ height:14px; }
+  /* tooltip (wie Referenz) */
+  .tip{ position:absolute; left:58px; top:50%; transform:translateY(-50%); background:#fff; color:#171717; font-size:12px; font-weight:600; padding:6px 11px; border-radius:9px; box-shadow:0 8px 24px rgb(0 0 0 /.25); white-space:nowrap; }
+  .tip::before{ content:""; position:absolute; left:-5px; top:50%; transform:translateY(-50%) rotate(45deg); width:9px;height:9px;background:#fff;border-radius:2px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>Linke Navigation — neues Konzept</h1>
+    <p>Eine durchdachte, professionelle Sidebar: kleines Logo + Workspace oben, <b>KORA als leuchtende Hero-Karte</b> direkt darunter (öffnet den KI-Assistenten, Badge = offene Hinweise), dann saubere Sections auf striktem Raster mit ruhigem Active-State (Akzent-Strich). Rechts der eingeklappte Zustand — KORA bleibt als leuchtendes Icon präsent.</p>
+  </div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+const ICON={
+  home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.3V20h13V9.3"/>',
+  users:'<path d="M16 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20"/><circle cx="9.2" cy="7.4" r="3.4"/><path d="M21 20v-1.6a3.4 3.4 0 0 0-2.6-3.3"/><path d="M15.6 4.2a3.4 3.4 0 0 1 0 6.4"/>',
+  card:'<rect x="2.5" y="5" width="19" height="14" rx="2.4"/><path d="M2.5 9.5h19"/>',
+  inbox:'<path d="M21.5 12h-5l-1.6 2.4H9.1L7.5 12h-5"/><path d="M5.6 5.6 2.5 12v5.4a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2V12l-3.1-6.4A2 2 0 0 0 16.6 4.5H7.4a2 2 0 0 0-1.8 1.1z"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+  trend:'<path d="M3 16.5 9 10.5l3.6 3.6L21 5.7"/><path d="M16.5 5.7H21V10"/>',
+  userplus:'<path d="M15 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20"/><circle cx="9" cy="7.4" r="3.4"/><path d="M19 8.5v5M21.5 11h-5"/>',
+  mail:'<rect x="2.5" y="4.5" width="19" height="15" rx="2.4"/><path d="m2.8 6.5 9.2 5.6 9.2-5.6"/>',
+  calendar:'<rect x="3.2" y="4.6" width="17.6" height="16.2" rx="2.4"/><path d="M3.2 9.5h17.6M8 2.6v4M16 2.6v4"/>',
+  help:'<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.2a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1 .9-1 1.7"/><circle cx="12" cy="16.6" r="0.6" fill="currentColor" stroke="none"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 14.9a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.3l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+  chev:'<path d="m9 6 6 6-6 6"/>',
+  collapse:'<path d="m13 6-6 6 6 6M19 6l-6 6 6 6"/>',
+  expand:'<path d="m11 6 6 6-6 6M5 6l6 6-6 6"/>',
+  spark:'<path d="M12 3.2l1.7 4.6 4.6 1.7-4.6 1.7L12 15.8l-1.7-4.6L5.7 9.5l4.6-1.7z"/><path d="M18.4 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
+};
+const I=n=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+ICON[n]+'</svg>';
+const LOGO='<svg class="logo" viewBox="0 0 160 160"><rect width="160" height="160" rx="42" fill="#3B6DF4"/><g fill="#fff" transform="translate(1 0) skewX(-14)"><rect x="78" y="36" width="56" height="23" rx="11"/><rect x="56" y="69" width="56" height="23" rx="11"/><rect x="68" y="102" width="33" height="23" rx="11"/></g></svg>';
+const MODEL=[
+  {label:'Menü',items:[{i:'home',n:'Heute',k:'H',active:1},{i:'users',n:'Kunden',k:'C'},{i:'card',n:'Finanzen',k:'F'}]},
+  {label:'Akquise',items:[{i:'inbox',n:'Follow-Ups'},{i:'target',n:'Leads',b:4},{i:'trend',n:'Pipeline',b:2},{i:'userplus',n:'Newcomer'}]},
+  {label:'Kommunikation',items:[{i:'mail',n:'Mail',b:3,a:1},{i:'calendar',n:'Kalender'}]},
+];
+const BOTTOM=[{i:'help',n:'Hilfe'},{i:'settings',n:'Einstellungen'}];
+
+// ── expanded ──
+function eItem(it){
+  const r = it.b!=null ? `<span class="badge ${it.a?'badge--a':''}">${it.b}</span>` : (it.k?`<span class="kbd">${it.k}</span>`:'<span></span>');
+  return `<div class="item" ${it.active?'data-active':''}>${I(it.i)}<span class="lbl">${it.n}</span>${r}</div>`;
+}
+function expanded(){
+  const secs = MODEL.map(s=>`<div class="seclabel">${s.label}</div>`+s.items.map(eItem).join('')).join('');
+  return `<div class="frame"><p class="cap">Ausgeklappt</p><div class="sb sb--exp"><div class="dots"><i></i><i></i><i></i></div><div class="body">
+    <div class="ws">${LOGO}<span class="ws__txt"><span class="ws__name">CULTERA AGENCY</span><span class="ws__meta">Mitglied · geteilt</span></span><span class="collapse">${I('collapse')}</span></div>
+    <div class="kora"><span class="kora__icon">${I('spark')}</span><span class="kora__b"><span class="kora__t">KORA</span><span class="kora__s">KI-Assistent</span></span><span class="kora__badge">7</span></div>
+    ${secs}
+    <div class="spacer"></div><div class="divider"></div>
+    ${BOTTOM.map(eItem).join('')}
+    <div class="userpill"><span class="uav">HW</span><span><div class="uname">Hendrik</div><div class="umail">hendrikwehe@fn.de</div></span></div>
+  </div></div></div>`;
+}
+// ── collapsed ──
+function cItem(it){
+  const dot = it.b!=null ? '<span class="ndot"></span>' : '';
+  const tip = it.n==='Leads' ? `<span class="tip">Leads</span>` : '';
+  return `<div class="item" ${it.active?'data-active':''}>${I(it.i)}${dot}${tip}</div>`;
+}
+function collapsed(){
+  const secs = MODEL.map((s,idx)=>(idx?'<div class="secgap"></div>':'')+s.items.map(cItem).join('')).join('');
+  return `<div class="frame"><p class="cap">Eingeklappt</p><div class="sb sb--col"><div class="dots"><i></i><i></i><i></i></div><div class="body">
+    <div class="ws"><span class="collapse">${I('expand')}</span></div>
+    <div class="kora-ic">${I('spark')}<span class="dot">7</span></div>
+    ${secs}
+    <div class="spacer"></div><div class="divider"></div>
+    ${BOTTOM.map(cItem).join('')}
+    <div class="userpill"><span class="uav">HW</span></div>
+  </div></div></div>`;
+}
+document.getElementById('stage').innerHTML = expanded()+collapsed();
+</script>
+</body>
+</html>
