@@ -21,6 +21,8 @@ export interface CompanyProfile {
   leistungszeitpunkt?: 'rechnungsdatum' | 'monatsende'
   logoBase64?: string
   invoiceAccentColor?: string
+  /** Mahngebühr je Stufe in Euro [Zahlungserinnerung, 1. Mahnung, 2. Mahnung]. */
+  dunningFees?: number[]
 }
 
 export interface CompanyModules {
