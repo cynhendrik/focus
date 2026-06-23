@@ -1,6 +1,6 @@
 import type { Todo } from '@/types/todo.types'
 import type { Invoice, Payment } from '@/types/finance.types'
-import { paidAmount, remaining, isOverdue } from '@/lib/invoice-status'
+import { paidAmount, remaining, isOverdue, todayLocalISO } from '@/lib/invoice-status'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 
 /** Default-Mahngebühr je Stufe in Euro: [Zahlungserinnerung, 1. Mahnung, 2. Mahnung]. */
@@ -59,8 +59,12 @@ export interface EscalatedItem {
   daysOverdue: number
 }
 
+/** Ganze Tage überfällig, TZ-sicher über lokale Datums-Strings (Mittag-Anker gegen DST/UTC-Drift). */
 function daysOverdueOf(dueDate: string): number {
-  return Math.max(0, Math.floor((Date.now() - new Date(dueDate).getTime()) / 86_400_000))
+  const today = todayLocalISO()
+  if (!dueDate || dueDate >= today) return 0
+  const ms = new Date(today + 'T12:00:00').getTime() - new Date(dueDate + 'T12:00:00').getTime()
+  return Math.max(0, Math.floor(ms / 86_400_000))
 }
 
 function nameOf(accounts: AccountLite[], accountId: string): string {
@@ -73,17 +77,15 @@ export function dueReminders(
   fees: number[] = DEFAULT_DUNNING_FEES, payments: Payment[] = [],
 ): DueReminder[] {
   return invoices
-    .filter(i => isOverdue(i) && !i.isSuggestion && getDunningState(i, todos).phase === 'due')
-    .map(invoice => {
-      const level = getDunningState(invoice, todos).level
-      return {
-        invoice,
-        customerName: nameOf(accounts, invoice.accountId),
-        level,
-        daysOverdue: daysOverdueOf(invoice.dueDate),
-        amountDue: outstandingWithPendingFee(invoice, payments, todos, level, fees),
-      }
-    })
+    .map(invoice => ({ invoice, state: getDunningState(invoice, todos) }))
+    .filter(({ invoice, state }) => isOverdue(invoice) && !invoice.isSuggestion && state.phase === 'due')
+    .map(({ invoice, state }) => ({
+      invoice,
+      customerName: nameOf(accounts, invoice.accountId),
+      level: state.level,
+      daysOverdue: daysOverdueOf(invoice.dueDate),
+      amountDue: outstandingWithPendingFee(invoice, payments, todos, state.level, fees),
+    }))
     .sort((a, b) => b.level - a.level || a.invoice.dueDate.localeCompare(b.invoice.dueDate))
 }
 
@@ -92,11 +94,12 @@ export function escalatedInvoices(
   invoices: Invoice[], todos: Todo[], accounts: AccountLite[],
 ): EscalatedItem[] {
   return invoices
-    .filter(i => isOverdue(i) && !i.isSuggestion && getDunningState(i, todos).phase === 'escalated')
-    .map(invoice => ({
+    .map(invoice => ({ invoice, state: getDunningState(invoice, todos) }))
+    .filter(({ invoice, state }) => isOverdue(invoice) && !invoice.isSuggestion && state.phase === 'escalated')
+    .map(({ invoice, state }) => ({
       invoice,
       customerName: nameOf(accounts, invoice.accountId),
-      level: getDunningState(invoice, todos).level,
+      level: state.level,
       daysOverdue: daysOverdueOf(invoice.dueDate),
     }))
 }
