@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldCreateReminderTask } from './useOverdueTaskSync'
+import { shouldCreateReminderTask, getDunningState } from './useOverdueTaskSync'
 import type { Todo } from '@/types/todo.types'
 import type { Invoice } from '@/types/finance.types'
 
@@ -84,5 +84,34 @@ describe('shouldCreateReminderTask', () => {
     const past = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10)
     const invoice = makeInvoice({ id: 'inv1', status: 'open', dueDate: past })
     expect(shouldCreateReminderTask(invoice, [])).toBe(true)
+  })
+})
+
+const baseInvoice = (over: Partial<Invoice> = {}): Invoice => ({
+  id: 'inv1', workspaceId: 'w', createdBy: 'u', accountId: 'a',
+  date: '2020-01-01', dueDate: '2020-01-15', status: 'open',
+  taxMode: 'standard', subtotal: 100, taxAmount: 19, total: 119,
+  bankInfo: '', isSuggestion: false, pendingSync: false,
+  createdAt: '', updatedAt: '', ...over,
+})
+
+const doneReminder = (updatedAt: string): Todo => ({
+  id: 't' + updatedAt, title: 'x', status: 'done', priority: 'p2', bucket: 'done',
+  checklist: [], tags: ['fee:0'], source: 'finance', actionType: 'send_reminder',
+  sourceRef: 'inv1', createdAt: '', updatedAt,
+})
+
+describe('getDunningState.phase', () => {
+  it('phase=due for a fresh overdue invoice (no reminders yet)', () => {
+    expect(getDunningState(baseInvoice(), []).phase).toBe('due')
+  })
+  it('phase=cooldown right after a reminder was completed', () => {
+    const today = new Date().toISOString()
+    expect(getDunningState(baseInvoice(), [doneReminder(today)]).phase).toBe('cooldown')
+  })
+  it('phase=escalated after the 3rd completed reminder (past 2. Mahnung)', () => {
+    const old = '2020-02-01T00:00:00.000Z'
+    const todos = [doneReminder(old), doneReminder(old), doneReminder(old)]
+    expect(getDunningState(baseInvoice(), todos).phase).toBe('escalated')
   })
 })
