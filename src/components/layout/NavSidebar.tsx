@@ -7,6 +7,7 @@ import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCompanyStore } from '@/store/company.store'
+import { WorkspaceSwitcher } from '@/core/workspace/WorkspaceSwitcher'
 import {
   Home, Users, CreditCard,
   Target, TrendingUp,
@@ -97,6 +98,9 @@ export function NavSidebar() {
           <span>CULTERA · 2026</span>
         </div>
       </div>
+
+      {/* Workspace-Switcher — wählen / erstellen / beitreten */}
+      <WorkspaceSwitcher />
 
       {/* KORA — der Dirigent über allem */}
       <button

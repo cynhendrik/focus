@@ -1,138 +1,176 @@
 import { useState, useRef, useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Check, ChevronDown, Plus, LogIn, LogOut, Users, ArrowRight } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import type { Role } from '@/lib/capabilities'
+
+const ROLE_LABEL: Record<Role, string> = { owner: 'Inhaber', admin: 'Admin', member: 'Mitglied' }
+
+type Mode = 'menu' | 'create' | 'join'
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
 
 export function WorkspaceSwitcher() {
-  const workspaces       = useWorkspaceStore(s => s.workspaces)
-  const activeId         = useWorkspaceStore(s => s.activeWorkspaceId)
-  const setActive        = useWorkspaceStore(s => s.setActiveWorkspace)
-  const createWorkspace  = useWorkspaceStore(s => s.createWorkspace)
-  const pendingCount     = useWorkspaceStore(s => s.pendingCount)
-  const isOnline         = useWorkspaceStore(s => s.isOnline)
-  const signOut          = useAuthStore(s => s.signOut)
+  const workspaces  = useWorkspaceStore(s => s.workspaces)
+  const activeId    = useWorkspaceStore(s => s.activeWorkspaceId)
+  const setActive   = useWorkspaceStore(s => s.setActiveWorkspace)
+  const create      = useWorkspaceStore(s => s.createWorkspace)
+  const joinByCode  = useWorkspaceStore(s => s.joinWorkspaceByCode)
+  const isOnline    = useWorkspaceStore(s => s.isOnline)
+  const signOut     = useAuthStore(s => s.signOut)
 
-  const [open, setOpen]       = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName]   = useState('')
-  const [error, setError]       = useState<string | null>(null)
+  const [open, setOpen]   = useState(false)
+  const [mode, setMode]   = useState<Mode>('menu')
+  const [value, setValue] = useState('')
+  const [busy, setBusy]   = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   const active = workspaces.find(w => w.id === activeId)
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-        setCreating(false)
-        setNewName('')
-        setError(null)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  const reset = () => { setMode('menu'); setValue(''); setError(null); setBusy(false) }
+  const close = () => { setOpen(false); reset() }
 
-  const handleCreate = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [open])
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newName.trim()) return
-    setError(null)
+    const v = value.trim()
+    if (!v || busy) return
+    setBusy(true); setError(null)
     try {
-      await createWorkspace(newName.trim())
-      setCreating(false)
-      setNewName('')
-      setOpen(false)
+      if (mode === 'create') await create(v)
+      else await joinByCode(v)
+      close()
     } catch (err: any) {
-      setError(err?.message ?? 'Fehler beim Erstellen')
+      setError(err?.message ?? (mode === 'create' ? 'Konnte nicht erstellt werden.' : 'Code ungültig oder Beitritt fehlgeschlagen.'))
+      setBusy(false)
     }
   }
 
   return (
-    <div ref={ref} className="relative px-3 pt-3 pb-2">
+    <div ref={ref} className="ws-switcher">
       <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--bg1)] border border-[var(--border)] hover:border-primary/30 transition-colors"
+        type="button"
+        className="ws-trigger"
+        onClick={() => (open ? close() : setOpen(true))}
+        data-open={open ? 'true' : 'false'}
+        title={active?.name ?? 'Workspace wählen'}
       >
-        <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-primary">
-          {active?.name.charAt(0).toUpperCase() ?? '?'}
-        </div>
-        <span className="text-sm font-semibold text-[var(--text)] truncate flex-1 text-left">
-          {active?.name ?? 'Kein Workspace'}
-        </span>
-        {pendingCount > 0 && (
-          <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-1.5 py-0.5 font-medium flex-shrink-0">
-            ⚡{pendingCount}
+        <span className="ws-avatar">{active ? initials(active.name) : '?'}</span>
+        <span className="ws-trigger__body">
+          <span className="ws-trigger__name">{active?.name ?? 'Kein Workspace'}</span>
+          <span className="ws-trigger__meta">
+            {active ? ROLE_LABEL[active.role] : 'wählen'}
+            {active?.isShared && <span className="ws-shared"><Users size={9} strokeWidth={2.5} />geteilt</span>}
           </span>
-        )}
-        {!isOnline && (
-          <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" title="Offline" />
-        )}
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text2)] flex-shrink-0">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+        </span>
+        {!isOnline && <span className="ws-offline" title="Offline — Änderungen werden später synchronisiert" />}
+        <ChevronDown size={14} className="ws-chevron" />
       </button>
 
-      {open && (
-        <div className="absolute top-full left-3 right-3 mt-1 py-1 rounded-xl bg-[var(--bg1)] border border-[var(--border)] shadow-lg z-50">
-          {workspaces.map(ws => (
-            <button
-              key={ws.id}
-              onClick={() => { setActive(ws.id); setOpen(false) }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--bg2)] transition-colors
-                ${ws.id === activeId ? 'text-primary font-medium' : 'text-[var(--text)]'}`}
-            >
-              {ws.id === activeId ? <span className="text-xs">✓</span> : <span className="w-3" />}
-              {ws.name}
-            </button>
-          ))}
-
-          <div className="h-px mx-3 bg-[var(--border)] my-1" />
-
-          {creating ? (
-            <form onSubmit={handleCreate} className="px-3 py-2 flex flex-col gap-2">
-              <input
-                autoFocus
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                placeholder="Workspace-Name…"
-                className="w-full text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg2)] border border-[var(--border)] text-[var(--text)] focus:outline-none focus:border-primary"
-              />
-              {error && <p className="text-xs text-red-400">{error}</p>}
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={!newName.trim()}
-                  className="flex-1 py-1.5 rounded-lg bg-primary text-[#0a0a0a] text-xs font-semibold disabled:opacity-40"
-                >
-                  Anlegen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setCreating(false); setNewName(''); setError(null) }}
-                  className="px-3 py-1.5 rounded-lg text-xs text-[var(--text2)] hover:text-[var(--text)]"
-                >
-                  Abbrechen
-                </button>
-              </div>
-            </form>
-          ) : (
-            <button
-              onClick={() => setCreating(true)}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--text2)] hover:text-[var(--text)] hover:bg-[var(--bg2)] transition-colors text-left"
-            >
-              <span className="text-base leading-none">+</span>
-              Neuer Workspace
-            </button>
-          )}
-
-          <div className="h-px mx-3 bg-[var(--border)] my-1" />
-          <button
-            onClick={signOut}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--text2)] hover:text-red-400 hover:bg-[var(--bg2)] transition-colors text-left"
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="ws-menu"
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.16, ease: [0.2, 0.7, 0.1, 1] }}
           >
-            Ausloggen
-          </button>
-        </div>
-      )}
+            {mode === 'menu' && (
+              <>
+                <div className="ws-menu__label">Deine Workspaces</div>
+                <div className="ws-menu__list">
+                  {workspaces.length === 0 && (
+                    <div className="ws-empty">Noch kein Workspace — leg unten einen an oder tritt einem bei.</div>
+                  )}
+                  {workspaces.map(ws => {
+                    const isActive = ws.id === activeId
+                    return (
+                      <button
+                        key={ws.id}
+                        type="button"
+                        className="ws-row"
+                        data-active={isActive ? 'true' : 'false'}
+                        onClick={() => { setActive(ws.id); close() }}
+                      >
+                        <span className="ws-avatar ws-avatar--sm">{initials(ws.name)}</span>
+                        <span className="ws-row__body">
+                          <span className="ws-row__name">{ws.name}</span>
+                          <span className="ws-row__meta">
+                            {ROLE_LABEL[ws.role]}{ws.isShared ? ' · geteilt' : ''}
+                          </span>
+                        </span>
+                        {isActive && <Check size={15} className="ws-row__check" />}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="ws-divider" />
+
+                <button type="button" className="ws-action" onClick={() => { setMode('create'); setValue(''); setError(null) }}>
+                  <span className="ws-action__icon"><Plus size={15} /></span>
+                  Neuer Workspace
+                </button>
+                <button type="button" className="ws-action" onClick={() => { setMode('join'); setValue(''); setError(null) }}>
+                  <span className="ws-action__icon"><LogIn size={15} /></span>
+                  Workspace beitreten
+                </button>
+
+                <div className="ws-divider" />
+
+                <button type="button" className="ws-action ws-action--danger" onClick={signOut}>
+                  <span className="ws-action__icon"><LogOut size={15} /></span>
+                  Ausloggen
+                </button>
+              </>
+            )}
+
+            {mode !== 'menu' && (
+              <form className="ws-form" onSubmit={submit}>
+                <div className="ws-form__label">
+                  {mode === 'create' ? 'Neuer Workspace' : 'Workspace beitreten'}
+                </div>
+                <div className="ws-form__row">
+                  <input
+                    autoFocus
+                    value={value}
+                    onChange={e => setValue(mode === 'join' ? e.target.value.toUpperCase() : e.target.value)}
+                    placeholder={mode === 'create' ? 'z.B. Agentur Müller' : 'Beitritts-Code'}
+                    maxLength={mode === 'join' ? 8 : 60}
+                    className="ws-input"
+                    style={mode === 'join' ? { fontFamily: 'var(--font-mono)', letterSpacing: '0.18em' } : undefined}
+                    disabled={busy}
+                  />
+                  <button type="submit" className="ws-submit" disabled={!value.trim() || busy} aria-label="Bestätigen">
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+                <p className="ws-form__hint">
+                  {mode === 'create' ? 'Du wirst Inhaber dieses Workspace.' : 'Du trittst als Mitglied bei.'}
+                </p>
+                {error && <p className="ws-form__error">{error}</p>}
+                <button type="button" className="ws-form__back" onClick={reset} disabled={busy}>← zurück</button>
+              </form>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
