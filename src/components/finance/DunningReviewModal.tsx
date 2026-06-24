@@ -37,7 +37,7 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
     })).then(pairs => { if (alive) setEmails(Object.fromEntries(pairs)) })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoices, todos])
+  }, [invoices, todos, accounts])
 
   // toast.store only supports 'success' | 'error' | 'info'; use 'error' for warnings
   const reportResult = (res: { ok: boolean; error?: string; warning?: string }) => {
@@ -98,7 +98,8 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
             )}
             {items.map(it => {
               const email = emails[it.invoice.accountId]
-              const noMail = email === null
+              const noMail = email === null            // confirmed: customer has no email
+              const notSendable = email == null        // loading (undefined) OR no email
               return (
                 <div key={it.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -113,12 +114,12 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
                   </div>
                   <button
                     type="button"
-                    disabled={noMail || sending === it.invoice.id || batch}
+                    disabled={notSendable || sending === it.invoice.id || batch}
                     onClick={() => sendOne(it.invoice.id, it.level)}
                     style={{
                       height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid var(--accent)',
                       background: 'var(--accent)', color: 'var(--accent-ink)',
-                      cursor: noMail ? 'not-allowed' : 'pointer', opacity: noMail ? 0.4 : 1,
+                      cursor: notSendable ? 'not-allowed' : 'pointer', opacity: notSendable ? 0.4 : 1,
                       display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
                     }}
                   >
