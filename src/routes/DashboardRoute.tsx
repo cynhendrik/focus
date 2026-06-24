@@ -20,6 +20,7 @@ import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
+import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
 
@@ -160,6 +161,8 @@ function WorkspaceView() {
   const upsertTodo = useTodosStore(s => s.upsert)
   const crmUpsert  = useCrmStore(s => s.upsert)
   const showToast  = useToastStore(s => s.show)
+
+  useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
 

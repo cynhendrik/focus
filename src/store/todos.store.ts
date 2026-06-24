@@ -109,11 +109,13 @@ interface TodosState {
   currentCustomerId: string | null
   isLoading: boolean
   error: AppError | null
+  reminderTrailAccounts: Set<string>
 
   loadForCustomer: (customerId: string) => Promise<void>
   loadAll: (workspaceId: string) => Promise<void>
   upsert: (payload: UpsertTodoPayload) => Promise<Todo>
   remove: (id: string) => Promise<void>
+  hydrateReminderTrail: (accountIds: string[]) => Promise<void>
 
   complete:        (id: string) => Promise<void>
   postpone:        (id: string) => Promise<void>
@@ -159,6 +161,7 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
   currentCustomerId: null,
   isLoading: false,
   error: null,
+  reminderTrailAccounts: new Set(),
 
   loadAll: async (workspaceId) => {
     try {
@@ -166,6 +169,29 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
       set({ allTodos: acts.map(activityToTodo) })
     } catch (err) {
       log.error('Failed to load all todos', { err })
+    }
+  },
+
+  hydrateReminderTrail: async (accountIds) => {
+    const loaded = get().reminderTrailAccounts
+    const missing = accountIds.filter(id => id && !loaded.has(id))
+    if (missing.length === 0) return
+    // mark immediately so concurrent/re-render calls don't refetch
+    set({ reminderTrailAccounts: new Set([...loaded, ...missing]) })
+    try {
+      const lists = await Promise.all(
+        missing.map(id => ActivitiesGateway.getByAccount(id).catch(() => [])),
+      )
+      const trail = lists.flat().map(activityToTodo)
+        .filter(t => t.actionType === 'send_reminder' && t.status === 'done')
+      if (trail.length === 0) return
+      set(s => {
+        let allTodos = s.allTodos
+        for (const t of trail) allTodos = upsertById(allTodos, t)
+        return { allTodos }
+      })
+    } catch (err) {
+      log.error('hydrateReminderTrail failed', { err })
     }
   },
 

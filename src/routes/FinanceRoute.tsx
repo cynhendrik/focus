@@ -3,6 +3,7 @@ import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Light
 import { useFinanceStore } from '@/store/finance.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useCapability } from '@/hooks/useCapability'
+import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -374,6 +375,7 @@ export function FinanceRoute() {
   const [animPct, setAnimPct] = useState(0)
 
   useEffect(() => { if (workspaceId) loadAll(workspaceId) }, [workspaceId, loadAll])
+  useReminderTrailHydration()
 
   useEffect(() => {
     if (!workspaceId || !userId) return
