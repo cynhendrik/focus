@@ -37,7 +37,7 @@ interface RowProps {
   customerName: string
   dunningLevel: number
   onPaid: (id: string) => Promise<void>
-  onSend: (invoice: Invoice, customerName: string, dunningLevel: number) => Promise<void>
+  onSend: (invoice: Invoice, dunningLevel: number) => Promise<void>
   onPreview: (invoice: Invoice) => void
   sending: boolean
   marking: boolean
@@ -126,7 +126,7 @@ function MahnRow({ invoice, customerName, dunningLevel, onPaid, onSend, onPrevie
         <button
           type="button"
           title={`${label} senden`}
-          onClick={() => onSend(invoice, customerName, dunningLevel)}
+          onClick={() => onSend(invoice, dunningLevel)}
           disabled={sending}
           style={{
             height: 32, padding: '0 12px', borderRadius: 8,
@@ -197,12 +197,17 @@ export function MahnwesenPanel() {
       })
   }, [invoices, allTodos, accounts])
 
+  const escalated = useMemo(
+    () => escalatedInvoices(invoices, allTodos, accounts),
+    [invoices, allTodos, accounts],
+  )
+
   const actionableItems = overdueItems.filter(i => i.state.canCreate)
   const waitingItems    = overdueItems.filter(i => !i.state.canCreate)
 
   // ── Senden ─────────────────────────────────────────────────────────────────
 
-  const sendReminder = async (invoice: Invoice, _customerName: string, dunningLevel: number) => {
+  const sendReminder = async (invoice: Invoice, dunningLevel: number) => {
     setSending(invoice.id)
     const res = await serviceSendReminder(invoice, dunningLevel)
     setSending(null)
@@ -233,7 +238,7 @@ export function MahnwesenPanel() {
     let count = 0
     for (const item of actionableItems) {
       try {
-        await sendReminder(item.invoice, item.customerName, item.state.level)
+        await sendReminder(item.invoice, item.state.level)
         count++
       } catch { /* weiter */ }
     }
@@ -370,28 +375,24 @@ export function MahnwesenPanel() {
         </div>
       )}
 
-      {(() => {
-        const escalated = escalatedInvoices(invoices, allTodos, accounts)
-        if (escalated.length === 0) return null
-        return (
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '0 18px 8px' }}>
-              Braucht Entscheidung
-            </div>
-            {escalated.map(e => (
-              <div key={e.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{e.customerName}</div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
-                    nach 2. Mahnung · {e.daysOverdue}d überfällig · Inkasso / abschreiben / persönlich
-                  </div>
-                </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>{fmtEur(e.invoice.total)} €</span>
-              </div>
-            ))}
+      {escalated.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '0 18px 8px' }}>
+            Braucht Entscheidung
           </div>
-        )
-      })()}
+          {escalated.map(e => (
+            <div key={e.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{e.customerName}</div>
+                <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+                  nach 2. Mahnung · {e.daysOverdue}d überfällig · Inkasso / abschreiben / persönlich
+                </div>
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>{fmtEur(e.invoice.total)} €</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
