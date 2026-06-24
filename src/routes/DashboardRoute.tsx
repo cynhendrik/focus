@@ -21,6 +21,7 @@ import { useCrmStore } from '@/store/crm.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { HeuteTile } from '@/components/heute/HeuteTile'
+import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
 
 import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -263,6 +264,7 @@ function WorkspaceView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <DunningNudgeCard />
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
       }}>
