@@ -4,18 +4,10 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useMailStore } from '@/store/mail.store'
 import { useToastStore } from '@/store/toast.store'
-import { useCompanyStore } from '@/store/company.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { useAuthStore } from '@/store/auth.store'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { isOverdue } from '@/lib/invoice-status'
-import { generateCorraDraft } from '@/lib/ai/corra'
-import { MailService } from '@/services/mail.service'
-import { FinanceService } from '@/services/finance.service'
-// getInvoicePdfBytes is imported lazily at call time (keeps react-pdf out of
-// the main bundle — loads only when a dunning PDF is generated).
-import { invoke } from '@tauri-apps/api/core'
-import type { Contact } from '@/types/contact.types'
+import { sendReminder as serviceSendReminder, escalatedInvoices } from '@/services/dunning.service'
 import type { Invoice } from '@/types/finance.types'
 import {
   CheckCircle, Send, FileText, ChevronDown, ChevronUp,
@@ -182,7 +174,6 @@ export function MahnwesenPanel() {
   const allTodos        = useTodosStore(s => s.allTodos)
   const mailAccounts    = useMailStore(s => s.accounts)
   const showToast       = useToastStore(s => s.show)
-  const profile         = useCompanyStore(s => s.profile)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const [sending, setSending]   = useState<string | null>(null)  // invoiceId
@@ -211,64 +202,14 @@ export function MahnwesenPanel() {
 
   // ── Senden ─────────────────────────────────────────────────────────────────
 
-  const sendReminder = async (invoice: Invoice, customerName: string, dunningLevel: number) => {
-    if (!mailAccounts[0]) {
-      showToast({ message: 'Kein E-Mail-Konto konfiguriert.', variant: 'error' })
-      return
-    }
+  const sendReminder = async (invoice: Invoice, _customerName: string, dunningLevel: number) => {
     setSending(invoice.id)
-    try {
-      // Kontakt-Mail laden
-      const contacts = await invoke<Contact[]>('get_contacts', { accountId: invoice.accountId }).catch(() => [])
-      const recipientEmail = contacts.find(c => c.email)?.email ?? ''
-      if (!recipientEmail) {
-        showToast({ message: 'Keine E-Mail-Adresse für diesen Kunden hinterlegt.', variant: 'error' })
-        return
-      }
-
-      // CORRA-Entwurf generieren
-      const body = await generateCorraDraft({
-        kind: 'reminder',
-        customerName,
-        invoiceNumber: invoice.number ?? invoice.id.slice(0, 8),
-        amount: invoice.total,
-        dueDate: invoice.dueDate,
-        daysOverdue: daysOverdue(invoice.dueDate),
-        dunningLevel,
-      }).catch(() =>
-        `Betreff: Zahlungserinnerung\n\nHiermit erinnern wir Sie freundlich an die offene Rechnung ${invoice.number ?? ''} über ${fmtEur(invoice.total)} €.`
-      )
-
-      // PDF generieren
-      const account = accounts.find(a => a.id === invoice.accountId)
-      let pdfPath: string | null = null
-      if (profile && account) {
-        try {
-          const fullInvoice = await FinanceService.getInvoice(invoice.id)
-          const { getInvoicePdfBytes } = await import('@/components/finance/InvoicePDF')
-          const bytes = await getInvoicePdfBytes(fullInvoice, profile, account)
-          const safeClient = account.name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 40)
-          const filename = `${LEVEL_LABEL[dunningLevel] ?? 'Mahnung'}_${invoice.number ?? invoice.id.slice(0, 8)}_${safeClient}.pdf`
-          pdfPath = await invoke<string>('save_pdf', { bytes: Array.from(bytes), suggestedName: filename })
-        } catch { /* PDF optional */ }
-      }
-
-      const levelLabel = LEVEL_LABEL[dunningLevel] ?? '2. Mahnung'
-      await MailService.sendEmail({
-        accountId: mailAccounts[0].id,
-        to: [recipientEmail],
-        subject: `${levelLabel} · Rechnung ${invoice.number ?? ''} · ${fmtEur(invoice.total)} €`,
-        bodyText: body,
-        ...(pdfPath ? { attachmentPaths: [pdfPath] } : {}),
-      })
-
-      showToast({ message: `${levelLabel} an ${customerName} gesendet.`, variant: 'success' })
-      if (workspaceId) loadAll(workspaceId)
-    } catch {
-      showToast({ message: 'Senden fehlgeschlagen.', variant: 'error' })
-    } finally {
-      setSending(null)
-    }
+    const res = await serviceSendReminder(invoice, dunningLevel)
+    setSending(null)
+    if (res.warning) showToast({ message: res.warning, variant: 'error' })
+    else if (res.ok) showToast({ message: 'Mahnung gesendet.', variant: 'success' })
+    else showToast({ message: res.error ?? 'Senden fehlgeschlagen.', variant: 'error' })
+    if (workspaceId) loadAll(workspaceId)
   }
 
   const markAsPaid = async (id: string) => {
@@ -428,6 +369,29 @@ export function MahnwesenPanel() {
           ))}
         </div>
       )}
+
+      {(() => {
+        const escalated = escalatedInvoices(invoices, allTodos, accounts)
+        if (escalated.length === 0) return null
+        return (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '0 18px 8px' }}>
+              Braucht Entscheidung
+            </div>
+            {escalated.map(e => (
+              <div key={e.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{e.customerName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+                    nach 2. Mahnung · {e.daysOverdue}d überfällig · Inkasso / abschreiben / persönlich
+                  </div>
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>{fmtEur(e.invoice.total)} €</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
