@@ -139,7 +139,7 @@ export async function recordReminderSent(
   })
 }
 
-export interface DunningSendResult { invoiceId: string; ok: boolean; error?: string }
+export interface DunningSendResult { invoiceId: string; ok: boolean; error?: string; warning?: string }
 
 /**
  * Versendet eine Mahnung: Kontakt-Mail → KORA-Text → PDF (optional) → SMTP →
@@ -195,10 +195,19 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
       ...(pdfPath ? { attachmentPaths: [pdfPath] } : {}),
     })
 
-    await recordReminderSent(invoice, level, fees)
+    try {
+      await recordReminderSent(invoice, level, fees)
+    } catch (recErr) {
+      log.error('reminder sent but recording the dunning step failed', { invoiceId: invoice.id, recErr })
+      return {
+        invoiceId: invoice.id,
+        ok: true,
+        warning: 'Mahnung gesendet, aber der Mahnschritt konnte nicht protokolliert werden — die Stufe wurde evtl. nicht hochgezählt.',
+      }
+    }
     return { invoiceId: invoice.id, ok: true }
   } catch (err) {
     log.warn('sendReminder failed', { invoiceId: invoice.id, err })
-    return fail('Versand fehlgeschlagen.')
+    return fail(`Versand fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
