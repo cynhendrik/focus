@@ -1,9 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   DEFAULT_DUNNING_FEES, dunningFee, parseFeeTag, reminderFeeTags,
   dueReminders, escalatedInvoices,
+  recordReminderSent,
 } from './dunning.service'
 import type { Invoice } from '@/types/finance.types'
+
+// vi.mock wird gehoistet — die Mock-Fn via vi.hoisted bereitstellen,
+// sonst "Cannot access 'mockUpsert' before initialization".
+const { mockUpsert } = vi.hoisted(() => ({ mockUpsert: vi.fn() }))
+vi.mock('@/store/todos.store', () => ({
+  useTodosStore: { getState: () => ({ upsert: mockUpsert }) },
+}))
 
 const inv = (over: Partial<Invoice> = {}): Invoice => ({
   id: 'inv1', workspaceId: 'w', createdBy: 'u', accountId: 'a',
@@ -78,5 +86,20 @@ describe('escalatedInvoices', () => {
     }) as any
     const res = escalatedInvoices([inv()], [done(1), done(2), done(3)], accounts)
     expect(res.map(r => r.invoice.id)).toEqual(['inv1'])
+  })
+})
+
+describe('recordReminderSent', () => {
+  it('creates a DONE send_reminder todo with the fee snapshot tag', async () => {
+    mockUpsert.mockClear()
+    await recordReminderSent(inv({ accountId: 'a' }), 1, [0, 5, 10])
+    expect(mockUpsert).toHaveBeenCalledTimes(1)
+    const payload = mockUpsert.mock.calls[0][0]
+    expect(payload.status).toBe('done')
+    expect(payload.bucket).toBe('done')
+    expect(payload.actionType).toBe('send_reminder')
+    expect(payload.sourceRef).toBe('inv1')
+    expect(payload.customerId).toBe('a')
+    expect(payload.tags).toEqual(['fee:500'])
   })
 })
