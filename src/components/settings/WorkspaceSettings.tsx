@@ -158,6 +158,29 @@ export function WorkspaceSettings({ workspaceId }: Props) {
         </div>
       </div>
 
+      {/* Mahngebühren */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700 }}>Mahngebühren</div>
+          <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Gestaffelt je Mahnstufe (Euro)</div>
+        </div>
+        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          {['Zahlungserinnerung', '1. Mahnung', '2. Mahnung'].map((lbl, i) => (
+            <Field
+              key={i}
+              label={lbl}
+              value={String((form.dunningFees ?? [0, 5, 10])[i] ?? 0)}
+              onChange={(v) => setForm(p => {
+                const next = [...(p.dunningFees ?? [0, 5, 10])]
+                next[i] = v === '' ? 0 : Number(v)
+                return { ...p, dunningFees: next }
+              })}
+              placeholder="0"
+            />
+          ))}
+        </div>
+      </div>
+
       <InvoiceNumberSettings />
 
       {/* Rechnungsdesign */}
