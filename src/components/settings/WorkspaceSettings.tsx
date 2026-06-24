@@ -172,7 +172,8 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               value={String((form.dunningFees ?? [0, 5, 10])[i] ?? 0)}
               onChange={(v) => setForm(p => {
                 const next = [...(p.dunningFees ?? [0, 5, 10])]
-                next[i] = v === '' ? 0 : Number(v)
+                const n = Number(v)
+                next[i] = v === '' || Number.isNaN(n) ? 0 : n
                 return { ...p, dunningFees: next }
               })}
               placeholder="0"
