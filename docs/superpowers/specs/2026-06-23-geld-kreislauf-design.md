@@ -141,6 +141,18 @@ Trigger ist App-Start / Öffnen von „Heute" (sowie Datumswechsel im laufenden 
 Optionale Verfeinerung (nicht in dieser Iteration): Neuberechnung um lokale
 Mitternacht bei laufender App.
 
+## Persistenz der Mahnstufe über App-Neustarts (Task 9)
+
+Die Stufe wird aus *abgeschlossenen* `send_reminder`-To-dos abgeleitet, aber der
+Startup-Loader (`todos.store.loadAll` → `getOpenTasks`) lädt nur `status='open'`.
+Damit die Stufe nach einem Neustart nicht auf 0 zurückfällt (Risiko Doppel-Versand),
+hydriert ein Hook (`useReminderTrailHydration`, gemountet in DashboardRoute +
+FinanceRoute) den erledigten Mahn-Trail **pro Konto mit überfälliger Rechnung** über
+das vorhandene `ActivitiesGateway.getByAccount` (funktioniert lokal **und** Supabase —
+kein Backend-Eingriff). `todos.store.hydrateReminderTrail(accountIds)` ist idempotent
+(merkt geladene Konten), merge nur DONE `send_reminder`-To-dos in `allTodos` (verschmutzt
+keine Today-Listen, die `status!=='done'` filtern). Fehler werden geloggt, nicht geworfen.
+
 ## Fehlerbehandlung
 
 - Kein Mail-Konto konfiguriert → globaler Hinweis, Versand deaktiviert.
