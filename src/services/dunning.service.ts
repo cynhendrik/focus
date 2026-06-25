@@ -153,23 +153,32 @@ export async function recordReminderSent(
 
 export interface DunningSendResult { invoiceId: string; ok: boolean; error?: string; warning?: string }
 
+export interface PreparedReminder {
+  invoiceId: string
+  level: number
+  mailAccountId: string
+  to: string[]
+  subject: string
+  body: string
+  attachmentPaths: string[]
+}
+
 /**
- * Versendet eine Mahnung: Kontakt-Mail → KORA-Text → PDF (optional) → SMTP →
- * bei Erfolg recordReminderSent (Stufe zählt hoch). Wirft nie — gibt ein Result zurück
- * (für isolierten Batch-Versand).
+ * Bereitet eine Mahnung vor (Empfänger, Betreff, KORA-Text, PDF-Anhang) OHNE zu senden.
+ * Für den Einzel-Versand, der die Mail im Editor öffnet. Wirft nie.
  */
-export async function sendReminder(invoice: Invoice, level: number): Promise<DunningSendResult> {
-  const fail = (error: string): DunningSendResult => ({ invoiceId: invoice.id, ok: false, error })
+export async function prepareReminder(
+  invoice: Invoice, level: number,
+): Promise<{ ok: true; data: PreparedReminder } | { ok: false; error: string }> {
   try {
     const mailAccount = useMailStore.getState().accounts[0]
-    if (!mailAccount) return fail('Kein E-Mail-Konto konfiguriert.')
+    if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert.' }
 
     const contacts = await invoke<Contact[]>('get_contacts', { accountId: invoice.accountId }).catch(() => [])
     const recipient = contacts.find(c => c.email)?.email
-    if (!recipient) return fail('Keine E-Mail-Adresse für diesen Kunden.')
+    if (!recipient) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Kunden.' }
 
-    const accounts = useAccountsStore.getState().accounts
-    const account = accounts.find(a => a.id === invoice.accountId)
+    const account = useAccountsStore.getState().accounts.find(a => a.id === invoice.accountId)
     const profile = useCompanyStore.getState().profile
     const fees = profile.dunningFees ?? DEFAULT_DUNNING_FEES
     const customerName = account?.name ?? 'Kunde'
@@ -192,7 +201,7 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
           + `Bitte gleichen Sie den Betrag zeitnah aus.\n\nMit freundlichen Grüßen`,
     )
 
-    let pdfPath: string | null = null
+    let attachmentPaths: string[] = []
     if (account) {
       try {
         const full = await FinanceGateway.getInvoice(invoice.id)
@@ -200,31 +209,52 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
         const bytes = await getInvoicePdfBytes(full, profile, account)
         const safe = account.name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 40)
         const filename = `${levelLabel(level)}_${invoice.number ?? invoice.id.slice(0, 8)}_${safe}.pdf`
-        pdfPath = await invoke<string>('save_pdf', { bytes: Array.from(bytes), suggestedName: filename })
+        const path = await invoke<string>('save_pdf', { bytes: Array.from(bytes), suggestedName: filename })
+        attachmentPaths = [path]
       } catch { /* PDF optional */ }
     }
 
-    await MailService.sendEmail({
-      accountId: mailAccount.id,
-      to: [recipient],
-      subject: `${levelLabel(level)} · Rechnung ${invoice.number ?? ''} · zu zahlen ${fmtEur(bd.total)} €`,
-      bodyText: body,
-      ...(pdfPath ? { attachmentPaths: [pdfPath] } : {}),
-    })
-
-    try {
-      await recordReminderSent(invoice, level, fees)
-    } catch (recErr) {
-      log.error('reminder sent but recording the dunning step failed', { invoiceId: invoice.id, recErr })
-      return {
-        invoiceId: invoice.id,
-        ok: true,
-        warning: 'Mahnung gesendet, aber der Mahnschritt konnte nicht protokolliert werden — die Stufe wurde evtl. nicht hochgezählt.',
-      }
+    return {
+      ok: true,
+      data: {
+        invoiceId: invoice.id, level, mailAccountId: mailAccount.id,
+        to: [recipient],
+        subject: `${levelLabel(level)} · Rechnung ${invoice.number ?? ''} · zu zahlen ${fmtEur(bd.total)} €`,
+        body, attachmentPaths,
+      },
     }
-    return { invoiceId: invoice.id, ok: true }
+  } catch (err) {
+    log.warn('prepareReminder failed', { invoiceId: invoice.id, err })
+    return { ok: false, error: 'Vorbereitung fehlgeschlagen.' }
+  }
+}
+
+/**
+ * Versendet eine Mahnung: Kontakt-Mail → KORA-Text → PDF (optional) → SMTP →
+ * bei Erfolg recordReminderSent (Stufe zählt hoch). Wirft nie — gibt ein Result zurück
+ * (für isolierten Batch-Versand).
+ */
+export async function sendReminder(invoice: Invoice, level: number): Promise<DunningSendResult> {
+  const prep = await prepareReminder(invoice, level)
+  if (!prep.ok) return { invoiceId: invoice.id, ok: false, error: prep.error }
+  const fees = useCompanyStore.getState().profile.dunningFees ?? DEFAULT_DUNNING_FEES
+  try {
+    await MailService.sendEmail({
+      accountId: prep.data.mailAccountId,
+      to: prep.data.to,
+      subject: prep.data.subject,
+      bodyText: prep.data.body,
+      ...(prep.data.attachmentPaths.length ? { attachmentPaths: prep.data.attachmentPaths } : {}),
+    })
   } catch (err) {
     log.warn('sendReminder failed', { invoiceId: invoice.id, err })
-    return fail(`Versand fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`)
+    return { invoiceId: invoice.id, ok: false, error: `Versand fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }
   }
+  try {
+    await recordReminderSent(invoice, level, fees)
+  } catch (recErr) {
+    log.error('reminder sent but recording the dunning step failed', { invoiceId: invoice.id, recErr })
+    return { invoiceId: invoice.id, ok: true, warning: 'Mahnung gesendet, aber der Mahnschritt konnte nicht protokolliert werden — die Stufe wurde evtl. nicht hochgezählt.' }
+  }
+  return { invoiceId: invoice.id, ok: true }
 }
