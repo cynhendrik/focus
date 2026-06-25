@@ -265,6 +265,38 @@ pub fn cmd_import_backup(db: State<'_, DbPool>, json: String) -> Result<ImportSu
     import_into(&mut conn, &json)
 }
 
+/// Leert alle User-Inhalts-Tabellen in einer Transaktion, behält aber das Setup
+/// (Firmenprofil + Rechnungs-Nummernkreis). Schema-introspektiv wie der Backup-Export,
+/// damit neue Tabellen automatisch mit-geleert werden.
+pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), String> {
+    const KEEP: &[&str] = &["company_settings", "invoice_sequences"];
+
+    let tables: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' \
+                      AND name NOT LIKE 'sqlite_%' AND name != 'sync_queue' ORDER BY name")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        rows.filter_map(Result::ok).collect()
+    };
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute_batch("PRAGMA defer_foreign_keys=ON;").map_err(|e| e.to_string())?;
+    for t in &tables {
+        if KEEP.contains(&t.as_str()) { continue; }
+        tx.execute(&format!("DELETE FROM \"{t}\""), [])
+            .map_err(|e| format!("{t}: {e}"))?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cmd_reset_workspace(db: State<'_, DbPool>) -> Result<(), String> {
+    let mut conn = db.conn();
+    reset_workspace_local(&mut conn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,5 +373,33 @@ mod tests {
         assert_eq!(count, 1);
         let name: String = conn2.query_row("SELECT name FROM customers WHERE id='c1'", [], |r| r.get(0)).unwrap();
         assert_eq!(name, "V1");
+    }
+
+    #[test]
+    fn reset_clears_data_but_keeps_setup() {
+        let mut conn = sample_conn();
+        conn.execute(
+            "INSERT INTO company_settings (id, profile, modules, crm_config, updated_at) \
+             VALUES ('ws1','{}','{}','{}','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) \
+             VALUES ('ws1', 5, 1)", []).unwrap();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+             VALUES ('a1','ws1','u1','Muster GmbH','2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, total, created_at, updated_at) \
+             VALUES ('i1','ws1','u1','a1','2026-01-01','2026-01-15',119.0,'2026-01-01','2026-01-01')", []).unwrap();
+
+        reset_workspace_local(&mut conn).unwrap();
+
+        let accounts: i64 = conn.query_row("SELECT count(*) FROM accounts", [], |r| r.get(0)).unwrap();
+        let invoices: i64 = conn.query_row("SELECT count(*) FROM invoices", [], |r| r.get(0)).unwrap();
+        assert_eq!(accounts, 0);
+        assert_eq!(invoices, 0);
+        let settings: i64 = conn.query_row("SELECT count(*) FROM company_settings", [], |r| r.get(0)).unwrap();
+        let seq: i64 = conn.query_row("SELECT next_number FROM invoice_sequences WHERE workspace_id='ws1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(settings, 1);
+        assert_eq!(seq, 5);
     }
 }

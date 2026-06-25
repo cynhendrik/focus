@@ -324,6 +324,7 @@ fn main() {
             commands::export::save_zip,
             commands::export::cmd_export_backup,
             commands::export::cmd_import_backup,
+            commands::export::cmd_reset_workspace,
             commands::calendar::get_calendar_events,
             commands::calendar::upsert_calendar_event,
             commands::calendar::delete_calendar_event,
