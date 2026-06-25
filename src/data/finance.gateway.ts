@@ -5,7 +5,7 @@ import {
   invoiceRowToInvoice, invoiceItemRowToItem, offerRowToOffer, offerItemRowToItem, paymentRowToPayment,
   invoicePayloadToRow, invoiceItemPayloadToRow, offerPayloadToRow, offerItemPayloadToRow, paymentPayloadToRow,
 } from './finance.mapper'
-import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, UpsertInvoicePayload, UpsertOfferPayload, CreatePaymentPayload } from '@/types/finance.types'
+import type { Invoice, InvoiceWithItems, Offer, OfferWithItems, Payment, InvoiceStatus, OfferStatus, UpsertInvoicePayload, UpsertOfferPayload, CreatePaymentPayload } from '@/types/finance.types'
 
 /** Supabase-Fehler in eine lesbare Error werfen (sonst zeigt die UI "[object Object]"). */
 function fail(error: { message?: string; details?: string; hint?: string; code?: string } | null): never {
@@ -202,6 +202,15 @@ export const FinanceGateway = {
       if (itErr) fail(itErr)
     }
     return this.getOffer(id)
+  },
+
+  async updateOfferStatus(id: string, status: OfferStatus): Promise<Offer> {
+    if (!shared()) return FinanceService.updateOfferStatus(id, status)
+    const now = new Date().toISOString()
+    const { data, error } = await supabase.from('offers')
+      .update({ status, updated_at: now }).eq('id', id).select('*').single()
+    if (error) fail(error)
+    return offerRowToOffer(data)
   },
 
   async deleteOffer(id: string): Promise<void> {

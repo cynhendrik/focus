@@ -340,6 +340,7 @@ export function FinanceRoute() {
   const payments              = useFinanceStore(s => s.payments)
   const deleteInvoice         = useFinanceStore(s => s.deleteInvoice)
   const deleteOffer           = useFinanceStore(s => s.deleteOffer)
+  const updateOfferStatus     = useFinanceStore(s => s.updateOfferStatus)
   const approveInvoiceSuggestion  = useFinanceStore(s => s.approveInvoiceSuggestion)
   const convertOfferToInvoice     = useFinanceStore(s => s.convertOfferToInvoice)
   const updateInvoiceStatus       = useFinanceStore(s => s.updateInvoiceStatus)
@@ -693,6 +694,14 @@ export function FinanceRoute() {
                           useToastStore.getState().show({ message: `Download fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
                         }
                       }} />
+                      {(offer.status === 'draft' || offer.status === 'sent') && (
+                        <>
+                          <RowBtn icon={<CheckCircle size={12} />} label="Annehmen" tone="ok"
+                            onClick={() => updateOfferStatus(offer.id, 'accepted')} />
+                          <RowBtn icon={<XCircle size={12} />} label="Ablehnen" tone="bad"
+                            onClick={() => updateOfferStatus(offer.id, 'rejected')} />
+                        </>
+                      )}
                       {offer.status === 'accepted' && (
                         <RowBtn icon={<ChevronRight size={12} />} label="→ Rechnung" tone="accent"
                           onClick={() => convertOfferToInvoice(offer.id, workspaceId, user?.id ?? '')} />

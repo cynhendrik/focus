@@ -9,7 +9,7 @@ import { log } from '@/lib/logger'
 import type {
   Invoice, InvoiceWithItems, UpsertInvoicePayload,
   Offer, OfferWithItems, UpsertOfferPayload,
-  FinanceKpis, InvoiceStatus,
+  FinanceKpis, InvoiceStatus, OfferStatus,
   Payment, CreatePaymentPayload,
 } from '@/types/finance.types'
 
@@ -79,6 +79,7 @@ interface FinanceState {
   createOffer: (payload: UpsertOfferPayload) => Promise<OfferWithItems>
   updateOffer: (id: string, payload: UpsertOfferPayload) => Promise<void>
   deleteOffer: (id: string) => Promise<void>
+  updateOfferStatus: (id: string, status: OfferStatus) => Promise<void>
   convertOfferToInvoice: (offerId: string, workspaceId: string, createdBy: string) => Promise<void>
 
   setActiveTab: (tab: ActiveTab) => void
@@ -230,6 +231,14 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     set(s => ({
       offers: s.offers.filter(o => o.id !== id),
       selectedOffer: s.selectedOffer?.offer.id === id ? null : s.selectedOffer,
+    }))
+  },
+
+  updateOfferStatus: async (id, status) => {
+    const updated = await FinanceGateway.updateOfferStatus(id, status)
+    set(s => ({
+      offers: s.offers.map(o => o.id === id ? updated : o),
+      selectedOffer: s.selectedOffer?.offer.id === id ? { ...s.selectedOffer, offer: updated } : s.selectedOffer,
     }))
   },
 
