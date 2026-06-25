@@ -23,6 +23,8 @@ export interface CompanyProfile {
   invoiceAccentColor?: string
   /** Mahngebühr je Stufe in Euro [Zahlungserinnerung, 1. Mahnung, 2. Mahnung]. */
   dunningFees?: number[]
+  /** Vom Nutzer festgelegte E-Mail-Signatur (Outlook-Stil), wird an neue Mails gehängt. */
+  emailSignature?: string
 }
 
 export interface CompanyModules {
