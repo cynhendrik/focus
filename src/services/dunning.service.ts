@@ -9,7 +9,7 @@ import { useMailStore } from '@/store/mail.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCompanyStore } from '@/store/company.store'
 import { MailService } from '@/services/mail.service'
-import { FinanceService } from '@/services/finance.service'
+import { FinanceGateway } from '@/data/finance.gateway'
 import { generateCorraDraft } from '@/lib/ai/corra'
 import { log } from '@/lib/logger'
 import type { Contact } from '@/types/contact.types'
@@ -195,7 +195,7 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
     let pdfPath: string | null = null
     if (account) {
       try {
-        const full = await FinanceService.getInvoice(invoice.id)
+        const full = await FinanceGateway.getInvoice(invoice.id)
         const { getInvoicePdfBytes } = await import('@/components/finance/InvoicePDF')
         const bytes = await getInvoicePdfBytes(full, profile, account)
         const safe = account.name.replace(/[/\\:*?"<>|]/g, '_').slice(0, 40)
