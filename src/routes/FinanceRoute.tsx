@@ -370,6 +370,7 @@ export function FinanceRoute() {
   const [stornoInv,        setStornoInv]        = useState<Invoice | null>(null)
   const [paymentInvoice,   setPaymentInvoice]   = useState<Invoice | null>(null)
   const [showBatchExport,  setShowBatchExport]  = useState(false)
+  const [editInvoice,      setEditInvoice]      = useState<InvoiceWithItems | null>(null)
 
   // Gauge animation — go from 0 to real value after mount/change
   const [animPct, setAnimPct] = useState(0)
@@ -411,6 +412,15 @@ export function FinanceRoute() {
   const handleReleaseInvoice = async (inv: Invoice) => {
     await updateInvoiceStatus(inv.id, 'open')
     await loadAll(workspaceId)
+  }
+
+  const openInvoiceEditor = async (inv: Invoice) => {
+    try {
+      const full = await FinanceGateway.getInvoice(inv.id)
+      setEditInvoice(full)
+    } catch (e) {
+      showToast({ message: `Entwurf konnte nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+    }
   }
 
   // KPIs
@@ -713,17 +723,18 @@ export function FinanceRoute() {
               <tbody>
                 {draftInvoices.map(inv => (
                   <tr key={inv.id}
-                    style={{ borderBottom: '1px solid var(--border)', transition: 'background 80ms' }}
+                    style={{ borderBottom: '1px solid var(--border)', transition: 'background 80ms', cursor: 'pointer' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.025)')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    onClick={() => openInvoiceEditor(inv)}
                   >
                     <td style={{ ...td, fontWeight: 500 }}>{accountName(inv.accountId)}</td>
                     <td style={{ ...td, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
                     <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                         {isAdmin && (
-                          <RowBtn icon={<CheckCircle size={12} />} label="Freigeben" tone="ok"
+                          <RowBtn icon={<CheckCircle size={12} />} label="In Rechnung umwandeln" tone="ok"
                             onClick={() => handleReleaseInvoice(inv)} />
                         )}
                         {isAdmin && (
@@ -870,6 +881,13 @@ export function FinanceRoute() {
       {showInvoiceForm && (
         <InvoiceForm onClose={() => setShowInvoiceForm(false)}
           onSaved={() => { setShowInvoiceForm(false); loadAll(workspaceId) }} />
+      )}
+      {editInvoice && (
+        <InvoiceForm
+          initial={editInvoice}
+          onClose={() => setEditInvoice(null)}
+          onSaved={() => { setEditInvoice(null); loadAll(workspaceId) }}
+        />
       )}
       {showOfferForm && (
         <OfferForm onClose={() => setShowOfferForm(false)}
