@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { UserCheck } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
+import { useToastStore } from '@/store/toast.store'
 import { leadToUpsertPayload } from '@/lib/lead-payload'
 import { useDialogFocus } from '@/components/ui/Sheet'
 import { ActivityStream } from '@/components/activity/ActivityStream'
@@ -12,8 +14,23 @@ interface Props {
 }
 
 export function LeadDetailModal({ lead, onClose }: Props) {
-  const upsertLead = useLeadsStore(s => s.upsert)
-  const dialogRef  = useDialogFocus(true)
+  const upsertLead      = useLeadsStore(s => s.upsert)
+  const convertToClient = useLeadsStore(s => s.convertToClient)
+  const showToast       = useToastStore(s => s.show)
+  const dialogRef       = useDialogFocus(true)
+  const [converting, setConverting] = useState(false)
+
+  async function handleConvert() {
+    setConverting(true)
+    try {
+      await convertToClient(lead.id)
+      showToast({ message: `${lead.name} ist jetzt Kunde.`, variant: 'success' })
+      onClose()
+    } catch {
+      showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
+      setConverting(false)
+    }
+  }
 
   // Local mirror of the phone — the modal receives `lead` as a snapshot, so
   // edits would otherwise not show until the board re-opens the modal.
@@ -66,11 +83,11 @@ export function LeadDetailModal({ lead, onClose }: Props) {
         aria-label={lead.name}
         tabIndex={-1}
         style={{
-          width: '100%', maxWidth: 760,
+          width: '100%', maxWidth: 840,
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 16, padding: 0,
           boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-          display: 'flex', flexDirection: 'column', maxHeight: '88vh',
+          display: 'flex', flexDirection: 'column', maxHeight: '95vh',
           overflow: 'hidden',
         }}
       >
@@ -83,16 +100,32 @@ export function LeadDetailModal({ lead, onClose }: Props) {
                 <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>{lead.companyName}</div>
               )}
             </div>
-            <button
-              aria-label="Schließen"
-              onClick={onClose}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--fg-dim)', fontSize: 18, lineHeight: 1, padding: '2px 6px',
-              }}
-            >
-              ×
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={handleConvert}
+                disabled={converting}
+                title="Lead direkt zum Kunden machen"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 8, cursor: converting ? 'default' : 'pointer',
+                  border: '1px solid var(--ok)', background: 'transparent',
+                  color: 'var(--ok)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  opacity: converting ? 0.6 : 1,
+                }}
+              >
+                <UserCheck size={14} /> {converting ? 'Wird umgewandelt…' : 'Zu Kunde machen'}
+              </button>
+              <button
+                aria-label="Schließen"
+                onClick={onClose}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--fg-dim)', fontSize: 18, lineHeight: 1, padding: '2px 6px',
+                }}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           {/* Contact info */}

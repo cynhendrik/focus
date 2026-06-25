@@ -17,9 +17,10 @@ import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 
-// Login-Bypass: im Dev immer, im Build via VITE_LOCAL_MODE=true (Tester-Build
-// ohne Supabase-Login — die App läuft dann komplett lokal).
-const DEV_BYPASS = import.meta.env.DEV || import.meta.env.VITE_LOCAL_MODE === 'true'
+// Login-Bypass: nur via VITE_LOCAL_MODE=true (Tester-Build ohne Supabase-Login —
+// die App läuft dann komplett lokal). Im normalen Dev erscheint der echte
+// Login-Screen (mit „überspringen"-Notausgang), damit echtes Auth testbar ist.
+const DEV_BYPASS = import.meta.env.VITE_LOCAL_MODE === 'true'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
@@ -216,11 +217,17 @@ export default function App() {
   useMailAutoSync()
   useOnboardingSync()
 
-  if (authLoading && !DEV_BYPASS) return <div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />
+  // Intro-Splash bei JEDEM Start zeigen — als Overlay über allen Render-Pfaden,
+  // damit ihn die Auth-Early-Returns (Login / Workspace-Picker) nicht überspringen.
+  const splashOverlay = splashPhase !== 'done'
+    ? <SplashScreen exiting={splashPhase === 'exiting'} />
+    : null
 
-  if (!user && !DEV_BYPASS) return <LoginScreen />
+  if (authLoading && !DEV_BYPASS) return <><div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />{splashOverlay}</>
 
-  if (!activeWorkspaceId && !DEV_BYPASS) return <WorkspacePicker />
+  if (!user && !DEV_BYPASS) return <><LoginScreen />{splashOverlay}</>
+
+  if (!activeWorkspaceId && !DEV_BYPASS) return <><WorkspacePicker />{splashOverlay}</>
 
 
   const renderMain = () => {
@@ -299,7 +306,7 @@ export default function App() {
       <OnboardingCard />
       <CompanyStep />
       {showWelcome && <WelcomeIntro onDone={markWelcomeSeen} />}
-      {splashPhase !== 'done' && <SplashScreen exiting={splashPhase === 'exiting'} />}
+      {splashOverlay}
     </AppShell>
   )
 }

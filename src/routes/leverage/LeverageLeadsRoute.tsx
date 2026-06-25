@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, List, LayoutGrid, CalendarClock } from 'lucide-react'
+import { Plus, Search, List, LayoutGrid, CalendarClock, UserCheck } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -50,12 +50,13 @@ function daysSince(iso: string | null): number {
 
 // ── Lead Row ──────────────────────────────────────────────────────────────────
 
-function LeadRow({ lead, stages, followUpCount, onClick, onFollowUp }: {
+function LeadRow({ lead, stages, followUpCount, onClick, onFollowUp, onConvert }: {
   lead: Lead
   stages: LeadStage[]
   followUpCount: number
   onClick: () => void
   onFollowUp: () => void
+  onConvert: () => void
 }) {
   const stage = resolveStage(lead.leadStatus, stages)
   const ds = daysSince(lead.lastActivityAt)
@@ -66,7 +67,7 @@ function LeadRow({ lead, stages, followUpCount, onClick, onFollowUp }: {
       onClick={onClick}
       style={{
         display: 'grid',
-        gridTemplateColumns: '40px 1fr auto auto',
+        gridTemplateColumns: '40px 1fr auto auto auto',
         alignItems: 'center', gap: 14,
         padding: '12px 16px',
         borderRadius: 12,
@@ -161,6 +162,22 @@ function LeadRow({ lead, stages, followUpCount, onClick, onFollowUp }: {
         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
       >
         <CalendarClock size={13} /> Follow-Up
+      </button>
+
+      {/* Direkt zum Kunden — ohne Umweg über Board → WON */}
+      <button
+        onClick={e => { e.stopPropagation(); onConvert() }}
+        title="Zu Kunde machen"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+          padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
+          border: '1px solid var(--border)', background: 'var(--surface-2)',
+          color: 'var(--fg-muted)', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ok)'; e.currentTarget.style.color = 'var(--ok)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--fg-muted)' }}
+      >
+        <UserCheck size={13} /> Zu Kunde
       </button>
     </div>
   )
@@ -346,10 +363,21 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 
 export function LeverageLeadsRoute() {
   const leads        = useLeadsStore(s => s.leads)
+  const convertToClient = useLeadsStore(s => s.convertToClient)
   const stages       = useLeadStagesStore(s => s.stages)
   const allFollowUps = useCrmStore(s => s.allFollowUps)
   const loadAllFollowUps = useCrmStore(s => s.loadAll)
   const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const showToast    = useToastStore(s => s.show)
+
+  async function handleConvert(lead: Lead) {
+    try {
+      await convertToClient(lead.id)
+      showToast({ message: `${lead.name} ist jetzt Kunde.`, variant: 'success' })
+    } catch {
+      showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
+    }
+  }
 
   const [viewMode,    setViewMode]    = useState<ViewMode>('list')
   const [query,       setQuery]       = useState('')
@@ -463,6 +491,7 @@ export function LeverageLeadsRoute() {
                 followUpCount={followUpsByLead.get(lead.id) ?? 0}
                 onClick={() => setDetailLead(lead)}
                 onFollowUp={() => setFollowUpLead(lead)}
+                onConvert={() => handleConvert(lead)}
               />
             ))
           )}
