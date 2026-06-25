@@ -4,6 +4,7 @@ import { useCompanyStore } from '@/store/company.store'
 import { useUiStore } from '@/store/ui.store'
 import type { CompanyProfile } from '@/types/company.types'
 import { InvoiceNumberSettings } from './InvoiceNumberSettings'
+import { buildSignatureFromProfile } from '@/lib/mail-signature'
 import { JoinCodeRow } from '@/core/workspace/JoinCodeRow'
 import { MembersSettings } from '@/components/workspace/MembersSettings'
 
@@ -179,6 +180,41 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               placeholder="0"
             />
           ))}
+        </div>
+      </div>
+
+      {/* E-Mail-Signatur */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700 }}>E-Mail-Signatur</div>
+            <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Wird automatisch an neue Mails gehängt (editierbar pro Mail)</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm(p => ({ ...p, emailSignature: buildSignatureFromProfile(p) }))}
+            style={{
+              flexShrink: 0, height: 30, padding: '0 12px', borderRadius: 8,
+              border: '1px solid var(--border)', background: 'var(--surface-2)',
+              color: 'var(--fg)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+            }}
+          >
+            Aus Firmenprofil übernehmen
+          </button>
+        </div>
+        <div style={{ padding: '16px 20px' }}>
+          <textarea
+            value={form.emailSignature ?? ''}
+            onChange={e => setForm(p => ({ ...p, emailSignature: e.target.value }))}
+            rows={7}
+            placeholder={'Mit freundlichen Grüßen\n\nMuster GmbH\n…'}
+            style={{
+              width: '100%', resize: 'vertical', boxSizing: 'border-box',
+              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10,
+              padding: '10px 14px', color: 'var(--fg)', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.6,
+              outline: 'none',
+            }}
+          />
         </div>
       </div>
 
