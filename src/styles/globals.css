@@ -34,6 +34,9 @@
 /* ========== Design Tokens ========== */
 
 :root {
+  /* Native Form-Controls (Date-Picker-Icon, Scrollbars, Dropdowns) im Dark-Mode rendern.
+     Sonst ist z. B. das Kalendersymbol in <input type="date"> dunkel/unsichtbar. */
+  color-scheme: dark;
   /* Flächen — warmes Neutral, Hue 270. Werte 1:1 aus Design-System. */
   --bg: oklch(19% 0.006 270);
   --bg-2: oklch(21% 0.007 270);
@@ -111,6 +114,7 @@
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   /* Hintergründe — #f2f2f7 Lila-Grau */
   --bg:        #f2f2f7;
   --bg-2:      #e8e8ef;
