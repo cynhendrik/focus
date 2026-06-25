@@ -49,7 +49,10 @@ begin
       and c.column_name = 'workspace_id'
       and c.table_name <> all (array[
         'company_settings', 'invoice_sequences', 'offer_sequences',
-        'time_planning', 'app_state'
+        'time_planning', 'app_state',
+        -- NIE löschen: der Workspace selbst + die Mitgliedschaften/Rollen,
+        -- sonst verliert der Owner den Zugriff auf den eigenen Workspace.
+        'workspaces', 'workspace_members'
       ])
   loop
     execute format('delete from public.%I where workspace_id = $1', t.table_name) using ws_id;
