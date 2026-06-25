@@ -415,6 +415,21 @@ export function FinanceRoute() {
     await loadAll(workspaceId)
   }
 
+  const handleOfferStatus = async (offerId: string, status: 'accepted' | 'rejected') => {
+    try {
+      await updateOfferStatus(offerId, status)
+      useToastStore.getState().show({
+        message: status === 'accepted' ? 'Angebot angenommen.' : 'Angebot abgelehnt.',
+        variant: 'success',
+      })
+    } catch (e) {
+      useToastStore.getState().show({
+        message: `Status-Änderung fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`,
+        variant: 'error',
+      })
+    }
+  }
+
   const openInvoiceEditor = async (inv: Invoice) => {
     try {
       const full = await FinanceGateway.getInvoice(inv.id)
@@ -697,9 +712,9 @@ export function FinanceRoute() {
                       {(offer.status === 'draft' || offer.status === 'sent') && (
                         <>
                           <RowBtn icon={<CheckCircle size={12} />} label="Annehmen" tone="ok"
-                            onClick={() => updateOfferStatus(offer.id, 'accepted')} />
+                            onClick={() => handleOfferStatus(offer.id, 'accepted')} />
                           <RowBtn icon={<XCircle size={12} />} label="Ablehnen" tone="bad"
-                            onClick={() => updateOfferStatus(offer.id, 'rejected')} />
+                            onClick={() => handleOfferStatus(offer.id, 'rejected')} />
                         </>
                       )}
                       {offer.status === 'accepted' && (
