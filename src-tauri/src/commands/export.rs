@@ -269,9 +269,13 @@ pub fn cmd_import_backup(db: State<'_, DbPool>, json: String) -> Result<ImportSu
 /// (Firmenprofil + Rechnungs-Nummernkreis). Schema-introspektiv wie der Backup-Export,
 /// damit neue Tabellen automatisch mit-geleert werden.
 pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), String> {
-    // Setup/Konfiguration, die NICHT geleert wird: Firmenprofil, Nummernkreise (Rechnung+Angebot),
-    // Singleton-/Geräte-State (sonst nach Reload bis zum App-Neustart leer).
-    const KEEP: &[&str] = &["company_settings", "invoice_sequences", "offer_sequences", "time_planning", "app_state"];
+    // Setup/Konfiguration + Workspace-Identität, die NICHT geleert wird. (workspaces/
+    // workspace_members existieren lokal aktuell nicht — defensiv für Konsistenz mit
+    // dem Cloud-Reset, falls sie lokal je dazukommen.)
+    const KEEP: &[&str] = &[
+        "company_settings", "invoice_sequences", "offer_sequences",
+        "time_planning", "app_state", "workspaces", "workspace_members",
+    ];
 
     let tables: Vec<String> = {
         let mut stmt = conn
