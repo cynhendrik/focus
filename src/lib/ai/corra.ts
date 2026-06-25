@@ -53,6 +53,10 @@ function formatEur(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
+function formatEur2(n: number): string {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+}
+
 function buildUserPrompt(ctx: CorraContext): string {
   if (ctx.kind === 'reminder') {
     const level = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung'][ctx.dunningLevel] ?? '2. Mahnung'
@@ -64,8 +68,8 @@ function buildUserPrompt(ctx: CorraContext): string {
 
     const hasFee = ctx.feeAmount != null && ctx.feeAmount > 0
     const betragZeile = hasFee
-      ? `Rechnungsbetrag: ${formatEur(ctx.baseAmount ?? ctx.amount)} · Mahngebühr: ${formatEur(ctx.feeAmount!)} · zu zahlen: ${formatEur(ctx.amount)}`
-      : `Offener Betrag: ${formatEur(ctx.amount)}`
+      ? `Rechnungsbetrag: ${formatEur2(ctx.baseAmount ?? ctx.amount)} · Mahngebühren: ${formatEur2(ctx.feeAmount!)} · zu zahlen: ${formatEur2(ctx.amount)}`
+      : `Offener Betrag: ${formatEur2(ctx.amount)}`
 
     return `Schreibe eine kurze ${level} per E-Mail an ${ctx.customerName}.
 Rechnung: ${ctx.invoiceNumber} · fällig seit ${ctx.daysOverdue} Tagen (${ctx.dueDate.slice(0, 10)}).
