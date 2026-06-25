@@ -43,13 +43,6 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, todos, accounts])
 
-  // toast.store only supports 'success' | 'error' | 'info'; use 'error' for warnings
-  const reportResult = (res: { ok: boolean; error?: string; warning?: string }) => {
-    if (res.warning) showToast({ message: res.warning, variant: 'error' })
-    else if (res.ok) showToast({ message: 'Mahnung gesendet.', variant: 'success' })
-    else showToast({ message: res.error ?? 'Versand fehlgeschlagen.', variant: 'error' })
-  }
-
   const sendOne = async (invoiceId: string, level: number) => {
     const item = items.find(i => i.invoice.id === invoiceId)
     if (!item) return
