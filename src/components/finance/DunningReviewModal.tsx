@@ -37,7 +37,8 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
     const accountIds = [...new Set(items.map(i => i.invoice.accountId))]
     Promise.all(accountIds.map(async id => {
       const contacts = await ContactsGateway.getByAccount(id).catch(() => [])
-      return [id, contacts.find(c => c.email)?.email ?? null] as const
+      const accEmail = accounts.find(a => a.id === id)?.email ?? null
+      return [id, contacts.find(c => c.email)?.email ?? accEmail] as const
     })).then(pairs => { if (alive) setEmails(Object.fromEntries(pairs)) })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps

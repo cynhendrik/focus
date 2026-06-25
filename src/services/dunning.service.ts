@@ -175,11 +175,10 @@ export async function prepareReminder(
     const mailAccount = useMailStore.getState().accounts[0]
     if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert.' }
 
-    const contacts = await ContactsGateway.getByAccount(invoice.accountId).catch(() => [])
-    const recipient = contacts.find(c => c.email)?.email
-    if (!recipient) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Kunden.' }
-
     const account = useAccountsStore.getState().accounts.find(a => a.id === invoice.accountId)
+    const contacts = await ContactsGateway.getByAccount(invoice.accountId).catch(() => [])
+    const recipient = contacts.find(c => c.email)?.email ?? account?.email
+    if (!recipient) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Kunden.' }
     const profile = useCompanyStore.getState().profile
     const fees = profile.dunningFees ?? DEFAULT_DUNNING_FEES
     const customerName = account?.name ?? 'Kunde'
