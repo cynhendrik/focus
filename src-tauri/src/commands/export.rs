@@ -269,7 +269,9 @@ pub fn cmd_import_backup(db: State<'_, DbPool>, json: String) -> Result<ImportSu
 /// (Firmenprofil + Rechnungs-Nummernkreis). Schema-introspektiv wie der Backup-Export,
 /// damit neue Tabellen automatisch mit-geleert werden.
 pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), String> {
-    const KEEP: &[&str] = &["company_settings", "invoice_sequences"];
+    // Setup/Konfiguration, die NICHT geleert wird: Firmenprofil, Nummernkreise (Rechnung+Angebot),
+    // Singleton-/Geräte-State (sonst nach Reload bis zum App-Neustart leer).
+    const KEEP: &[&str] = &["company_settings", "invoice_sequences", "offer_sequences", "time_planning", "app_state"];
 
     let tables: Vec<String> = {
         let mut stmt = conn
@@ -385,6 +387,9 @@ mod tests {
             "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) \
              VALUES ('ws1', 5, 1)", []).unwrap();
         conn.execute(
+            "INSERT INTO offer_sequences (workspace_id, next_number, start_number) \
+             VALUES ('ws1', 3, 1)", []).unwrap();
+        conn.execute(
             "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
              VALUES ('a1','ws1','u1','Muster GmbH','2026-01-01','2026-01-01')", []).unwrap();
         conn.execute(
@@ -399,7 +404,9 @@ mod tests {
         assert_eq!(invoices, 0);
         let settings: i64 = conn.query_row("SELECT count(*) FROM company_settings", [], |r| r.get(0)).unwrap();
         let seq: i64 = conn.query_row("SELECT next_number FROM invoice_sequences WHERE workspace_id='ws1'", [], |r| r.get(0)).unwrap();
+        let oseq: i64 = conn.query_row("SELECT next_number FROM offer_sequences WHERE workspace_id='ws1'", [], |r| r.get(0)).unwrap();
         assert_eq!(settings, 1);
         assert_eq!(seq, 5);
+        assert_eq!(oseq, 3);
     }
 }
