@@ -9,7 +9,10 @@ import { useCompanyStore } from '@/store/company.store'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { isOverdue } from '@/lib/invoice-status'
 import { sendReminder as serviceSendReminder, escalatedInvoices, outstandingWithPendingFee, DEFAULT_DUNNING_FEES } from '@/services/dunning.service'
-import type { Invoice } from '@/types/finance.types'
+import { FinanceGateway } from '@/data/finance.gateway'
+import { InvoicePreview } from '@/components/finance/InvoicePreview'
+import type { Invoice, InvoiceWithItems } from '@/types/finance.types'
+import type { Account } from '@/types/account.types'
 import {
   CheckCircle, Send, FileText, ChevronDown, ChevronUp,
   Loader, AlertTriangle, Clock,
@@ -43,9 +46,10 @@ interface RowProps {
   onPreview: (invoice: Invoice) => void
   sending: boolean
   marking: boolean
+  previewing?: boolean
 }
 
-function MahnRow({ invoice, customerName, dunningLevel, amount, onPaid, onSend, onPreview, sending, marking }: RowProps) {
+function MahnRow({ invoice, customerName, dunningLevel, amount, onPaid, onSend, onPreview, sending, marking, previewing }: RowProps) {
   const days  = daysOverdue(invoice.dueDate)
   const color = LEVEL_COLOR[dunningLevel] ?? LEVEL_COLOR[2]
   const bg    = LEVEL_BG[dunningLevel] ?? LEVEL_BG[2]
@@ -113,16 +117,20 @@ function MahnRow({ invoice, customerName, dunningLevel, amount, onPaid, onSend, 
           type="button"
           title="PDF anzeigen"
           onClick={() => onPreview(invoice)}
+          disabled={previewing}
           style={{
             width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
-            background: 'transparent', color: 'var(--fg-muted)', cursor: 'pointer',
+            background: 'transparent', color: 'var(--fg-muted)', cursor: previewing ? 'not-allowed' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'all 160ms',
+            transition: 'all 160ms', opacity: previewing ? 0.6 : 1,
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-3)'; e.currentTarget.style.color = 'var(--fg)' }}
+          onMouseEnter={e => { if (!previewing) { e.currentTarget.style.background = 'var(--surface-3)'; e.currentTarget.style.color = 'var(--fg)' } }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-muted)' }}
         >
-          <FileText size={13} />
+          {previewing
+            ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />
+            : <FileText size={13} />
+          }
         </button>
 
         <button
@@ -175,7 +183,8 @@ export function MahnwesenPanel() {
   const loadAll         = useFinanceStore(s => s.loadAll)
   const accounts        = useAccountsStore(s => s.accounts)
   const allTodos        = useTodosStore(s => s.allTodos)
-  const fees            = useCompanyStore(s => s.profile.dunningFees) ?? DEFAULT_DUNNING_FEES
+  const profile         = useCompanyStore(s => s.profile)
+  const fees            = profile.dunningFees ?? DEFAULT_DUNNING_FEES
   const mailAccounts    = useMailStore(s => s.accounts)
   const showToast       = useToastStore(s => s.show)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
@@ -184,6 +193,8 @@ export function MahnwesenPanel() {
   const [marking, setMarking]   = useState<string | null>(null)
   const [batchSending, setBatch] = useState(false)
   const [showDone, setShowDone] = useState(false)
+  const [previewing, setPreviewing] = useState<string | null>(null)
+  const [previewData, setPreviewData] = useState<{ full: InvoiceWithItems; account: Account } | null>(null)
 
   // Berechne Mahnstatus für jede überfällige Rechnung
   const overdueItems = useMemo(() => {
@@ -249,6 +260,22 @@ export function MahnwesenPanel() {
     }
     setBatch(false)
     showToast({ message: `${count} Erinnerung${count !== 1 ? 'en' : ''} gesendet.`, variant: 'success' })
+  }
+
+  // ── PDF-Vorschau ────────────────────────────────────────────────────────────
+
+  const previewPdf = async (invoice: Invoice) => {
+    setPreviewing(invoice.id)
+    try {
+      const account = accounts.find(a => a.id === invoice.accountId)
+      if (!account) { showToast({ message: 'Kunde nicht gefunden.', variant: 'error' }); return }
+      const full = await FinanceGateway.getInvoice(invoice.id)
+      setPreviewData({ full, account })
+    } catch (e) {
+      showToast({ message: `Vorschau konnte nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+    } finally {
+      setPreviewing(null)
+    }
   }
 
   // ── Empty state ─────────────────────────────────────────────────────────────
@@ -334,7 +361,8 @@ export function MahnwesenPanel() {
               amount={amount}
               onPaid={markAsPaid}
               onSend={sendReminder}
-              onPreview={() => {}} // TODO: wire to existing preview
+              onPreview={previewPdf}
+              previewing={previewing === invoice.id}
               sending={sending === invoice.id}
               marking={marking === invoice.id}
             />
@@ -374,7 +402,8 @@ export function MahnwesenPanel() {
               amount={amount}
               onPaid={markAsPaid}
               onSend={sendReminder}
-              onPreview={() => {}}
+              onPreview={previewPdf}
+              previewing={previewing === invoice.id}
               sending={sending === invoice.id}
               marking={marking === invoice.id}
             />
@@ -402,6 +431,15 @@ export function MahnwesenPanel() {
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+
+      {previewData && (
+        <InvoicePreview
+          data={previewData.full}
+          profile={profile}
+          account={previewData.account}
+          onClose={() => setPreviewData(null)}
+        />
+      )}
     </div>
   )
 }
