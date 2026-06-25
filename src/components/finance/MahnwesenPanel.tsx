@@ -8,7 +8,9 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useCompanyStore } from '@/store/company.store'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { isOverdue } from '@/lib/invoice-status'
-import { sendReminder as serviceSendReminder, escalatedInvoices, outstandingWithPendingFee, DEFAULT_DUNNING_FEES } from '@/services/dunning.service'
+import { sendReminder as serviceSendReminder, escalatedInvoices, outstandingWithPendingFee, DEFAULT_DUNNING_FEES, prepareReminder, recordReminderSent } from '@/services/dunning.service'
+import type { PreparedReminder } from '@/services/dunning.service'
+import { ComposeModal } from '@/components/mail/ComposeModal'
 import { FinanceGateway } from '@/data/finance.gateway'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import type { Invoice, InvoiceWithItems } from '@/types/finance.types'
@@ -189,6 +191,7 @@ export function MahnwesenPanel() {
   const showToast       = useToastStore(s => s.show)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
+  const [compose, setCompose]   = useState<{ data: PreparedReminder; invoice: Invoice } | null>(null)
   const [sending, setSending]   = useState<string | null>(null)  // invoiceId
   const [marking, setMarking]   = useState<string | null>(null)
   const [batchSending, setBatch] = useState(false)
@@ -223,14 +226,12 @@ export function MahnwesenPanel() {
 
   // ── Senden ─────────────────────────────────────────────────────────────────
 
-  const sendReminder = async (invoice: Invoice, dunningLevel: number) => {
+  const openReminderEditor = async (invoice: Invoice, level: number) => {
     setSending(invoice.id)
-    const res = await serviceSendReminder(invoice, dunningLevel)
+    const prep = await prepareReminder(invoice, level)
     setSending(null)
-    if (res.warning) showToast({ message: res.warning, variant: 'error' })
-    else if (res.ok) showToast({ message: 'Mahnung gesendet.', variant: 'success' })
-    else showToast({ message: res.error ?? 'Senden fehlgeschlagen.', variant: 'error' })
-    if (workspaceId) loadAll(workspaceId)
+    if (!prep.ok) { showToast({ message: prep.error, variant: 'error' }); return }
+    setCompose({ data: prep.data, invoice })
   }
 
   const markAsPaid = async (id: string) => {
@@ -251,15 +252,18 @@ export function MahnwesenPanel() {
       return
     }
     setBatch(true)
-    let count = 0
+    let ok = 0, failed = 0, warned = 0
     for (const item of actionableItems) {
-      try {
-        await sendReminder(item.invoice, item.state.level)
-        count++
-      } catch { /* weiter */ }
+      const res = await serviceSendReminder(item.invoice, item.state.level)
+      if (res.warning) warned++
+      res.ok ? ok++ : failed++
     }
     setBatch(false)
-    showToast({ message: `${count} Erinnerung${count !== 1 ? 'en' : ''} gesendet.`, variant: 'success' })
+    showToast({
+      message: `${ok} Erinnerung${ok !== 1 ? 'en' : ''} gesendet${failed ? `, ${failed} fehlgeschlagen` : ''}${warned ? `, ${warned} mit Warnung` : ''}.`,
+      variant: failed ? 'error' : 'success',
+    })
+    if (workspaceId) loadAll(workspaceId)
   }
 
   // ── PDF-Vorschau ────────────────────────────────────────────────────────────
@@ -360,7 +364,7 @@ export function MahnwesenPanel() {
               dunningLevel={state.level}
               amount={amount}
               onPaid={markAsPaid}
-              onSend={sendReminder}
+              onSend={openReminderEditor}
               onPreview={previewPdf}
               previewing={previewing === invoice.id}
               sending={sending === invoice.id}
@@ -401,7 +405,7 @@ export function MahnwesenPanel() {
               dunningLevel={state.level}
               amount={amount}
               onPaid={markAsPaid}
-              onSend={sendReminder}
+              onSend={openReminderEditor}
               onPreview={previewPdf}
               previewing={previewing === invoice.id}
               sending={sending === invoice.id}
@@ -438,6 +442,27 @@ export function MahnwesenPanel() {
           profile={profile}
           account={previewData.account}
           onClose={() => setPreviewData(null)}
+        />
+      )}
+
+      {compose && (
+        <ComposeModal
+          mode="new"
+          accountId={compose.data.mailAccountId}
+          initialTo={compose.data.to}
+          initialSubject={compose.data.subject}
+          initialBody={compose.data.body}
+          initialAttachmentPaths={compose.data.attachmentPaths}
+          onClose={() => setCompose(null)}
+          onSent={async () => {
+            const inv = compose.invoice
+            const lvl = compose.data.level
+            setCompose(null)
+            try { await recordReminderSent(inv, lvl, fees) }
+            catch { /* recording optional; send already happened */ }
+            showToast({ message: 'Mahnung gesendet.', variant: 'success' })
+            if (workspaceId) loadAll(workspaceId)
+          }}
         />
       )}
     </div>

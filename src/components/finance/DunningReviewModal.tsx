@@ -7,8 +7,11 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useToastStore } from '@/store/toast.store'
-import { dueReminders, sendReminder, DEFAULT_DUNNING_FEES } from '@/services/dunning.service'
+import { dueReminders, sendReminder, DEFAULT_DUNNING_FEES, prepareReminder, recordReminderSent } from '@/services/dunning.service'
+import type { PreparedReminder } from '@/services/dunning.service'
 import type { Contact } from '@/types/contact.types'
+import type { Invoice } from '@/types/finance.types'
+import { ComposeModal } from '@/components/mail/ComposeModal'
 
 const LEVEL_LABEL = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung']
 const fmtEur = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -24,6 +27,7 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
   const showToast   = useToastStore(s => s.show)
 
   const items = dueReminders(invoices, todos, accounts, fees, payments)
+  const [compose, setCompose] = useState<{ data: PreparedReminder; invoice: Invoice } | null>(null)
   const [emails, setEmails]   = useState<Record<string, string | null>>({})
   const [sending, setSending] = useState<string | null>(null)
   const [batch, setBatch]     = useState(false)
@@ -47,11 +51,13 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
   }
 
   const sendOne = async (invoiceId: string, level: number) => {
+    const item = items.find(i => i.invoice.id === invoiceId)
+    if (!item) return
     setSending(invoiceId)
-    const res = await sendReminder(items.find(i => i.invoice.id === invoiceId)!.invoice, level)
+    const prep = await prepareReminder(item.invoice, level)
     setSending(null)
-    reportResult(res)
-    if (workspaceId) await loadAll(workspaceId)
+    if (!prep.ok) { showToast({ message: prep.error, variant: 'error' }); return }
+    setCompose({ data: prep.data, invoice: item.invoice })
   }
 
   const sendAll = async () => {
@@ -145,6 +151,27 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {compose && (
+        <ComposeModal
+          mode="new"
+          accountId={compose.data.mailAccountId}
+          initialTo={compose.data.to}
+          initialSubject={compose.data.subject}
+          initialBody={compose.data.body}
+          initialAttachmentPaths={compose.data.attachmentPaths}
+          onClose={() => setCompose(null)}
+          onSent={async () => {
+            const inv = compose.invoice
+            const lvl = compose.data.level
+            setCompose(null)
+            try { await recordReminderSent(inv, lvl, fees) }
+            catch { /* recording optional; send already happened */ }
+            showToast({ message: 'Mahnung gesendet.', variant: 'success' })
+            if (workspaceId) await loadAll(workspaceId)
+          }}
+        />
+      )}
     </>
   )
 }
