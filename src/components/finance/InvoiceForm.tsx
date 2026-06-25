@@ -63,6 +63,22 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
   const [isSaving, setIsSaving] = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
+  // Customer combobox
+  const [custQuery, setCustQuery] = useState('')
+  const [custOpen,  setCustOpen]  = useState(false)
+  const custRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!custOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (custRef.current && !custRef.current.contains(e.target as Node)) {
+        setCustOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [custOpen])
+
   const dueDateAutoRef = useRef(true)
   const handleDateChange = (newDate: string) => {
     setDate(newDate)
@@ -214,14 +230,59 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '22px 28px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Kunde */}
+          {/* Kunde — searchable combobox */}
           <FieldBlock label="Kunde">
-            <select value={accountId} onChange={e => setAccountId(e.target.value)} className="inv-input">
-              <option value="">Kunden wählen…</option>
-              {accounts.filter(a => !a.isPrivate).map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            <div ref={custRef} style={{ position: 'relative' }}>
+              <input
+                className="inv-input"
+                type="text"
+                placeholder="Kunde suchen…"
+                value={custOpen ? custQuery : (account?.name ?? '')}
+                onFocus={() => { setCustOpen(true); setCustQuery('') }}
+                onChange={e => { setCustQuery(e.target.value); setCustOpen(true) }}
+                onKeyDown={e => { if (e.key === 'Escape') { setCustOpen(false); e.stopPropagation() } }}
+                autoComplete="off"
+              />
+              {custOpen && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 10, boxShadow: 'var(--shadow-2)',
+                  maxHeight: 240, overflowY: 'auto', zIndex: 400,
+                }}>
+                  {accounts.filter(a => !a.isPrivate && a.name.toLowerCase().includes(custQuery.toLowerCase())).length === 0 ? (
+                    <div style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--fg-dim)', fontStyle: 'italic' }}>
+                      Keine Treffer
+                    </div>
+                  ) : (
+                    accounts
+                      .filter(a => !a.isPrivate && a.name.toLowerCase().includes(custQuery.toLowerCase()))
+                      .map(a => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onPointerDown={e => {
+                            e.preventDefault()
+                            setAccountId(a.id)
+                            setCustOpen(false)
+                            setCustQuery('')
+                          }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '9px 14px', background: 'none', border: 'none',
+                            borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                            fontSize: 13, color: 'var(--fg)', fontFamily: 'var(--font-sans)',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-2)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+                        >
+                          {a.name}
+                        </button>
+                      ))
+                  )}
+                </div>
+              )}
+            </div>
           </FieldBlock>
 
           {/* Datum */}
