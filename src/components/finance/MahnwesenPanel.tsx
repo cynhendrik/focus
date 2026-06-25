@@ -5,9 +5,10 @@ import { useTodosStore } from '@/store/todos.store'
 import { useMailStore } from '@/store/mail.store'
 import { useToastStore } from '@/store/toast.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useCompanyStore } from '@/store/company.store'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { isOverdue } from '@/lib/invoice-status'
-import { sendReminder as serviceSendReminder, escalatedInvoices } from '@/services/dunning.service'
+import { sendReminder as serviceSendReminder, escalatedInvoices, outstandingWithPendingFee, DEFAULT_DUNNING_FEES } from '@/services/dunning.service'
 import type { Invoice } from '@/types/finance.types'
 import {
   CheckCircle, Send, FileText, ChevronDown, ChevronUp,
@@ -36,6 +37,7 @@ interface RowProps {
   invoice: Invoice
   customerName: string
   dunningLevel: number
+  amount: number
   onPaid: (id: string) => Promise<void>
   onSend: (invoice: Invoice, dunningLevel: number) => Promise<void>
   onPreview: (invoice: Invoice) => void
@@ -43,7 +45,7 @@ interface RowProps {
   marking: boolean
 }
 
-function MahnRow({ invoice, customerName, dunningLevel, onPaid, onSend, onPreview, sending, marking }: RowProps) {
+function MahnRow({ invoice, customerName, dunningLevel, amount, onPaid, onSend, onPreview, sending, marking }: RowProps) {
   const days  = daysOverdue(invoice.dueDate)
   const color = LEVEL_COLOR[dunningLevel] ?? LEVEL_COLOR[2]
   const bg    = LEVEL_BG[dunningLevel] ?? LEVEL_BG[2]
@@ -102,7 +104,7 @@ function MahnRow({ invoice, customerName, dunningLevel, onPaid, onSend, onPrevie
 
       {/* Amount */}
       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14, color: 'var(--fg)', whiteSpace: 'nowrap' }}>
-        {fmtEur(invoice.total)} €
+        {fmtEur(amount)} €
       </span>
 
       {/* Actions */}
@@ -168,10 +170,12 @@ function MahnRow({ invoice, customerName, dunningLevel, onPaid, onSend, onPrevie
 
 export function MahnwesenPanel() {
   const invoices        = useFinanceStore(s => s.invoices)
+  const payments        = useFinanceStore(s => s.payments)
   const updateStatus    = useFinanceStore(s => s.updateInvoiceStatus)
   const loadAll         = useFinanceStore(s => s.loadAll)
   const accounts        = useAccountsStore(s => s.accounts)
   const allTodos        = useTodosStore(s => s.allTodos)
+  const fees            = useCompanyStore(s => s.profile.dunningFees) ?? DEFAULT_DUNNING_FEES
   const mailAccounts    = useMailStore(s => s.accounts)
   const showToast       = useToastStore(s => s.show)
   const workspaceId     = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
@@ -188,14 +192,15 @@ export function MahnwesenPanel() {
       .map(inv => {
         const state = getDunningState(inv, allTodos)
         const account = accounts.find(a => a.id === inv.accountId)
-        return { invoice: inv, state, customerName: account?.name ?? '—' }
+        const amount = outstandingWithPendingFee(inv, payments, allTodos, state.level, fees)
+        return { invoice: inv, state, customerName: account?.name ?? '—', amount }
       })
       .sort((a, b) => {
         // Höchste Stufe zuerst, dann älteste zuerst
         if (b.state.level !== a.state.level) return b.state.level - a.state.level
         return a.invoice.dueDate.localeCompare(b.invoice.dueDate)
       })
-  }, [invoices, allTodos, accounts])
+  }, [invoices, allTodos, accounts, payments, fees])
 
   const escalated = useMemo(
     () => escalatedInvoices(invoices, allTodos, accounts),
@@ -320,12 +325,13 @@ export function MahnwesenPanel() {
               Fällig zum Senden
             </span>
           </div>
-          {actionableItems.map(({ invoice, state, customerName }) => (
+          {actionableItems.map(({ invoice, state, customerName, amount }) => (
             <MahnRow
               key={invoice.id}
               invoice={invoice}
               customerName={customerName}
               dunningLevel={state.level}
+              amount={amount}
               onPaid={markAsPaid}
               onSend={sendReminder}
               onPreview={() => {}} // TODO: wire to existing preview
@@ -359,12 +365,13 @@ export function MahnwesenPanel() {
             <div style={{ flex: 1 }} />
             {showDone ? <ChevronUp size={13} style={{ color: 'var(--fg-dim)' }} /> : <ChevronDown size={13} style={{ color: 'var(--fg-dim)' }} />}
           </button>
-          {showDone && waitingItems.map(({ invoice, state, customerName }) => (
+          {showDone && waitingItems.map(({ invoice, state, customerName, amount }) => (
             <MahnRow
               key={invoice.id}
               invoice={invoice}
               customerName={customerName}
               dunningLevel={state.level}
+              amount={amount}
               onPaid={markAsPaid}
               onSend={sendReminder}
               onPreview={() => {}}
