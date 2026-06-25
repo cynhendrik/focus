@@ -5,6 +5,8 @@ import { X, Paperclip } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useDialogFocus } from '@/components/ui/Sheet'
 import type { EmailHeader, SendEmailPayload } from '@/types/mail.types'
+import { useCompanyStore } from '@/store/company.store'
+import { appendSignature } from '@/lib/mail-signature'
 
 interface ComposeModalProps {
   mode: 'new' | 'reply' | 'forward'
@@ -115,7 +117,12 @@ export function ComposeModal({
   const [cc, setCc]                         = useState<string[]>([])
   const [showCc, setShowCc]                 = useState(false)
   const [subject, setSubject]               = useState(initialSubject ?? subjectInitial(mode, replyTo))
-  const [body, setBody]                     = useState(initialBody ?? bodyInitial(mode, replyTo, replyBody))
+  const [body, setBody]                     = useState(() => {
+    const base = initialBody ?? bodyInitial(mode, replyTo, replyBody)
+    if (mode !== 'new') return base
+    const signature = useCompanyStore.getState().profile.emailSignature
+    return appendSignature(base, signature)
+  })
   const [files, setFiles]                   = useState<File[]>([])
   const [attachmentPaths, setAttachmentPaths] = useState<string[]>(initialAttachmentPaths ?? [])
   const [error, setError]                   = useState('')
