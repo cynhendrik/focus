@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { AlertTriangle, Download, Upload } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { useToastStore } from '@/store/toast.store'
+import { supabase } from '@/lib/supabase'
+import { useWorkspaceStore } from '@/store/workspace.store'
 
 interface Props { workspaceId: string }
 
@@ -9,21 +11,42 @@ interface ImportSummary { tables: number; rows: number; skipped_unknown_columns:
 
 export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
   const [confirmText, setConfirmText] = useState('')
-  const [busy, setBusy] = useState<'export' | 'import' | null>(null)
+  const [busy, setBusy] = useState<'export' | 'import' | 'reset' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const toast = useToastStore(s => s.show)
+  const activeId = useWorkspaceStore(s => s.activeWorkspaceId)
+  const workspaces = useWorkspaceStore(s => s.workspaces)
+  const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  const isOwner = workspaces.find(w => w.id === activeId)?.role === 'owner'
 
-  const handleReset = () => {
-    // Ehrlich: es gibt (noch) kein Backend-Kommando, das den Workspace wirklich
-    // leert. Vorher hat der Button "✓ Zurückgesetzt" gezeigt, ohne etwas zu
-    // löschen — das war irreführend. Bis ein echtes, abgesichertes Reset-Kommando
-    // existiert, sagen wir die Wahrheit statt Erfolg vorzutäuschen.
-    toast({
-      message: 'Workspace-Reset ist noch nicht verfügbar. Exportiere ein Backup und lösche Einträge gezielt, oder installiere neu.',
-      variant: 'error',
-      durationMs: 6000,
-    })
-    setConfirmText('')
+  const handleReset = async () => {
+    if (!isOwner) {
+      toast({ message: 'Nur der Inhaber dieses Workspace kann zurücksetzen.', variant: 'error' })
+      return
+    }
+    const sharedWarn = isShared
+      ? '\n\nACHTUNG: Dieser Workspace ist GETEILT — dies löscht die Daten für ALLE Mitglieder.'
+      : ''
+    if (!window.confirm(`Workspace wirklich zurücksetzen? Alle Inhalte werden gelöscht (Firmenprofil & Einstellungen bleiben). Unwiderruflich.${sharedWarn}`)) {
+      return
+    }
+    setBusy('reset')
+    try {
+      await invoke('cmd_reset_workspace')
+      if (isShared && activeId) {
+        const { error } = await supabase.rpc('reset_workspace', { ws_id: activeId })
+        if (error) {
+          toast({ message: `Lokal geleert, aber Cloud-Reset fehlgeschlagen: ${error.message}. Bitte erneut ausführen.`, variant: 'error', durationMs: 8000 })
+          setBusy(null)
+          return
+        }
+      }
+      toast({ message: 'Workspace zurückgesetzt — App lädt neu…', variant: 'success', durationMs: 2000 })
+      setTimeout(() => window.location.reload(), 1200)
+    } catch (e) {
+      toast({ message: `Reset fehlgeschlagen: ${String(e)}`, variant: 'error' })
+      setBusy(null)
+    }
   }
 
   // Vollständiges Backup — schreibt ALLE Tabellen (nicht nur die im Store
@@ -106,6 +129,11 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
         <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: '0 0 14px' }}>
           Löscht alle Kunden, Deals, Leads und Einstellungen. Nicht rückgängig machbar.
         </p>
+        {!isOwner && (
+          <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '0 0 10px' }}>
+            Nur der Inhaber dieses Workspace kann zurücksetzen.
+          </p>
+        )}
         <input
           value={confirmText}
           onChange={e => setConfirmText(e.target.value)}
@@ -118,18 +146,18 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           }}
         />
         <button
-          disabled={confirmText !== 'zurücksetzen'}
+          disabled={confirmText !== 'zurücksetzen' || !isOwner || busy !== null}
           onClick={handleReset}
           style={{
             padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-            cursor: confirmText === 'zurücksetzen' ? 'pointer' : 'not-allowed',
-            background: confirmText === 'zurücksetzen' ? '#ef4444' : 'var(--surface-2)',
-            border: '1px solid ' + (confirmText === 'zurücksetzen' ? '#ef4444' : 'var(--border)'),
-            color: confirmText === 'zurücksetzen' ? '#fff' : 'var(--fg-dim)',
+            cursor: confirmText === 'zurücksetzen' && isOwner && busy === null ? 'pointer' : 'not-allowed',
+            background: confirmText === 'zurücksetzen' && isOwner && busy === null ? '#ef4444' : 'var(--surface-2)',
+            border: '1px solid ' + (confirmText === 'zurücksetzen' && isOwner && busy === null ? '#ef4444' : 'var(--border)'),
+            color: confirmText === 'zurücksetzen' && isOwner && busy === null ? '#fff' : 'var(--fg-dim)',
             transition: 'background 140ms, color 140ms',
           }}
         >
-          Workspace zurücksetzen
+          {busy === 'reset' ? 'Setzt zurück…' : 'Workspace zurücksetzen'}
         </button>
       </div>
     </div>
