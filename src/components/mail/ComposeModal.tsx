@@ -13,6 +13,10 @@ interface ComposeModalProps {
   accountId: string
   onClose: () => void
   onSent: () => void
+  initialTo?: string[]
+  initialSubject?: string
+  initialBody?: string
+  initialAttachmentPaths?: string[]
 }
 
 function tagInputInitial(mode: 'new' | 'reply' | 'forward', replyTo?: EmailHeader): string[] {
@@ -102,18 +106,20 @@ function TagInput({
 
 export function ComposeModal({
   mode, replyTo, replyBody, accountId, onClose, onSent,
+  initialTo, initialSubject, initialBody, initialAttachmentPaths,
 }: ComposeModalProps) {
   const sendEmail = useMailStore(s => s.sendEmail)
   const isSending = useMailStore(s => s.isSending)
 
-  const [to, setTo]           = useState<string[]>(tagInputInitial(mode, replyTo))
-  const [cc, setCc]           = useState<string[]>([])
-  const [showCc, setShowCc]   = useState(false)
-  const [subject, setSubject] = useState(subjectInitial(mode, replyTo))
-  const [body, setBody]       = useState(bodyInitial(mode, replyTo, replyBody))
-  const [files, setFiles]     = useState<File[]>([])
-  const [error, setError]     = useState('')
-  const fileRef               = useRef<HTMLInputElement>(null)
+  const [to, setTo]                         = useState<string[]>(initialTo ?? tagInputInitial(mode, replyTo))
+  const [cc, setCc]                         = useState<string[]>([])
+  const [showCc, setShowCc]                 = useState(false)
+  const [subject, setSubject]               = useState(initialSubject ?? subjectInitial(mode, replyTo))
+  const [body, setBody]                     = useState(initialBody ?? bodyInitial(mode, replyTo, replyBody))
+  const [files, setFiles]                   = useState<File[]>([])
+  const [attachmentPaths, setAttachmentPaths] = useState<string[]>(initialAttachmentPaths ?? [])
+  const [error, setError]                   = useState('')
+  const fileRef                             = useRef<HTMLInputElement>(null)
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
@@ -143,7 +149,7 @@ export function ComposeModal({
       cc: cc.length ? cc : undefined,
       subject: subject.trim(),
       bodyText: body,
-      attachmentPaths: [],
+      attachmentPaths,
     }
 
     try {
@@ -246,7 +252,7 @@ export function ComposeModal({
             />
           </div>
 
-          {/* Anhang-Chips */}
+          {/* Anhang-Chips (browser File picker) */}
           {files.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {files.map((f, i) => (
@@ -262,6 +268,30 @@ export function ComposeModal({
                   >×</button>
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Anhang-Chips (vorbelegte Dateipfade, z. B. generierte Rechnungs-PDFs) */}
+          {attachmentPaths.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {attachmentPaths.map(p => {
+                const name = p.split(/[/\\]/).pop() ?? p
+                return (
+                  <span key={p} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    borderRadius: 6, padding: '3px 8px', fontSize: 11.5, color: 'var(--fg)',
+                  }}>
+                    <Paperclip size={11} /> {name}
+                    <button
+                      type="button"
+                      onClick={() => setAttachmentPaths(prev => prev.filter(x => x !== p))}
+                      aria-label="Anhang entfernen"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 0, lineHeight: 1 }}
+                    >✕</button>
+                  </span>
+                )
+              })}
             </div>
           )}
 
