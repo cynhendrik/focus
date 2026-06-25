@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { X, Send, Loader, AlertTriangle } from 'lucide-react'
+import { ContactsGateway } from '@/data/contacts.gateway'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
@@ -36,7 +36,7 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
     let alive = true
     const accountIds = [...new Set(items.map(i => i.invoice.accountId))]
     Promise.all(accountIds.map(async id => {
-      const contacts = await invoke<Contact[]>('get_contacts', { accountId: id }).catch(() => [])
+      const contacts = await ContactsGateway.getByAccount(id).catch(() => [])
       return [id, contacts.find(c => c.email)?.email ?? null] as const
     })).then(pairs => { if (alive) setEmails(Object.fromEntries(pairs)) })
     return () => { alive = false }

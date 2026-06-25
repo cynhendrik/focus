@@ -3,7 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Send, Sparkles, Loader, Check } from 'lucide-react'
-import { invoke } from '@tauri-apps/api/core'
+import { ContactsGateway } from '@/data/contacts.gateway'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useMailStore } from '@/store/mail.store'
 import { useToastStore } from '@/store/toast.store'
@@ -84,7 +84,7 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
         setTo(account.email)
       } else if (invoice!.accountId) {
         // 2. Primärkontakt des Kunden laden
-        invoke<Contact[]>('get_contacts', { accountId: invoice!.accountId })
+        ContactsGateway.getByAccount(invoice!.accountId)
           .then(contacts => {
             const primary = contacts.find(c => c.isPrimary && c.email) ?? contacts.find(c => c.email)
             if (primary?.email) setTo(primary.email)

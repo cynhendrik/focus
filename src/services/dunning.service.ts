@@ -3,6 +3,7 @@ import type { Invoice, Payment } from '@/types/finance.types'
 import { paidAmount, remaining, isOverdue, todayLocalISO } from '@/lib/invoice-status'
 import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { invoke } from '@tauri-apps/api/core'
+import { ContactsGateway } from '@/data/contacts.gateway'
 import { useTodosStore } from '@/store/todos.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useMailStore } from '@/store/mail.store'
@@ -174,7 +175,7 @@ export async function prepareReminder(
     const mailAccount = useMailStore.getState().accounts[0]
     if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert.' }
 
-    const contacts = await invoke<Contact[]>('get_contacts', { accountId: invoice.accountId }).catch(() => [])
+    const contacts = await ContactsGateway.getByAccount(invoice.accountId).catch(() => [])
     const recipient = contacts.find(c => c.email)?.email
     if (!recipient) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Kunden.' }
 
