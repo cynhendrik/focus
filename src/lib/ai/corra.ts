@@ -10,7 +10,9 @@ export interface CorraReminderContext {
   kind: 'reminder'
   customerName: string
   invoiceNumber: string
-  amount: number
+  amount: number          // zu zahlender Gesamtbetrag (inkl. Gebühr)
+  baseAmount?: number     // reiner Rechnungsbetrag (ohne Gebühr)
+  feeAmount?: number      // Mahngebühr(en)
   dueDate: string
   daysOverdue: number
   dunningLevel: number // 0 = Erinnerung, 1 = 1. Mahnung, 2 = 2. Mahnung
@@ -60,9 +62,15 @@ function buildUserPrompt(ctx: CorraContext): string {
       ? 'Bestimmt, aber noch freundlich. Klare Bitte um Zahlung bis zu einem Datum.'
       : 'Klar und ernst. Kein Drama, aber unmissverständlich: das muss jetzt geklärt werden.'
 
+    const hasFee = ctx.feeAmount != null && ctx.feeAmount > 0
+    const betragZeile = hasFee
+      ? `Rechnungsbetrag: ${formatEur(ctx.baseAmount ?? ctx.amount)} · Mahngebühr: ${formatEur(ctx.feeAmount!)} · zu zahlen: ${formatEur(ctx.amount)}`
+      : `Offener Betrag: ${formatEur(ctx.amount)}`
+
     return `Schreibe eine kurze ${level} per E-Mail an ${ctx.customerName}.
-Rechnung: ${ctx.invoiceNumber} · ${formatEur(ctx.amount)} · fällig seit ${ctx.daysOverdue} Tagen (${ctx.dueDate.slice(0, 10)}).
-Ton: ${tone}
+Rechnung: ${ctx.invoiceNumber} · fällig seit ${ctx.daysOverdue} Tagen (${ctx.dueDate.slice(0, 10)}).
+${betragZeile}
+Ton: ${tone}${hasFee ? '\nWichtig: Weise die Mahngebühr transparent aus (Rechnungsbetrag + Mahngebühr = zu zahlender Gesamtbetrag) und nenne den Gesamtbetrag.' : ''}
 Kein Betreff, nur der Fließtext. 2-4 Sätze. Kein "Sehr geehrte/r", kein formelles Grußwort.`
   }
 

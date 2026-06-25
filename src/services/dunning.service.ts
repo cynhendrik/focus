@@ -43,14 +43,26 @@ export function accruedFees(todos: Todo[], invoiceId: string): number {
     .reduce((sum, tag) => sum + parseFeeTag(tag), 0)
 }
 
+export interface ReminderBreakdown { base: number; fee: number; total: number }
+
+/** Rechnungsrest (base) vs. Gebühren (bereits berechnet + aktuelle Stufe), und Summe. */
+export function reminderBreakdown(
+  invoice: Invoice, payments: Payment[], todos: Todo[], level: number,
+  fees: number[] = DEFAULT_DUNNING_FEES,
+): ReminderBreakdown {
+  const paid = paidAmount(payments, invoice.id)
+  const base = remaining(invoice, paid)
+  const fee  = Math.round((accruedFees(todos, invoice.id) + dunningFee(level, fees)) * 100) / 100
+  const total = Math.round((base + fee) * 100) / 100
+  return { base, fee, total }
+}
+
 /** Offener Gesamtbetrag inkl. der Gebühr der gerade fälligen Stufe (Euro). */
 export function outstandingWithPendingFee(
   invoice: Invoice, payments: Payment[], todos: Todo[], level: number,
   fees: number[] = DEFAULT_DUNNING_FEES,
 ): number {
-  const paid = paidAmount(payments, invoice.id)
-  const base = remaining(invoice, paid)
-  return Math.round((base + accruedFees(todos, invoice.id) + dunningFee(level, fees)) * 100) / 100
+  return reminderBreakdown(invoice, payments, todos, level, fees).total
 }
 
 export interface AccountLite { id: string; name: string }
@@ -164,15 +176,20 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
     const days = daysOverdueOf(invoice.dueDate)
     const payments = useFinanceStore.getState().payments
     const todos = useTodosStore.getState().allTodos
-    const amountDue = outstandingWithPendingFee(invoice, payments, todos, level, fees)
+    const bd = reminderBreakdown(invoice, payments, todos, level, fees)
 
     const body = await generateCorraDraft({
       kind: 'reminder', customerName,
       invoiceNumber: invoice.number ?? invoice.id.slice(0, 8),
-      amount: amountDue, dueDate: invoice.dueDate, daysOverdue: days, dunningLevel: level,
+      amount: bd.total, baseAmount: bd.base, feeAmount: bd.fee,
+      dueDate: invoice.dueDate, daysOverdue: days, dunningLevel: level,
     }).catch(() =>
-      `Sehr geehrte Damen und Herren,\n\nwir erinnern an die offene Rechnung ${invoice.number ?? ''} `
-      + `über ${fmtEur(amountDue)} €.\n\nMit freundlichen Grüßen`,
+      bd.fee > 0
+        ? `Guten Tag,\n\nwir möchten an die offene Rechnung ${invoice.number ?? ''} erinnern.\n`
+          + `Rechnungsbetrag ${fmtEur(bd.base)} € + Mahngebühr ${fmtEur(bd.fee)} € = zu zahlen ${fmtEur(bd.total)} €.\n\n`
+          + `Bitte gleichen Sie den Betrag zeitnah aus.\n\nMit freundlichen Grüßen`
+        : `Guten Tag,\n\nwir möchten an die offene Rechnung ${invoice.number ?? ''} über ${fmtEur(bd.total)} € erinnern.\n\n`
+          + `Bitte gleichen Sie den Betrag zeitnah aus.\n\nMit freundlichen Grüßen`,
     )
 
     let pdfPath: string | null = null
@@ -190,7 +207,7 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
     await MailService.sendEmail({
       accountId: mailAccount.id,
       to: [recipient],
-      subject: `${levelLabel(level)} · Rechnung ${invoice.number ?? ''} · ${fmtEur(amountDue)} €`,
+      subject: `${levelLabel(level)} · Rechnung ${invoice.number ?? ''} · zu zahlen ${fmtEur(bd.total)} €`,
       bodyText: body,
       ...(pdfPath ? { attachmentPaths: [pdfPath] } : {}),
     })

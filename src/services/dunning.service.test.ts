@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   DEFAULT_DUNNING_FEES, dunningFee, parseFeeTag, reminderFeeTags,
   dueReminders, escalatedInvoices,
-  recordReminderSent,
+  recordReminderSent, reminderBreakdown,
 } from './dunning.service'
 import type { Invoice } from '@/types/finance.types'
 
@@ -86,6 +86,33 @@ describe('escalatedInvoices', () => {
     }) as any
     const res = escalatedInvoices([inv()], [done(1), done(2), done(3)], accounts)
     expect(res.map(r => r.invoice.id)).toEqual(['inv1'])
+  })
+})
+
+describe('reminderBreakdown', () => {
+  it('splits remaining vs fees (accrued + pending level fee)', () => {
+    // total 119, no payments, no prior reminders, level 1 → base 119, fee 5, total 124
+    const b = reminderBreakdown(inv(), [], [], 1, [0, 5, 10])
+    expect(b.base).toBe(119)
+    expect(b.fee).toBe(5)
+    expect(b.total).toBe(124)
+  })
+  it('includes accrued fees from prior done reminders', () => {
+    const prior = {
+      id: 'r1', title: 'x', status: 'done', priority: 'p2', bucket: 'done',
+      checklist: [], tags: ['fee:500'], source: 'finance', actionType: 'send_reminder',
+      sourceRef: 'inv1', createdAt: '', updatedAt: '2020-02-01T00:00:00.000Z',
+    } as any
+    // prior fee 5 (accrued) + pending level-2 fee 10 = 15; base 119; total 134
+    const b = reminderBreakdown(inv(), [], [prior], 2, [0, 5, 10])
+    expect(b.base).toBe(119)
+    expect(b.fee).toBe(15)
+    expect(b.total).toBe(134)
+  })
+  it('no fee at level 0', () => {
+    const b = reminderBreakdown(inv(), [], [], 0, [0, 5, 10])
+    expect(b.fee).toBe(0)
+    expect(b.total).toBe(119)
   })
 })
 
