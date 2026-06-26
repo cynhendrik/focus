@@ -12,7 +12,7 @@ import {
   Home, Users, CreditCard,
   Target, TrendingUp,
   Mail, Calendar, Inbox, UserPlus,
-  Settings, PanelLeftClose, PanelLeftOpen, Sparkles, HelpCircle,
+  Settings, PanelLeftClose, PanelLeftOpen, Sparkles, HelpCircle, MessagesSquare,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -142,6 +142,8 @@ export function NavSidebar() {
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} badgeAccent />}
       {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
+      <NavItem icon={MessagesSquare} label="Team" active={appView === 'team'}
+        onClick={() => setAppView('team')} />
 
       <div className="nav-spacer" />
       <div className="nav-foot-divider" />
