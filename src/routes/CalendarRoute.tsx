@@ -21,21 +21,21 @@ const DE_MONTHS_SHORT = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep',
 // ── Farb-Helpers ──────────────────────────────────────────────────────────────
 
 function evtBg(color?: string)     {
-  if (color === 'accent') return 'var(--accent)'
+  if (color === 'accent') return 'color-mix(in srgb, var(--accent) 16%, transparent)'
   if (color === 'warn')   return 'oklch(82% 0.16 70 / 0.18)'
   if (color === 'ok')     return 'oklch(78% 0.18 145 / 0.18)'
   if (color === 'danger') return 'oklch(65% 0.22 25 / 0.18)'
   return 'var(--surface-2)'
 }
 function evtFg(color?: string)     {
-  if (color === 'accent') return 'var(--accent-ink)'
+  if (color === 'accent') return 'var(--accent-text)'
   if (color === 'warn')   return 'var(--warn)'
   if (color === 'ok')     return 'var(--ok)'
   if (color === 'danger') return 'var(--danger)'
   return 'var(--fg)'
 }
 function evtBorder(color?: string) {
-  if (color === 'accent') return 'transparent'
+  if (color === 'accent') return 'color-mix(in srgb, var(--accent) 40%, transparent)'
   if (color === 'warn')   return 'oklch(82% 0.16 70 / 0.4)'
   if (color === 'ok')     return 'oklch(78% 0.18 145 / 0.4)'
   if (color === 'danger') return 'oklch(65% 0.22 25 / 0.4)'
@@ -212,7 +212,7 @@ function WeekView({
               borderLeft: '1px solid var(--border)',
               position: 'relative',
               minHeight: totalH,
-              background: today ? 'oklch(100% 0 0 / 0.012)' : 'transparent',
+              background: today ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'transparent',
             }}
           >
             {/* Hour slots (clickable) */}
@@ -387,10 +387,10 @@ function MonthView({
               opacity: inMonth ? 1 : 0.35,
               cursor: 'pointer',
               position: 'relative',
-              background: today ? 'oklch(100% 0 0 / 0.02)' : 'transparent',
+              background: today ? 'color-mix(in srgb, var(--accent) 5%, transparent)' : 'transparent',
               transition: 'background 80ms',
             }}
-            onMouseEnter={e => { if (!today) (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.02)') }}
+            onMouseEnter={e => { if (!today) (e.currentTarget.style.background = 'var(--surface-2)') }}
             onMouseLeave={e => { if (!today) (e.currentTarget.style.background = '') }}
           >
             <div style={{
@@ -1130,8 +1130,8 @@ export function CalendarRoute() {
                 style={{
                   padding: '6px 14px', fontSize: 12, fontWeight: 500,
                   border: 'none', cursor: 'pointer',
-                  background: view === v ? 'var(--accent)' : 'none',
-                  color: view === v ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  background: view === v ? 'var(--nav-active-bg)' : 'none',
+                  color: view === v ? 'var(--accent-text)' : 'var(--fg-muted)',
                   transition: 'background 150ms, color 150ms',
                 }}
               >

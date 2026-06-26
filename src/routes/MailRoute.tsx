@@ -371,7 +371,7 @@ export function MailRoute() {
               onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--fg-muted)' }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--fg-dim)' }}>
               {t.label}
-              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'oklch(56% 0.19 264)', boxShadow: '0 0 12px oklch(56% 0.19 264 / 0.5)' }} />}
+              {active && <span style={{ position: 'absolute', left: 18, right: 18, bottom: -1, height: 2, borderRadius: 2, background: 'var(--accent-gradient)', boxShadow: '0 0 12px var(--accent-glow)' }} />}
             </button>
           )
         })}
@@ -400,13 +400,13 @@ export function MailRoute() {
                   const count = emails.filter(e => !e.isRead && e.folder === f.path).length
                   return (
                     <button key={f.path} onClick={() => selectFolder(f.path)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', background: active ? '#dbeafe' : 'transparent', color: active ? '#1d4ed8' : 'var(--fg-2)', fontSize: 13.5, fontWeight: active ? 600 : 400, transition: 'background 100ms' }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'oklch(100% 0 0 / 0.05)' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', background: active ? 'var(--nav-active-bg)' : 'transparent', color: active ? 'var(--accent-text)' : 'var(--fg-2)', fontSize: 13.5, fontWeight: active ? 600 : 400, transition: 'background 100ms' }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--surface-2)' }}
                       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-                      <span style={{ color: active ? '#1d4ed8' : 'var(--fg-dim)', flexShrink: 0 }}>{folderIcon(f.path)}</span>
+                      <span style={{ color: active ? 'var(--accent-text)' : 'var(--fg-dim)', flexShrink: 0 }}>{folderIcon(f.path)}</span>
                       <span style={{ flex: 1 }}>{label}</span>
                       {count > 0 && (
-                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 99, background: active ? '#1d4ed8' : 'var(--surface-3)', color: active ? '#fff' : 'var(--fg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', fontFamily: 'var(--font-mono)' }}>{count}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 99, background: active ? 'var(--accent)' : 'var(--surface-3)', color: active ? '#fff' : 'var(--fg-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', fontFamily: 'var(--font-mono)' }}>{count}</span>
                       )}
                     </button>
                   )
@@ -476,12 +476,12 @@ export function MailRoute() {
                           display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                           padding: '7px 10px', borderRadius: 8, border: isDragTarget ? '1px dashed var(--accent)' : 'none',
                           cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-                          background: active ? '#dbeafe' : isDragTarget ? 'oklch(60% 0.15 250 / 0.12)' : 'transparent',
-                          color: active ? '#1d4ed8' : 'var(--fg-2)', fontSize: 13.5,
+                          background: active ? 'var(--nav-active-bg)' : isDragTarget ? 'var(--accent-soft)' : 'transparent',
+                          color: active ? 'var(--accent-text)' : 'var(--fg-2)', fontSize: 13.5,
                           fontWeight: active ? 600 : 400, transition: 'background 100ms',
                         }}
                         onMouseEnter={e => {
-                          if (!active) e.currentTarget.style.background = 'oklch(100% 0 0 / 0.05)'
+                          if (!active) e.currentTarget.style.background = 'var(--surface-2)'
                           const del = e.currentTarget.querySelector<HTMLElement>('.folder-del')
                           if (del) del.style.opacity = '1'
                         }}
@@ -491,7 +491,7 @@ export function MailRoute() {
                           if (del) del.style.opacity = '0'
                         }}
                       >
-                        <Mail size={15} style={{ color: active ? '#1d4ed8' : 'var(--fg-dim)', flexShrink: 0 }} />
+                        <Mail size={15} style={{ color: active ? 'var(--accent-text)' : 'var(--fg-dim)', flexShrink: 0 }} />
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.displayName}</span>
                         <span
                           className="folder-del"
@@ -527,7 +527,7 @@ export function MailRoute() {
                   </button>
                 </div>
                 <div style={{ height: 4, borderRadius: 99, background: 'var(--surface-2)', overflow: 'hidden', marginBottom: 5 }}>
-                  <div style={{ height: '100%', width: isSyncing && syncProgress?.total ? `${(syncProgress.done / syncProgress.total) * 100}%` : '40%', background: 'oklch(56% 0.19 264)', borderRadius: 99, transition: 'width 300ms' }} />
+                  <div style={{ height: '100%', width: isSyncing && syncProgress?.total ? `${(syncProgress.done / syncProgress.total) * 100}%` : '40%', background: 'var(--accent-gradient)', borderRadius: 99, transition: 'width 300ms' }} />
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
                   {isSyncing ? 'Synchronisiert…' : foldersLastFetched > 0 ? `Synchronisiert · ${formatLastFetched(foldersLastFetched)}` : 'Bereit'}
@@ -565,7 +565,7 @@ export function MailRoute() {
                   ] as const).map(f => {
                     const active = mailFilter === f.id
                     return (
-                      <button key={f.id} onClick={() => setMailFilter(f.id)} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: active ? 700 : 500, border: 'none', background: active ? 'var(--surface-3)' : 'transparent', color: active ? 'var(--fg)' : 'var(--fg-muted)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: active ? '0.01em' : '0', transition: 'all 120ms' }}>
+                      <button key={f.id} onClick={() => setMailFilter(f.id)} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: active ? 700 : 500, border: active ? '1px solid var(--border)' : '1px solid transparent', background: active ? 'var(--nav-active-bg)' : 'transparent', color: active ? 'var(--accent-text)' : 'var(--fg-muted)', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: active ? '0.01em' : '0', transition: 'all 120ms' }}>
                         {f.label.toUpperCase()}
                       </button>
                     )
@@ -589,12 +589,12 @@ export function MailRoute() {
                       draggable
                       onDragStart={e => e.dataTransfer.setData('emailId', email.id)}
                       onClick={() => selectEmail(email)}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', cursor: 'pointer', background: active ? 'oklch(100% 0 0 / 0.06)' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'background 100ms' }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'oklch(100% 0 0 / 0.03)' }}
-                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? 'oklch(100% 0 0 / 0.06)' : 'transparent' }}>
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 16px', cursor: 'pointer', background: active ? 'var(--nav-active-bg)' : 'transparent', borderBottom: '1px solid var(--border)', transition: 'background 100ms' }}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--surface-2)' }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? 'var(--nav-active-bg)' : 'transparent' }}>
 
                       {/* Unread dot */}
-                      <div style={{ width: 8, height: 8, borderRadius: 99, marginTop: 15, flexShrink: 0, background: !email.isRead ? '#3b82f6' : 'transparent' }} />
+                      <div style={{ width: 8, height: 8, borderRadius: 99, marginTop: 15, flexShrink: 0, background: !email.isRead ? 'var(--accent)' : 'transparent' }} />
 
                       <MailAvatar name={sender} />
 
@@ -612,12 +612,12 @@ export function MailRoute() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Flag size={12} style={{ color: 'var(--fg-dim)', flexShrink: 0, opacity: 0.5 }} />
                           {cust && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: '#fff3cd', color: '#856404', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--accent-soft)', color: 'var(--accent-text)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                               {cust.name}
                             </span>
                           )}
                           {!cust && isKunde && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: '#fff3cd', color: '#856404', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'var(--accent-soft)', color: 'var(--accent-text)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                               Kunde
                             </span>
                           )}
