@@ -71,7 +71,7 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
       return 'verlauf'
   }
 }
-export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'developer' | 'gefahrenzone' | 'auftraege'
+export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'datenschutz' | 'developer' | 'gefahrenzone' | 'auftraege'
 
 export type AppView =
   | 'dashboard' | 'profile'

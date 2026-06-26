@@ -28,6 +28,8 @@ export function CorraIdleView({ onSend, loading }: Props) {
   )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const theme    = useUiStore(s => s.theme)
+  const setAppView     = useUiStore(s => s.setAppView)
+  const setSettingsTab = useUiStore(s => s.setSettingsTab)
   const isDark   = theme === 'dark'
   const unread   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
   const today    = new Date().toISOString().slice(0, 10)
@@ -231,6 +233,21 @@ export function CorraIdleView({ onSend, loading }: Props) {
             ↑
           </button>
         </div>
+
+        {/* Datenschutz-Hinweis — KI sendet an Anthropic (USA) */}
+        <button
+          type="button"
+          onClick={() => { setSettingsTab('datenschutz'); setAppView('settings') }}
+          style={{
+            marginTop: 14, width: '100%',
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            color: 'var(--fg-dim)', fontSize: 11, fontFamily: 'inherit',
+          }}
+        >
+          <span aria-hidden>🛈</span>
+          KI-Antworten werden von Anthropic (USA) erzeugt. Mehr erfahren →
+        </button>
       </div>
     </div>
   )

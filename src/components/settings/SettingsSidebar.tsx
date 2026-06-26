@@ -1,6 +1,6 @@
 import type { SettingsTab } from '@/store/ui.store'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, LayoutGrid, Plug, Code2, AlertTriangle, Clock, Palette } from 'lucide-react'
+import { Building2, LayoutGrid, Plug, Code2, AlertTriangle, Clock, Palette, ShieldCheck } from 'lucide-react'
 
 const ITEMS: { key: SettingsTab; label: string; icon: LucideIcon; dividerBefore?: boolean }[] = [
   { key: 'workspace',     label: 'Unternehmen',   icon: Building2                      },
@@ -8,6 +8,7 @@ const ITEMS: { key: SettingsTab; label: string; icon: LucideIcon; dividerBefore?
   { key: 'auftraege',     label: 'Aufträge',       icon: Clock,      dividerBefore: true },
   { key: 'module',        label: 'Module',         icon: LayoutGrid, dividerBefore: true },
   { key: 'integrationen', label: 'Integrationen',  icon: Plug                           },
+  { key: 'datenschutz',   label: 'Datenschutz',    icon: ShieldCheck                    },
   { key: 'developer',     label: 'Entwickler',     icon: Code2,      dividerBefore: true },
   { key: 'gefahrenzone',  label: 'Gefahrenzone',   icon: AlertTriangle                  },
 ]
