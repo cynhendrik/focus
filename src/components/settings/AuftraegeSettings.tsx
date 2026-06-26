@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Plus, Trash2, Archive, Check, X } from 'lucide-react'
 import { useAuftraege } from '@/store/auftraege.store'
 import type { Auftrag } from '@/types/auftrag.types'
+import { SettingsPage, SettingCard } from './ui'
 
 function fmtEur(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -142,52 +143,52 @@ export function AuftraegeSettings() {
   const archived = auftraege.filter(a => a.status === 'archived')
 
   return (
-    <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Aufträge</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>
-            Auftragstypen für die Zeiterfassung — z.&nbsp;B. „Beratung 120&nbsp;€/h", „Entwicklung 95&nbsp;€/h".
-          </p>
+    <SettingsPage
+      title="Aufträge"
+      subtitle={'Auftragstypen für die Zeiterfassung — z. B. „Beratung 120 €/h“, „Entwicklung 95 €/h“.'}
+      maxWidth={640}
+    >
+      <SettingCard>
+        {/* Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          {/* Tabellenkopf */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px auto', gap: 8, flex: 1 }}>
+            {['Bezeichnung', 'Stundensatz', ''].map(h => (
+              <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</span>
+            ))}
+          </div>
+          {!adding && (
+            <button
+              onClick={() => setAdding(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: 'var(--accent-ink)', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginLeft: 12 }}
+            >
+              <Plus size={13} /> Neu
+            </button>
+          )}
         </div>
-        {!adding && (
-          <button
-            onClick={() => setAdding(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: 'var(--accent-ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <Plus size={14} /> Neu
-          </button>
+
+        {/* Neuen Auftrag Form */}
+        {adding && <NewAuftragForm onDone={() => setAdding(false)} />}
+
+        {/* Aktive Aufträge */}
+        {active.length === 0 && !adding && (
+          <p style={{ fontSize: 13, color: 'var(--fg-dim)', padding: '8px 0 0' }}>Noch keine Aufträge. Klicke „Neu" um den ersten anzulegen.</p>
         )}
-      </div>
+        {active.map(a => <AuftragRow key={a.id} auftrag={a} />)}
 
-      {/* Tabellenkopf */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px auto', gap: 8, padding: '6px 0', borderBottom: '2px solid var(--border)' }}>
-        {['Bezeichnung', 'Stundensatz', ''].map(h => (
-          <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{h}</span>
-        ))}
-      </div>
-
-      {/* Neuen Auftrag Form */}
-      {adding && <NewAuftragForm onDone={() => setAdding(false)} />}
-
-      {/* Aktive Aufträge */}
-      {active.length === 0 && !adding && (
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', padding: '20px 0' }}>Noch keine Aufträge. Klicke „Neu" um den ersten anzulegen.</p>
-      )}
-      {active.map(a => <AuftragRow key={a.id} auftrag={a} />)}
-
-      {/* Archivierte */}
-      {archived.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <button
-            onClick={() => setShowArchived(v => !v)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--fg-dim)', padding: 0, display: 'flex', alignItems: 'center', gap: 5 }}
-          >
-            {showArchived ? '▼' : '▶'} {archived.length} archivierte Aufträge
-          </button>
-          {showArchived && archived.map(a => <AuftragRow key={a.id} auftrag={a} />)}
-        </div>
-      )}
-    </div>
+        {/* Archivierte */}
+        {archived.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--fg-dim)', padding: 0, display: 'flex', alignItems: 'center', gap: 5 }}
+            >
+              {showArchived ? '▼' : '▶'} {archived.length} archivierte Aufträge
+            </button>
+            {showArchived && archived.map(a => <AuftragRow key={a.id} auftrag={a} />)}
+          </div>
+        )}
+      </SettingCard>
+    </SettingsPage>
   )
 }
