@@ -32,7 +32,20 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length, pendingScroll])
 
-  // Inbox → Nachricht: scrollen + kurz hervorheben.
+  // Inbox → Nachricht (1/2): stabiler 1400ms Flash-Timer — NICHT abhängig von messages.length,
+  // damit eingehende Nachrichten den Timer nicht zurücksetzen.
+  useEffect(() => {
+    if (!pendingScroll) return
+    const id = pendingScroll
+    const t = setTimeout(() => {
+      const el = rowRefs.current.get(id)
+      if (el) el.style.background = 'transparent'
+      clearScroll(null)
+    }, 1400)
+    return () => clearTimeout(t)
+  }, [pendingScroll, clearScroll])
+
+  // Inbox → Nachricht (2/2): Scroll + Highlight — wiederholt wenn Zeile noch nicht gemountet.
   useEffect(() => {
     if (!pendingScroll) return
     const el = rowRefs.current.get(pendingScroll)
@@ -40,9 +53,7 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
     el.scrollIntoView({ block: 'center', behavior: 'smooth' })
     el.style.transition = 'background 200ms'
     el.style.background = 'var(--accent-soft)'
-    const t = setTimeout(() => { el.style.background = 'transparent'; clearScroll(null) }, 1400)
-    return () => clearTimeout(t)
-  }, [pendingScroll, messages.length, clearScroll])
+  }, [pendingScroll, messages.length])
 
   const onScroll = () => {
     const el = scrollRef.current
