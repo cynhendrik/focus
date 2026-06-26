@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff, Copy, Check, Trash2 } from 'lucide-react'
 import { getApiKey, setApiKey, clearApiKey, getModel, setModel } from '@/lib/ai/briefing'
+import { SettingsPage, SettingCard, SettingsSection, FieldRow } from './ui'
 
 const SUPABASE_URL   = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const WEBHOOK_SECRET = import.meta.env.VITE_LEAD_WEBHOOK_SECRET as string | undefined
@@ -56,20 +57,15 @@ export function DeveloperSettings({ workspaceId }: Props) {
     setModel(m)
   }
 
-  const base   = SUPABASE_URL ?? '—'
-  const secret = WEBHOOK_SECRET ?? '—'
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
-      <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Entwickler</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Interne Konfiguration — nicht für Endkunden sichtbar</p>
-      </div>
-
+    <SettingsPage
+      title="Entwickler"
+      subtitle="Interne Konfiguration — nicht für Endkunden sichtbar"
+      maxWidth={600}
+    >
       {/* Backend URLs */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>Backend</div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingsSection label="Backend">
+        <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
           {SUPABASE_URL
             ? <CopyRow label="Supabase URL" value={SUPABASE_URL} />
             : <div style={{ padding: '14px 20px', fontSize: 12, color: 'var(--warn)' }}>VITE_SUPABASE_URL nicht gesetzt</div>
@@ -85,50 +81,51 @@ export function DeveloperSettings({ workspaceId }: Props) {
               {!SUPABASE_URL ? 'VITE_SUPABASE_URL' : 'VITE_LEAD_WEBHOOK_SECRET'} nicht gesetzt
             </div>
           )}
-        </div>
-      </div>
+        </SettingCard>
+      </SettingsSection>
 
       {/* API Key */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>Anthropic API Key</div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={e => setApiKeyState(e.target.value)}
-                placeholder="sk-ant-api03-..."
-                style={{
-                  width: '100%', padding: '8px 36px 8px 12px', fontSize: 13, borderRadius: 8,
-                  border: '1px solid var(--border)', background: 'var(--surface-2)',
-                  color: 'var(--fg)', outline: 'none', fontFamily: 'var(--font-mono)',
-                  boxSizing: 'border-box' as const,
-                }}
-              />
-              <button
-                onClick={() => setShowKey(v => !v)}
-                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 0 }}
-              >
-                {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+      <SettingsSection label="Anthropic API Key">
+        <SettingCard>
+          <FieldRow label="API Key">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={e => setApiKeyState(e.target.value)}
+                  placeholder="sk-ant-api03-..."
+                  style={{
+                    width: '100%', padding: '8px 36px 8px 12px', fontSize: 13,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border)', background: 'var(--surface-2)',
+                    color: 'var(--fg)', outline: 'none', fontFamily: 'var(--font-mono)',
+                    boxSizing: 'border-box' as const,
+                  }}
+                />
+                <button
+                  onClick={() => setShowKey(v => !v)}
+                  style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', padding: 0 }}
+                >
+                  {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <button onClick={handleSaveKey} className="btn-primary" style={{ fontSize: 12, padding: '6px 14px', flexShrink: 0 }}>
+                {keySaved ? '✓' : 'Speichern'}
               </button>
+              {apiKey && (
+                <button onClick={handleClearKey} style={{ padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', color: 'var(--fg-dim)', display: 'flex', alignItems: 'center' }}>
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
-            <button onClick={handleSaveKey} className="btn-primary" style={{ fontSize: 12, padding: '6px 14px', flexShrink: 0 }}>
-              {keySaved ? '✓' : 'Speichern'}
-            </button>
-            {apiKey && (
-              <button onClick={handleClearKey} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', color: 'var(--fg-dim)', display: 'flex', alignItems: 'center' }}>
-                <Trash2 size={13} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+          </FieldRow>
+        </SettingCard>
+      </SettingsSection>
 
       {/* Model */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-muted)', marginBottom: 8 }}>Modell</div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingsSection label="Modell">
+        <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
           {MODELS.map((m, i) => (
             <button
               key={m.id}
@@ -152,8 +149,8 @@ export function DeveloperSettings({ workspaceId }: Props) {
               <span style={{ fontSize: 13, fontWeight: model === m.id ? 600 : 400 }}>{m.label}</span>
             </button>
           ))}
-        </div>
-      </div>
-    </div>
+        </SettingCard>
+      </SettingsSection>
+    </SettingsPage>
   )
 }
