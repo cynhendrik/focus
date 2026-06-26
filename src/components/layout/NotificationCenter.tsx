@@ -1,147 +1,71 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Bell, Mail, RefreshCw, CreditCard, CheckSquare, Snowflake } from 'lucide-react'
+import { Bell } from 'lucide-react'
+import { useNotificationsStore } from '@/store/notifications.store'
+import { useAuthStore } from '@/store/auth.store'
+import { useMembersStore } from '@/store/members.store'
 import { useUiStore } from '@/store/ui.store'
-import { useMailStore } from '@/store/mail.store'
-import { useCrmStore } from '@/store/crm.store'
-import { useFinanceStore } from '@/store/finance.store'
-import { useTodosStore } from '@/store/todos.store'
-import { useLeadsStore } from '@/store/leads.store'
-import { useAccountsStore } from '@/store/accounts.store'
+import { useOpenTask } from '@/lib/chat/useOpenTask'
+import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
+import type { Notification } from '@/types/notification.types'
 
-interface NotiItem {
-  id: string
-  icon: React.ReactNode
-  title: string
-  subtitle: string
-  onClick: () => void
+const LABEL: Record<Notification['type'], string> = {
+  assigned:  'hat dir eine Aufgabe zugewiesen',
+  mention:   'hat dich erwähnt',
+  comment:   'hat zu deiner Aufgabe kommentiert',
+  completed: 'hat deine Aufgabe abgeschlossen',
 }
 
-// Glocke = vollständiger Überblick über ALLES Offene (breiter als HEUTE):
-// ungelesene Mails · offene/überfällige Follow-ups · überfällige Rechnungen ·
-// offene/fällige Aufgaben · kalte Leads. Klick springt zum jeweiligen Bereich.
+/** Glocke = Vorschau der Inbox: Top-12 ungelesen + „Alle ansehen →". */
 export function NotificationCenter() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const emails       = useMailStore(s => s.emails)
-  const selectEmail  = useMailStore(s => s.selectEmail)
-  const allFollowUps = useCrmStore(s => s.allFollowUps)
-  const lastActivity = useCrmStore(s => s.lastActivity)
-  const invoices     = useFinanceStore(s => s.invoices)
-  const todos        = useTodosStore(s => s.allTodos)
-  const leads        = useLeadsStore(s => s.leads)
-  const accounts     = useAccountsStore(s => s.accounts)
-  const setAppView                = useUiStore(s => s.setAppView)
-  const openCustomerAt            = useUiStore(s => s.openCustomerAt)
-  const setSelectedLeverageLeadId = useUiStore(s => s.setSelectedLeverageLeadId)
+  const notifications = useNotificationsStore(s => s.notifications)
+  const load          = useNotificationsStore(s => s.load)
+  const markRead      = useNotificationsStore(s => s.markRead)
+  const myId          = useAuthStore(s => s.user?.id)
+  const nameOf        = useMembersStore(s => s.nameOf)
+  const setAppView          = useUiStore(s => s.setAppView)
+  const setPendingScrollMsg = useUiStore(s => s.setPendingScrollMessageId)
+  const openTask = useOpenTask()
+
+  useEffect(() => { if (myId) void load(myId) }, [myId, load])
 
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const { groups, total } = useMemo(() => {
-    const nameById = new Map<string, string>()
-    for (const a of accounts) nameById.set(a.id, a.name)
-    for (const l of leads) nameById.set(l.id, l.name)
-    const nameOf = (id?: string | null) => (id ? nameById.get(id) ?? '' : '')
+  const unread = useMemo(() => notifications.filter(n => !n.readAt), [notifications])
+  const preview = unread.slice(0, 12)
+  const loud = loudUnreadCount(notifications)
 
-    const todayStr = new Date().toLocaleDateString('sv')
-
-    const mails: NotiItem[] = emails
-      .filter(e => !e.isRead && e.customerId != null)
-      .sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''))
-      .map(e => ({
-        id: 'mail-' + e.id,
-        icon: <Mail size={14} />,
-        title: e.fromName || e.fromAddr || 'Mail',
-        subtitle: e.subject || '(ohne Betreff)',
-        onClick: () => { void selectEmail(e); setAppView('mail') },
-      }))
-
-    const fus: NotiItem[] = allFollowUps
-      .filter(f => f.status === 'offen')
-      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-      .map(f => {
-        const overdue = !!f.dueDate && f.dueDate.slice(0, 10) < todayStr
-        return {
-          id: 'fu-' + f.id,
-          icon: <RefreshCw size={14} />,
-          title: nameOf(f.customerId) || f.title,
-          subtitle: overdue ? `überfällig · ${f.title}` : f.title,
-          onClick: () => setAppView('leverage_inbox'),
-        }
-      })
-
-    const invs: NotiItem[] = invoices
-      .filter(i => {
-        if (i.status === 'paid' || i.status === 'cancelled' || i.status === 'draft') return false
-        return i.status === 'overdue' || (!!i.dueDate && i.dueDate.slice(0, 10) < todayStr)
-      })
-      .map(i => ({
-        id: 'inv-' + i.id,
-        icon: <CreditCard size={14} />,
-        title: nameOf(i.accountId) || (i.number ?? 'Rechnung'),
-        subtitle: `überfällig${i.number ? ' · ' + i.number : ''}`,
-        onClick: () => setAppView('invoices'),
-      }))
-
-    const tks: NotiItem[] = todos
-      .filter(t =>
-        t.status !== 'done' &&
-        (t.bucket === 'today' || t.bucket === 'in_progress' || t.status === 'in_progress' ||
-          (!!t.dueDate && t.dueDate.slice(0, 10) <= todayStr)),
-      )
-      .map(t => ({
-        id: 'todo-' + t.id,
-        icon: <CheckSquare size={14} />,
-        title: t.title,
-        subtitle: nameOf(t.customerId) || 'Aufgabe',
-        onClick: () => { if (t.customerId) openCustomerAt(t.customerId); else setAppView('dashboard') },
-      }))
-
-    const lastById = new Map<string, string | null>()
-    for (const la of lastActivity) lastById.set(la.accountId, la.lastActivityAt)
-    const openFuLeadIds = new Set(allFollowUps.filter(f => f.status === 'offen').map(f => f.customerId))
-    const cutoff = Date.now() - 14 * 86_400_000
-    const colds: NotiItem[] = leads
-      .filter(l => l.pipelineStage !== 'won' && l.pipelineStage !== 'lost' && !openFuLeadIds.has(l.id))
-      .filter(l => {
-        const la = lastById.get(l.id) ?? l.lastActivityAt ?? null
-        return !la || new Date(la).getTime() < cutoff
-      })
-      .map(l => ({
-        id: 'lead-' + l.id,
-        icon: <Snowflake size={14} />,
-        title: l.name,
-        subtitle: 'lange kein Kontakt',
-        onClick: () => { setSelectedLeverageLeadId(l.id); setAppView('leverage_lead_detail') },
-      }))
-
-    const groups = [
-      { key: 'mail', label: 'Ungelesene Mails',       items: mails },
-      { key: 'fu',   label: 'Follow-ups',             items: fus },
-      { key: 'inv',  label: 'Überfällige Rechnungen', items: invs },
-      { key: 'task', label: 'Offene Aufgaben',        items: tks },
-      { key: 'cold', label: 'Kalte Leads',            items: colds },
-    ].filter(g => g.items.length > 0)
-    const total = groups.reduce((s, g) => s + g.items.length, 0)
-    return { groups, total }
-  }, [emails, allFollowUps, lastActivity, invoices, todos, leads, accounts, selectEmail, setAppView, openCustomerAt, setSelectedLeverageLeadId])
+  const jump = (n: Notification) => {
+    void markRead(n.id)
+    setOpen(false)
+    if (n.refType === 'task') { openTask(n.refId); return }
+    if (n.messageId) setPendingScrollMsg(n.messageId)
+    setAppView('team')
+  }
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         className="icon-btn"
-        title={total > 0 ? `Benachrichtigungen (${total})` : 'Benachrichtigungen'}
+        title={loud > 0 ? `Benachrichtigungen (${loud})` : 'Benachrichtigungen'}
         onClick={() => setOpen(o => !o)}
-        style={{ position: 'relative', color: (open || total > 0) ? 'var(--accent)' : undefined }}
+        style={{ position: 'relative', color: (open || loud > 0) ? 'var(--accent)' : undefined }}
       >
         <Bell size={16} />
+        {loud > 0 && (
+          <span style={{
+            position: 'absolute', top: -2, right: -2, minWidth: 14, height: 14, padding: '0 3px',
+            borderRadius: 99, background: 'var(--accent)', color: 'var(--accent-ink)',
+            fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>{loud}</span>
+        )}
       </button>
 
       {open && (
@@ -152,47 +76,39 @@ export function NotificationCenter() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 8px 10px' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>Benachrichtigungen</span>
-            <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)' }}>{total} offen</span>
+            <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)' }}>{unread.length} ungelesen</span>
           </div>
 
-          {groups.length === 0 ? (
+          {preview.length === 0 ? (
             <div style={{ padding: '24px 8px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-              Alles erledigt — nichts offen. 🎉
+              Alles gelesen. 🎉
             </div>
-          ) : groups.map(g => (
-            <div key={g.key} style={{ marginBottom: 6 }}>
-              <div style={{
-                fontSize: 9.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '6px 8px 3px',
-              }}>
-                {g.label} · {g.items.length}
-              </div>
-              {g.items.slice(0, 12).map(it => (
+          ) : (
+            <>
+              {preview.map(n => (
                 <button
-                  key={it.id}
-                  onClick={() => { it.onClick(); setOpen(false) }}
+                  key={n.id}
+                  onClick={() => jump(n)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-                    background: 'transparent', border: 'none', cursor: 'pointer', padding: 8,
-                    borderRadius: 8, color: 'var(--fg)', fontFamily: 'inherit',
+                    display: 'flex', flexDirection: 'column', gap: 1, width: '100%', textAlign: 'left',
+                    background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, borderRadius: 8,
+                    color: 'var(--fg)', fontFamily: 'inherit',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                 >
-                  <span style={{ color: 'var(--accent)', flexShrink: 0, display: 'flex' }}>{it.icon}</span>
-                  <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
-                    <span style={{ fontSize: 11, color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.subtitle}</span>
-                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600 }}>{nameOf(n.actorId)}</span>
+                  <span style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{LABEL[n.type]}</span>
                 </button>
               ))}
-              {g.items.length > 12 && (
-                <div style={{ fontSize: 10.5, color: 'var(--fg-dim)', padding: '2px 8px 4px' }}>
-                  +{g.items.length - 12} weitere
-                </div>
-              )}
-            </div>
-          ))}
+              <button
+                onClick={() => { setAppView('inbox'); setOpen(false) }}
+                style={{ width: '100%', textAlign: 'center', padding: '8px', marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+              >
+                Alle ansehen →
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
