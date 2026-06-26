@@ -56,17 +56,32 @@ jobs:
       - name: Frontend-Deps installieren
         run: npm ci
 
+      # Vite liest VITE_*-Variablen aus .env im Projekt-Root zur Build-Zeit und
+      # backt sie ins Bundle. Wir schreiben sie hier aus GitHub-Secrets (über die
+      # Step-env, nicht direkt interpoliert — sicher gegen Sonderzeichen/Injection).
+      - name: .env für Vite schreiben (Supabase + Webhook)
+        shell: bash
+        env:
+          VITE_SUPABASE_URL:        ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY:   ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_LEAD_WEBHOOK_SECRET: ${{ secrets.VITE_LEAD_WEBHOOK_SECRET }}
+        run: |
+          {
+            echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+            echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY"
+            echo "VITE_LEAD_WEBHOOK_SECRET=$VITE_LEAD_WEBHOOK_SECRET"
+          } > .env
+
       - name: Tauri bauen
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Tester-Build: lokaler Modus (kein Login), Supabase als Platzhalter.
-          # (Diese Werte liegen lokal in src-tauri/.cargo/config.toml, das gitignored ist.)
-          VITE_LOCAL_MODE: 'true'
-          SUPABASE_URL: 'https://placeholder.supabase.co'
-          SUPABASE_ANON_KEY: 'placeholder-key'
+          # Voll-Cloud-Build: eingebetteter Anthropic-Key (KORA) zur Compile-Zeit für
+          # Rust option_env!(); Supabase/Webhook kommen via .env (Schritt oben) ins
+          # Vite-Bundle. Kein VITE_LOCAL_MODE → Login-Screen erscheint (mit „überspringen").
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
           args: ${{ matrix.args }}
           # Legt automatisch ein (Entwurfs-)Release mit den Installern als Assets an.
