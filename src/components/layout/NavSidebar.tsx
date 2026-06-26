@@ -118,7 +118,7 @@ export function NavSidebar() {
 
       {/* ── MENÜ ──────────────────────────────────────────────────────── */}
       {!collapsed && <SectionLabel>Menü</SectionLabel>}
-      <NavItem icon={Home}       label="Heute"    active={appView === 'dashboard'}
+      <NavItem icon={Home}       label="Mein Tag"    active={appView === 'dashboard'}
         onClick={() => setAppView('dashboard')} kbd="H" />
       {mod('crm')      && <NavItem icon={Users}      label="Kunden"   active={appView === 'clients'}
         onClick={() => setAppView('clients')} kbd="C" />}
