@@ -537,34 +537,38 @@ export function FinanceRoute() {
           { key: 'uebersicht', label: 'Übersicht' },
           { key: 'mahnwesen',  label: 'Mahnwesen', badge: overdueInvoices.length || undefined },
           ...(canContracts ? [{ key: 'vertraege' as const, label: 'Verträge', badge: vertraege.filter(v => v.status === 'active').length || undefined }] : []),
-        ] as const).map(tab => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFinanceTab(tab.key)}
-            style={{
-              padding: '8px 16px',
-              fontSize: 13, fontWeight: financeTab === tab.key ? 600 : 500,
-              color: financeTab === tab.key ? 'var(--fg)' : 'var(--fg-muted)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              borderBottom: `2px solid ${financeTab === tab.key ? 'var(--accent)' : 'transparent'}`,
-              marginBottom: -1,
-              display: 'flex', alignItems: 'center', gap: 7,
-              transition: 'color 160ms, border-color 160ms',
-            }}
-          >
-            {tab.label}
-            {'badge' in tab && tab.badge ? (
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
-                padding: '1px 6px', borderRadius: 99,
-                background: 'oklch(72% 0.18 25 / 0.14)', color: 'var(--danger)',
-              }}>
-                {tab.badge}
-              </span>
-            ) : null}
-          </button>
-        ))}
+        ] as const).map(tab => {
+          const isActive = financeTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setFinanceTab(tab.key)}
+              style={{
+                padding: '8px 16px',
+                fontSize: 13, fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: `2px solid transparent`,
+                borderImage: isActive ? 'var(--accent-gradient) 1' : 'none',
+                marginBottom: -1,
+                display: 'flex', alignItems: 'center', gap: 7,
+                transition: 'color 160ms',
+              }}
+            >
+              {tab.label}
+              {'badge' in tab && tab.badge ? (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700,
+                  padding: '1px 6px', borderRadius: 99,
+                  background: 'oklch(72% 0.18 25 / 0.14)', color: 'var(--danger)',
+                }}>
+                  {tab.badge}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
       </div>
 
       {/* Mahnwesen Tab */}
@@ -573,7 +577,7 @@ export function FinanceRoute() {
 
       {/* ── Umsatz (nur im Übersicht-Tab) ────────────────────────────────── */}
       {financeTab === 'uebersicht' && <>
-      <div className="card" style={{ padding: '24px 28px', overflow: 'hidden', position: 'relative' }}>
+      <div className="card" style={{ padding: '24px 28px', overflow: 'hidden', position: 'relative', boxShadow: 'var(--card-shadow)' }}>
 
         {/* Subtle background glow blob */}
         <div style={{
@@ -595,9 +599,10 @@ export function FinanceRoute() {
                 <button key={p} onClick={() => setPeriod(p)} style={{
                   padding: '5px 14px', fontSize: 12, fontWeight: 500,
                   border: 'none', cursor: 'pointer',
-                  background: period === p ? 'var(--accent)' : 'none',
-                  color: period === p ? 'var(--accent-ink)' : 'var(--fg-muted)',
+                  background: period === p ? 'var(--accent-gradient)' : 'none',
+                  color: period === p ? '#fff' : 'var(--fg-muted)',
                   transition: 'background 150ms, color 150ms',
+                  boxShadow: period === p ? `0 4px 14px -4px var(--accent-glow)` : 'none',
                 }}>
                   {p === 'eigener' ? 'Eigener' : p.charAt(0).toUpperCase() + p.slice(1)}
                 </button>
@@ -658,7 +663,7 @@ export function FinanceRoute() {
       </div>
 
       {/* ── Onboarding & Entwürfe ─────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Tag size={14} style={{ color: 'var(--fg-muted)' }} />
@@ -687,7 +692,7 @@ export function FinanceRoute() {
               {activeOffers.map(offer => (
                 <tr key={offer.id}
                   style={{ borderBottom: '1px solid var(--border)', transition: 'background 80ms' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.025)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
                   onMouseLeave={e => (e.currentTarget.style.background = '')}
                 >
                   <td style={td}><span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{offer.number ?? '—'}</span></td>
@@ -782,7 +787,7 @@ export function FinanceRoute() {
       </div>
 
       {/* ── Rechnungen ─────────────────────────────────────────────────────── */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -791,13 +796,22 @@ export function FinanceRoute() {
               {filteredInvoices.length > 0 && <span className="chip">{filteredInvoices.length}</span>}
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
-              {INVOICE_FILTERS.map(f => (
-                <button key={f.value} onClick={() => setInvoiceFilter(f.value)}
-                  className="chip" data-tone={invoiceFilter === f.value ? 'accent' : ''}
-                  style={{ cursor: 'pointer' }}>
-                  {f.label}
-                </button>
-              ))}
+              {INVOICE_FILTERS.map(f => {
+                const isActive = invoiceFilter === f.value
+                return (
+                  <button key={f.value} onClick={() => setInvoiceFilter(f.value)}
+                    className="chip"
+                    style={{
+                      cursor: 'pointer',
+                      background: isActive ? 'var(--nav-active-bg)' : undefined,
+                      color: isActive ? 'var(--accent-text)' : undefined,
+                      border: isActive ? '1px solid oklch(91% 0.03 264 / 0.3)' : undefined,
+                      transition: 'background 150ms, color 150ms',
+                    }}>
+                    {f.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -833,7 +847,7 @@ export function FinanceRoute() {
                     opacity: inv.status === 'cancelled' ? 0.5 : 1,
                     textDecoration: inv.status === 'cancelled' ? 'line-through' : 'none',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'oklch(100% 0 0 / 0.025)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
                   onMouseLeave={e => (e.currentTarget.style.background = '')}
                 >
                   <td style={td}><span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{inv.number ?? '—'}</span></td>
@@ -1017,7 +1031,7 @@ function StornoModal({ invoice, onCancel, onConfirm }: StornoModalProps) {
       background: 'oklch(0% 0 0 / 0.55)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <div className="card" style={{ width: 420, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="card" style={{ width: 420, padding: 28, display: 'flex', flexDirection: 'column', gap: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--card-shadow), 0 20px 60px -10px oklch(0% 0 0 / 0.35)' }}>
         <div>
           <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700 }}>Rechnung stornieren</h3>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--fg-muted)' }}>
@@ -1131,7 +1145,7 @@ function BatchExportModal({ invoices, accounts, profile, onClose }: BatchExportM
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'oklch(0% 0 0 / 0.55)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: 440, padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="card" style={{ width: 440, padding: 28, display: 'flex', flexDirection: 'column', gap: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--card-shadow), 0 20px 60px -10px oklch(0% 0 0 / 0.35)' }}>
         <div>
           <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700 }}>Batch PDF Export</h3>
           <p style={{ margin: 0, fontSize: 12, color: 'var(--fg-muted)' }}>
@@ -1152,10 +1166,10 @@ function BatchExportModal({ invoices, accounts, profile, onClose }: BatchExportM
           </div>
         </div>
 
-        <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 13 }}>
+        <div style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--fg)' }}>
           {eligible.length === 0
             ? <span style={{ color: 'var(--fg-dim)' }}>Keine Rechnungen in diesem Zeitraum</span>
-            : <span><strong>{eligible.length}</strong> Rechnung{eligible.length !== 1 ? 'en' : ''} werden exportiert</span>
+            : <span><strong style={{ color: 'var(--accent-text)' }}>{eligible.length}</strong> Rechnung{eligible.length !== 1 ? 'en' : ''} werden exportiert</span>
           }
         </div>
 

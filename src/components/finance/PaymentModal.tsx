@@ -54,14 +54,14 @@ export function PaymentModal({ invoice, onClose }: { invoice: Invoice; onClose: 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+        position: 'fixed', inset: 0, zIndex: 1000, background: 'oklch(0% 0 0 / 0.55)', backdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div style={{
         width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        borderRadius: 'var(--radius-lg)', padding: 24, boxShadow: 'var(--card-shadow), 0 20px 60px -10px oklch(0% 0 0 / 0.35)',
       }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 4px' }}>Zahlung erfassen</h2>
         <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '0 0 16px' }}>
@@ -71,9 +71,9 @@ export function PaymentModal({ invoice, onClose }: { invoice: Invoice; onClose: 
         {/* Summary */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           {[['Gesamt', invoice.total], ['Bezahlt', paid], ['Offen', rest]].map(([k, v]) => (
-            <div key={k as string} style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
-              <div style={{ fontSize: 10, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
-              <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: k === 'Offen' && (v as number) > 0 ? 'var(--warn)' : 'var(--fg)' }}>{fmt(v as number)}</div>
+            <div key={k as string} style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' }}>
+              <div style={{ fontSize: 10, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--font-mono)' }}>{k}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: k === 'Offen' && (v as number) > 0 ? 'var(--warn)' : k === 'Bezahlt' && (v as number) > 0 ? 'var(--ok)' : 'var(--fg)' }}>{fmt(v as number)}</div>
             </div>
           ))}
         </div>

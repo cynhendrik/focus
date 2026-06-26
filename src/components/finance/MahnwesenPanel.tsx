@@ -68,7 +68,7 @@ function MahnRow({ invoice, customerName, dunningLevel, amount, onPaid, onSend, 
       borderBottom: '1px solid var(--border)',
       transition: 'background 160ms',
     }}
-    onMouseEnter={e => { e.currentTarget.style.background = 'oklch(100% 0 0 / 0.02)' }}
+    onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
       {/* Avatar */}
@@ -345,10 +345,10 @@ export function MahnwesenPanel() {
 
       {/* Aktionsfähige Erinnerungen */}
       {actionableItems.length > 0 && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
           <div style={{
             padding: '10px 18px', borderBottom: '1px solid var(--border)',
-            background: 'oklch(72% 0.18 25 / 0.04)',
+            background: 'oklch(72% 0.18 25 / 0.06)',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <AlertTriangle size={12} style={{ color: 'var(--danger)' }} />
@@ -376,7 +376,7 @@ export function MahnwesenPanel() {
 
       {/* Auf Cooldown / wartend */}
       {waitingItems.length > 0 && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
           <button
             type="button"
             onClick={() => setShowDone(v => !v)}
@@ -387,7 +387,7 @@ export function MahnwesenPanel() {
               display: 'flex', alignItems: 'center', gap: 8,
               transition: 'background 160ms',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'oklch(100% 0 0 / 0.02)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
           >
             <Clock size={12} style={{ color: 'var(--fg-dim)' }} />
@@ -416,19 +416,19 @@ export function MahnwesenPanel() {
       )}
 
       {escalated.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '0 18px 8px' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginTop: 4 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--fg-dim)', padding: '10px 18px 8px' }}>
             Braucht Entscheidung
           </div>
           {escalated.map(e => (
             <div key={e.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{e.customerName}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg)' }}>{e.customerName}</div>
                 <div style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
                   nach 2. Mahnung · {e.daysOverdue}d überfällig · Inkasso / abschreiben / persönlich
                 </div>
               </div>
-              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>{fmtEur(e.invoice.total)} €</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14, color: 'var(--fg)' }}>{fmtEur(e.invoice.total)} €</span>
             </div>
           ))}
         </div>

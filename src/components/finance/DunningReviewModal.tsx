@@ -75,12 +75,15 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
     <>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, zIndex: 200, background: 'oklch(0% 0 0 / 0.5)',
+        position: 'fixed', inset: 0, zIndex: 200, background: 'oklch(0% 0 0 / 0.55)',
+        backdropFilter: 'blur(8px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       }}>
         <div onClick={e => e.stopPropagation()} style={{
           width: 'min(640px, 100%)', maxHeight: '80vh', display: 'flex', flexDirection: 'column',
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden',
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--card-shadow), 0 20px 60px -10px oklch(0% 0 0 / 0.35)',
+          overflow: 'hidden',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
             <div>
@@ -101,9 +104,12 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
               const noMail = email === null            // confirmed: customer has no email
               const notSendable = email == null        // loading (undefined) OR no email
               return (
-                <div key={it.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
+                <div key={it.invoice.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)', transition: 'background 120ms' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = '' }}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{it.customerName}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--fg)' }}>{it.customerName}</div>
                     <div style={{ fontSize: 11, color: 'var(--fg-dim)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span>{LEVEL_LABEL[it.level] ?? '2. Mahnung'}</span>
                       <span>· {it.daysOverdue}d überfällig</span>
@@ -117,10 +123,13 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
                     disabled={notSendable || sending === it.invoice.id || batch}
                     onClick={() => sendOne(it.invoice.id, it.level)}
                     style={{
-                      height: 32, padding: '0 14px', borderRadius: 8, border: '1px solid var(--accent)',
-                      background: 'var(--accent)', color: 'var(--accent-ink)',
-                      cursor: notSendable ? 'not-allowed' : 'pointer', opacity: notSendable ? 0.4 : 1,
+                      height: 32, padding: '0 14px', borderRadius: 'var(--radius-sm)', border: 'none',
+                      background: notSendable ? 'var(--surface-2)' : 'var(--accent-gradient)',
+                      color: notSendable ? 'var(--fg-dim)' : '#fff',
+                      boxShadow: notSendable ? 'none' : `0 4px 14px -4px var(--accent-glow)`,
+                      cursor: notSendable ? 'not-allowed' : 'pointer', opacity: notSendable ? 0.5 : 1,
                       display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600,
+                      transition: 'opacity 160ms, box-shadow 160ms',
                     }}
                   >
                     {sending === it.invoice.id ? <Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={12} />}
@@ -132,12 +141,8 @@ export function DunningReviewModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {items.length > 0 && (
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={sendAll} disabled={batch} style={{
-                height: 36, padding: '0 18px', borderRadius: 9, border: 'none',
-                background: 'var(--accent)', color: 'var(--accent-ink)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, opacity: batch ? 0.6 : 1,
-              }}>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', background: 'var(--surface)' }}>
+              <button type="button" onClick={sendAll} disabled={batch} className="btn-primary" style={{ opacity: batch ? 0.6 : 1 }}>
                 {batch ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={13} />}
                 Alle senden
               </button>

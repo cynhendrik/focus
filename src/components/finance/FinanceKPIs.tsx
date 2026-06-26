@@ -25,10 +25,10 @@ interface KpiCardProps {
 function KpiCard({ label, value, sub, icon, tone = 'neutral' }: KpiCardProps) {
   const color = TONE_COLOR[tone]
   return (
-    <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12, boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span className="card-label">{label}</span>
-        <span style={{ color, opacity: 0.7 }}>{icon}</span>
+        <span style={{ color, opacity: 0.75 }}>{icon}</span>
       </div>
       <div style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em', color }}>
         {value}
@@ -89,7 +89,7 @@ export function FinanceKPIs() {
       </div>
 
       {kpis.suggestionCount > 0 && (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px' }}>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--card-shadow)' }}>
           <Lightbulb size={16} style={{ color: 'var(--warn)', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>
             <strong style={{ color: 'var(--warn)' }}>{kpis.suggestionCount} Rechnungsvorschlag{kpis.suggestionCount !== 1 ? 'e' : ''}</strong> warten auf Freigabe
@@ -98,7 +98,7 @@ export function FinanceKPIs() {
       )}
 
       {kpis.topClients.length > 0 && (
-        <div className="card">
+        <div className="card" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: 'var(--card-shadow)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Users size={15} style={{ color: 'var(--fg-muted)' }} />
             <span className="card-label">Top-Kunden (Umsatz)</span>
