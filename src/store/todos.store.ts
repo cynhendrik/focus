@@ -122,6 +122,7 @@ interface TodosState {
   setBucket:       (id: string, bucket: TodoBucket) => Promise<void>
   setScheduledAt:  (id: string, iso: string | undefined) => Promise<void>
   setPriority:     (id: string, priority: TodoPriority) => Promise<void>
+  setAssignee:     (id: string, assignee: string | undefined) => Promise<void>
   toggleChecklist: (id: string, itemId: string) => Promise<void>
   updateNotes:     (id: string, notes: string) => Promise<void>
 }
@@ -304,6 +305,12 @@ export const useTodosStore = create<TodosState>()((set, get) => ({
     const current = get().allTodos.find(t => t.id === id)
     if (!current) return
     await get().upsert({ ...todoToPayload(current), priority })
+  },
+
+  setAssignee: async (id, assignee) => {
+    const current = get().allTodos.find(t => t.id === id)
+    if (!current) return
+    await get().upsert({ ...todoToPayload(current), assignee })
   },
 
   toggleChecklist: async (id, itemId) => {

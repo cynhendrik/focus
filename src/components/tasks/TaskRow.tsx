@@ -4,6 +4,7 @@ import { useTodosStore } from '@/store/todos.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import type { Todo, TodoPriority } from '@/types/todo.types'
 import { Trash2 } from 'lucide-react'
+import { AssigneePicker } from '@/components/team/AssigneePicker'
 
 const PRIO_COLOR: Record<TodoPriority, string> = {
   p1: 'oklch(60% 0.2 25)',
@@ -224,6 +225,11 @@ export function TaskRow({ todo }: Props) {
               </div>
             </div>
           )}
+
+          <div>
+            <div className="card-label">Zuständig</div>
+            <AssigneePicker todo={todo} />
+          </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
