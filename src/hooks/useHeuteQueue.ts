@@ -7,6 +7,8 @@ import { useCalendarStore } from '@/store/calendar.store'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useAuthStore } from '@/store/auth.store'
+import { filterMine } from '@/lib/todos/ownership'
 import { staticHeuteQueue } from '@/lib/ai/heute-queue'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
 
@@ -16,8 +18,9 @@ export function useHeuteQueue() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    const myId = useAuthStore.getState().user?.id
     const input = {
-      todos:          useTodosStore.getState().allTodos,
+      todos:          filterMine(useTodosStore.getState().allTodos, myId),
       invoices:       useFinanceStore.getState().invoices,
       emails:         useMailStore.getState().emails,
       deals:          useDealsStore.getState().deals,
