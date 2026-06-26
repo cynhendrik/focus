@@ -41,8 +41,8 @@ export function SettingsRoute() {
   return (
     <div style={{ display: 'flex', height: '100%', background: 'var(--bg)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em' }}>Settings.</h1>
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface)' }}>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>Einstellungen</h1>
         </div>
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <SettingsSidebar
