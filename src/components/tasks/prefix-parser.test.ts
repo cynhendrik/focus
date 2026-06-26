@@ -207,6 +207,30 @@ describe('parseTaskText', () => {
       expect(r.title).toBe('Call Klara')
     })
 
+    it('typed @-token resolves via resolveMention fallback (no popover pick)', () => {
+      const r = parseTaskText('Call mit @Klara', {
+        resolveMention: q => (q.toLowerCase() === 'klara' ? 'cust-9' : undefined),
+      })
+      expect(r.customerId).toBe('cust-9')
+      expect(r.title).toBe('Call')
+    })
+
+    it('picked mention takes precedence over resolveMention fallback', () => {
+      const r = parseTaskText('Call @Klara', {
+        mentions: [{ marker: '@Klara', customerId: 'picked-1' }],
+        resolveMention: () => 'fallback-2',
+      })
+      expect(r.customerId).toBe('picked-1')
+    })
+
+    it('resolveMention returning undefined keeps word in title', () => {
+      const r = parseTaskText('Call @Unbekannt', {
+        resolveMention: () => undefined,
+      })
+      expect(r.customerId).toBeUndefined()
+      expect(r.title).toBe('Call Unbekannt')
+    })
+
     it('multiple resolved mentions: first wins', () => {
       const r = parseTaskText('Treffen @Klara @Tobi', {
         mentions: [

@@ -93,6 +93,12 @@ function parseSoftDateToken(rawToken: string): string | undefined {
 export interface ParseContext {
   /** Resolved mentions — `[{ marker: '@<token>', customerId }]`. Composer fills this from the mention popover. */
   mentions?: Array<{ marker: string; customerId: string }>
+  /**
+   * Fallback resolver for @-tokens the user typed but never picked from the popover.
+   * Receives the text after `@` and returns a customerId (or undefined). Composer
+   * supplies a name/company matcher so plain typing (`@Kunde`) still links the customer.
+   */
+  resolveMention?: (query: string) => string | undefined
 }
 
 export function parseTaskText(input: string, ctx: ParseContext = {}): TaskDraft {
@@ -118,9 +124,10 @@ export function parseTaskText(input: string, ctx: ParseContext = {}): TaskDraft 
         : Math.round(value)
       continue
     }
-    // Resolved mention from popover (highest precedence on @-tokens)
+    // Resolved mention from popover (highest precedence on @-tokens), with a
+    // typed-name fallback so "@Kunde" links even without picking from the popover.
     if (token.startsWith('@')) {
-      const resolved = mentionMap.get(token.toLowerCase())
+      const resolved = mentionMap.get(token.toLowerCase()) ?? ctx.resolveMention?.(token.slice(1))
       if (resolved) {
         // First mention wins — keeps later mentions usable as participants display
         if (!draft.customerId) draft.customerId = resolved

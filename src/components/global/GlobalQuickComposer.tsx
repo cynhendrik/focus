@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -170,6 +170,19 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     [accounts],
   )
 
+  // Typed-name fallback: resolve "@Kunde" without picking from the popover —
+  // matches the same way (name/company) and returns the top hit, exactly what
+  // pressing Enter on the default-selected popover row would have done.
+  const resolveMention = useCallback((q: string) => {
+    const query = q.trim().toLowerCase().replace(/[,;:.!?]+$/, '')
+    if (!query) return undefined
+    const match = candidates.find(c =>
+      c.name.toLowerCase().includes(query) ||
+      (c.company ?? '').toLowerCase().includes(query)
+    )
+    return match?.id
+  }, [candidates])
+
   const placeholderText = pinnedCustomer
     ? `! Aufgabe · Oder Gedanke für ${pinnedCustomer.name}…`
     : '! Aufgabe · Gedanke tippen · @Kunde verknüpfen'
@@ -221,14 +234,20 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   })
 
   const draft = useMemo(() => {
-    const parsed = parseTaskText(text, { mentions })
+    const parsed = parseTaskText(text, { mentions, resolveMention })
     parsed.actionType = detectActionType(parsed.title) ?? undefined
     return parsed
-  }, [text, mentions])
+  }, [text, mentions, resolveMention])
 
+  // An explicit @-mention always overrides the contextually pinned customer:
+  // standing in Kunde X but typing "@Kunde B" must capture for B, not X.
   const effectiveCustomerId = useMemo(
-    () => pinnedCustomer?.id ?? draft.customerId,
+    () => draft.customerId ?? pinnedCustomer?.id,
     [pinnedCustomer, draft.customerId],
+  )
+  const effectiveCustomer = useMemo(
+    () => accounts.find(a => a.id === effectiveCustomerId),
+    [accounts, effectiveCustomerId],
   )
 
   const canSubmit = isTaskMode
@@ -402,9 +421,9 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
           </div>
           <div style={{ fontSize: 12, color: 'var(--fg-muted)', marginTop: 1 }}>
             {isTaskMode
-              ? pinnedCustomer ? `Bei ${pinnedCustomer.name}` : 'Workspace'
+              ? effectiveCustomer ? `Bei ${effectiveCustomer.name}` : 'Workspace'
               : effectiveCustomerId
-                ? `→ Notiz bei ${accounts.find(a => a.id === effectiveCustomerId)?.name ?? 'Kunde'}`
+                ? `→ Notiz bei ${effectiveCustomer?.name ?? 'Kunde'}`
                 : '@Kunde tippen um zu verknüpfen'
             }
           </div>
@@ -470,7 +489,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
                 <Chip color="accent">{ACTION_TYPE_LABELS[draft.actionType]}</Chip>
               )}
               {draft.tags.map(t => <Chip key={t} color="muted">#{t}</Chip>)}
-              {effectiveCustomerId && !pinnedCustomer && (() => {
+              {effectiveCustomerId && effectiveCustomerId !== pinnedCustomer?.id && (() => {
                 const acc = accounts.find(a => a.id === effectiveCustomerId)
                 return acc ? <Chip color="accent" onClick={goToCustomer} clickable>@ {acc.name}</Chip> : null
               })()}
