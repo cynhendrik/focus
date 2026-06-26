@@ -27,6 +27,8 @@ export function Topbar() {
   const toggleTheme    = useUiStore(s => s.toggleTheme)
   const zeitPanelOpen  = useUiStore(s => s.zeitPanelOpen)
   const setZeitPanel   = useUiStore(s => s.setZeitPanelOpen)
+  const chatDrawerOpen   = useUiStore(s => s.chatDrawerOpen)
+  const toggleChatDrawer = useUiStore(s => s.toggleChatDrawer)
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
   const { label, tag } = meta
@@ -62,6 +64,14 @@ export function Topbar() {
         </button>
         <button className="icon-btn" onClick={toggleTheme} title="Theme wechseln">
           <Sun size={16} />
+        </button>
+        <button
+          className="icon-btn"
+          onClick={toggleChatDrawer}
+          title="Team-Chat"
+          style={{ color: chatDrawerOpen ? 'var(--accent)' : undefined }}
+        >
+          <MessagesSquare size={16} />
         </button>
         <NotificationCenter />
       </div>
