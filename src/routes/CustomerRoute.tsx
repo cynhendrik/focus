@@ -293,7 +293,7 @@ export function CustomerRoute({ customerId }: Props) {
           <button
             className="btn-ghost"
             onClick={() => setAktionenOpen(v => !v)}
-            style={{ background: 'var(--accent)', color: 'var(--accent-ink)', border: 'none' }}
+            style={{ background: 'var(--accent-gradient)', color: '#fff', border: 'none', boxShadow: '0 4px 16px -4px var(--accent-glow)' }}
           >
             Aktionen
             <ChevronDown size={12} style={{
@@ -359,9 +359,9 @@ export function CustomerRoute({ customerId }: Props) {
       {customer.archivedAt && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
-          padding: '8px 24px', background: 'var(--surface-2)',
+          padding: '8px 24px', background: 'color-mix(in srgb, var(--accent-violet) 8%, var(--surface-2))',
           borderBottom: '1px solid var(--border)',
-          fontSize: 12, color: 'var(--fg-dim)',
+          fontSize: 12, color: 'var(--fg-muted)',
         }}>
           <Archive size={13} />
           <span>Dieser Kunde ist archiviert — er taucht nicht in der aktiven Liste auf, alle Daten bleiben erhalten.</span>
@@ -402,7 +402,7 @@ export function CustomerRoute({ customerId }: Props) {
                 padding: '18px 18px 16px',
                 marginRight: 8,
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                color: active ? 'var(--fg)' : 'var(--fg-dim)',
+                color: active ? 'var(--accent-text)' : 'var(--fg-dim)',
                 fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 500,
                 position: 'relative',
                 transition: 'color 140ms',
@@ -416,11 +416,11 @@ export function CustomerRoute({ customerId }: Props) {
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   minWidth: 18, height: 18, padding: '0 6px', borderRadius: 99,
-                  background: 'oklch(35% 0.10 25)',
-                  color: 'oklch(80% 0.13 25)',
+                  background: 'var(--accent-soft)',
+                  color: 'var(--accent-text)',
                   fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 700,
                   fontVariantNumeric: 'tabular-nums',
-                  border: '1px solid oklch(38% 0.12 25 / 0.7)',
+                  border: '1px solid color-mix(in srgb, var(--accent) 35%, transparent)',
                 }}>
                   {badge}
                 </span>
@@ -429,8 +429,8 @@ export function CustomerRoute({ customerId }: Props) {
                 <span style={{
                   position: 'absolute', left: 18, right: 18, bottom: -1,
                   height: 2, borderRadius: 2,
-                  background: 'var(--accent)',
-                  boxShadow: '0 0 12px oklch(56% 0.19 264 / 0.5)',
+                  background: 'var(--accent-gradient)',
+                  boxShadow: '0 0 12px var(--accent-glow)',
                 }} />
               )}
             </button>

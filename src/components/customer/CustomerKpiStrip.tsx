@@ -147,8 +147,11 @@ export function CustomerKpiStrip({ customerId }: Props) {
       {/* Eine Zeile, vier Zahlen */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
-        padding: '10px 2px 12px',
-        borderBottom: '1px solid var(--border)',
+        padding: '10px 14px 12px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-sm)',
+        boxShadow: 'var(--card-shadow)',
       }}>
         <Stat label="Kunde seit" value={`${months} Mo.`} muted={months === 0} />
         <Dot />
@@ -170,7 +173,7 @@ export function CustomerKpiStrip({ customerId }: Props) {
           onClick={() => setActiveTab('finanzen')}
           style={{
             display: 'flex', alignItems: 'center', gap: 12, width: '100%',
-            padding: '10px 14px', borderRadius: 12,
+            padding: '10px 14px', borderRadius: 'var(--radius-sm)',
             background: 'oklch(72% 0.18 25 / 0.10)',
             border: '1px solid oklch(72% 0.18 25 / 0.30)',
             color: 'oklch(80% 0.16 25)', cursor: 'pointer',

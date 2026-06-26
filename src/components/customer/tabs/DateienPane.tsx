@@ -153,7 +153,7 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
           display: 'flex', alignItems: 'center',
           paddingLeft: 8 + depth * 16, paddingRight: 8,
           borderRadius: 7, cursor: 'pointer', marginBottom: 1,
-          background: isActive ? 'var(--accent)' : 'transparent',
+          background: isActive ? 'var(--nav-active-bg)' : 'transparent',
           transition: 'background 80ms',
         }}
       >
@@ -161,7 +161,7 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
           onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
           style={{
             width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, color: isActive ? 'var(--accent-ink)' : 'var(--fg-dim)',
+            flexShrink: 0, color: isActive ? 'var(--accent-text)' : 'var(--fg-dim)',
           }}
         >
           {children.length > 0
@@ -169,13 +169,13 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
             : null}
         </span>
 
-        <span style={{ display: 'flex', alignItems: 'center', color: isActive ? 'var(--accent-ink)' : 'var(--fg-muted)', marginRight: 6, flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)', marginRight: 6, flexShrink: 0 }}>
           {isActive ? <FolderOpen size={13} /> : <Folder size={13} />}
         </span>
 
         <span style={{
           flex: 1, fontSize: 13, fontWeight: isActive ? 600 : 400,
-          color: isActive ? 'var(--accent-ink)' : 'var(--fg)',
+          color: isActive ? 'var(--accent-text)' : 'var(--fg)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           padding: '5px 0',
         }}>
@@ -187,8 +187,8 @@ function SidebarNode({ folder, all, depth, activeId, onSelect }: SidebarNodeProp
             fontSize: 11, fontWeight: 500, minWidth: 18, height: 18,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             borderRadius: 5, flexShrink: 0, marginLeft: 4, padding: '0 4px',
-            background: isActive ? 'oklch(100% 0 0 / 0.2)' : 'var(--surface-2)',
-            color: isActive ? 'var(--accent-ink)' : 'var(--fg-muted)',
+            background: isActive ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-2)',
+            color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)',
           }}>
             {children.length}
           </span>
@@ -690,17 +690,17 @@ export function DateienPane({ customerId }: Props) {
                 onClick={() => navigate(null)}
                 onMouseEnter={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'var(--surface-2)' }}
                 onMouseLeave={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'transparent' }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1, background: activeFolderId === null ? 'var(--accent)' : 'transparent', transition: 'background 80ms' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1, background: activeFolderId === null ? 'var(--nav-active-bg)' : 'transparent', transition: 'background 80ms' }}
               >
                 <span style={{ width: 16, flexShrink: 0 }} />
-                <span style={{ display: 'flex', color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg-muted)', flexShrink: 0 }}>
+                <span style={{ display: 'flex', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)', flexShrink: 0 }}>
                   {activeFolderId === null ? <FolderOpen size={13} /> : <Folder size={13} />}
                 </span>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400, color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg)' }}>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400, color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg)' }}>
                   Alle Dateien
                 </span>
                 {rootFolders.length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 500, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, padding: '0 4px', background: activeFolderId === null ? 'oklch(100% 0 0 / 0.2)' : 'var(--surface-2)', color: activeFolderId === null ? 'var(--accent-ink)' : 'var(--fg-muted)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, padding: '0 4px', background: activeFolderId === null ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-2)', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)' }}>
                     {rootFolders.length}
                   </span>
                 )}
@@ -732,7 +732,7 @@ export function DateienPane({ customerId }: Props) {
           padding: '13px 22px 11px',
           borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0, background: 'var(--surface)',
+          flexShrink: 0, background: 'var(--surface-2)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--fg)' }}>
@@ -802,9 +802,9 @@ export function DateienPane({ customerId }: Props) {
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg)', letterSpacing: '-0.01em', marginBottom: 8 }}>
                 Dateien
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 68px', alignItems: 'center', gap: 8, padding: '6px 12px 8px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 68px', alignItems: 'center', gap: 8, padding: '6px 12px 8px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0' }}>
                 {['Name', 'Datum', 'Größe'].map((h, i) => (
-                  <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', textAlign: i === 2 ? 'right' : 'left' }}>
+                  <span key={i} style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', letterSpacing: '0.12em', textTransform: 'uppercase', textAlign: i === 2 ? 'right' : 'left' }}>
                     {h}
                   </span>
                 ))}

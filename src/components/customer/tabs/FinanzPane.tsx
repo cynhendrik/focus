@@ -11,7 +11,7 @@ import { useAccountsStore }  from '@/store/accounts.store'
 import { useToastStore }     from '@/store/toast.store'
 import { isOverdue, paidAmount, remaining, displayInvoiceStatus } from '@/lib/invoice-status'
 import { PaymentModal }      from '@/components/finance/PaymentModal'
-import type { Invoice, Offer } from '@/types/finance.types'
+import type { Invoice, Offer, Payment } from '@/types/finance.types'
 import type { Zeiteintrag }   from '@/types/auftrag.types'
 
 interface Props { customerId: string }
@@ -51,6 +51,101 @@ interface AuftragGroup {
   entries:      Zeiteintrag[]
   totalMinutes: number
   totalAmount:  number
+}
+
+// ── Aurora table header style ─────────────────────────────────────────────────
+const thS: React.CSSProperties = {
+  padding: '8px 14px',
+  fontFamily: 'var(--font-mono)', fontSize: 10.5,
+  fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+  color: 'var(--fg-dim)', textAlign: 'left',
+}
+
+const tdS: React.CSSProperties = { padding: '9px 14px', verticalAlign: 'middle' }
+
+// ── Row sub-components with hover state ───────────────────────────────────────
+
+function InvoiceRow({ inv, payments, pdfBusy, onPayment, onDownload }: {
+  inv: Invoice
+  payments: Payment[]
+  pdfBusy: string | null
+  onPayment: (inv: Invoice) => void
+  onDownload: (inv: Invoice) => void
+}) {
+  const [hover, setHover] = useState(false)
+  const paid = paidAmount(payments, inv.id)
+  const s = displayInvoiceStatus(inv, paid)
+  return (
+    <tr
+      style={{
+        borderBottom: '1px solid var(--border)',
+        background: hover ? 'var(--surface-2)' : 'transparent',
+        transition: 'background 100ms',
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <td style={tdS}><span className="mono" style={{ fontSize: 11 }}>{inv.number ?? '—'}</span></td>
+      <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
+      <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.dueDate)}</td>
+      <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
+      <td style={tdS}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
+          {s === 'partly' && (
+            <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
+              {fmt(remaining(inv, paid))} offen
+            </span>
+          )}
+        </span>
+      </td>
+      <td style={{ ...tdS, textAlign: 'right' }}>
+        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+          {inv.status !== 'draft' && inv.status !== 'cancelled' && (
+            <button onClick={() => onPayment(inv)} title="Zahlung erfassen"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 11, transition: 'border-color 100ms, color 100ms' }}>
+              <Banknote size={12} /> Zahlung
+            </button>
+          )}
+          <button onClick={() => onDownload(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
+            <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function OfferRow({ offer, pdfBusy, onDownload }: {
+  offer: Offer
+  pdfBusy: string | null
+  onDownload: (o: Offer) => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <tr
+      style={{
+        borderBottom: '1px solid var(--border)',
+        background: hover ? 'var(--surface-2)' : 'transparent',
+        transition: 'background 100ms',
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <td style={tdS}><span className="mono" style={{ fontSize: 11 }}>{offer.number ?? '—'}</span></td>
+      <td style={{ ...tdS, fontSize: 12 }}>{offer.title}</td>
+      <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(offer.validUntil)}</td>
+      <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(offer.total)}</td>
+      <td style={tdS}><span className="chip" data-tone={STATUS_TONE[offer.status] ?? ''}>{STATUS_LABEL[offer.status] ?? offer.status}</span></td>
+      <td style={{ ...tdS, textAlign: 'right' }}>
+        <button onClick={() => onDownload(offer)} disabled={pdfBusy === offer.id} title="Angebot als PDF"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg-muted)', cursor: pdfBusy === offer.id ? 'wait' : 'pointer', fontSize: 11 }}>
+          <Download size={12} /> {pdfBusy === offer.id ? '…' : 'PDF'}
+        </button>
+      </td>
+    </tr>
+  )
 }
 
 export function FinanzPane({ customerId }: Props) {
@@ -217,7 +312,7 @@ export function FinanzPane({ customerId }: Props) {
           { label: 'Offen',        value: totalOpen,    tone: 'warn' },
           { label: 'Überfällig',   value: totalOverdue, tone: 'bad'  },
         ].map(({ label, value, tone }) => (
-          <div key={label} className="card" style={{ padding: '14px 16px' }}>
+          <div key={label} className="card" style={{ padding: '14px 16px', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
             <div className="card-label" style={{ marginBottom: 6 }}>{label}</div>
             <div className="chip" data-tone={value > 0 ? tone : ''} style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: 0, background: 'none', letterSpacing: '-0.02em' }}>
               {fmt(value)}
@@ -229,12 +324,12 @@ export function FinanzPane({ customerId }: Props) {
       {/* Nicht abgerechnet */}
       {groups.length > 0 && (
         <Section title="Nicht abgerechnet" icon={<Clock size={13} />}>
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
             {/* Header row */}
             <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '8px 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
               <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ cursor: 'pointer' }} />
               {['Auftrag', 'Zeit', 'Betrag'].map(h => (
-                <span key={h} className="card-label" style={{ fontWeight: 500 }}>{h}</span>
+                <span key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-dim)' } as React.CSSProperties}>{h}</span>
               ))}
             </div>
 
@@ -245,12 +340,12 @@ export function FinanzPane({ customerId }: Props) {
                 <div
                   key={key}
                   onClick={() => toggleGroup(key)}
-                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'oklch(56% 0.19 264 / 0.05)' : 'transparent', transition: 'background 100ms' }}
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr 80px 90px', alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: checked ? 'var(--nav-active-bg)' : 'transparent', transition: 'background 100ms' }}
                 >
                   <input type="checkbox" checked={checked} onChange={() => toggleGroup(key)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer' }} />
                   <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{g.auftragTitle}</span>
                   <span style={{ fontSize: 12, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>{fmtH(g.totalMinutes)}</span>
-                  <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: checked ? 'var(--fg)' : 'var(--fg-muted)' }}>{fmt(g.totalAmount)}</span>
+                  <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', fontWeight: 600, color: checked ? 'var(--accent-text)' : 'var(--fg-muted)' }}>{fmt(g.totalAmount)}</span>
                 </div>
               )
             })}
@@ -265,14 +360,14 @@ export function FinanzPane({ customerId }: Props) {
                 <button
                   onClick={handleCreateOffer}
                   disabled={!selectedGroups.length || creating}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-3)', color: selectedGroups.length ? 'var(--fg)' : 'var(--fg-dim)', fontSize: 12, fontWeight: 600, cursor: selectedGroups.length ? 'pointer' : 'not-allowed', transition: 'all 140ms' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)', color: selectedGroups.length ? 'var(--fg)' : 'var(--fg-dim)', fontSize: 12, fontWeight: 600, cursor: selectedGroups.length ? 'pointer' : 'not-allowed', transition: 'all 140ms' }}
                 >
                   <Tag size={12} /> Angebot
                 </button>
                 <button
                   onClick={handleCreateInvoice}
                   disabled={!selectedGroups.length || creating}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: selectedGroups.length ? 'var(--accent)' : 'var(--surface-3)', color: selectedGroups.length ? 'var(--accent-ink)' : 'var(--fg-dim)', fontSize: 12, fontWeight: 600, cursor: selectedGroups.length ? 'pointer' : 'not-allowed', transition: 'all 140ms' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', background: selectedGroups.length ? 'var(--accent-gradient)' : 'var(--surface-3)', color: selectedGroups.length ? '#fff' : 'var(--fg-dim)', fontSize: 12, fontWeight: 600, cursor: selectedGroups.length ? 'pointer' : 'not-allowed', transition: 'all 140ms', boxShadow: selectedGroups.length ? '0 4px 14px -4px var(--accent-glow)' : 'none' }}
                 >
                   <ChevronRight size={12} /> {creating ? 'Erstellt…' : 'Rechnung'}
                 </button>
@@ -284,51 +379,18 @@ export function FinanzPane({ customerId }: Props) {
 
       {/* Invoices */}
       <Section title="Rechnungen" icon={<FileText size={13} />} empty={invoices.length === 0} emptyText="Keine Rechnungen">
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                 {['Nummer', 'Datum', 'Fällig', 'Betrag', 'Status', ''].map(h => (
-                  <th key={h} className="card-label" style={{ padding: '8px 14px', fontWeight: 500, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
+                  <th key={h} style={{ ...thS, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {invoices.map(inv => (
-                <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={tdS}><span className="mono" style={{ fontSize: 11 }}>{inv.number ?? '—'}</span></td>
-                  <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
-                  <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.dueDate)}</td>
-                  <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
-                  <td style={tdS}>{(() => {
-                    const paid = paidAmount(payments, inv.id)
-                    const s = displayInvoiceStatus(inv, paid)
-                    return (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
-                        {s === 'partly' && (
-                          <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                            {fmt(remaining(inv, paid))} offen
-                          </span>
-                        )}
-                      </span>
-                    )
-                  })()}</td>
-                  <td style={{ ...tdS, textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-                      {inv.status !== 'draft' && inv.status !== 'cancelled' && (
-                        <button onClick={() => setPaymentInvoice(inv)} title="Zahlung erfassen"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 11 }}>
-                          <Banknote size={12} /> Zahlung
-                        </button>
-                      )}
-                      <button onClick={() => downloadInvoice(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
-                        <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                <InvoiceRow key={inv.id} inv={inv} payments={payments} pdfBusy={pdfBusy} onPayment={setPaymentInvoice} onDownload={downloadInvoice} />
               ))}
             </tbody>
           </table>
@@ -337,30 +399,18 @@ export function FinanzPane({ customerId }: Props) {
 
       {/* Offers */}
       <Section title="Angebote" icon={<Tag size={13} />} empty={offers.length === 0} emptyText="Keine Angebote">
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: 'var(--card-shadow)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
                 {['Nummer', 'Titel', 'Gültig bis', 'Betrag', 'Status', ''].map(h => (
-                  <th key={h} className="card-label" style={{ padding: '8px 14px', fontWeight: 500, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
+                  <th key={h} style={{ ...thS, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {offers.map(offer => (
-                <tr key={offer.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={tdS}><span className="mono" style={{ fontSize: 11 }}>{offer.number ?? '—'}</span></td>
-                  <td style={{ ...tdS, fontSize: 12 }}>{offer.title}</td>
-                  <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(offer.validUntil)}</td>
-                  <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(offer.total)}</td>
-                  <td style={tdS}><span className="chip" data-tone={STATUS_TONE[offer.status] ?? ''}>{STATUS_LABEL[offer.status] ?? offer.status}</span></td>
-                  <td style={{ ...tdS, textAlign: 'right' }}>
-                    <button onClick={() => downloadOffer(offer)} disabled={pdfBusy === offer.id} title="Angebot als PDF"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--fg-muted)', cursor: pdfBusy === offer.id ? 'wait' : 'pointer', fontSize: 11 }}>
-                      <Download size={12} /> {pdfBusy === offer.id ? '…' : 'PDF'}
-                    </button>
-                  </td>
-                </tr>
+                <OfferRow key={offer.id} offer={offer} pdfBusy={pdfBusy} onDownload={downloadOffer} />
               ))}
             </tbody>
           </table>
@@ -390,5 +440,3 @@ function Section({ title, icon, children, empty, emptyText }: {
     </div>
   )
 }
-
-const tdS: React.CSSProperties = { padding: '9px 14px', verticalAlign: 'middle' }

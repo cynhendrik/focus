@@ -35,6 +35,9 @@ function avatarColors(_variation: number) {
   }
 }
 
+// Primary avatar — uses the accent gradient for emphasis on the ClientAvatar when size >= 44.
+// Kept as a separate helper so the small (size=26) "Zuletzt" chips remain neutral.
+
 function signalColors(tone: ClientSignalTone) {
   switch (tone) {
     case 'bad':  return { ink: 'oklch(72% 0.20 25)',  bg: 'oklch(72% 0.20 25 / 0.10)', stroke: 'oklch(72% 0.20 25 / 0.35)' }
@@ -47,15 +50,20 @@ function signalColors(tone: ClientSignalTone) {
 
 function ClientAvatar({ name, variation, size = 44 }: { name: string; variation: number; size?: number }) {
   const { stroke, ink, bg } = avatarColors(variation)
+  // Large avatars (≥ 44px) in the main list get the accent gradient for visual prominence.
+  // Small chips (Zuletzt strip) keep the neutral surface treatment.
+  const isLarge = size >= 44
   return (
     <div
       style={{
-        width: size, height: size, borderRadius: 12,
-        background: bg, border: `1.5px solid ${stroke}`,
+        width: size, height: size, borderRadius: isLarge ? 'var(--radius-sm)' : 8,
+        background: isLarge ? 'var(--accent-gradient)' : bg,
+        border: isLarge ? 'none' : `1.5px solid ${stroke}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: ink, fontFamily: 'var(--font-mono)',
+        color: isLarge ? '#fff' : ink, fontFamily: 'var(--font-mono)',
         fontSize: size <= 28 ? 10 : 13, fontWeight: 700,
         letterSpacing: '0.04em', flexShrink: 0,
+        boxShadow: isLarge ? '0 4px 12px -4px var(--accent-glow)' : 'none',
       }}
     >
       {customerInitials(name)}
@@ -153,19 +161,20 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
       style={{
         display: 'grid', gridTemplateColumns: COL_TEMPLATE,
         alignItems: 'center', columnGap: 18,
-        padding: '14px 20px', borderRadius: 14,
-        background: 'var(--surface-2)',
+        padding: '14px 20px', borderRadius: 'var(--radius)',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
+        boxShadow: 'var(--card-shadow)',
         cursor: 'pointer',
-        transition: 'border-color 140ms, background 140ms, transform 140ms',
+        transition: 'border-color 140ms, background 140ms, box-shadow 140ms',
       }}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = 'var(--border-strong)'
-        e.currentTarget.style.background = 'var(--surface-3)'
+        e.currentTarget.style.background = 'var(--surface-2)'
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = 'var(--border)'
-        e.currentTarget.style.background = 'var(--surface-2)'
+        e.currentTarget.style.background = 'var(--surface)'
       }}
     >
       {/* Kunde */}
@@ -312,8 +321,8 @@ function SortTabs({
               padding: '7px 14px', borderRadius: 9, border: 'none',
               cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
               fontFamily: 'inherit',
-              background: isActive ? 'var(--accent)' : 'transparent',
-              color: isActive ? 'var(--accent-ink)' : 'var(--fg-muted)',
+              background: isActive ? 'var(--nav-active-bg)' : 'transparent',
+              color: isActive ? 'var(--accent-text)' : 'var(--fg-muted)',
               transition: 'background 140ms, color 140ms',
             }}
           >
@@ -529,9 +538,9 @@ function ClientBoard() {
                 style={{
                   fontSize: 11.5, padding: '3px 10px', borderRadius: 99, cursor: 'pointer',
                   fontFamily: 'inherit', whiteSpace: 'nowrap',
-                  background: active ? 'var(--accent)' : 'var(--surface-2)',
-                  color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
-                  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                  background: active ? 'var(--nav-active-bg)' : 'var(--surface-2)',
+                  color: active ? 'var(--accent-text)' : 'var(--fg-muted)',
+                  border: `1px solid ${active ? 'var(--accent-text)' : 'var(--border)'}`,
                   transition: 'background 120ms, color 120ms, border-color 120ms',
                 }}
               >
@@ -561,8 +570,8 @@ function ClientBoard() {
           <div style={{
             padding: '40px 20px', textAlign: 'center',
             color: 'var(--fg-dim)', fontSize: 13,
-            background: 'var(--surface-2)', border: '1px solid var(--border)',
-            borderRadius: 14,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)', boxShadow: 'var(--card-shadow)',
           }}>
             Keine Kunden passen zur Suche.
           </div>
@@ -598,10 +607,11 @@ function EmptyClientBoard({ onAddManual }: {
     }}>
       <div style={{
         width: 64, height: 64, borderRadius: 18, margin: '0 auto',
-        background: 'var(--accent-soft)',
+        background: 'var(--accent-gradient)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 10px 30px -8px var(--accent-glow)',
       }}>
-        <UserPlus size={28} style={{ color: 'var(--accent)' }} />
+        <UserPlus size={28} style={{ color: '#fff' }} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
