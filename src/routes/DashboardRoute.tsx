@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 
+import { filterMine } from '@/lib/todos/ownership'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -156,6 +157,8 @@ function WorkspaceView() {
   const customers = useCustomersStore(s => s.customers)
   const invoices  = useFinanceStore(s => s.invoices)
   const todos     = useTodosStore(s => s.allTodos)
+  const myUserId = useAuthStore(s => s.user?.id)
+  const myTodos  = useMemo(() => filterMine(todos, myUserId), [todos, myUserId])
   const followUps = useCrmStore(s => s.allFollowUps)
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
@@ -261,10 +264,10 @@ function WorkspaceView() {
   // Heute faellig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
-    const tasks = todos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
+    const tasks = myTodos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
     const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
-  }, [todos, followUps, events, todayIso])
+  }, [myTodos, followUps, events, todayIso])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -428,7 +431,7 @@ function WorkspaceView() {
         </div>
       )}
 
-      <TagesplanCard events={events} todos={todos} customers={customers} />
+      <TagesplanCard events={events} todos={myTodos} customers={customers} />
 
       <InboxCard />
     </div>
