@@ -3,7 +3,7 @@ import { X, Plus, GripHorizontal } from 'lucide-react'
 import type { StickyNote, StickyCheck } from '@/types/notes-module.types'
 
 export const STICKY_COLORS = [
-  '#FFF176', '#F48FB1', '#81D4FA', '#A5D6A7', '#CE93D8', '#FFCC80',
+  '#FDF3C7', '#FBDCE6', '#D4E9F7', '#D6EFD8', '#E7DAF3', '#FCE6CE',
 ] as const
 
 interface Props {
@@ -58,6 +58,10 @@ export function StickyCard({ note, onChange, onDelete }: Props) {
 
   return (
     <div
+      // Keep clicks inside the Zettel from bubbling to the note editor's
+      // scroll-area onClick (which would steal focus into the main notes editor).
+      onClick={e => e.stopPropagation()}
+      onDoubleClick={e => e.stopPropagation()}
       style={{
         position: 'absolute',
         left: note.x,
