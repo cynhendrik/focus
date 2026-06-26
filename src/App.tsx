@@ -78,6 +78,7 @@ import { HelpDrawer } from '@/components/help/HelpDrawer'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { useVertraege } from '@/store/vertraege.store'
+import { useMembersStore } from '@/store/members.store'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -199,6 +200,8 @@ export default function App() {
       loadAllDeals(activeWorkspaceId)
       syncLeads(activeWorkspaceId)
       loadLeads(activeWorkspaceId)
+      useMembersStore.getState().ensureSelf()
+      useMembersStore.getState().load(activeWorkspaceId)
       useVertraege.getState().loadVertraege(activeWorkspaceId)
       // Demo-Seeder gehoert ganz nach hinten, blockiert nichts.
       useOnboardingStore.getState().bootstrap()
