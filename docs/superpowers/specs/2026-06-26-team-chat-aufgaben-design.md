@@ -21,6 +21,7 @@ Max arbeitet ab → "@Lukas, fertig, schau dir das an").
 | Task↔Chat-Kopplung | **Volle Verzahnung** — Zuweisung/Status posten Karten, Aufgaben verlinkbar, Nachricht→Aufgabe |
 | Zuweisungsrecht | **Flach** — jedes Mitglied darf zuweisen (später per RBAC einschränkbar) |
 | Benachrichtigung | **In-App-Inbox + Badges** (keine OS-Push), plus "Mir zugewiesen"-Ansicht |
+| Chat-Platzierung | **Hybrid** — NAV-Vollansicht *plus* ausklappbarer Mini-Drawer für nebenbei |
 | Architektur | **Ansatz A** — eigene `messages` + `notifications` Tabellen, cloud-first |
 
 ## Wichtige Bestands-Fakten (geprüft)
@@ -136,9 +137,17 @@ erzeugen Folge-Effekte zentral — kein Client darf `notifications` direkt schre
 Drei Touchpoints, alle im Bestand verankert (`appView`-Enum, `NavSidebar`,
 `RouteSwitch`, `NotificationCenter`):
 
-1. **Team-Kanal** — neuer `appView: 'team'` + `TeamChatRoute`, `NavItem`
-   (Icon `MessagesSquare`) mit ungelesen-Badge. Nachrichtenliste (append-first) +
-   Composer. Composer nutzt das bestehende `MentionPopover`, erweitert um
+1. **Team-Kanal (Hybrid: Vollansicht + Mini-Drawer)** — beide Surfaces teilen sich
+   denselben `messages.store` und dieselben Komponenten (`MessageList`, `Composer`),
+   nur der Container unterscheidet sich:
+   - **Vollansicht:** neuer `appView: 'team'` + `TeamChatRoute`, `NavItem`
+     (Icon `MessagesSquare`) mit ungelesen-Badge. Chat füllt den Arbeitsbereich.
+   - **Mini-Drawer:** rechts ein-/ausklappbares Panel (≈340px), per Toggle-Button
+     in der **Topbar** (neben der Glocke) — bewusst *nicht* unten rechts, um nicht
+     mit der Quick-Capture-Blase zu kollidieren. Zustand `chatDrawerOpen` im
+     `ui.store`; sichtbar unabhängig vom aktuellen `appView`. Der Drawer zeigt
+     dieselbe Liste + Composer kompakt; ein „⤢"-Button springt in die Vollansicht.
+   Composer (in beiden) nutzt das bestehende `MentionPopover`, erweitert um
    Mitglieder *und* Aufgaben (`@Person`, `@Aufgabe`). System-Nachrichten rendern
    als Karte (Titel, Fälligkeit, Status; Klick → springt zur Aufgabe).
 
@@ -164,10 +173,13 @@ Quick-Composer mit vorbefülltem Text + Rückverweis (`ref` auf die Nachricht).
   `src/store/notifications.store.ts` (unread-count, markRead).
 - `src/core/sync/useWorkspaceRealtime.ts` — zwei Subscriptions ergänzen
   (messages per workspace, notifications per user_id).
-- `src/routes/TeamChatRoute.tsx` + Komponenten unter `src/components/team/`.
+- `src/routes/TeamChatRoute.tsx` + geteilte Komponenten unter
+  `src/components/team/` (`MessageList`, `Composer`, `SystemMessageCard`,
+  `ChatDrawer`). Vollansicht und Drawer rendern dieselben `MessageList`/`Composer`.
+- `src/store/ui.store.ts` — `chatDrawerOpen` + `toggleChatDrawer` ergänzen.
 - Erweiterung: `MentionPopover` um Mitglieder + Aufgaben; `NotificationCenter` um
-  den „Für dich"-Abschnitt; `NavSidebar` um den Team-Eintrag; `appView`-Enum +
-  `RouteSwitch`.
+  den „Für dich"-Abschnitt; `NavSidebar` um den Team-Eintrag; `Topbar` um den
+  Drawer-Toggle (neben der Glocke); `appView`-Enum + `RouteSwitch`.
 
 ## Edge-Cases & Sicherheit
 
