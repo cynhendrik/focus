@@ -3,7 +3,8 @@ interface Props { on: boolean; saving?: boolean; onChange?: () => void }
 export function AuroraToggle({ on, saving = false, onChange }: Props) {
   return (
     <button
-      type="button" role="switch" aria-checked={on} onClick={onChange} disabled={saving}
+      type="button" role="switch" aria-checked={on} disabled={saving}
+      onClick={(e) => { e.stopPropagation(); onChange?.() }}
       style={{
         width: 44, height: 25, borderRadius: 99, flexShrink: 0, position: 'relative',
         border: 'none', padding: 0, cursor: saving ? 'default' : 'pointer',
