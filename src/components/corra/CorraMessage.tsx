@@ -29,9 +29,10 @@ export function CorraMessage({ message, onExecute, onDismiss, statusMap }: Props
       {!isUser && (
         <div style={{
           width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          background: 'var(--accent)',
+          background: 'var(--accent-gradient)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 12, marginTop: 2,
+          boxShadow: '0 0 8px var(--accent-glow)',
         }}>✦</div>
       )}
 

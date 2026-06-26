@@ -132,7 +132,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 9,
-              color: isDark ? 'color-mix(in srgb, var(--accent) 50%, transparent)' : 'var(--fg-dim)',
+              color: 'var(--accent-text)',
               fontFamily: 'var(--font-mono)', letterSpacing: '0.18em',
               textTransform: 'uppercase', marginBottom: 10,
             }}>
@@ -163,14 +163,14 @@ export function CorraIdleView({ onSend, loading }: Props) {
                   <span style={{
                     margin: '0 10px',
                     fontSize: 9, fontFamily: 'var(--font-mono)',
-                    color: isDark ? 'rgba(59,109,244,0.25)' : 'var(--fg-dim)',
+                    color: 'color-mix(in srgb, var(--accent) 25%, transparent)',
                     opacity: 0.5,
                   }}>·</span>
                 )}
                 <span style={{
                   fontSize: 9, fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.12em',
-                  color: isDark ? 'rgba(59,109,244,0.6)' : 'var(--fg-dim)',
+                  color: isDark ? 'color-mix(in srgb, var(--accent) 60%, transparent)' : 'var(--fg-dim)',
                 }}>
                   {item}
                 </span>
@@ -184,7 +184,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
           className="corra-input-wrap"
           data-focused={isFocused ? 'true' : 'false'}
           style={{
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+            background: 'var(--surface-2)',
             borderRadius: 16, padding: '14px 16px',
             display: 'flex', alignItems: 'flex-end', gap: 10,
           }}
@@ -218,7 +218,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
             style={{
               width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0,
               background: input.trim() && !loading
-                ? 'var(--accent)'
+                ? 'var(--accent-gradient)'
                 : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
               color: input.trim() && !loading
                 ? 'var(--accent-ink)'
@@ -226,7 +226,7 @@ export function CorraIdleView({ onSend, loading }: Props) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
               transition: 'all 180ms',
-              boxShadow: input.trim() && !loading && isDark ? '0 0 12px rgba(59,109,244,0.4)' : 'none',
+              boxShadow: input.trim() && !loading ? `0 0 12px var(--accent-glow)` : 'none',
               fontSize: 16,
             }}
           >

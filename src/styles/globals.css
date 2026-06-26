@@ -1848,11 +1848,11 @@ div:hover > .file-delete-btn {
 }
 .corra-input-wrap[data-focused="true"] {
   animation: none;
-  box-shadow: 0 0 0 1.5px rgba(59,109,244,0.55), 0 0 28px rgba(59,109,244,0.1);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 @keyframes corraInputIdle {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(59,109,244,0.18); }
-  50%       { box-shadow: 0 0 0 1px rgba(59,109,244,0.4), 0 0 18px rgba(59,109,244,0.07); }
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); }
+  50%       { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 7%, transparent); }
 }
 [data-theme="light"] .corra-input-wrap {
   animation: corraInputIdleLight 4s ease-in-out infinite;

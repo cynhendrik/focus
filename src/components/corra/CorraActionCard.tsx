@@ -66,7 +66,7 @@ export function CorraActionCard({ actions, onExecute, onDismiss, statusMap }: Pr
         return (
           <motion.div key={a.id} variants={item} style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            background: 'var(--surface-1, #111)',
+            background: 'var(--surface-2)',
             border: '1px solid var(--border)',
             borderRadius: 10, padding: '10px 14px',
             opacity: s === 'done' ? 0.6 : 1,
@@ -86,7 +86,7 @@ export function CorraActionCard({ actions, onExecute, onDismiss, statusMap }: Pr
             {s === 'done' ? (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 11, color: 'var(--accent)', fontWeight: 600,
+                fontSize: 11, color: 'var(--success, #22c55e)', fontWeight: 600,
               }}>
                 <Check size={13} /> Erledigt
               </div>
@@ -98,7 +98,7 @@ export function CorraActionCard({ actions, onExecute, onDismiss, statusMap }: Pr
                   onClick={() => handleExecute(a)}
                   style={{
                     padding: '5px 12px', borderRadius: 7, border: 'none',
-                    background: s === 'loading' ? 'color-mix(in srgb, var(--fg) 8%, transparent)' : 'var(--accent)',
+                    background: s === 'loading' ? 'color-mix(in srgb, var(--fg) 8%, transparent)' : 'var(--accent-gradient)',
                     color: s === 'loading' ? 'var(--fg-dim)' : 'var(--accent-ink)',
                     fontSize: 11, fontWeight: 700, cursor: s === 'loading' ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap',

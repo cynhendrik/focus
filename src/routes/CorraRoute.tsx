@@ -298,7 +298,7 @@ export function CorraRoute() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--surface-1, #111)', border: '1px solid var(--border)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
               borderRadius: 14, padding: 22, width: 360, maxWidth: '90%',
               display: 'flex', flexDirection: 'column', gap: 12,
             }}
@@ -314,7 +314,7 @@ export function CorraRoute() {
               onClick={() => applyFollowupChoice('renew')}
               style={{
                 padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: 'var(--accent)', color: 'var(--accent-ink)',
+                background: 'var(--accent-gradient)', color: 'var(--accent-ink)',
                 fontSize: 13, fontWeight: 600, textAlign: 'left',
               }}
             >
@@ -357,7 +357,7 @@ export function CorraRoute() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'var(--surface-1, #111)', border: '1px solid var(--border)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
               borderRadius: 14, padding: 22, width: 360, maxWidth: '90%',
               display: 'flex', flexDirection: 'column', gap: 12,
             }}
@@ -373,7 +373,7 @@ export function CorraRoute() {
               onClick={() => applyInvoiceChoice('mahnwesen')}
               style={{
                 padding: '10px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                background: 'var(--accent)', color: 'var(--accent-ink)',
+                background: 'var(--accent-gradient)', color: 'var(--accent-ink)',
                 fontSize: 13, fontWeight: 600, textAlign: 'left',
               }}
             >

@@ -125,9 +125,9 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear, 
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{
                 width: 28, height: 28, borderRadius: '50%',
-                background: 'var(--accent)', flexShrink: 0,
+                background: 'var(--accent-gradient)', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12,
+                fontSize: 12, boxShadow: '0 0 10px var(--accent-glow)',
               }}>✦</div>
               <div style={{ paddingTop: 6, display: 'flex', gap: 5, alignItems: 'center' }}>
                 {[0, 1, 2].map(i => (
@@ -155,7 +155,7 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear, 
       }}>
         <div style={{
           maxWidth: 760, margin: '0 auto',
-          background: 'var(--surface-1, #111)',
+          background: 'var(--surface-2)',
           border: '1px solid var(--border)',
           borderRadius: 14, padding: '12px 16px',
           display: 'flex', gap: 10, alignItems: 'flex-end',
@@ -186,11 +186,12 @@ export function CorraChatPanel({ messages, loading, onSend, onExecute, onClear, 
             disabled={!input.trim() || loading}
             style={{
               width: 34, height: 34, borderRadius: '50%', border: 'none', flexShrink: 0,
-              background: input.trim() && !loading ? 'var(--accent)' : 'color-mix(in srgb, var(--fg) 8%, transparent)',
+              background: input.trim() && !loading ? 'var(--accent-gradient)' : 'color-mix(in srgb, var(--fg) 8%, transparent)',
               color: input.trim() && !loading ? 'var(--accent-ink)' : 'var(--fg-dim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
               fontSize: 15, transition: 'all 160ms',
+              boxShadow: input.trim() && !loading ? '0 0 10px var(--accent-glow)' : 'none',
             }}
           >↑</button>
         </div>
