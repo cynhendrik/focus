@@ -24,7 +24,7 @@ function DroppableColumn({ stage, deals, onEdit, showStallWarnings }: {
       ref={setNodeRef}
       style={{
         flex: 1, minWidth: 190,
-        background: isOver ? 'rgba(255,255,255,0.04)' : 'transparent',
+        background: isOver ? 'var(--nav-active-bg)' : 'transparent',
         borderRight: '1px solid var(--border)',
         padding: '14px 12px', transition: 'background 150ms',
       }}
@@ -52,8 +52,8 @@ function DroppableColumn({ stage, deals, onEdit, showStallWarnings }: {
           />
         ))}
         {deals.length === 0 && (
-          <div style={{ border: '1.5px dashed rgba(255,255,255,0.08)', borderRadius: 9, padding: 16, textAlign: 'center' }}>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>Keine Deals</span>
+          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center', background: 'var(--surface-2)' }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Keine Deals</span>
           </div>
         )}
       </div>

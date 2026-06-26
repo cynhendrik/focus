@@ -389,13 +389,13 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{
-          fontSize: 10, padding: '1px 7px', borderRadius: 99, fontWeight: 700,
-          background: isWebinar    ? 'rgba(139,92,246,0.15)'
-                    : isNewsletter ? 'rgba(34,197,94,0.12)'
+          fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 700,
+          background: isWebinar    ? 'color-mix(in srgb, #a78bfa 14%, transparent)'
+                    : isNewsletter ? 'color-mix(in srgb, #4ade80 12%, transparent)'
                     : 'var(--surface-2)',
           color: isWebinar    ? '#a78bfa'
                : isNewsletter ? '#4ade80'
-               : 'var(--fg-dim)',
+               : 'var(--fg-muted)',
         }}>
           {sourceLabel(lead.leadSource, lead.leadSourceDetail)}
         </span>
@@ -411,10 +411,11 @@ function LeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm, isDragg
           onClick={e => { e.stopPropagation(); onWarm() }}
           style={{
             marginTop: 8, width: '100%', padding: '5px 0',
-            borderRadius: 6, fontSize: 10, fontWeight: 800, cursor: 'pointer',
-            background: 'var(--accent)', border: 'none',
-            color: 'var(--accent-ink)', display: 'flex', alignItems: 'center',
+            borderRadius: 'var(--radius-sm)', fontSize: 10, fontWeight: 800, cursor: 'pointer',
+            background: 'var(--accent-gradient)', border: 'none',
+            color: '#fff', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: 4,
+            boxShadow: '0 2px 8px var(--accent-glow)',
           }}
         >
           ↑ Warm Lead
@@ -464,7 +465,7 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
         flex: 1, minWidth: 200,
         borderRight: '1px solid var(--border)',
         padding: '14px 12px',
-        background: isOver ? col.hoverBg : 'transparent',
+        background: isOver ? col.hoverBg : 'var(--bg-2, transparent)',
         transition: 'background 150ms',
         display: 'flex', flexDirection: 'column',
         overflowY: 'auto',
@@ -491,7 +492,7 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
           />
         ))}
         {leads.length === 0 && (
-          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 9, padding: 16, textAlign: 'center' }}>
+          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center', background: 'var(--surface-2)' }}>
             <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Leer</span>
           </div>
         )}
@@ -527,13 +528,13 @@ function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: s
       <div style={{
         padding: '13px 16px 11px', flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 8,
-        borderBottom: '1px solid rgba(74,222,128,0.15)',
-        background: 'linear-gradient(to bottom, rgba(74,222,128,0.04), transparent)',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
       }}>
         <div style={{
           width: 6, height: 6, borderRadius: '50%',
           background: '#4ade80',
-          boxShadow: '0 0 6px rgba(74,222,128,0.7)',
+          boxShadow: '0 0 6px color-mix(in srgb, #4ade80 60%, transparent)',
         }} />
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--fg-muted)' }}>
           Re-Engage
@@ -568,7 +569,7 @@ function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: s
                   {!isLast && (
                     <div style={{
                       width: 1.5, flex: 1, marginTop: 3,
-                      background: 'linear-gradient(to bottom, rgba(74,222,128,0.35), rgba(74,222,128,0.08))',
+                      background: 'linear-gradient(to bottom, color-mix(in srgb, #4ade80 35%, transparent), color-mix(in srgb, #4ade80 8%, transparent))',
                       minHeight: 16,
                     }} />
                   )}
@@ -592,8 +593,8 @@ function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: s
                     onClick={() => reactivate(lead)}
                     style={{
                       marginTop: 6, padding: '2px 8px', fontSize: 10, fontWeight: 700,
-                      borderRadius: 6, border: '1px solid rgba(74,222,128,0.3)',
-                      background: 'rgba(74,222,128,0.08)', color: '#4ade80',
+                      borderRadius: 'var(--radius-sm)', border: '1px solid color-mix(in srgb, #4ade80 30%, transparent)',
+                      background: 'color-mix(in srgb, #4ade80 10%, transparent)', color: '#4ade80',
                       cursor: 'pointer', fontFamily: 'inherit',
                     }}
                   >

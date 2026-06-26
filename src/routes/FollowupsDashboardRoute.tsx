@@ -320,9 +320,9 @@ function CreateForm({ customers, onCreate, onCancel }: CreateFormProps) {
                   onClick={() => { setSelectedCustomer(c); setSearch(''); setShowDrop(false) }}
                   style={{
                     padding: '7px 10px', fontSize: 12, cursor: 'pointer',
-                    borderBottom: '1px solid rgba(255,255,255,0.04)',
+                    borderBottom: '1px solid var(--border)',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
                   onMouseLeave={e => (e.currentTarget.style.background = '')}
                 >
                   <span style={{ fontWeight: 600 }}>{c.name}</span>
@@ -350,10 +350,10 @@ function CreateForm({ customers, onCreate, onCancel }: CreateFormProps) {
             key={s.label}
             onClick={() => setDueAt(dueAt === s.value ? '' : s.value)}
             style={{
-              padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 500,
-              background: dueAt === s.value ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
-              color: dueAt === s.value ? 'var(--fg)' : 'var(--fg-dim)',
-              border: '1px solid transparent', cursor: 'pointer',
+              padding: '3px 9px', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 500,
+              background: dueAt === s.value ? 'var(--nav-active-bg)' : 'var(--surface-2)',
+              color: dueAt === s.value ? 'var(--accent-text)' : 'var(--fg-dim)',
+              border: dueAt === s.value ? '1px solid var(--accent-soft)' : '1px solid var(--border)', cursor: 'pointer',
             }}
           >
             {s.label}
@@ -406,9 +406,9 @@ function MailComposeModal({ target, onClose }: { target: ComposeTarget; onClose:
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        width: 540, maxWidth: '92vw', background: 'var(--bg)',
+        width: 540, maxWidth: '92vw', background: 'var(--surface)',
         border: '1px solid var(--border)', borderRadius: 16,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        boxShadow: 'var(--card-shadow)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {/* Header */}
@@ -418,7 +418,7 @@ function MailComposeModal({ target, onClose }: { target: ComposeTarget; onClose:
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
-              width: 26, height: 26, borderRadius: 7, background: 'rgba(45,212,191,0.12)',
+              width: 26, height: 26, borderRadius: 7, background: 'color-mix(in srgb, #2dd4bf 12%, transparent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Mail size={12} style={{ color: '#2dd4bf' }} />
@@ -477,7 +477,7 @@ function MailComposeModal({ target, onClose }: { target: ComposeTarget; onClose:
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '12px 20px', borderTop: '1px solid var(--border)',
-          background: 'rgba(255,255,255,0.02)',
+          background: 'var(--surface)',
         }}>
           <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
             Öffnet deinen Standard-Mailclient
@@ -519,9 +519,9 @@ function ModalShell({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        width: 540, maxWidth: '92vw', background: 'var(--bg)',
+        width: 540, maxWidth: '92vw', background: 'var(--surface)',
         border: '1px solid var(--border)', borderRadius: 16,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        boxShadow: 'var(--card-shadow)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         <div style={{
@@ -542,7 +542,7 @@ function ModalShell({
           </button>
         </div>
         {children}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
           {footer}
         </div>
       </div>
@@ -826,9 +826,9 @@ function DraftEditorModal({
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        width: 560, maxWidth: '92vw', background: 'var(--bg)',
+        width: 560, maxWidth: '92vw', background: 'var(--surface)',
         border: '1px solid var(--border)', borderRadius: 16,
-        boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+        boxShadow: 'var(--card-shadow)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {/* Header */}
@@ -839,7 +839,7 @@ function DraftEditorModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 26, height: 26, borderRadius: 7,
-              background: 'rgba(45,212,191,0.12)',
+              background: 'color-mix(in srgb, #2dd4bf 12%, transparent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Edit3 size={12} style={{ color: '#2dd4bf' }} />
@@ -892,7 +892,7 @@ function DraftEditorModal({
         <div style={{
           display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
           padding: '12px 20px', borderTop: '1px solid var(--border)',
-          background: 'rgba(255,255,255,0.02)',
+          background: 'var(--surface)',
         }}>
           <button onClick={onClose} className="btn-ghost" style={{ fontSize: 12, padding: '6px 14px' }}>
             Abbrechen
