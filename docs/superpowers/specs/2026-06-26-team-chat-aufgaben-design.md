@@ -20,9 +20,21 @@ Max arbeitet ab → "@Lukas, fertig, schau dir das an").
 | Kanal-Struktur | **Ein Kanal pro Workspace** (das Workspace *ist* der Kanal) |
 | Task↔Chat-Kopplung | **Volle Verzahnung** — Zuweisung/Status posten Karten, Aufgaben verlinkbar, Nachricht→Aufgabe |
 | Zuweisungsrecht | **Flach** — jedes Mitglied darf zuweisen (später per RBAC einschränkbar) |
-| Benachrichtigung | **In-App-Inbox + Badges** (keine OS-Push), plus "Mir zugewiesen"-Ansicht |
+| Benachrichtigung | **In-App-Inbox + Badges** (keine OS-Push) |
+| Persönliche Fläche | **„HEUTE" aufspalten** in *Mein Tag* (Pull/Commitment, `assignee=ich`) + *Inbox* (Push/Triage) — statt eine Fläche zu überladen |
 | Chat-Platzierung | **Hybrid** — NAV-Vollansicht *plus* ausklappbarer Mini-Drawer für nebenbei |
 | Architektur | **Ansatz A** — eigene `messages` + `notifications` Tabellen, cloud-first |
+| Skalierungs-Schutz | Mention≠Kommentar trennen · Inbox gruppieren (Typ→Kunde) · Kommentare an `ref` heften (Thread-Key) |
+| Zukunfts-Fit | **Eine** Spalte `visibility` heute → Kundenportal später additiv (kein Rewrite) |
+
+> **Skalierungs- & Zukunfts-Erkundung (4 Agenten, 2026-06-26):** Bei 20–50 Kunden
+> × 3–6 Mitarbeitern kippt eine einzelne „HEUTE"-Fläche und ein flacher Kanal in
+> Lärm. Branchen-Konsens (Linear/Asana/Basecamp/Things): **zwei** Flächen —
+> Triage-*Inbox* (Push) getrennt von *Mein Tag* (Pull). Der **eine Kanal** bleibt
+> (kein Fragmentieren), Skalierung kommt über Thread-Keys + Inbox-Gruppierung, nicht
+> über neue Container. Künftiges Kundenportal ist zu ~90% gratis future-proof
+> (polymorphe `ref`, OR-kombinierte RLS-Policies) — nur **eine** Spalte (`visibility`)
+> ist billige Versicherung, die heute mit muss.
 
 ## Wichtige Bestands-Fakten (geprüft)
 
@@ -57,14 +69,27 @@ Zwei neue cloud-first Tabellen nach dem `note_entries`-Muster.
 | `kind` | text not null | `'user'` \| `'system'` |
 | `body` | text not null default `''` | Nachrichtentext (bei System: Render-Hinweis) |
 | `system_event` | text null | `'task_assigned'` \| `'task_completed'` \| `'task_created'` |
-| `ref_type` | text null | `'task'` \| `'account'` |
-| `ref_id` | **text** null | polymorphe Referenz (kein FK) |
+| `ref_type` | text null | `'task'` \| `'account'` (später `'project'`) |
+| `ref_id` | **text** null | polymorphe Referenz (kein FK) — dient auch als **Thread-Key** |
+| `visibility` | text not null default `'internal'` | `check (visibility in ('internal','client'))` — Zukunfts-Versicherung fürs Kundenportal |
 | `mentions` | jsonb not null default `'[]'` | Array erwähnter `user_id`s |
 | `created_at` | text default `(now())::text` | |
 | `updated_at` | text default `(now())::text` | |
 | `deleted_at` | text null | Soft-Delete |
 
 Indexe: `messages (workspace_id, created_at)` für Verlauf + Keyset-Pagination.
+
+**Thread-Key (Skalierung ohne Fragmentieren):** `ref_type`/`ref_id` sind nicht nur
+für System-Karten — auch ein *getippter* Kommentar, der aus einem Kunden-/Aufgaben-
+Kontext verfasst wird, bekommt `ref` mitgestempelt (Composer-seitig, kein Schema-
+Change). Dadurch ist jede Nachricht filterbar („nur Kunde X") — ein **Filter/Lens**
+auf der einen Tabelle, **kein** neuer Container.
+
+**`visibility`:** Heute schreibt jede Team-Nachricht automatisch `'internal'`. Die
+Spalte verankert ab Zeile null die Invariante *„nichts ist kundensichtbar, außer
+explizit markiert"*. Ein künftiges Kundenportal fügt nur eine **zweite** permissive
+RLS-Policy (`… and visibility='client'`) hinzu — die `messages`-Tabelle wird nie
+umgeschrieben. Mehr dazu unter „Zukunfts-Fit".
 
 RLS:
 - SELECT: `using (is_workspace_member(workspace_id))`
@@ -115,10 +140,18 @@ erzeugen Folge-Effekte zentral — kein Client darf `notifications` direkt schre
 ### Trigger 2 — `AFTER INSERT ON public.messages`
 
 `WHEN (new.kind = 'user')`:
-- Für jede `user_id` in `new.mentions` (≠ actor) → `notifications` (`type='mention'`,
-  `ref_type='message'`, `ref_id=new.id`, `message_id=new.id`).
-- Falls `new.ref_type='task'`: `notifications` (`type='comment'`) an Assignee +
-  Ersteller der Aufgabe (≠ actor, dedupliziert gegen bereits erwähnte User).
+- **`mention` (immer benachrichtigen — das laute Signal):** für jede `user_id` in
+  `new.mentions` (≠ actor) → `notifications` (`type='mention'`, `ref_type='message'`,
+  `ref_id=new.id`, `message_id=new.id`).
+- **`comment` (gedämpft — sonst Lärm bei 50×6):** falls `new.ref_type='task'`,
+  `notifications` (`type='comment'`) **nur** an Assignee + Ersteller der Aufgabe,
+  die ≠ actor sind, **noch nicht** über `mentions` erfasst wurden **und** den Thread
+  nicht stummgeschaltet haben. Dieser Pfad ist die lauteste Quelle im System — die
+  Trennung mention/comment (zwei `type`-Werte) ist Pflicht, kein Nice-to-have.
+
+> **Stummschalten (billige v1):** ein `muted_refs jsonb` auf einer Pro-User-
+> Einstellungszeile; der Trigger überspringt `comment`-Notifications, deren `ref_id`
+> der Empfänger gemutet hat. Serverseitige Mute-Erzwingung darüber hinaus = später.
 
 **Solo-Modus:** Schreibt lokal in SQLite → kein Postgres-Trigger feuert. Akzeptiert
 (kein Team zum Benachrichtigen).
@@ -162,13 +195,31 @@ Drei Touchpoints, alle im Bestand verankert (`appView`-Enum, `NavSidebar`,
    - *Inbox → Aufgabe:* `assigned`/`completed`-Benachrichtigungen springen direkt
      zur Aufgabe (`ref_type='task'`).
 
-2. **Inbox** — `NotificationCenter` (Glocke) bekommt oben einen Abschnitt
-   „Für dich": echte `notifications`, ungelesen hervorgehoben, Klick markiert
-   gelesen (`read_at`) + springt zum Ziel. Bisherige berechnete Übersicht bleibt
-   darunter. Badge = Anzahl ungelesener `notifications`.
+2. **Inbox (neue Fläche — Push/Triage)** — neuer `appView: 'inbox'` + `NavItem` mit
+   ungelesen-Badge. Gespeist aus dem `notifications.store`. Wird auf null abgearbeitet
+   („Inbox Zero"). **Gruppierung gegen Lärm** (rein client-seitig, mirrors die
+   bestehende Gruppen-Logik in `NotificationCenter`):
+   - **Primär nach Typ**, Priorität: `assigned` (Aktion nötig) → `mention` (du wurdest
+     gerufen) → `comment` (FYI zu deinem Kram) → `completed` (FYI).
+   - **`comment`/`mention` nach `ref_id` (Kunde/Aufgabe) zusammenfassen:** „Kunde
+     Müller — 4 neue Kommentare (Anna, Max)" als *eine* aufklappbare Zeile statt 4.
+     100 Roh-Events → ~5–8 ruhige Zeilen.
+   - Klick markiert gelesen (`read_at`) + springt zum Ziel.
+   Die **Glocke** (`NotificationCenter`) wird zur **Vorschau** derselben
+   `notifications` (Top-12 ungelesen + „Alle ansehen →" zur Inbox-Route). Die heutige
+   berechnete Mail/Follow-up/Rechnungs/Lead-Aggregation wandert raus (hat eigene
+   Heimat in Mail/Akquise/Finanzen). Badge = ungelesene `notifications`; laute Zahl =
+   nur `assigned`+`mention`, `comment`-FYI nicht ins Badge aufblähen.
 
-3. **„Mir zugewiesen"** — Sektion/Filter in der `Heute`-Ansicht (`assignee = ich`),
-   plus Mitglieder-Picker an der Aufgabe zum Zuweisen (`assignee`-Feld existiert).
+3. **Mein Tag (umgebaute „HEUTE" — Pull/Commitment)** — `appView:'dashboard'` bleibt,
+   wird umbenannt; **überall Default-Filter `assignee === ich`**:
+   - KPI-Zeile bleibt workspace-weit (Umsatz, aktive Kunden); „Heute fällig" zählt
+     **meine** Items.
+   - „Dein nächster Zug" (`useHeuteQueue`) bekommt nur *meine* Aufgaben/Follow-ups.
+   - „Mein Tagesplan" = heutige Termine + **meine** fälligen/geplanten Aufgaben.
+   - Der `InboxCard`-Mail-Block fliegt hier raus (Mail hat eigene Route).
+   Plus Mitglieder-Picker an der Aufgabe zum Zuweisen (`assignee`-Feld existiert).
+   *Reiner Client-Filter — kein Schema-Change; entlärmt sofort, auch ohne Chat-Backend.*
 
 **Nachricht → Aufgabe:** Hover-Aktion „In Aufgabe umwandeln" → öffnet den
 Quick-Composer mit vorbefülltem Text + Rückverweis (`ref` auf die Nachricht).
@@ -187,13 +238,55 @@ Quick-Composer mit vorbefülltem Text + Rückverweis (`ref` auf die Nachricht).
 - `src/routes/TeamChatRoute.tsx` + geteilte Komponenten unter
   `src/components/team/` (`MessageList`, `Composer`, `SystemMessageCard`,
   `ChatDrawer`). Vollansicht und Drawer rendern dieselben `MessageList`/`Composer`.
+- `src/routes/InboxRoute.tsx` + `src/components/inbox/` (gruppierte Notification-
+  Liste); Glocke (`NotificationCenter`) auf Vorschau-Modus derselben Quelle umstellen.
+- `src/routes/DashboardRoute.tsx` → „Mein Tag": `assignee=ich`-Filter in
+  `useHeuteQueue`-Input, `dueToday` und `buildTagesplan`; abgeleiteter Selektor
+  `myTodos` im `todos.store` (workspace-weites `loadAll` bleibt für Delegations-/
+  Übersicht).
 - `src/store/ui.store.ts` — `chatDrawerOpen` + `toggleChatDrawer` ergänzen.
-- Erweiterung: `MentionPopover` um Mitglieder + Aufgaben; `NotificationCenter` um
-  den „Für dich"-Abschnitt; `NavSidebar` um den Team-Eintrag; `Topbar` um den
-  Drawer-Toggle (neben der Glocke); `appView`-Enum + `RouteSwitch`.
+- Erweiterung: `MentionPopover` um Mitglieder + Aufgaben; `NavSidebar` um Team- +
+  Inbox-Eintrag (Badges); `Topbar` um den Drawer-Toggle (neben der Glocke);
+  `appView`-Enum (`'team'`, `'inbox'`) + `RouteSwitch`.
+
+## Zukunfts-Fit (Projekt-Planner + Kundenportal) — bewusst NICHT jetzt gebaut
+
+Geprüft (Datenmodell-Agent): die aktuelle Architektur ist zu ~90% gratis future-proof.
+Was den späteren Bau ermöglicht, **ohne** das heutige Modell zu überladen:
+
+- ✅ **`ref_type='project'`** ist gratis abgedeckt (polymorpher Text-Diskriminator,
+  kein FK/CHECK). Ein künftiges Projekt ist nur ein neuer Render-/String-Fall.
+- ✅ **Kundennachricht im Kundenmodul** ist heute schon ausdrückbar via
+  `ref_type='account'` (filtern auf `ref_id=<account>`).
+- ✅ **Interne vs. externe RLS koexistieren** ohne Tabellen-Rewrite: permissive
+  Policies werden **OR**-kombiniert. Externe Kunden sind *keine* `workspace_members`
+  → die bestehende `is_workspace_member`-Policy gibt ihnen automatisch nichts; das
+  Portal fügt später nur eine **zweite** Policy hinzu.
+- ⚠️ **Einzige Vorkehrung heute:** Spalte `visibility` (s. Datenmodell). Verankert
+  „internal unless marked", null Verhaltensänderung jetzt, spart später das riskante
+  Nachrüsten/Backfill historischer Zeilen.
+- ❌ **Später (additiver Anbau, kein Rewrite):** `project_participants`-Tabelle +
+  `is_project_participant()`-Funktion; Magic-Link-Login für externe Kunden; eine
+  zweite RLS-Policy `… and visibility='client'`. Externe Nutzer kommen **nie** in
+  `workspace_members` (würde jeden `is_workspace_member`/`has_capability`-Pfad
+  vergiften). Keine `scope/thread`-Spalten (`ref` reicht als Thread-Key).
+
+## Build-Phasen
+
+Ein Design, drei aufeinander aufbauende Phasen — jede für sich testbar und wertvoll.
+
+| Phase | Inhalt | Abhängigkeit | Sofort-Wert |
+|---|---|---|---|
+| **1 — Mein Tag** | `DashboardRoute` auf `assignee=ich` umstellen + `myTodos`-Selektor | keine (reiner Client-Filter) | Entlärmung **ohne** Backend |
+| **2 — Motor** | Migration `0019` (Tabellen, `visibility`, RLS, beide Trigger inkl. mention≠comment), Gateways/Mapper/Stores, Realtime-Subscriptions | Migration | Datenbasis + Tests |
+| **3 — Oberflächen** | Team-Chat (Vollansicht + Drawer), **Inbox**-Route + Gruppierung, Glocke als Vorschau, Mention-Erweiterung (Mitglieder+Aufgaben), Sprung-Verhalten | Phase 2 | volles Erlebnis |
 
 ## Edge-Cases & Sicherheit
 
+- **⚠️ Vor Phase 1 verifizieren:** `activities.assignee` speichert die echte
+  `auth.uid()` (nicht einen Anzeigenamen) — die gesamte Personen-Filterung *und* der
+  Zuweisungs-Trigger hängen daran. Falls alte lokale Zeilen Namen halten:
+  einmaliger Backfill.
 - **Self-notify unterdrücken:** Empfänger ≠ Actor in allen Triggern.
 - **Verwaiste Referenz:** Aufgabe gelöscht → Karte zeigt „Aufgabe gelöscht",
   kein Absturz; `notifications.message_id` cascade beim Löschen der Nachricht.
@@ -208,14 +301,26 @@ Quick-Composer mit vorbefülltem Text + Rückverweis (`ref` auf die Nachricht).
 - SQL-/Trigger-Tests: Zuweisung → genau 1 System-Message + 1 Notification;
   Self-Assign → 0 Notifications; Kommentar mit Mention → 1 mention-Notification;
   Status→done → 1 completed-Notification an Ersteller.
-- Store-Tests: append-first-Einfügen, Keyset-Pagination, unread-count, markRead.
+- Store-Tests: append-first-Einfügen, Keyset-Pagination, unread-count, markRead;
+  `myTodos`-Selektor (nur `assignee=ich`).
+- Trigger-Lärm-Tests: Kommentar an gemuteten Thread → 0 `comment`-Notification;
+  erwähnter User bekommt nur `mention`, nicht zusätzlich `comment` (Dedup).
+- Inbox-Gruppierung: N `comment`-Notifications am selben `ref_id` → 1 aufklappbare
+  Zeile; Badge zählt nur `assigned`+`mention`.
 - Mention-Parsing erweitert (Mitglieder + Aufgaben), analog
   `prefix-parser.test.ts`.
 
 ## Bewusst NICHT im Scope (YAGNI)
 
-- Mehrere Kanäle / Themen-Kanäle / Kanal-pro-Kunde.
+- Mehrere Kanäle / Themen-Kanäle / Kanal-pro-Kunde (Skalierung kommt über
+  Thread-Keys + Inbox-Gruppierung, **nicht** über neue Container).
+- Projekt-Planner-Modul + Kundenportal (nur via `visibility` vorbereitet, s. o.).
+- `project_participants`-Tabelle, externe Rollen, `scope/thread`-Spalten.
 - OS-/Desktop-Push-Benachrichtigungen (Tauri).
+- Digests / Read-Cursors pro Thread / serverseitige Mute-Erzwingung
+  (billige `muted_refs`-v1 reicht).
+- Workload-Board pro Mitarbeiter; eigene „Von mir delegiert"-Fläche
+  (gespeicherter Filter reicht).
 - Read-Receipts über simples ungelesen hinaus, Reaktionen, Datei-Anhänge,
-  Threads/Antworten.
+  Threads/Antworten (parent_id-Reply-Bäume).
 - Hierarchische Zuweisungsrechte (flach zum Start; RBAC später).
