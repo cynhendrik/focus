@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/ui.store'
+import { SettingsPage, SettingCard } from './ui'
 
 const THEMES = [
   {
@@ -61,14 +62,13 @@ export function AussehensSettings() {
   const setColorStyle = useUiStore(s => s.setColorStyle)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 560 }}>
-      <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Erscheinungsbild</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Theme und visuelle Einstellungen</p>
-      </div>
-
+    <SettingsPage
+      title="Erscheinungsbild"
+      subtitle="Theme und visuelle Einstellungen"
+      maxWidth={560}
+    >
       {/* Theme */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px' }}>
+      <SettingCard>
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 14 }}>Theme</div>
         <div style={{ display: 'flex', gap: 12 }}>
           {THEMES.map(t => {
@@ -93,10 +93,10 @@ export function AussehensSettings() {
             )
           })}
         </div>
-      </div>
+      </SettingCard>
 
       {/* Stil */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px' }}>
+      <SettingCard>
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Stil</div>
         <div style={{ fontSize: 12, color: 'var(--fg-dim)', marginBottom: 14 }}>
           Farbakzente der Oberfläche
@@ -124,7 +124,7 @@ export function AussehensSettings() {
             )
           })}
         </div>
-      </div>
-    </div>
+      </SettingCard>
+    </SettingsPage>
   )
 }
