@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useToastStore } from '@/store/toast.store'
 import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { SettingsPage, SettingCard } from './ui'
 
 interface Props { workspaceId: string }
 
@@ -86,14 +87,13 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 560 }}>
-      <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Daten & Gefahrenzone</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Backup, Wiederherstellung und irreversible Aktionen</p>
-      </div>
-
+    <SettingsPage
+      title="Daten & Gefahrenzone"
+      subtitle="Backup, Wiederherstellung und irreversible Aktionen"
+      maxWidth={560}
+    >
       {/* Backup / Export */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px' }}>
+      <SettingCard>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Backup exportieren</div>
         <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: '0 0 14px' }}>
           Sichert <strong>alle</strong> Daten (Kunden, Rechnungen, Kontakte, Notizen, Kalender …) als
@@ -104,10 +104,10 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 16px' }}>
           <Download size={13} /> {busy === 'export' ? 'Exportiere…' : 'Backup exportieren'}
         </button>
-      </div>
+      </SettingCard>
 
       {/* Import / Restore */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px' }}>
+      <SettingCard>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Backup importieren</div>
         <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: '0 0 14px' }}>
           Stellt Daten aus einer Backup-Datei wieder her. Einträge mit gleicher ID werden überschrieben,
@@ -118,10 +118,10 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '7px 16px' }}>
           <Upload size={13} /> {busy === 'import' ? 'Importiere…' : 'Backup importieren'}
         </button>
-      </div>
+      </SettingCard>
 
       {/* Reset */}
-      <div style={{ background: 'var(--surface)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '20px' }}>
+      <SettingCard danger>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <AlertTriangle size={15} style={{ color: '#f87171' }} />
           <div style={{ fontSize: 14, fontWeight: 600, color: '#f87171' }}>Workspace zurücksetzen</div>
@@ -139,7 +139,8 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           onChange={e => setConfirmText(e.target.value)}
           placeholder='Tippe "zurücksetzen" zum Bestätigen'
           style={{
-            width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8, marginBottom: 10,
+            width: '100%', padding: '8px 12px', fontSize: 13,
+            borderRadius: 'var(--radius-sm)', marginBottom: 10,
             border: '1px solid var(--border)', background: 'var(--surface-2)',
             color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
             boxSizing: 'border-box' as const,
@@ -149,7 +150,7 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           disabled={confirmText !== 'zurücksetzen' || !isOwner || busy !== null}
           onClick={handleReset}
           style={{
-            padding: '7px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+            padding: '7px 16px', borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 600,
             cursor: confirmText === 'zurücksetzen' && isOwner && busy === null ? 'pointer' : 'not-allowed',
             background: confirmText === 'zurücksetzen' && isOwner && busy === null ? '#ef4444' : 'var(--surface-2)',
             border: '1px solid ' + (confirmText === 'zurücksetzen' && isOwner && busy === null ? '#ef4444' : 'var(--border)'),
@@ -159,7 +160,7 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
         >
           {busy === 'reset' ? 'Setzt zurück…' : 'Workspace zurücksetzen'}
         </button>
-      </div>
-    </div>
+      </SettingCard>
+    </SettingsPage>
   )
 }
