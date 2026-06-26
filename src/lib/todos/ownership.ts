@@ -9,7 +9,7 @@ import type { Todo } from '@/types/todo.types'
  */
 export function isMine(todo: Pick<Todo, 'assignee'>, userId: string | undefined): boolean {
   const a = todo.assignee
-  if (!a) return true        // unassignt → für alle sichtbar
+  if (!a) return true        // unassignt → in jedermanns „Mein Tag" sichtbar (Solo-Sicherheitsnetz)
   if (!userId) return true    // kein eingeloggter Nutzer (lokal/solo) → nichts verstecken
   return a === userId
 }

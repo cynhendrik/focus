@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DashboardRoute "Heute" — Workspace-View (KPI-Kacheln + CORRA-Queue).
+// DashboardRoute "Mein Tag" — persönliche View (KPI-Kacheln + CORRA-Queue), auf assignee=ich gefiltert.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
