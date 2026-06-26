@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { UserPlus, Check } from 'lucide-react'
 import { useMembersStore } from '@/store/members.store'
 import { useTodosStore } from '@/store/todos.store'
@@ -7,14 +7,22 @@ import type { Todo } from '@/types/todo.types'
 /** Mitglieder-Picker an einer Aufgabe. Schreibt assignee → Trigger benachrichtigt. */
 export function AssigneePicker({ todo }: { todo: Todo }) {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
   const members     = useMembersStore(s => s.members())
   const nameOf      = useMembersStore(s => s.nameOf)
   const setAssignee = useTodosStore(s => s.setAssignee)
 
   const current = todo.assignee ? nameOf(todo.assignee) : 'Niemand'
 
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--fg-muted)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}

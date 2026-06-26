@@ -43,7 +43,7 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
       if (el) el.style.background = 'transparent'
       clearScroll(null)
     }, 1400)
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); clearScroll(null) }
   }, [pendingScroll, clearScroll])
 
   // Inbox → Nachricht (2/2): Scroll + Highlight — wiederholt wenn Zeile noch nicht gemountet.

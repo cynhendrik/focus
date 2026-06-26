@@ -9,7 +9,7 @@ const mk = (id: string, createdAt: string): Message => ({
 })
 
 describe('messages.store', () => {
-  beforeEach(() => useMessagesStore.setState({ messages: [], loading: false, hasMore: true }))
+  beforeEach(() => useMessagesStore.setState({ messages: [], loading: false, hasMore: true, loadingMore: false }))
 
   it('appendRealtime adds a new message at the end', () => {
     useMessagesStore.setState({ messages: [mk('a', 'T1')] })

@@ -4,9 +4,10 @@ import { log } from '@/lib/logger'
 import type { Message, CreateMessagePayload } from '@/types/message.types'
 
 interface MessagesState {
-  messages: Message[]
-  loading:  boolean
-  hasMore:  boolean
+  messages:    Message[]
+  loading:     boolean
+  hasMore:     boolean
+  loadingMore: boolean
   loadRecent:     (workspaceId: string) => Promise<void>
   loadMore:       (workspaceId: string) => Promise<void>
   appendRealtime: (msg: Message) => void
@@ -16,9 +17,10 @@ interface MessagesState {
 const PAGE = 50
 
 export const useMessagesStore = create<MessagesState>()((set, get) => ({
-  messages: [],
-  loading:  false,
-  hasMore:  true,
+  messages:    [],
+  loading:     false,
+  hasMore:     true,
+  loadingMore: false,
 
   loadRecent: async (workspaceId) => {
     set({ loading: true })
@@ -32,14 +34,22 @@ export const useMessagesStore = create<MessagesState>()((set, get) => ({
   },
 
   loadMore: async (workspaceId) => {
-    const { messages, hasMore } = get()
+    const { messages, hasMore, loadingMore } = get()
     if (!hasMore || messages.length === 0) return
+    if (loadingMore) return
     const oldest = messages[0].createdAt
+    set({ loadingMore: true })
     try {
       const older = await MessagesGateway.listBefore(workspaceId, oldest, PAGE)
-      set(s => ({ messages: [...older, ...s.messages], hasMore: older.length === PAGE }))
+      set(s => {
+        const existing = new Set(s.messages.map(m => m.id))
+        const fresh = older.filter(m => !existing.has(m.id))
+        return { messages: [...fresh, ...s.messages], hasMore: older.length === PAGE }
+      })
     } catch (err) {
       log.error('Failed to load older messages', { err })
+    } finally {
+      set({ loadingMore: false })
     }
   },
 
