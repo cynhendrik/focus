@@ -34,7 +34,7 @@ export function ChatComposer({ contextRef }: Props = {}) {
   const recomputeMention = (value: string, caret: number) => {
     const before = value.slice(0, caret)
     const q = extractMentionQuery(before)
-    if (q) setMq({ open: true, query: q.query, start: q.startOffset })
+    if (q) { setMq({ open: true, query: q.query, start: q.startOffset }); setActiveIdx(0) }
     else setMq({ open: false, query: '', start: -1 })
   }
 
