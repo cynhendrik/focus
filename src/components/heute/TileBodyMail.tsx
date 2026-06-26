@@ -258,7 +258,7 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
         }}>
           <div style={{ display: 'flex', gap: 6 }}>
             <span style={{
-              background: 'var(--accent)', color: 'var(--accent-ink)',
+              background: 'var(--accent-gradient)', color: '#fff',
               fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
             }}>✉ E-Mail</span>
           </div>
@@ -298,10 +298,10 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
           style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '11px 22px',
             borderRadius: 99, border: 'none',
-            background: (sending || generating) ? 'var(--surface-3)' : 'var(--accent)',
-            color: (sending || generating) ? 'var(--fg-muted)' : 'var(--accent-ink)',
+            background: (sending || generating) ? 'var(--surface-3)' : 'var(--accent-gradient)',
+            color: (sending || generating) ? 'var(--fg-muted)' : '#fff',
             fontSize: 13, fontWeight: 700,
-            boxShadow: (sending || generating) ? 'none' : '0 4px 16px -6px var(--accent-glow)',
+            boxShadow: (sending || generating) ? 'none' : '0 10px 30px -8px var(--accent-glow)',
             cursor: (sending || generating) ? 'not-allowed' : 'pointer',
             transition: 'all 200ms',
           }}>

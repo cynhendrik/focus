@@ -36,10 +36,10 @@ export function TileBodyTodo({ todo, onDone, onSkip }: Props) {
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '11px 24px', borderRadius: 99, border: 'none',
-            background: loading ? 'var(--surface-3)' : 'var(--accent)',
-            color: loading ? 'var(--fg-muted)' : 'var(--accent-ink)',
+            background: loading ? 'var(--surface-3)' : 'var(--accent-gradient)',
+            color: loading ? 'var(--fg-muted)' : '#fff',
             fontSize: 13, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: loading ? 'none' : '0 4px 16px -6px var(--accent-glow)',
+            boxShadow: loading ? 'none' : '0 10px 30px -8px var(--accent-glow)',
             transition: 'all 200ms',
           }}
         >

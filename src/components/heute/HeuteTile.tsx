@@ -115,10 +115,11 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
 
   return (
     <div style={{
-      background: 'var(--surface-1)',
+      background: 'var(--surface)',
       border: '1px solid var(--border)',
       borderLeft: '3px solid var(--accent)',
-      borderRadius: 16,
+      borderRadius: 'var(--radius)',
+      boxShadow: 'var(--card-shadow)',
       padding: '28px 32px',
       display: 'flex',
       flexDirection: 'column',

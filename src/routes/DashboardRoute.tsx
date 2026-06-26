@@ -90,8 +90,9 @@ function KpiCard({
 }) {
   return (
     <div style={{
-      borderRadius: 16, border: '1px solid var(--border)',
-      background: 'var(--bg-2)', padding: '18px 20px',
+      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+      background: 'var(--surface)', padding: '18px 20px',
+      boxShadow: 'var(--card-shadow)',
       display: 'flex', flexDirection: 'column', gap: 12,
       position: 'relative', minHeight: 152,
     }}>
@@ -372,8 +373,9 @@ function WorkspaceView() {
                   next.type === 'followup'          ? 'Follow-up' : 'Todo'
                 return (
                   <div key={next.id} style={{
-                    borderRadius: 12, border: '1px solid var(--border)',
-                    background: 'var(--surface-1)', padding: '12px 14px',
+                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
+                    background: 'var(--surface)', padding: '12px 14px',
+                    boxShadow: 'var(--card-shadow)',
                     opacity: 1 - i * 0.2,
                     display: 'flex', flexDirection: 'column', gap: 5,
                   }}>
@@ -399,16 +401,16 @@ function WorkspaceView() {
       )}
       {!queueLoading && queueIndex >= queueItems.length && queueItems.length > 0 && (
         <div style={{
-          borderRadius: 16, border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)',
-          background: 'var(--surface-1)', padding: '24px 32px',
+          borderRadius: 'var(--radius)', border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)',
+          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '24px 32px',
           display: 'flex', alignItems: 'center', gap: 16,
         }}>
           <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: 'var(--accent)',
+            width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-gradient)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px var(--accent-glow)', flexShrink: 0,
+            boxShadow: '0 10px 30px -8px var(--accent-glow)', flexShrink: 0,
           }}>
-            <span style={{ color: 'var(--accent-ink)', fontSize: 16 }}>✓</span>
+            <span style={{ color: '#fff', fontSize: 16 }}>✓</span>
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>Alles erledigt für heute.</div>
@@ -443,8 +445,8 @@ function WeekMonthToggle({
         onClick={() => onChange(id)}
         style={{
           padding: '4px 11px', borderRadius: 99,
-          background: active ? 'var(--accent)' : 'transparent',
-          color: active ? 'var(--accent-ink)' : 'var(--fg-muted)',
+          background: active ? 'var(--nav-active-bg)' : 'transparent',
+          color: active ? 'var(--accent-text)' : 'var(--fg-muted)',
           border: 'none', cursor: 'pointer',
           fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700,
           letterSpacing: '0.10em', textTransform: 'uppercase',
@@ -547,8 +549,8 @@ function TagesplanCard({
 
   return (
     <div style={{
-      borderRadius: 16, border: '1px solid var(--border)',
-      background: 'var(--bg-2)', padding: '20px 22px',
+      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+      background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 22px',
     }}>
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
@@ -664,8 +666,8 @@ function InboxCard() {
 
   return (
     <div style={{
-      borderRadius: 16, border: '1px solid var(--border)',
-      background: 'var(--bg-2)',
+      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+      background: 'var(--surface)', boxShadow: 'var(--card-shadow)',
       display: 'flex', flexDirection: 'column', minHeight: 0,
       maxHeight: 480, overflow: 'hidden',
     }}>
@@ -691,9 +693,9 @@ function InboxCard() {
             onClick={() => setAppView('mail')}
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 8,
-              background: 'transparent', border: '1px solid var(--border)',
-              color: 'var(--fg-muted)', cursor: 'pointer',
+              padding: '5px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              color: 'var(--fg)', cursor: 'pointer',
               fontFamily: 'inherit', fontSize: 11.5,
             }}
           >
@@ -807,7 +809,7 @@ export function DashboardRoute() {
   return (
     <div className="main-inner">
       <PageHeader
-        title={<>{greeting()}, <span style={{ color: 'var(--accent)' }}>{firstName}</span></>}
+        title={<>{greeting()}, <span style={{ color: 'var(--accent-text)' }}>{firstName}</span></>}
         right={
           <div className="greeting-sub">
             <span>{dateLine}</span>
