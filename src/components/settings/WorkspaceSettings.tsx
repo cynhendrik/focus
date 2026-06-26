@@ -7,6 +7,7 @@ import { InvoiceNumberSettings } from './InvoiceNumberSettings'
 import { buildSignatureFromProfile } from '@/lib/mail-signature'
 import { JoinCodeRow } from '@/core/workspace/JoinCodeRow'
 import { MembersSettings } from '@/components/workspace/MembersSettings'
+import { SettingsPage, SettingCard, FieldRow, AuroraToggle } from './ui'
 
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false)
@@ -16,21 +17,18 @@ function CopyField({ label, value }: { label: string; value: string }) {
     setTimeout(() => setCopied(false), 1800)
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {label}
-      </label>
+    <FieldRow label={label}>
       <div style={{ display: 'flex', gap: 6 }}>
         <input readOnly value={value} style={{
           flex: 1, padding: '8px 12px', fontSize: 12,
-          borderRadius: 8, border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
           background: 'var(--surface-2)', color: 'var(--fg-dim)',
           outline: 'none', fontFamily: 'var(--font-mono)',
         }} />
         <button
           onClick={copy}
           style={{
-            padding: '0 12px', borderRadius: 8, border: '1px solid var(--border)',
+            padding: '0 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
             background: 'var(--surface-2)', cursor: 'pointer', color: 'var(--fg-muted)',
             display: 'flex', alignItems: 'center',
           }}
@@ -38,28 +36,25 @@ function CopyField({ label, value }: { label: string; value: string }) {
           {copied ? <Check size={14} style={{ color: 'var(--ok)' }} /> : <Copy size={14} />}
         </button>
       </div>
-    </div>
+    </FieldRow>
   )
 }
 
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {label}
-      </label>
+    <FieldRow label={label}>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         style={{
-          padding: '8px 12px', fontSize: 13, borderRadius: 8,
+          padding: '8px 12px', fontSize: 13, borderRadius: 'var(--radius-sm)',
           border: '1px solid var(--border)', background: 'var(--surface-2)',
           color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', width: '100%',
           boxSizing: 'border-box' as const,
         }}
       />
-    </div>
+    </FieldRow>
   )
 }
 
@@ -87,29 +82,22 @@ export function WorkspaceSettings({ workspaceId }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 600 }}>
-      <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Unternehmen</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>Firmendaten, Rechnungsdesign und Erscheinungsbild</p>
-      </div>
+    <SettingsPage title="Unternehmen" subtitle="Firmendaten, Rechnungsdesign und Erscheinungsbild" maxWidth={600}>
 
       {/* Workspace */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Unternehmensname
-          </label>
-          <Field label="" value={val('name')} onChange={f('name')} placeholder="Muster GmbH" />
+          <Field label="Unternehmensname" value={val('name')} onChange={f('name')} placeholder="Muster GmbH" />
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <CopyField label="Workspace ID" value={workspaceId} />
           <JoinCodeRow />
           <MembersSettings />
         </div>
-      </div>
+      </SettingCard>
 
       {/* Company Profile */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Unternehmensprofil</div>
           <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Wird auf Rechnungen und Angeboten verwendet</div>
@@ -132,7 +120,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             onClick={() => setForm(p => ({ ...p, kleinunternehmer: !p.kleinunternehmer }))}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+              padding: '12px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer',
               border: `1px solid ${form.kleinunternehmer ? 'var(--accent)' : 'var(--border)'}`,
               background: form.kleinunternehmer ? 'oklch(56% 0.19 264 / 0.06)' : 'var(--surface-2)',
               transition: 'all 180ms',
@@ -142,25 +130,13 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>§19 UStG Kleinunternehmer</div>
               <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 2 }}>Keine Mehrwertsteuer auf Rechnungen ausweisen</div>
             </div>
-            <div style={{
-              width: 36, height: 20, borderRadius: 10, flexShrink: 0,
-              background: form.kleinunternehmer ? 'var(--accent)' : 'var(--surface-3)',
-              position: 'relative', transition: 'background 180ms',
-            }}>
-              <div style={{
-                position: 'absolute', top: 2,
-                left: form.kleinunternehmer ? 18 : 2,
-                width: 16, height: 16, borderRadius: '50%',
-                background: form.kleinunternehmer ? 'var(--accent-ink)' : 'var(--fg-dim)',
-                transition: 'left 180ms',
-              }} />
-            </div>
+            <AuroraToggle on={form.kleinunternehmer ?? false} onChange={() => setForm(p => ({ ...p, kleinunternehmer: !p.kleinunternehmer }))} />
           </div>
         </div>
-      </div>
+      </SettingCard>
 
       {/* Mahngebühren */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Mahngebühren</div>
           <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Gestaffelt je Mahnstufe (Euro)</div>
@@ -181,10 +157,10 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             />
           ))}
         </div>
-      </div>
+      </SettingCard>
 
       {/* E-Mail-Signatur */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700 }}>E-Mail-Signatur</div>
@@ -194,7 +170,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             type="button"
             onClick={() => setForm(p => ({ ...p, emailSignature: buildSignatureFromProfile(p) }))}
             style={{
-              flexShrink: 0, height: 30, padding: '0 12px', borderRadius: 8,
+              flexShrink: 0, height: 30, padding: '0 12px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border)', background: 'var(--surface-2)',
               color: 'var(--fg)', cursor: 'pointer', fontSize: 12, fontWeight: 600,
             }}
@@ -210,18 +186,19 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             placeholder={'Mit freundlichen Grüßen\n\nMuster GmbH\n…'}
             style={{
               width: '100%', resize: 'vertical', boxSizing: 'border-box',
-              background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
               padding: '10px 14px', color: 'var(--fg)', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.6,
               outline: 'none',
             }}
           />
         </div>
-      </div>
+      </SettingCard>
 
       <InvoiceNumberSettings />
 
       {/* Rechnungsdesign */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Rechnungsdesign</div>
           <div style={{ fontSize: 11, color: 'var(--fg-dim)', marginTop: 1 }}>Logo und Farbe für Rechnungen &amp; Angebote</div>
@@ -229,10 +206,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Logo */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Logo
-            </label>
+          <FieldRow label="Logo" hint="PNG oder SVG empfohlen, max. 1 MB">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {form.logoBase64 ? (
                 <div style={{
@@ -254,7 +228,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
               )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{
-                  padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  padding: '7px 14px', borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 600,
                   border: '1px solid var(--border)', background: 'var(--surface-2)',
                   color: 'var(--fg)', cursor: 'pointer',
                 }}>
@@ -275,7 +249,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
                   <button
                     onClick={() => setForm(p => ({ ...p, logoBase64: undefined }))}
                     style={{
-                      padding: '7px 14px', borderRadius: 8, fontSize: 12,
+                      padding: '7px 14px', borderRadius: 'var(--radius-sm)', fontSize: 12,
                       border: '1px solid var(--border)', background: 'transparent',
                       color: 'var(--fg-dim)', cursor: 'pointer',
                     }}
@@ -285,14 +259,10 @@ export function WorkspaceSettings({ workspaceId }: Props) {
                 )}
               </div>
             </div>
-            <p style={{ fontSize: 11, color: 'var(--fg-dim)', margin: 0 }}>PNG oder SVG empfohlen, max. 1 MB</p>
-          </div>
+          </FieldRow>
 
           {/* Akzentfarbe */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              Akzentfarbe
-            </label>
+          <FieldRow label="Akzentfarbe">
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {['#111111', '#1e40af', '#065f46', '#7c3aed', '#b45309', '#be123c'].map(color => (
                 <button
@@ -324,13 +294,13 @@ export function WorkspaceSettings({ workspaceId }: Props) {
                 {form.invoiceAccentColor ?? '#111111'}
               </span>
             </div>
-          </div>
+          </FieldRow>
 
         </div>
-      </div>
+      </SettingCard>
 
       {/* Erscheinungsbild */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <SettingCard style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 12, fontWeight: 700 }}>Erscheinungsbild</div>
         </div>
@@ -344,21 +314,9 @@ export function WorkspaceSettings({ workspaceId }: Props) {
           <div style={{ fontSize: 13, color: 'var(--fg)' }}>
             {theme === 'dark' ? 'Dunkles Theme' : 'Helles Theme'}
           </div>
-          <div style={{
-            width: 36, height: 20, borderRadius: 10,
-            background: theme === 'dark' ? 'var(--accent)' : 'var(--surface-3)',
-            position: 'relative', transition: 'background 180ms',
-          }}>
-            <div style={{
-              position: 'absolute', top: 2,
-              left: theme === 'dark' ? 18 : 2,
-              width: 16, height: 16, borderRadius: '50%',
-              background: theme === 'dark' ? 'var(--accent-ink)' : 'var(--fg-dim)',
-              transition: 'left 180ms',
-            }} />
-          </div>
+          <AuroraToggle on={theme === 'dark'} onChange={toggleTheme} />
         </div>
-      </div>
+      </SettingCard>
 
       {/* Save */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -366,6 +324,6 @@ export function WorkspaceSettings({ workspaceId }: Props) {
           {saved ? '✓ Gespeichert' : 'Speichern'}
         </button>
       </div>
-    </div>
+    </SettingsPage>
   )
 }
