@@ -148,8 +148,19 @@ Drei Touchpoints, alle im Bestand verankert (`appView`-Enum, `NavSidebar`,
      `ui.store`; sichtbar unabhängig vom aktuellen `appView`. Der Drawer zeigt
      dieselbe Liste + Composer kompakt; ein „⤢"-Button springt in die Vollansicht.
    Composer (in beiden) nutzt das bestehende `MentionPopover`, erweitert um
-   Mitglieder *und* Aufgaben (`@Person`, `@Aufgabe`). System-Nachrichten rendern
-   als Karte (Titel, Fälligkeit, Status; Klick → springt zur Aufgabe).
+   Mitglieder *und* Aufgaben (`@Person`, `@Aufgabe`).
+
+   **Sprung-Verhalten (ein Klick):**
+   - *Nachricht → Aufgabe:* Jede Nachricht mit `ref_type='task'` — System-Karte
+     **oder** getippter Kommentar mit `@Aufgabe` — rendert den Aufgaben-Titel als
+     klickbaren Chip/Karte (Titel, Fälligkeit, Status). Klick öffnet die Aufgabe
+     (setzt `appView` + selektiert die Aufgabe in Heute-/Kunden-Ansicht). Verwaiste
+     Referenz (Aufgabe gelöscht) → Chip inaktiv, Label „Aufgabe gelöscht".
+   - *Inbox → Nachricht:* Klick auf eine `comment`/`mention`-Benachrichtigung
+     öffnet den Kanal und scrollt via `message_id` zu genau dieser Nachricht +
+     hebt sie kurz hervor (Highlight-Flash).
+   - *Inbox → Aufgabe:* `assigned`/`completed`-Benachrichtigungen springen direkt
+     zur Aufgabe (`ref_type='task'`).
 
 2. **Inbox** — `NotificationCenter` (Glocke) bekommt oben einen Abschnitt
    „Für dich": echte `notifications`, ungelesen hervorgehoben, Klick markiert
