@@ -233,6 +233,13 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     },
   })
 
+  const consumePrefill = useGlobalComposerStore(s => s.consumePrefill)
+  useEffect(() => {
+    if (!editor) return
+    const p = consumePrefill()
+    if (p) { editor.commands.setContent(p); editor.commands.focus('end'); setText(p) }
+  }, [editor, consumePrefill])
+
   const draft = useMemo(() => {
     const parsed = parseTaskText(text, { mentions, resolveMention })
     parsed.actionType = detectActionType(parsed.title) ?? undefined

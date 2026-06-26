@@ -4,6 +4,7 @@ import { useMembersStore } from '@/store/members.store'
 import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useGlobalComposerStore } from '@/store/global-composer.store'
 import { SystemMessageCard } from './SystemMessageCard'
 import { TaskRefChip } from './TaskRefChip'
 import type { Message } from '@/types/message.types'
@@ -96,6 +97,16 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
               {m.body}
             </div>
             {m.refType === 'task' && m.refId && <TaskRefChip taskId={m.refId} />}
+            <button
+              onClick={() => useGlobalComposerStore.getState().openWith('! ' + m.body)}
+              style={{
+                alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: 2,
+                fontSize: 10.5, color: 'var(--fg-dim)', background: 'transparent',
+                border: 'none', cursor: 'pointer',
+              }}
+            >
+              In Aufgabe umwandeln
+            </button>
           </div>
         )
       })}
