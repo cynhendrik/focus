@@ -59,13 +59,21 @@ export function DatenschutzSettings() {
           </InfoRow>
         </div>
 
-        <p style={{
-          fontSize: 12, fontStyle: 'italic', color: 'var(--fg-dim)', margin: 0,
+        <div style={{
+          fontSize: 12, color: 'var(--fg-dim)', margin: 0, lineHeight: 1.55,
           paddingTop: 12, borderTop: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: 6,
         }}>
-          Rechtsgrundlage der Übermittlung in die USA (z. B. Standardvertragsklauseln / AVV mit
-          Anthropic) sowie die vollständige Datenschutzerklärung: wird ergänzt.
-        </p>
+          <span>
+            <strong>Rechtsgrundlage der USA-Übermittlung:</strong> EU-Standardvertragsklauseln
+            (Art. 46 DSGVO); Anthropic ist zudem unter dem EU-US&nbsp;Data&nbsp;Privacy&nbsp;Framework
+            zertifiziert. Der Auftragsverarbeitungsvertrag nach Art.&nbsp;28 DSGVO ist Bestandteil von
+            Anthropics Commercial&nbsp;Terms&nbsp;of&nbsp;Service (anthropic.com/legal/data-processing-addendum).
+          </span>
+          <span style={{ fontStyle: 'italic' }}>
+            Vollständige Datenschutzerklärung: wird ergänzt.
+          </span>
+        </div>
       </div>
     </div>
   )
