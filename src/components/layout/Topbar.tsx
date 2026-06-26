@@ -2,7 +2,7 @@ import { useUiStore } from '@/store/ui.store'
 import { NotificationCenter } from './NotificationCenter'
 import {
   Sun, Sunrise, Users, CreditCard, Target,
-  Mail, Calendar, Clock, Settings, Plug, Sparkles, User, Timer, MessagesSquare,
+  Mail, Calendar, Clock, Settings, Plug, Sparkles, User, Timer, MessagesSquare, Inbox,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -19,6 +19,7 @@ const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: Luci
   integrations:   { label: 'Integrationen',  tag: 'VERBINDUNGEN',  Icon: Plug       },
   profile:        { label: 'Profil',         tag: 'KONTO',         Icon: User       },
   team:           { label: 'Team',           tag: 'CHAT',          Icon: MessagesSquare },
+  inbox:          { label: 'Inbox',          tag: 'BENACHRICHTIGUNGEN', Icon: Inbox },
 }
 
 export function Topbar() {

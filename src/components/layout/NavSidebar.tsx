@@ -1,5 +1,7 @@
 import { useUiStore } from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useNotificationsStore } from '@/store/notifications.store'
+import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
 import { useCapability } from '@/hooks/useCapability'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
@@ -76,6 +78,8 @@ export function NavSidebar() {
   }
   const canFinances = useCapability('finances')
 
+  const loudInbox = useNotificationsStore(s => loudUnreadCount(s.notifications))
+
   const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
   const displayName = ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
     || user?.email?.split('@')[0]
@@ -124,6 +128,8 @@ export function NavSidebar() {
         onClick={() => setAppView('clients')} kbd="C" />}
       {mod('finanzen') && canFinances && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
+      <NavItem icon={Inbox} label="Inbox" active={appView === 'inbox'}
+        onClick={() => setAppView('inbox')} badge={loudInbox || undefined} badgeAccent />
 
       {/* ── AKQUISE — Leads → Deals, der Weg zum Neukunden ─────────────── */}
       {!collapsed && <SectionLabel>Akquise</SectionLabel>}
