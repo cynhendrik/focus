@@ -17,6 +17,11 @@ import { usePipelineStore } from '@/store/pipeline.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useCompanyStore } from '@/store/company.store'
+import { useMessagesStore } from '@/store/messages.store'
+import { useNotificationsStore } from '@/store/notifications.store'
+import { messageRowToMessage } from '@/data/messages.mapper'
+import { notificationRowToNotification } from '@/data/notifications.mapper'
+import { useAuthStore } from '@/store/auth.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
 import { log } from '@/lib/logger'
 
@@ -91,6 +96,19 @@ export function useWorkspaceRealtime() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'company_settings', filter: `workspace_id=eq.${activeWorkspaceId}` },
         () => { useCompanyStore.getState().load() },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        (payload) => { useMessagesStore.getState().appendRealtime(messageRowToMessage(payload.new as any)) },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${useAuthStore.getState().user?.id ?? ''}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') return
+          useNotificationsStore.getState().upsertRealtime(notificationRowToNotification(payload.new as any))
+        },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
 
