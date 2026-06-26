@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { SettingsPage, SettingCard } from './ui'
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -19,29 +20,22 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 
 export function DatenschutzSettings() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 640 }}>
-      <div>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Datenschutz</h2>
-        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: 0 }}>
-          Wie Cultera Focus mit KI-Funktionen und deinen Daten umgeht
-        </p>
-      </div>
+    <SettingsPage
+      title="Datenschutz"
+      subtitle="Wie Cultera Focus mit KI-Funktionen und deinen Daten umgeht"
+      maxWidth={640}
+    >
+      <SettingCard>
+        <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>KI-Funktionen &amp; Datenschutz</h3>
 
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '20px 22px',
-        display: 'flex', flexDirection: 'column', gap: 16,
-      }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>KI-Funktionen &amp; Datenschutz</h3>
-
-        <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--fg-muted)', margin: 0 }}>
+        <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--fg-muted)', margin: '0 0 12px' }}>
           Cultera Focus bietet KI-gestützte Funktionen — den KORA-Assistenten, Textentwürfe,
           Kunden-Briefings und Mahntext-Vorschläge. Dafür übermitteln wir die jeweils nötigen
           Inhalte an unseren Dienstleister <strong>Anthropic PBC (USA)</strong> und lassen sie
           dort verarbeiten.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
           <InfoRow label="Wann">
             Nur wenn du eine KI-Funktion aktiv nutzt (KORA anschreiben, Entwurf/Briefing/Mahntext
             anfordern). Ohne deine Aktion gehen keine Daten an die KI.
@@ -74,7 +68,7 @@ export function DatenschutzSettings() {
             Vollständige Datenschutzerklärung: wird ergänzt.
           </span>
         </div>
-      </div>
-    </div>
+      </SettingCard>
+    </SettingsPage>
   )
 }
