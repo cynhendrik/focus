@@ -18,10 +18,17 @@ import {
   migrateCompanySettings, migratePipelineStages, migrateLeadStages, migrateCalendar,
   migrateInvoices, migrateInvoiceItems, migratePayments,
   migrateOffers, migrateOfferItems, bumpSequences,
+  migrateVertraege, migrateNoteFolders, migrateNoteEntries,
+  migrateAuftraege, migrateZeiteintraege,
   runMigration,
 } from './migration-runner'
 
-beforeEach(() => { upsertMock.mockClear(); deleteEqMock.mockClear(); vi.mocked(invoke).mockReset() })
+beforeEach(() => {
+  upsertMock.mockClear()
+  deleteEqMock.mockClear()
+  vi.mocked(invoke).mockReset()
+  localStorage.clear()
+})
 
 describe('migrateAccounts', () => {
   it('reads local clients+leads and upserts them re-scoped, preserving id/created_at', async () => {
@@ -506,6 +513,172 @@ describe('migrateOfferItems', () => {
     const n = await migrateOfferItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(0)
     expect(deleteEqMock).not.toHaveBeenCalled()
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateVertraege', () => {
+  it('reads contracts and upserts re-scoped, preserving id/created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_contracts')
+        return [{ id: 'v1', workspaceId: 'L', accountId: 'a1', title: 'Wartung', createdAt: 'VT', items: [], status: 'active', taxMode: 'standard', intervalValue: 1, intervalUnit: 'month', startDate: '2025-01-01', nextBillingDate: '2026-01-01', endDate: null, notes: '' }]
+      return []
+    })
+    const n = await migrateVertraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('v1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('VT')
+    expect(row.title).toBe('Wartung')
+    expect(row.items).toEqual([])
+  })
+
+  it('returns 0 and skips upsert when workspace has no contracts', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_contracts') return []
+      return []
+    })
+    const n = await migrateVertraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateNoteFolders', () => {
+  it('reads workspace dump and upserts note_folders re-scoped, preserving id/created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'note_folders' && args.workspaceId === 'L')
+        return [{
+          id: 'nf1', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', name: 'Projekte',
+          created_at: 'FT', updated_at: 'FU',
+          local_only_col: 'should-be-excluded',
+        }]
+      return []
+    })
+    const n = await migrateNoteFolders({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('nf1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('FT')
+    expect(row.name).toBe('Projekte')
+    expect(row.account_id).toBe('a1')
+    expect(row.local_only_col).toBeUndefined()
+  })
+
+  it('returns 0 and skips upsert when workspace has no note_folders', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'note_folders') return []
+      return []
+    })
+    const n = await migrateNoteFolders({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateNoteEntries', () => {
+  it('reads workspace dump, parses tags/stickies strings, re-scopes, preserving id/created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'note_entries' && args.workspaceId === 'L')
+        return [{
+          id: 'ne1', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', folder_id: 'nf1', title: 'Ideen',
+          content: 'lorem', tags: '["foo","bar"]', stickies: '[{"id":"s1","text":"sticky"}]',
+          updated_by: null, created_at: 'NT', updated_at: 'NU',
+        }]
+      return []
+    })
+    const n = await migrateNoteEntries({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('ne1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('NT')
+    expect(row.folder_id).toBe('nf1')
+    expect(row.tags).toEqual(['foo', 'bar'])
+    expect(row.stickies).toEqual([{ id: 's1', text: 'sticky' }])
+  })
+
+  it('stickies from local record are preserved (not defaulted to [])', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'note_entries')
+        return [{
+          id: 'ne2', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', folder_id: null, title: null,
+          content: '', tags: '[]', stickies: '[{"id":"sticky42","text":"Important!"}]',
+          updated_by: null, created_at: 'T2', updated_at: 'T2',
+        }]
+      return []
+    })
+    await migrateNoteEntries({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.stickies).toEqual([{ id: 'sticky42', text: 'Important!' }])
+    expect(row.tags).toEqual([])
+  })
+
+  it('returns 0 and skips upsert when workspace has no note_entries', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'note_entries') return []
+      return []
+    })
+    const n = await migrateNoteEntries({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateAuftraege', () => {
+  it('reads localStorage and re-scopes workspace_id/created_by', async () => {
+    localStorage.setItem('cynera-auftraege-v1', JSON.stringify([{ id: 'au1', title: 'Webprojekt', notes: '', status: 'active', defaultHourlyRate: null, createdAt: 'AT' }]))
+    const n = await migrateAuftraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('au1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('AT')
+    expect(row.title).toBe('Webprojekt')
+  })
+
+  it('returns 0 and skips upsert when localStorage is empty', async () => {
+    const n = await migrateAuftraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+
+  it('is idempotent — second run upserts same ids', async () => {
+    localStorage.setItem('cynera-auftraege-v1', JSON.stringify([{ id: 'au2', title: 'T', notes: '', status: 'active', defaultHourlyRate: null, createdAt: 'T' }]))
+    await migrateAuftraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    await migrateAuftraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(upsertMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('migrateZeiteintraege', () => {
+  it('reads localStorage and re-scopes, without created_at (DB default)', async () => {
+    localStorage.setItem('cynera-zeiteintraege-v1', JSON.stringify([{ id: 'ze1', auftragId: 'au1', accountId: 'acc1', date: '2026-01-15', minutes: 90, description: 'Dev', hourlyRate: 85, billed: false, invoiceId: null }]))
+    const n = await migrateZeiteintraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('ze1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.auftrag_id).toBe('au1')
+    expect(row.minutes).toBe(90)
+    expect(row.billed).toBe(false)
+    // No created_at injected — DB default applies
+    expect(row.created_at).toBeUndefined()
+  })
+
+  it('returns 0 and skips upsert when localStorage is empty', async () => {
+    const n = await migrateZeiteintraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
     expect(upsertMock).not.toHaveBeenCalled()
   })
 })

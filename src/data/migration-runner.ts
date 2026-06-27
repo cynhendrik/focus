@@ -10,6 +10,8 @@ import {
   offerPayloadToRow, offerItemPayloadToRow,
   paymentPayloadToRow,
 } from './finance.mapper'
+import { vertragPayloadToRow } from './vertraege.mapper'
+import { auftragToRow, zeiteintragToRow } from './auftraege.mapper'
 import type { Account } from '@/types/account.types'
 import type { Lead, UpsertLeadPayload } from '@/types/lead.types'
 import type { UpsertAccountPayload } from '@/types/account.types'
@@ -411,6 +413,128 @@ export async function bumpSequences(ctx: MigrationCtx): Promise<void> {
   )
 }
 
+/** Parse localStorage value as T[]; returns [] on missing/invalid JSON or non-array. */
+function lsParse<T>(key: string): T[] {
+  try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : [] } catch { return [] }
+}
+
+/** String-encoded JSON array → native array; arrays pass through; anything else → []. */
+function asJsonArray(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : [] } catch { return [] } }
+  return []
+}
+
+// Cloud column allowlist for `note_folders` (derived from NotesModuleGateway createFolder write-path).
+const NOTE_FOLDER_CLOUD_COLS = new Set([
+  'id', 'workspace_id', 'created_by', 'account_id', 'name', 'created_at', 'updated_at',
+])
+
+// Cloud column allowlist for `note_entries` (derived from NotesModuleGateway createEntry write-path).
+const NOTE_ENTRY_CLOUD_COLS = new Set([
+  'id', 'workspace_id', 'created_by', 'account_id', 'folder_id',
+  'title', 'content', 'tags', 'stickies', 'updated_by', 'created_at', 'updated_at',
+])
+
+/**
+ * Migriert lokale Verträge (cmd_get_contracts) in die Cloud-Tabelle `vertraege`.
+ * items ist bereits natives Array (Mapper liefert Array aus lokalem Rust-Wert).
+ * Preserviert created_at aus dem Domain-Objekt.
+ *
+ * Mapper-Signatur (vertraege.mapper.ts, verifiziert):
+ *   vertragPayloadToRow(p: ContractRow, ctx: { createdBy: string })
+ *   → enthält workspace_id (aus p.workspaceId), created_by, created_at.
+ *   scope() überschreibt workspace_id mit cloudWsId und created_by mit uid.
+ */
+export async function migrateVertraege(ctx: MigrationCtx): Promise<number> {
+  const list = await invoke<any[]>('cmd_get_contracts', { workspaceId: ctx.localWsId })
+  const rows = list.map(v => scope(vertragPayloadToRow(v, { createdBy: ctx.uid }), ctx, v.createdAt))
+  await upsertRows('vertraege', rows)
+  return rows.length
+}
+
+/**
+ * Migriert lokale Note-Folders in die Cloud-Tabelle `note_folders` via workspace-weitem
+ * SQLite-Dump (cmd_dump_table). Projiziert auf Cloud-Spalten-Allowlist, re-scoped
+ * workspace_id/created_by, preserviert id + created_at aus dem Rohzeile.
+ * Workspace-weiter Dump statt per-Account: vermeidet Datenverlust durch Waisen-Rows.
+ */
+export async function migrateNoteFolders(ctx: MigrationCtx): Promise<number> {
+  const raw = await invoke<Record<string, unknown>[]>('cmd_dump_table', {
+    table: 'note_folders',
+    workspaceId: ctx.localWsId,
+  })
+  const rows = raw.map(r => {
+    const row: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(r)) {
+      if (NOTE_FOLDER_CLOUD_COLS.has(k)) row[k] = v
+    }
+    row.workspace_id = ctx.cloudWsId
+    row.created_by = ctx.uid
+    return row
+  })
+  await upsertRows('note_folders', rows)
+  return rows.length
+}
+
+/**
+ * Migriert lokale Note-Entries in die Cloud-Tabelle `note_entries` via workspace-weitem
+ * SQLite-Dump (cmd_dump_table). Projiziert auf Cloud-Spalten-Allowlist, parst
+ * tags/stickies JSON-String → jsonb-Array, re-scoped workspace_id/created_by,
+ * preserviert id + created_at aus dem Rohzeile.
+ * Workspace-weiter Dump statt per-Account: vermeidet Datenverlust durch Waisen-Rows.
+ */
+export async function migrateNoteEntries(ctx: MigrationCtx): Promise<number> {
+  const raw = await invoke<Record<string, unknown>[]>('cmd_dump_table', {
+    table: 'note_entries',
+    workspaceId: ctx.localWsId,
+  })
+  const rows = raw.map(r => {
+    const row: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(r)) {
+      if (NOTE_ENTRY_CLOUD_COLS.has(k)) row[k] = v
+    }
+    // SQLite stores tags/stickies as JSON strings; cloud expects jsonb arrays.
+    row.tags = asJsonArray(row.tags)
+    row.stickies = asJsonArray(row.stickies)
+    row.workspace_id = ctx.cloudWsId
+    row.created_by = ctx.uid
+    return row
+  })
+  await upsertRows('note_entries', rows)
+  return rows.length
+}
+
+/**
+ * Migriert Aufträge aus localStorage (`cynera-auftraege-v1`) in die Cloud-Tabelle `auftraege`.
+ * Preserviert created_at (Mapper liefert es aus a.createdAt).
+ *
+ * Mapper-Signatur (auftraege.mapper.ts, verifiziert):
+ *   auftragToRow(a: Auftrag, ctx: { workspaceId: string; createdBy: string })
+ */
+export async function migrateAuftraege(ctx: MigrationCtx): Promise<number> {
+  const rows = lsParse<any>('cynera-auftraege-v1').map(a =>
+    scope(auftragToRow(a, { workspaceId: ctx.cloudWsId, createdBy: ctx.uid }), ctx, a.createdAt),
+  )
+  await upsertRows('auftraege', rows)
+  return rows.length
+}
+
+/**
+ * Migriert Zeiteinträge aus localStorage (`cynera-zeiteintraege-v1`) in die Cloud-Tabelle `zeiteintraege`.
+ * created_at wird NICHT injiziert — Zeiteintrag-Typ hat kein createdAt, DB-Default (now()) greift.
+ *
+ * Mapper-Signatur (auftraege.mapper.ts, verifiziert):
+ *   zeiteintragToRow(z: Zeiteintrag, ctx: { workspaceId: string; createdBy: string })
+ */
+export async function migrateZeiteintraege(ctx: MigrationCtx): Promise<number> {
+  const rows = lsParse<any>('cynera-zeiteintraege-v1').map(z =>
+    scope(zeiteintragToRow(z, { workspaceId: ctx.cloudWsId, createdBy: ctx.uid }), ctx),
+  )
+  await upsertRows('zeiteintraege', rows)
+  return rows.length
+}
+
 const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number> }> = [
   { name: 'company_settings', run: migrateCompanySettings },
   { name: 'pipeline_stages', run: migratePipelineStages },
@@ -425,6 +549,11 @@ const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number
   { name: 'payments', run: migratePayments },
   { name: 'offers', run: migrateOffers },
   { name: 'offer_items', run: migrateOfferItems },
+  { name: 'vertraege', run: migrateVertraege },
+  { name: 'note_folders', run: migrateNoteFolders },
+  { name: 'note_entries', run: migrateNoteEntries },
+  { name: 'auftraege', run: migrateAuftraege },
+  { name: 'zeiteintraege', run: migrateZeiteintraege },
 ]
 
 export async function runMigration(
