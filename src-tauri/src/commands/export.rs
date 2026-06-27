@@ -202,7 +202,7 @@ fn json_to_sql(v: &serde_json::Value) -> rusqlite::types::Value {
 }
 
 /// Core import logic — testable without Tauri state.
-pub fn import_into(conn: &mut rusqlite::Connection, json: &str) -> Result<ImportSummary, String> {
+pub fn import_into(conn: &mut rusqlite::Connection, json: &str, active_ws: Option<&str>, user_id: Option<&str>) -> Result<ImportSummary, String> {
     let manifest: serde_json::Value = serde_json::from_str(json)
         .map_err(|e| format!("Ungültige Backup-Datei: {e}"))?;
     let fmt = manifest.get("format").and_then(|v| v.as_str());
@@ -241,12 +241,11 @@ pub fn import_into(conn: &mut rusqlite::Connection, json: &str) -> Result<Import
             let mut cols: Vec<String> = Vec::new();
             let mut vals: Vec<rusqlite::types::Value> = Vec::new();
             for (k, v) in obj {
-                if existing.contains(k) {
-                    cols.push(format!("\"{k}\""));
-                    vals.push(json_to_sql(v));
-                } else {
-                    summary.skipped_unknown_columns += 1;
-                }
+                if !existing.contains(k) { summary.skipped_unknown_columns += 1; continue; }
+                cols.push(format!("\"{k}\""));
+                if k == "workspace_id" { if let Some(ws) = active_ws { vals.push(rusqlite::types::Value::Text(ws.to_string())); continue; } }
+                if k == "created_by"   { if let Some(u)  = user_id   { vals.push(rusqlite::types::Value::Text(u.to_string()));  continue; } }
+                vals.push(json_to_sql(v));
             }
             if cols.is_empty() { continue; }
             let placeholders = vec!["?"; cols.len()].join(", ");
@@ -265,9 +264,9 @@ pub fn import_into(conn: &mut rusqlite::Connection, json: &str) -> Result<Import
 }
 
 #[tauri::command]
-pub fn cmd_import_backup(db: State<'_, DbPool>, json: String) -> Result<ImportSummary, String> {
+pub fn cmd_import_backup(db: State<'_, DbPool>, json: String, active_workspace_id: Option<String>, user_id: Option<String>) -> Result<ImportSummary, String> {
     let mut conn = db.conn();
-    import_into(&mut conn, &json)
+    import_into(&mut conn, &json, active_workspace_id.as_deref(), user_id.as_deref())
 }
 
 /// Leert alle User-Inhalts-Tabellen in einer Transaktion, behält aber das Setup
@@ -426,7 +425,7 @@ mod tests {
         assert_eq!(before, 0);
 
         // 4. Import in die leere DB
-        let summary = import_into(&mut conn2, &json_str).unwrap();
+        let summary = import_into(&mut conn2, &json_str, None, None).unwrap();
         assert!(summary.rows >= 3, "mindestens die 3 eingefügten Zeilen");
 
         // 5. Alles wieder da?
@@ -460,7 +459,7 @@ mod tests {
 
         // Fresh DB with FK enforcement ON (matches the production pool).
         let mut conn2 = sample_conn();
-        let summary = import_into(&mut conn2, &json)
+        let summary = import_into(&mut conn2, &json, None, None)
             .expect("import must succeed with child tables and foreign_keys=ON");
         assert!(summary.rows >= 3, "accounts + invoices + invoice_items");
 
@@ -473,7 +472,7 @@ mod tests {
     #[test]
     fn import_rejects_foreign_file() {
         let mut conn = sample_conn();
-        let err = import_into(&mut conn, "{\"format\":\"something-else\",\"tables\":{}}").unwrap_err();
+        let err = import_into(&mut conn, "{\"format\":\"something-else\",\"tables\":{}}", None, None).unwrap_err();
         assert!(err.contains("keine Cultera-Backup-Datei"));
     }
 
@@ -490,8 +489,8 @@ mod tests {
         conn2.execute(
             "INSERT INTO customers (id, name, tags, created_at, updated_at) \
              VALUES ('c1','ALT','[]','2025-01-01','2025-01-01')", []).unwrap();
-        import_into(&mut conn2, &json).unwrap();
-        import_into(&mut conn2, &json).unwrap(); // zweimal = kein Duplikat
+        import_into(&mut conn2, &json, None, None).unwrap();
+        import_into(&mut conn2, &json, None, None).unwrap(); // zweimal = kein Duplikat
 
         let count: i64 = conn2.query_row("SELECT count(*) FROM customers WHERE id='c1'", [], |r| r.get(0)).unwrap();
         assert_eq!(count, 1);
@@ -533,6 +532,23 @@ mod tests {
              VALUES ('a1','dev','u','X','2026-01-01','2026-01-01')", []).unwrap();
         assert_eq!(has_workspace_data(&conn, "dev").unwrap(), true);
         assert_eq!(has_workspace_data(&conn, "other").unwrap(), false);
+    }
+
+    #[test]
+    fn import_rescopes_workspace_id_to_active() {
+        let conn = sample_conn();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+             VALUES ('a1','OLD-WS','old-user','Muster GmbH','2026-01-01','2026-01-01')", []).unwrap();
+        let json = String::from_utf8(build_backup_json(&conn).unwrap()).unwrap();
+
+        let mut conn2 = sample_conn();
+        import_into(&mut conn2, &json, Some("ACTIVE-WS"), Some("me")).unwrap();
+
+        let (ws, by): (String, String) = conn2
+            .query_row("SELECT workspace_id, created_by FROM accounts WHERE id='a1'", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!(ws, "ACTIVE-WS");
+        assert_eq!(by, "me");
     }
 
     #[test]
