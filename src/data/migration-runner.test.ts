@@ -5,7 +5,7 @@ const upsertMock = vi.fn().mockResolvedValue({ error: null })
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ upsert: upsertMock }) } }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { migrateAccounts } from './migration-runner'
+import { migrateAccounts, runMigration } from './migration-runner'
 
 beforeEach(() => { upsertMock.mockClear(); vi.mocked(invoke).mockReset() })
 
@@ -29,10 +29,39 @@ describe('migrateAccounts', () => {
   })
 
   it('is idempotent — a second run upserts the same ids (no duplication semantics)', async () => {
-    vi.mocked(invoke).mockResolvedValue([{ id: 'a1', name: 'X', createdAt: 'T', tags: [], isPrivate: false }])
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_accounts') return [{ id: 'a1', name: 'X', createdAt: 'T', tags: [], isPrivate: false }]
+      if (cmd === 'get_leads') return []
+      return []
+    })
     await migrateAccounts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     await migrateAccounts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     // beide Läufe nutzen upsert(onConflict:id) → kein Duplikat-Pfad; hier: 2 upsert-Calls mit gleicher id
     expect(upsertMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('runMigration', () => {
+  it('calls onProgress with (entity, count) for each entity', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_accounts') return [
+        { id: 'b1', name: 'A', createdAt: '2025-01-01T00:00:00Z', tags: [], isPrivate: false },
+        { id: 'b2', name: 'B', createdAt: '2025-02-01T00:00:00Z', tags: [], isPrivate: false },
+      ]
+      if (cmd === 'get_leads') return []
+      return []
+    })
+    const onProgress = vi.fn()
+    await runMigration({ localWsId: 'L', cloudWsId: 'C', uid: 'U' }, onProgress)
+    expect(onProgress).toHaveBeenCalledWith('accounts', 2)
+  })
+
+  it('resolves without throwing when onProgress is omitted', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_accounts') return [{ id: 'c1', name: 'Z', createdAt: '2025-03-01T00:00:00Z', tags: [], isPrivate: false }]
+      if (cmd === 'get_leads') return []
+      return []
+    })
+    await expect(runMigration({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })).resolves.toBeUndefined()
   })
 })
