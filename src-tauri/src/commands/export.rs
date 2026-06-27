@@ -213,6 +213,11 @@ pub fn import_into(conn: &mut rusqlite::Connection, json: &str) -> Result<Import
         .ok_or("Backup enthält keine Tabellen.")?;
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
+    // Tables are restored in alphabetical order, so a child can be inserted before
+    // its parent (e.g. invoice_items before invoices). With foreign_keys=ON (the
+    // production pool, pool.rs), that aborts the whole import. Defer FK enforcement
+    // to commit time — the final state is consistent. Same pattern as reset_workspace_local.
+    tx.execute_batch("PRAGMA defer_foreign_keys=ON;").map_err(|e| e.to_string())?;
     let mut summary = ImportSummary { tables: 0, rows: 0, skipped_unknown_columns: 0 };
 
     for (table, rows_val) in tables {
@@ -350,6 +355,38 @@ mod tests {
         assert_eq!(cust, "Kunde Eins");
         let total: f64 = conn2.query_row("SELECT total FROM invoices WHERE id='i1'", [], |r| r.get(0)).unwrap();
         assert_eq!(total, 119.0);
+    }
+
+    #[test]
+    fn import_restores_child_rows_with_foreign_keys_enforced() {
+        // Regression: a backup containing a child table (invoice_items → invoices)
+        // must import even though "invoice_items" sorts BEFORE "invoices"
+        // alphabetically. Production runs with foreign_keys=ON (pool.rs), so
+        // inserting the child before the parent fails unless FK checks are deferred
+        // to commit. Virtually every real backup has invoice line items.
+        let conn = sample_conn();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+             VALUES ('a1','ws1','u1','Muster GmbH','2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, total, created_at, updated_at) \
+             VALUES ('i1','ws1','u1','a1','2026-01-01','2026-01-15',119.0,'2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoice_items (id, invoice_id, title, quantity, unit_price, tax_rate, total, sort_order) \
+             VALUES ('it1','i1','Leistung',1,100.0,19,119.0,0)", []).unwrap();
+
+        let json = String::from_utf8(build_backup_json(&conn).unwrap()).unwrap();
+
+        // Fresh DB with FK enforcement ON (matches the production pool).
+        let mut conn2 = sample_conn();
+        let summary = import_into(&mut conn2, &json)
+            .expect("import must succeed with child tables and foreign_keys=ON");
+        assert!(summary.rows >= 3, "accounts + invoices + invoice_items");
+
+        let item_invoice: String = conn2
+            .query_row("SELECT invoice_id FROM invoice_items WHERE id='it1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(item_invoice, "i1");
     }
 
     #[test]
