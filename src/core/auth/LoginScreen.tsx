@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth.store'
-import { useWorkspaceStore } from '@/store/workspace.store'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const IS_DEV = import.meta.env.DEV
@@ -121,14 +120,9 @@ function Field({
 
 // ── LoginScreen ───────────────────────────────────────────────────────────────
 
-const TESTER_NAME_STORE = 'cultera:tester-name'
-
 export function LoginScreen() {
   const signIn = useAuthStore(s => s.signIn)
   const signUp = useAuthStore(s => s.signUp)
-  const [devName, setDevName] = useState(() => {
-    try { return localStorage.getItem(TESTER_NAME_STORE) ?? '' } catch { return '' }
-  })
 
   const [phase,    setPhase]    = useState<'intro' | 'fading' | 'login'>('intro')
   const [mode,     setMode]     = useState<'login' | 'register'>('login')
@@ -160,16 +154,6 @@ export function LoginScreen() {
     } finally {
       setLoading(false)
     }
-  }
-
-  function handleDevSkip() {
-    const name = devName.trim()
-    try { localStorage.setItem(TESTER_NAME_STORE, name) } catch { /* ignore */ }
-    useWorkspaceStore.getState().setActiveWorkspace('dev')
-    useAuthStore.setState({
-      user: { id: 'dev', email: 'tester@cultera.local', user_metadata: { full_name: name || 'Tester' } } as any,
-      loading: false,
-    })
   }
 
   function switchMode() {
@@ -356,41 +340,6 @@ export function LoginScreen() {
               </form>
             </div>
 
-            {/* Skip — bottom right (Tester-Modus: Name eingeben, dann überspringen) */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
-              <input
-                value={devName}
-                onChange={e => setDevName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleDevSkip() }}
-                placeholder="Dein Name"
-                style={{
-                  fontSize: 10, color: 'rgba(255,255,255,0.75)',
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 5, padding: '4px 8px', outline: 'none',
-                  fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', width: 120,
-                }}
-              />
-              <button
-                onClick={handleDevSkip}
-                style={{
-                  fontSize: 9.5, color: 'rgba(255,255,255,0.2)',
-                  background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 5, padding: '3px 8px', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', letterSpacing: '0.06em',
-                  textTransform: 'uppercase', transition: 'color 150ms, border-color 150ms',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color       = 'rgba(255,255,255,0.55)'
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color       = 'rgba(255,255,255,0.2)'
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-                }}
-              >
-                überspringen
-              </button>
-            </div>
           </div>
 
         </div>

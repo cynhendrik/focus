@@ -17,10 +17,6 @@ import { useUiStore }   from '@/store/ui.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 
-// Login-Bypass: nur via VITE_LOCAL_MODE=true (Tester-Build ohne Supabase-Login —
-// die App läuft dann komplett lokal). Im normalen Dev erscheint der echte
-// Login-Screen (mit „überspringen"-Notausgang), damit echtes Auth testbar ist.
-const DEV_BYPASS = import.meta.env.VITE_LOCAL_MODE === 'true'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { CommandPalette } from '@/components/CommandPalette'
 import { LoginScreen }   from '@/core/auth/LoginScreen'
@@ -164,12 +160,6 @@ export default function App() {
   }, [openPicker, setCmdPaletteOpen, setQuickCaptureOpen, setAppView])
 
   useEffect(() => {
-    if (DEV_BYPASS && !activeWorkspaceId) {
-      useWorkspaceStore.getState().setActiveWorkspace('dev')
-    }
-  }, [])
-
-  useEffect(() => {
     if (user) loadWorkspaces()
   }, [user, loadWorkspaces])
 
@@ -229,11 +219,11 @@ export default function App() {
     ? <SplashScreen exiting={splashPhase === 'exiting'} />
     : null
 
-  if (authLoading && !DEV_BYPASS) return <><div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />{splashOverlay}</>
+  if (authLoading) return <><div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />{splashOverlay}</>
 
-  if (!user && !DEV_BYPASS) return <><LoginScreen />{splashOverlay}</>
+  if (!user) return <><LoginScreen />{splashOverlay}</>
 
-  if (!activeWorkspaceId && !DEV_BYPASS) return <><WorkspacePicker />{splashOverlay}</>
+  if (!activeWorkspaceId) return <><WorkspacePicker />{splashOverlay}</>
 
 
   const renderMain = () => {
