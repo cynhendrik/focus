@@ -7,6 +7,7 @@ import { InvoiceNumberSettings } from './InvoiceNumberSettings'
 import { buildSignatureFromProfile } from '@/lib/mail-signature'
 import { JoinCodeRow } from '@/core/workspace/JoinCodeRow'
 import { MembersSettings } from '@/components/workspace/MembersSettings'
+import { ShareWorkspaceButton } from '@/components/workspace/ShareWorkspaceButton'
 import { SettingsPage, SettingCard, FieldRow, AuroraToggle } from './ui'
 
 function CopyField({ label, value }: { label: string; value: string }) {
@@ -91,6 +92,7 @@ export function WorkspaceSettings({ workspaceId }: Props) {
         </div>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <CopyField label="Workspace ID" value={workspaceId} />
+          <ShareWorkspaceButton />
           <JoinCodeRow />
           <MembersSettings />
         </div>
