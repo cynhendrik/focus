@@ -19,6 +19,7 @@ import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useMessagesStore } from '@/store/messages.store'
 import { useNotificationsStore } from '@/store/notifications.store'
+import { useKpisStore } from '@/store/kpis.store'
 import { messageRowToMessage } from '@/data/messages.mapper'
 import { notificationRowToNotification } from '@/data/notifications.mapper'
 import { useAuthStore } from '@/store/auth.store'
@@ -108,6 +109,14 @@ export function useWorkspaceRealtime() {
         (payload) => {
           if (payload.eventType === 'DELETE') return
           useNotificationsStore.getState().upsertRealtime(notificationRowToNotification(payload.new as any))
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'kpis', filter: `workspace_id=eq.${activeWorkspaceId}` },
+        () => {
+          const ks = useKpisStore.getState()
+          if (ks.currentCustomerId) ks.loadForCustomer(ks.currentCustomerId)
         },
       )
       .subscribe((status) => log.info('Realtime accounts channel', { status }))
