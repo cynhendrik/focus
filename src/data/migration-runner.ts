@@ -369,28 +369,43 @@ export async function migrateOfferItems(ctx: MigrationCtx): Promise<number> {
 }
 
 /**
- * Setzt die Cloud-Nummernkreise auf MAX(number)+1 der migrierten Belege (lückenlose Fortführung).
+ * Setzt die Cloud-Nummernkreise auf MAX(number) der migrierten Belege (lückenlose Fortführung).
  * Wird vom Orchestrator NACH runMigration aufgerufen — NICHT in ENTITIES registriert.
  *
- * Verifikation: invoice_sequences(workspace_id PK, next_number) + offer_sequences(workspace_id PK, next_number)
- * Annahme: allocate_invoice_number liest next_number als "nächste zu vergebende Nummer" (kein +1 intern).
+ * Verifikation: invoice_sequences(workspace_id PK, next_number, start_number, format, seq_year)
+ *               offer_sequences(workspace_id PK, next_number, start_number)
+ * GoBD-Korrekt: allocate_invoice/offer_number intern: v_to_use = next_number + 1 → next_number
+ * speichert die ZULETZT VERGEBENE Nummer. Daher muss next_number = MAX(lokal) gesetzt werden,
+ * damit die nächste Cloud-Vergabe MAX+1 ergibt (kein Sprung, kein Duplikat).
  * Regex: RE-YYYY-NNN → trailing NNN; ANG-YYYY-NNN → trailing NNN.
  */
 export async function bumpSequences(ctx: MigrationCtx): Promise<void> {
-  const nextOf = (nums: (string | null | undefined)[]): number => {
+  const maxOf = (nums: (string | null | undefined)[]): number => {
     const seqs = nums
       .map(n => Number(String(n ?? '').match(/(\d+)\s*$/)?.[1] ?? 0))
       .filter(n => Number.isFinite(n) && n > 0)
-    return (seqs.length > 0 ? Math.max(...seqs) : 0) + 1
+    return seqs.length > 0 ? Math.max(...seqs) : 0
   }
   const invoices = await invoke<any[]>('get_invoices', { workspaceId: ctx.localWsId, statusFilter: null })
   const offers   = await invoke<any[]>('get_offers', { workspaceId: ctx.localWsId })
+  const [localInvSeq]   = await invoke<any[]>('cmd_dump_table', { table: 'invoice_sequences', workspaceId: ctx.localWsId })
+  const [localOfferSeq] = await invoke<any[]>('cmd_dump_table', { table: 'offer_sequences', workspaceId: ctx.localWsId })
   await supabase.from('invoice_sequences').upsert(
-    { workspace_id: ctx.cloudWsId, next_number: nextOf(invoices.map(i => i.number)) },
+    {
+      workspace_id: ctx.cloudWsId,
+      next_number:  maxOf(invoices.map(i => i.number)),
+      start_number: localInvSeq?.start_number ?? 1,
+      format:       localInvSeq?.format ?? null,
+      seq_year:     localInvSeq?.seq_year ?? 0,
+    },
     { onConflict: 'workspace_id' },
   )
   await supabase.from('offer_sequences').upsert(
-    { workspace_id: ctx.cloudWsId, next_number: nextOf(offers.map(o => o.number)) },
+    {
+      workspace_id: ctx.cloudWsId,
+      next_number:  maxOf(offers.map(o => o.number)),
+      start_number: localOfferSeq?.start_number ?? 1,
+    },
     { onConflict: 'workspace_id' },
   )
 }
