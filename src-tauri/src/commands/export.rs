@@ -308,6 +308,53 @@ pub fn cmd_reset_workspace(db: State<'_, DbPool>) -> Result<(), String> {
     reset_workspace_local(&mut conn)
 }
 
+/// Schreibt workspace_id (und created_by, falls Spalte existiert) aller
+/// workspace-scoped Tabellen von `from` auf `to`/`user_id` um. Schema-introspektiv,
+/// FK-deferred. Gibt die Zahl der geänderten Zeilen zurück.
+pub fn rescope_workspace(conn: &mut rusqlite::Connection, from: &str, to: &str, user_id: &str) -> Result<u64, String> {
+    let tables: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' \
+                      AND name NOT LIKE 'sqlite_%' AND name != 'sync_queue' ORDER BY name")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        rows.filter_map(Result::ok).collect()
+    };
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute_batch("PRAGMA defer_foreign_keys=ON;").map_err(|e| e.to_string())?;
+    let mut total: u64 = 0;
+    for t in &tables {
+        let cols: std::collections::HashSet<String> = {
+            let mut stmt = match tx.prepare(&format!("PRAGMA table_info(\"{t}\")")) {
+                Ok(s) => s, Err(_) => continue,
+            };
+            let c = stmt.query_map([], |r| r.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            c.filter_map(Result::ok).collect()
+        };
+        if !cols.contains("workspace_id") { continue; }
+        let has_created_by = cols.contains("created_by");
+        let sql = if has_created_by {
+            format!("UPDATE \"{t}\" SET workspace_id=?1, created_by=?2 WHERE workspace_id=?3")
+        } else {
+            format!("UPDATE \"{t}\" SET workspace_id=?1 WHERE workspace_id=?2")
+        };
+        let changed = if has_created_by {
+            tx.execute(&sql, rusqlite::params![to, user_id, from]).map_err(|e| format!("{t}: {e}"))?
+        } else {
+            tx.execute(&sql, rusqlite::params![to, from]).map_err(|e| format!("{t}: {e}"))?
+        };
+        total += changed as u64;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(total)
+}
+
+#[tauri::command]
+pub fn cmd_rescope_workspace(db: State<'_, DbPool>, from: String, to: String, user_id: String) -> Result<u64, String> {
+    let mut conn = db.conn();
+    rescope_workspace(&mut conn, &from, &to, &user_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,6 +463,31 @@ mod tests {
         assert_eq!(count, 1);
         let name: String = conn2.query_row("SELECT name FROM customers WHERE id='c1'", [], |r| r.get(0)).unwrap();
         assert_eq!(name, "V1");
+    }
+
+    #[test]
+    fn rescope_rewrites_workspace_id_and_created_by() {
+        let mut conn = sample_conn();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+             VALUES ('a1','dev','old','Muster GmbH','2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, total, created_at, updated_at) \
+             VALUES ('i1','dev','old','a1','2026-01-01','2026-01-15',119.0,'2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO invoice_items (id, invoice_id, title, quantity, unit_price, tax_rate, total, sort_order) \
+             VALUES ('it1','i1','Pos',1,100.0,19,119.0,0)", []).unwrap();
+
+        let n = rescope_workspace(&mut conn, "dev", "ws-new", "me").unwrap();
+        assert!(n >= 2, "accounts + invoices umgeschrieben");
+
+        let (ws, by): (String, String) = conn
+            .query_row("SELECT workspace_id, created_by FROM accounts WHERE id='a1'", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!(ws, "ws-new");
+        assert_eq!(by, "me");
+        // Tabelle ohne workspace_id-Spalte bleibt unangetastet, kein Fehler:
+        let inv_items: i64 = conn.query_row("SELECT count(*) FROM invoice_items WHERE id='it1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(inv_items, 1);
     }
 
     #[test]
