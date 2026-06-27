@@ -7,13 +7,13 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useMembersStore } from '@/store/members.store'
 import { parseTaskText, type TaskDraft } from './prefix-parser'
 import { detectActionType, ACTION_TYPE_LABELS } from '@/lib/action-keywords'
 import { CalendarEventConfirmCard, type PendingEventDraft } from './CalendarEventConfirmCard'
-import {
-  MentionPopover, extractMentionQuery, useMentionPopoverState,
-  type MentionCandidate,
-} from './MentionPopover'
+import { extractMentionQuery, useMentionPopoverState } from './MentionPopover'
+import { buildTaskMentionCandidates, markerForTask, type TaskMentionCandidate } from './task-mentions'
+import { TaskMentionPopover, filterTaskCandidates } from './TaskMentionPopover'
 import { Plus, Send, Calendar } from 'lucide-react'
 
 const PRIO_LABEL: Record<string, string> = {
@@ -37,11 +37,13 @@ interface Props { customerId?: string }
 
 export function TaskComposer({ customerId }: Props = {}) {
   const upsert       = useTodosStore(s => s.upsert)
+  const setAssignee  = useTodosStore(s => s.setAssignee)
   const accounts     = useAccountsStore(s => s.accounts)
+  const members      = useMembersStore(s => s.members())
   const upsertEvent  = useCalendarStore(s => s.upsert)
   const [text, setText] = useState('')
-  /** Resolved mentions: marker (e.g. "@Klara") → customerId */
-  const [mentions, setMentions] = useState<Array<{ marker: string; customerId: string }>>([])
+  /** Resolved mentions: marker (e.g. "@Klara") → kind + id */
+  const [mentions, setMentions] = useState<Array<{ marker: string; kind: 'member' | 'customer'; id: string }>>([])
   const [pendingEvent, setPendingEvent] = useState<PendingEventDraft | null>(null)
   const [pendingDraft, setPendingDraft] = useState<TaskDraft | null>(null)
   const submitRef = useRef<() => void>(() => {})
@@ -53,9 +55,9 @@ export function TaskComposer({ customerId }: Props = {}) {
     ? 'Was muss erledigt werden? "!! morgen 10:00 #call Logo finalisieren"'
     : 'Was muss erledigt werden? "!! morgen 10:00 #call Termin mit @Klara"'
 
-  const candidates: MentionCandidate[] = useMemo(
-    () => accounts.filter(a => !a.isPrivate).map(a => ({ id: a.id, name: a.name, company: a.industry })),
-    [accounts],
+  const candidates: TaskMentionCandidate[] = useMemo(
+    () => buildTaskMentionCandidates(members, accounts),
+    [members, accounts],
   )
 
   const editor = useEditor({
@@ -117,9 +119,7 @@ export function TaskComposer({ customerId }: Props = {}) {
 
   // Parse the text with currently resolved mentions
   const draft = useMemo(() => {
-    const parsed = parseTaskText(text, {
-      mentions: mentions.map(m => ({ marker: m.marker, kind: 'customer' as const, id: m.customerId })),
-    })
+    const parsed = parseTaskText(text, { mentions })
     parsed.actionType = detectActionType(parsed.title) ?? undefined
     return parsed
   }, [text, mentions])
@@ -132,29 +132,19 @@ export function TaskComposer({ customerId }: Props = {}) {
   const canSubmit = !!(draft.title.trim() || draft.tags.length || effectiveCustomerId)
 
   /** Insert the mention marker (display = @Name) and record it in `mentions`. */
-  const pickMention = (cand: MentionCandidate) => {
+  const pickMention = (cand: TaskMentionCandidate) => {
     if (!editor) return
     const m = mentionStateRef.current
     if (!m.ctx.open) return
-    const marker = `@${cand.name.split(' ')[0]}`   // first word, keeps it short
-    // Replace from startOffset to current cursor with `marker + space`
-    // We use text-level replacement via editor commands.
+    const marker = markerForTask(cand)
     const fullText = editor.getText()
     const pos = editor.state.selection.from
     const textOffset = posToTextOffset(editor, pos)
     const before = fullText.slice(0, m.ctx.startOffset)
     const after  = fullText.slice(textOffset)
-    const next = `${before}${marker} ${after}`
-    editor.commands.setContent(next)
-    // Place cursor at end of marker+space
-    const newCursor = (before + marker + ' ').length
-    editor.commands.setTextSelection(textOffsetToPos(editor, newCursor))
-    // Record the mention
-    setMentions(prev => {
-      // dedupe by marker
-      const without = prev.filter(p => p.marker.toLowerCase() !== marker.toLowerCase())
-      return [...without, { marker, customerId: cand.id }]
-    })
+    editor.commands.setContent(`${before}${marker} ${after}`)
+    editor.commands.setTextSelection(textOffsetToPos(editor, (before + marker + ' ').length))
+    setMentions(prev => [...prev.filter(p => p.marker.toLowerCase() !== marker.toLowerCase()), { marker, kind: cand.kind, id: cand.id }])
     m.close()
   }
 
@@ -163,11 +153,7 @@ export function TaskComposer({ customerId }: Props = {}) {
     const picker = () => {
       const m = mentionStateRef.current
       if (!m.ctx.open) return
-      const q = m.ctx.query.toLowerCase().trim()
-      const filtered = q
-        ? candidates.filter(c =>
-            c.name.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q))
-        : candidates
+      const filtered = filterTaskCandidates(candidates, m.ctx.query)
       const cand = filtered[m.activeIdx]
       if (cand) pickMention(cand)
     }
@@ -207,7 +193,7 @@ export function TaskComposer({ customerId }: Props = {}) {
       }
     }
 
-    await upsert({
+    const created = await upsert({
       title:          eventOverride?.title ?? title,
       priority:       sourceDraft.priority ?? 'p3',
       scheduledAt:    sourceDraft.scheduledAt,
@@ -219,6 +205,9 @@ export function TaskComposer({ customerId }: Props = {}) {
       bucket:         sourceDraft.scheduledAt && sourceDraft.scheduledAt.slice(0, 10) === todayStr
                       ? 'today' : 'backlog',
     })
+    if (sourceDraft.assigneeId) {
+      try { await setAssignee(created.id, sourceDraft.assigneeId) } catch { /* Store loggt; Aufgabe bleibt erstellt */ }
+    }
 
     editor.commands.clearContent()
     setText('')
@@ -338,7 +327,7 @@ export function TaskComposer({ customerId }: Props = {}) {
       </div>
     </div>
 
-    <MentionPopover
+    <TaskMentionPopover
       open={mention.ctx.open}
       query={mention.ctx.query}
       candidates={candidates}
