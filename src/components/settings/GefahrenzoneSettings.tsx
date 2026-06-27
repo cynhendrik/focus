@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { useToastStore } from '@/store/toast.store'
 import { supabase } from '@/lib/supabase'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 import { SettingsPage, SettingCard } from './ui'
 
 interface Props { workspaceId: string }
@@ -73,7 +74,13 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
     setBusy('import')
     try {
       const json = await file.text()
-      const s = await invoke<ImportSummary>('cmd_import_backup', { json })
+      const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
+      const userId = useAuthStore.getState().user?.id ?? null
+      if (!activeWorkspaceId) {
+        toast({ message: 'Kein aktiver Workspace — Import abgebrochen.', variant: 'error' })
+        setBusy(null); return
+      }
+      const s = await invoke<ImportSummary>('cmd_import_backup', { json, activeWorkspaceId, userId })
       toast({
         message: `${s.rows} Einträge aus ${s.tables} Tabellen wiederhergestellt — App lädt neu…`,
         variant: 'success', durationMs: 3000,
