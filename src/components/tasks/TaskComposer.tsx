@@ -321,7 +321,7 @@ export function TaskComposer({ customerId }: Props = {}) {
           <span style={{ color: 'var(--fg-dim)', fontSize: 11 }}>
             {customerId
               ? '! Priorität · Zeit · Datum · # Tag'
-              : '! Priorität · Zeit · Datum · # Tag · @ Kunde'}
+              : '! Priorität · Zeit · Datum · # Tag · @ Mitglied/Kunde'}
           </span>
         )}
       </div>
