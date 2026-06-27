@@ -9,6 +9,9 @@ interface MembersState {
   profiles:  Record<string, MemberProfile>
   memberIds: string[]
   ensureSelf: () => Promise<void>
+  /** Eigenen Anzeigenamen setzen (Profil-UI / Erst-Login). Schreibt profiles +
+   *  aktualisiert den lokalen Store sofort → überall (Chat, Mitglieder) sichtbar. */
+  setMyDisplayName: (name: string) => Promise<void>
   load:       (workspaceId: string) => Promise<void>
   nameOf:     (userId: string) => string
   members:    () => MemberProfile[]
@@ -30,6 +33,14 @@ export const useMembersStore = create<MembersState>()((set, get) => ({
     } catch (err) {
       log.error('Failed to ensure own profile', { err })
     }
+  },
+
+  setMyDisplayName: async (name) => {
+    const user = useAuthStore.getState().user
+    if (!user) return
+    const displayName = name.trim() || user.email?.split('@')[0] || 'Nutzer'
+    await ProfilesGateway.ensureSelf({ id: user.id, displayName, email: user.email ?? null })
+    set(s => ({ profiles: { ...s.profiles, [user.id]: { id: user.id, displayName, email: user.email ?? null } } }))
   },
 
   load: async (workspaceId) => {

@@ -74,6 +74,7 @@ import { CompanyStep } from '@/components/onboarding/CompanyStep'
 import { SplashScreen } from '@/components/ui/SplashScreen'
 import { HelpDrawer } from '@/components/help/HelpDrawer'
 import { ChatDrawer } from '@/components/team/ChatDrawer'
+import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { useVertraege } from '@/store/vertraege.store'
@@ -301,6 +302,7 @@ export default function App() {
       <Suspense fallback={null}><GlobalQuickComposer /></Suspense>
       <HelpDrawer />
       <ChatDrawer />
+      <NamePrompt />
       <OnboardingCard />
       <CompanyStep />
       {showWelcome && <WelcomeIntro onDone={markWelcomeSeen} />}

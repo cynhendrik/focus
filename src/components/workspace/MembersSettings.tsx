@@ -4,6 +4,9 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useCapability } from '@/hooks/useCapability'
 import type { Role, Capability } from '@/lib/capabilities'
 import { useAuthStore } from '@/store/auth.store'
+import { useMembersStore } from '@/store/members.store'
+
+const ROLE_LABEL: Record<Role, string> = { owner: 'Inhaber', admin: 'Admin', member: 'Mitglied' }
 
 const GRANTABLE: Capability[] = ['finances', 'contracts']
 
@@ -12,13 +15,17 @@ export function MembersSettings() {
   const isShared = useWorkspaceStore(s => s.workspaces.find(w => w.id === s.activeWorkspaceId)?.isShared ?? false)
   const canManage = useCapability('manage_members')
   const myId = useAuthStore(s => s.user?.id)
+  const nameOf = useMembersStore(s => s.nameOf)
+  const profiles = useMembersStore(s => s.profiles)
+  const loadProfiles = useMembersStore(s => s.load)
   const [members, setMembers] = useState<WorkspaceMember[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!canManage || !isShared || !workspaceId) return
     WorkspaceMembersGateway.list(workspaceId).then(setMembers).catch(e => setError(String(e)))
-  }, [canManage, isShared, workspaceId])
+    loadProfiles(workspaceId)   // Klarnamen + E-Mails der Mitglieder laden
+  }, [canManage, isShared, workspaceId, loadProfiles])
 
   // Nur im geteilten Workspace und nur für Verwalter (Owner) anzeigen.
   if (!canManage || !isShared) return null
@@ -39,8 +46,13 @@ export function MembersSettings() {
         const isSelf = m.userId === myId
         return (
           <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ flex: 1, fontSize: 13, fontFamily: 'var(--font-mono)' }}>
-              {m.userId}{isSelf ? ' (du)' : ''}
+            <span style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
+                {nameOf(m.userId)}{isSelf ? ' (du)' : ''}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>
+                {[profiles[m.userId]?.email, ROLE_LABEL[m.role]].filter(Boolean).join(' · ')}
+              </span>
             </span>
             <select
               value={m.role}

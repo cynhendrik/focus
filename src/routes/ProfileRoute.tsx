@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { User, Shield, CreditCard, LogOut, Check, MessageSquare, Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth.store'
+import { useMembersStore } from '@/store/members.store'
 import { useToastStore } from '@/store/toast.store'
 
 // ── Section shell ──────────────────────────────────────────────────────────────
@@ -59,6 +60,8 @@ function ProfilSection() {
     try {
       const { error } = await supabase.auth.updateUser({ data: { full_name: name.trim() } })
       if (error) throw error
+      // Geteiltes Profil (Chat/Mitglieder) sofort mitschreiben — nicht erst beim nächsten Start.
+      await useMembersStore.getState().setMyDisplayName(name.trim())
       showToast({ message: 'Profil gespeichert.', variant: 'success' })
     } catch (err) {
       showToast({ message: err instanceof Error ? err.message : 'Speichern fehlgeschlagen', variant: 'error' })
