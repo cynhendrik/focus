@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { supabase } from '@/lib/supabase'
 import type { Role, Capability } from '@/lib/capabilities'
+import { makeLocalWorkspace, hasLocalOrphanData, rescopeWorkspace } from '@/data/workspace-local'
 
 export interface Workspace {
   id: string
@@ -11,18 +12,6 @@ export interface Workspace {
   capabilities: Capability[]
   isShared: boolean
   join_code: string | null
-}
-
-/** Pro Workspace true, wenn mehr als ein Mitglied existiert. */
-export function deriveShared(
-  ids: string[],
-  memberRows: { workspace_id: string }[],
-): Record<string, boolean> {
-  const counts = new Map<string, number>()
-  for (const r of memberRows) counts.set(r.workspace_id, (counts.get(r.workspace_id) ?? 0) + 1)
-  const out: Record<string, boolean> = {}
-  for (const id of ids) out[id] = (counts.get(id) ?? 0) > 1
-  return out
 }
 
 const JOIN_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -38,11 +27,13 @@ export function generateJoinCode(length = 6): string {
 
 interface WorkspaceState {
   workspaces: Workspace[]
+  localWorkspaces: Workspace[]
   activeWorkspaceId: string | null
   pendingCount: number
   isOnline: boolean
   loadWorkspaces: () => Promise<void>
   createWorkspace: (name: string) => Promise<void>
+  createLocalWorkspace: (name: string) => string
   joinWorkspaceByCode: (code: string) => Promise<void>
   regenerateJoinCode: (workspaceId: string) => Promise<string>
   setActiveWorkspace: (id: string) => void
@@ -56,6 +47,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => ({
       workspaces: [],
+      localWorkspaces: [],
       activeWorkspaceId: null,
       pendingCount: 0,
       isOnline: true,
@@ -75,40 +67,32 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         if (error) throw error
 
-        const base = (data ?? []).map((m: any) => ({
+        const cloud: Workspace[] = (data ?? []).map((m: any) => ({
           id: m.workspaces.id,
           name: m.workspaces.name,
           logo_url: m.workspaces.logo_url,
           role: (m.role ?? 'member') as Role,
           capabilities: (m.capabilities ?? []) as Capability[],
           join_code: m.workspaces.join_code ?? null,
+          isShared: true,
         }))
 
-        const ids = base.map((w) => w.id)
-        let sharedMap: Record<string, boolean> = {}
-        if (ids.length > 0) {
-          const { data: members } = await supabase
-            .from('workspace_members')
-            .select('workspace_id')
-            .in('workspace_id', ids)
-          sharedMap = deriveShared(ids, members ?? [])
+        // Adoption: vorhandene 'dev'-Daten als lokalen Workspace übernehmen (einmalig).
+        let local = get().localWorkspaces
+        if (local.length === 0 && await hasLocalOrphanData()) {
+          const id = crypto.randomUUID()
+          await rescopeWorkspace('dev', id, uid)
+          local = [makeLocalWorkspace(id, 'Mein Workspace')]
+          set({ localWorkspaces: local, activeWorkspaceId: id })
         }
 
-        const workspaces: Workspace[] = base.map((w) => ({
-          ...w,
-          isShared: sharedMap[w.id] ?? false,
-        }))
+        set({ workspaces: cloud })
 
-        set({ workspaces })
-
-        // Die persistierte activeWorkspaceId kann veraltet sein (z. B. eine alte
-        // 'dev'-Id oder ein Workspace, dem der Nutzer nicht mehr angehört). Passt
-        // sie zu keinem geladenen Workspace, zurücksetzen: bei genau einem
-        // Workspace automatisch wählen, sonst null (dann greift der Picker).
+        const all = [...cloud, ...local]
         const { activeWorkspaceId } = get()
-        const validActive = workspaces.some((w) => w.id === activeWorkspaceId)
+        const validActive = all.some((w) => w.id === activeWorkspaceId)
         if (!validActive) {
-          set({ activeWorkspaceId: workspaces.length === 1 ? workspaces[0].id : null })
+          set({ activeWorkspaceId: all.length === 1 ? all[0].id : null })
         }
       },
 
@@ -130,6 +114,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         await get().loadWorkspaces()
         set({ activeWorkspaceId: ws.id })
+      },
+
+      createLocalWorkspace: (name) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ localWorkspaces: [...s.localWorkspaces, makeLocalWorkspace(id, name)], activeWorkspaceId: id }))
+        return id
       },
 
       joinWorkspaceByCode: async (code) => {
@@ -167,13 +157,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       getActiveWorkspaceId: () => get().activeWorkspaceId,
       isActiveWorkspaceShared: () => {
-        const { workspaces, activeWorkspaceId } = get()
-        return workspaces.find((w) => w.id === activeWorkspaceId)?.isShared ?? false
+        const { workspaces, localWorkspaces, activeWorkspaceId } = get()
+        return [...workspaces, ...localWorkspaces].find((w) => w.id === activeWorkspaceId)?.isShared ?? false
       },
     }),
     {
-      name: 'focus-workspace-v1',
-      partialize: (s) => ({ activeWorkspaceId: s.activeWorkspaceId }),
+      name: 'focus-workspace-v2',
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as Record<string, unknown>
+        if (!Array.isArray(s.localWorkspaces)) s.localWorkspaces = []
+        return s as unknown as WorkspaceState
+      },
+      partialize: (s) => ({ activeWorkspaceId: s.activeWorkspaceId, localWorkspaces: s.localWorkspaces }),
     }
   )
 )
