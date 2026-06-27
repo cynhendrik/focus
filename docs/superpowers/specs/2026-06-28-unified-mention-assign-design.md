@@ -19,7 +19,7 @@
 | Kunde-Pick | setzt **customerId** (wie bisher). |
 | Mehrere | **Ein** Assignee (letzter Mitglied-Pick gewinnt); Kundenverknüpfung wie bisher (eine). |
 | Tipp-Fallback (ohne Pick) | Mitglied-Zuweisung **erfordert Pick** aus dem Popover (kein stilles Fuzzy-Zuweisen). Kunden-Tipp-Fallback bleibt wie heute (GlobalQuickComposer). |
-| Backend | Zuweisungs-Trigger feuert künftig **AFTER INSERT OR UPDATE** (Zuweisung beim Anlegen benachrichtigt). |
+| Backend | **Keine** Trigger-/Migrations-Änderung. Composer legt Aufgabe an (INSERT **ohne** assignee) und ruft dann `setAssignee` (UPDATE) → der **bestehende** UPDATE-Trigger benachrichtigt. (Verhindert Benachrichtigungs-Flut bei der „Teilen"-Migration, die Aktivitäten mit Bestands-assignee per INSERT schreibt.) |
 | Geltungsbereich | `TaskComposer` + `GlobalQuickComposer` (Task-Modus). `ColumnQuickAdd` (Board-Spalte) unverändert (kein `@` dort). |
 | YAGNI (nicht bauen) | eigenes `#`-Zeichen, Mehrfach-Zuweisung, `@Aufgabe` im Task-Composer, ColumnQuickAdd-`@`. |
 
@@ -50,8 +50,8 @@ Ein gruppiertes Popover (Vorlage `ChatMentionPopover`): Gruppen-Header **„Mitg
 ### 4. Persistenz beim Anlegen
 `upsert({ ..., customerId: effectiveCustomerId, assignee: draft.assigneeId })` in beiden Composern. `todoToCreatePayload` reicht `assignee` durch (existiert). Bestehender „Zuständig"-Picker im TaskRow bleibt zusätzlich.
 
-### 5. Backend — Trigger auf INSERT erweitern (Migration 0023)
-`tg_task_assignment_fanout` neu als **`AFTER INSERT OR UPDATE ON public.activities`**, `TG_OP`-sicher: bei INSERT gibt es kein `OLD` → die „assignee geändert"-Bedingung als `(TG_OP='INSERT' AND new.assignee IS NOT NULL) OR (TG_OP='UPDATE' AND new.assignee IS DISTINCT FROM old.assignee AND new.assignee IS NOT NULL)` formulieren; ebenso der `task_completed`-Zweig nur für UPDATE. Self-Assign-Guard (`new.assignee <> auth.uid()`) bleibt. Live anwenden (Controller, PAT) + verifizieren.
+### 5. Backend — KEINE Trigger-Änderung; Zuweisung als Folge-UPDATE
+Der Zuweisungs-Trigger `tg_task_assignment_fanout` bleibt **AFTER UPDATE** (unverändert). Der Composer legt die Aufgabe an (`upsert` create, **ohne** assignee), und ruft danach `useTodosStore.getState().setAssignee(newId, assigneeId)` → das ist ein UPDATE (`assignee` von null→X, also „distinct") → der **bestehende** Trigger erzeugt genau **eine** System-Karte + Benachrichtigung. **Wichtig:** im Create-Payload `assignee` NICHT setzen, sonst ist der spätere UPDATE nicht „distinct" und der Trigger feuert nicht. Vorteil: keine Migration, kein Risiko, **und** die „Teilen"-Migration (INSERT mit Bestands-assignee) löst weiterhin **keine** Benachrichtigungs-Flut aus.
 
 ### 6. Namensgleichheit (die „Überschneidung")
 Gelöst durch die **zwei sichtbaren Gruppen** + Pick-basierte Auflösung (Marker trägt `kind`+`id`, keine Namens-Neuauflösung). Gleichnamige Person/Kunde sind getrennt wählbar.
@@ -65,7 +65,7 @@ Gelöst durch die **zwei sichtbaren Gruppen** + Pick-basierte Auflösung (Marker
 - `buildTaskMentionCandidates` (Mitglieder vor Kunden, kind korrekt).
 - Parser/Draft: Mitglied-Marker → `assigneeId`, Kunde-Marker → `customerId`, beide gleichzeitig.
 - Composer: Member-Pick beim Submit → `upsert` mit `assignee`; Customer-Pick → `customerId`.
-- SQL/Trigger: INSERT mit `assignee≠creator` → genau 1 System-Message + 1 `assigned`-Notification; INSERT self-assign → 0 Notifications; UPDATE-Verhalten unverändert.
+- Composer-Submit mit Mitglied-Pick: ruft `upsert` (create, **ohne** assignee) **und** danach `setAssignee(newId, memberId)` (UPDATE → Trigger benachrichtigt). Kein Trigger-/SQL-Test nötig (Trigger unverändert).
 
 ## Bewusst NICHT im Scope
 `#`-Sigil, Mehrfach-Zuweisung, `@Aufgabe` im Task-Composer, ColumnQuickAdd-`@`, Auto-Pin auf Nicht-CRM-Ansichten, Chat-Composer-Änderungen.
