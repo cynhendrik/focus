@@ -40,7 +40,7 @@ export function ChatDrawer() {
       </div>
       {!isShared ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, textAlign: 'center', fontSize: 12.5, color: 'var(--fg-dim)' }}>
-          Team-Chat erscheint, sobald ein zweites Mitglied im Workspace ist.
+          Team-Chat erscheint, sobald dieser Workspace geteilt ist (Einstellungen → Workspace teilen).
         </div>
       ) : (
         <>

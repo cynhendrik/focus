@@ -20,8 +20,8 @@ export function TeamChatRoute() {
         <MessagesSquare size={28} />
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg-muted)' }}>Team-Chat</div>
         <div style={{ fontSize: 12.5, maxWidth: 360, textAlign: 'center' }}>
-          Der Team-Chat ist verfügbar, sobald ein zweites Mitglied in diesem Workspace ist.
-          Lade jemanden über deinen Beitritts-Code ein.
+          Team-Chat ist verfügbar, sobald dieser Workspace geteilt ist. Teile ihn in den
+          Einstellungen, um mit deinem Team zu schreiben.
         </div>
       </div>
     )
