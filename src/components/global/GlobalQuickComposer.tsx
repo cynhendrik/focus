@@ -241,7 +241,10 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   }, [editor, consumePrefill])
 
   const draft = useMemo(() => {
-    const parsed = parseTaskText(text, { mentions, resolveMention })
+    const parsed = parseTaskText(text, {
+      mentions: mentions.map(m => ({ marker: m.marker, kind: 'customer' as const, id: m.customerId })),
+      resolveMention,
+    })
     parsed.actionType = detectActionType(parsed.title) ?? undefined
     return parsed
   }, [text, mentions, resolveMention])

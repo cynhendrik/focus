@@ -117,7 +117,9 @@ export function TaskComposer({ customerId }: Props = {}) {
 
   // Parse the text with currently resolved mentions
   const draft = useMemo(() => {
-    const parsed = parseTaskText(text, { mentions })
+    const parsed = parseTaskText(text, {
+      mentions: mentions.map(m => ({ marker: m.marker, kind: 'customer' as const, id: m.customerId })),
+    })
     parsed.actionType = detectActionType(parsed.title) ?? undefined
     return parsed
   }, [text, mentions])

@@ -10,6 +10,8 @@ export interface TaskDraft {
   tags: string[]
   /** Customer reference — populated either by the @-mention popover or legacy +Kunde. */
   customerId?: string
+  /** Team-member assignee — populated when a member @-mention is resolved. Last mention wins. */
+  assigneeId?: string
   /** Detected at creation time from keywords — stored in DB, never re-inferred from title. */
   actionType?: TodoActionType
 }
@@ -91,8 +93,8 @@ function parseSoftDateToken(rawToken: string): string | undefined {
 }
 
 export interface ParseContext {
-  /** Resolved mentions — `[{ marker: '@<token>', customerId }]`. Composer fills this from the mention popover. */
-  mentions?: Array<{ marker: string; customerId: string }>
+  /** Resolved mentions — tagged with kind so member/customer routing works at parse time. */
+  mentions?: Array<{ marker: string; kind: 'member' | 'customer'; id: string }>
   /**
    * Fallback resolver for @-tokens the user typed but never picked from the popover.
    * Receives the text after `@` and returns a customerId (or undefined). Composer
@@ -106,8 +108,8 @@ export function parseTaskText(input: string, ctx: ParseContext = {}): TaskDraft 
   const titleParts: string[] = []
 
   // Resolve pre-known mentions first — strip marker tokens out of the title pass.
-  const mentionMap = new Map<string, string>()
-  for (const m of ctx.mentions ?? []) mentionMap.set(m.marker.toLowerCase(), m.customerId)
+  const mentionMap = new Map<string, { kind: 'member' | 'customer'; id: string }>()
+  for (const m of ctx.mentions ?? []) mentionMap.set(m.marker.toLowerCase(), { kind: m.kind, id: m.id })
 
   for (const token of input.trim().split(/\s+/)) {
     if (!token) continue
@@ -127,12 +129,14 @@ export function parseTaskText(input: string, ctx: ParseContext = {}): TaskDraft 
     // Resolved mention from popover (highest precedence on @-tokens), with a
     // typed-name fallback so "@Kunde" links even without picking from the popover.
     if (token.startsWith('@')) {
-      const resolved = mentionMap.get(token.toLowerCase()) ?? ctx.resolveMention?.(token.slice(1))
-      if (resolved) {
-        // First mention wins — keeps later mentions usable as participants display
-        if (!draft.customerId) draft.customerId = resolved
+      const picked = mentionMap.get(token.toLowerCase())
+      if (picked) {
+        if (picked.kind === 'member') draft.assigneeId = picked.id          // last wins
+        else if (!draft.customerId)   draft.customerId = picked.id          // first wins
         continue
       }
+      const fallback = ctx.resolveMention?.(token.slice(1))                  // customers only
+      if (fallback) { if (!draft.customerId) draft.customerId = fallback; continue }
       // Unresolved @-token: drop the @ and treat as a normal word in the title.
       // This makes "@Klara" still readable even when the mention hasn't been picked.
       titleParts.push(token.slice(1))

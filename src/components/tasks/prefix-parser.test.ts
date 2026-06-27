@@ -184,10 +184,30 @@ describe('parseTaskText', () => {
     })
   })
 
+  describe('parseTaskText mentions (tagged kind)', () => {
+    it('member marker -> assigneeId, customer marker -> customerId', () => {
+      const d = parseTaskText('@Mia @Acme Angebot finalisieren', {
+        mentions: [
+          { marker: '@Mia', kind: 'member', id: 'u1' },
+          { marker: '@Acme', kind: 'customer', id: 'a1' },
+        ],
+      })
+      expect(d.assigneeId).toBe('u1')
+      expect(d.customerId).toBe('a1')
+      expect(d.title).toBe('Angebot finalisieren')
+    })
+
+    it('typed customer fallback still resolves customerId', () => {
+      const d = parseTaskText('@Klara anrufen', { resolveMention: q => q === 'Klara' ? 'a9' : undefined })
+      expect(d.customerId).toBe('a9')
+      expect(d.assigneeId).toBeUndefined()
+    })
+  })
+
   describe('@-mention resolution via ParseContext', () => {
     it('resolved @-mention sets customerId, marker removed from title', () => {
       const r = parseTaskText('Call mit @Klara', {
-        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+        mentions: [{ marker: '@Klara', kind: 'customer', id: 'cust-1' }],
       })
       expect(r.customerId).toBe('cust-1')
       // "mit" is a filler, gets stripped
@@ -196,7 +216,7 @@ describe('parseTaskText', () => {
 
     it('case-insensitive marker match', () => {
       const r = parseTaskText('Treffen mit @KLARA', {
-        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+        mentions: [{ marker: '@Klara', kind: 'customer', id: 'cust-1' }],
       })
       expect(r.customerId).toBe('cust-1')
     })
@@ -217,7 +237,7 @@ describe('parseTaskText', () => {
 
     it('picked mention takes precedence over resolveMention fallback', () => {
       const r = parseTaskText('Call @Klara', {
-        mentions: [{ marker: '@Klara', customerId: 'picked-1' }],
+        mentions: [{ marker: '@Klara', kind: 'customer', id: 'picked-1' }],
         resolveMention: () => 'fallback-2',
       })
       expect(r.customerId).toBe('picked-1')
@@ -234,8 +254,8 @@ describe('parseTaskText', () => {
     it('multiple resolved mentions: first wins', () => {
       const r = parseTaskText('Treffen @Klara @Tobi', {
         mentions: [
-          { marker: '@Klara', customerId: 'cust-1' },
-          { marker: '@Tobi',  customerId: 'cust-2' },
+          { marker: '@Klara', kind: 'customer', id: 'cust-1' },
+          { marker: '@Tobi',  kind: 'customer', id: 'cust-2' },
         ],
       })
       expect(r.customerId).toBe('cust-1')
@@ -243,7 +263,7 @@ describe('parseTaskText', () => {
 
     it('combined: priority + date + time + mention', () => {
       const r = parseTaskText('!! Morgen 12:30 Termin mit @Klara', {
-        mentions: [{ marker: '@Klara', customerId: 'cust-1' }],
+        mentions: [{ marker: '@Klara', kind: 'customer', id: 'cust-1' }],
       })
       expect(r.priority).toBe('p1')
       expect(r.hasExplicitTime).toBe(true)
