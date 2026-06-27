@@ -5,7 +5,7 @@ const upsertMock = vi.fn().mockResolvedValue({ error: null })
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ upsert: upsertMock }) } }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { migrateAccounts, runMigration } from './migration-runner'
+import { migrateAccounts, migrateContacts, migrateDeals, migrateActivities, runMigration } from './migration-runner'
 
 beforeEach(() => { upsertMock.mockClear(); vi.mocked(invoke).mockReset() })
 
@@ -63,5 +63,108 @@ describe('runMigration', () => {
       return []
     })
     await expect(runMigration({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })).resolves.toBeUndefined()
+  })
+})
+
+describe('migrateContacts', () => {
+  it('iterates accounts and upserts contacts re-scoped, preserving id/created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_accounts') return [{ id: 'a1' }]
+      if (cmd === 'get_leads') return []
+      if (cmd === 'get_contacts' && args.accountId === 'a1')
+        return [{ id: 'k1', accountId: 'a1', firstName: 'P', createdBy: 'orig', createdAt: 'T' }]
+      return []
+    })
+    const n = await migrateContacts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    expect(upsertMock.mock.calls.at(-1)![0][0]).toMatchObject({
+      id: 'k1', workspace_id: 'C', created_by: 'U', created_at: 'T',
+    })
+  })
+
+  it('returns 0 when no accounts exist', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_accounts') return []
+      if (cmd === 'get_leads') return []
+      return []
+    })
+    const n = await migrateContacts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateDeals', () => {
+  it('reads deals by workspace and upserts them re-scoped, preserving id/created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_deals_by_workspace')
+        return [{ id: 'd1', accountId: 'a1', title: 'Big Deal', stage: 'prospect', createdAt: 'DT' }]
+      return []
+    })
+    const n = await migrateDeals({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    expect(upsertMock.mock.calls.at(-1)![0][0]).toMatchObject({
+      id: 'd1', workspace_id: 'C', created_by: 'U', created_at: 'DT',
+    })
+  })
+
+  it('is idempotent — second run upserts same ids', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_deals_by_workspace')
+        return [{ id: 'd2', accountId: 'a1', title: 'Another', stage: 'prospect', createdAt: 'T2' }]
+      return []
+    })
+    await migrateDeals({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    await migrateDeals({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(upsertMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('migrateActivities', () => {
+  it('iterates accounts and upserts activities with direct row mapping, preserving contact_id/outcome/direction', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_accounts') return [{ id: 'a1' }]
+      if (cmd === 'get_leads') return []
+      if (cmd === 'get_activities_by_account' && args.accountId === 'a1')
+        return [{
+          id: 'act1', accountId: 'a1', contactId: 'c1', dealId: null,
+          type: 'call', title: 'First call', body: null,
+          outcome: 'strong_interest', direction: 'out', emailId: null,
+          assignee: null, status: 'done', dueAt: null,
+          payload: '{"extra":"data"}',
+          createdAt: 'AT', updatedAt: 'AT2',
+        }]
+      return []
+    })
+    const n = await migrateActivities({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({
+      id: 'act1', workspace_id: 'C', created_by: 'U', created_at: 'AT',
+      contact_id: 'c1', outcome: 'strong_interest', direction: 'out',
+    })
+    expect(row.payload).toEqual({ extra: 'data' })
+  })
+
+  it('parses payload string to object and maps due_at correctly', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_accounts') return [{ id: 'a1' }]
+      if (cmd === 'get_leads') return []
+      if (cmd === 'get_activities_by_account' && args.accountId === 'a1')
+        return [{
+          id: 'act2', accountId: 'a1', contactId: null, dealId: null,
+          type: 'task', title: 'Task', body: null,
+          outcome: null, direction: null, emailId: null,
+          assignee: 'bob', status: 'open', dueAt: '2026-07-01',
+          payload: '{}',
+          createdAt: 'CT', updatedAt: 'UT',
+        }]
+      return []
+    })
+    await migrateActivities({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.due_at).toBe('2026-07-01')
+    expect(row.payload).toEqual({})
+    expect(row.assignee).toBe('bob')
   })
 })
