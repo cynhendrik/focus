@@ -15,16 +15,7 @@ export const PipelineStagesGateway = {
     const { data, error } = await supabase.from('pipeline_stages').select('*')
       .eq('workspace_id', workspaceId).order('order_index', { ascending: true })
     if (error) fail(error)
-    let stages = (data ?? []).map(pipelineStageRowToStage)
-    // Lazy-Migration: Cloud leer → lokal geseedete Stages einmalig hochschieben.
-    if (stages.length === 0) {
-      const local = await PipelineService.getAll(workspaceId).catch(() => [] as PipelineStage[])
-      if (local.length > 0) {
-        const up = await supabase.from('pipeline_stages')
-          .upsert(local.map(pipelineStageToRow), { onConflict: 'id' }).select('*')
-        if (!up.error) stages = (up.data ?? []).map(pipelineStageRowToStage).sort((a, b) => a.orderIndex - b.orderIndex)
-      }
-    }
+    const stages = (data ?? []).map(pipelineStageRowToStage)
     return stages
   },
   async upsert(payload: UpsertPipelineStagePayload): Promise<PipelineStage> {

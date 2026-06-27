@@ -1,10 +1,8 @@
 import { create } from 'zustand'
-import { AuftraegeGateway, KEY_AUFTRAEGE, KEY_ZEITEINTRAEGE } from '@/data/auftraege.gateway'
+import { AuftraegeGateway } from '@/data/auftraege.gateway'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { log } from '@/lib/logger'
 import type { Auftrag, Zeiteintrag, CreateAuftragPayload, AddZeiteintragPayload } from '@/types/auftrag.types'
-
-const MIGRATED_KEY = 'cynera-auftraege-migrated-v1'
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -39,10 +37,6 @@ interface AuftraegeState {
   unbilledMinutes:    (auftragId: string) => number
 }
 
-function lsGet<T>(key: string): T[] {
-  try { return JSON.parse(localStorage.getItem(key) ?? '[]') } catch { return [] }
-}
-
 export const useAuftraege = create<AuftraegeState>()((set, get) => ({
   auftraege:     [],
   zeiteintraege: [],
@@ -50,23 +44,7 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
 
   async loadAuftraege(workspaceId) {
     try {
-      let data = await AuftraegeGateway.loadAll(workspaceId)
-
-      // Einmalige Migration localStorage → Cloud (nur shared, Cloud leer, noch nicht migriert).
-      if (useWorkspaceStore.getState().isActiveWorkspaceShared()
-          && data.auftraege.length === 0 && data.zeiteintraege.length === 0
-          && localStorage.getItem(MIGRATED_KEY) !== '1') {
-        const legacyA = lsGet<Auftrag>(KEY_AUFTRAEGE)
-        const legacyZ = lsGet<Zeiteintrag>(KEY_ZEITEINTRAEGE)
-        if (legacyA.length > 0 || legacyZ.length > 0) {
-          for (const a of legacyA) await AuftraegeGateway.upsertAuftrag(a).catch(e => log.error('Auftrag-Migration', { e }))
-          for (const z of legacyZ) await AuftraegeGateway.upsertZeiteintrag(z).catch(e => log.error('Zeiteintrag-Migration', { e }))
-          data = await AuftraegeGateway.loadAll(workspaceId)
-          log.info('Aufträge aus localStorage migriert', { auftraege: legacyA.length, zeiteintraege: legacyZ.length })
-        }
-        localStorage.setItem(MIGRATED_KEY, '1')
-      }
-
+      const data = await AuftraegeGateway.loadAll(workspaceId)
       set({ auftraege: data.auftraege, zeiteintraege: data.zeiteintraege, loaded: true })
     } catch (err) {
       log.error('Aufträge laden fehlgeschlagen', { err })
