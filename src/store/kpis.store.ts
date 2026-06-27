@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { KpiService } from '@/services/kpi.service'
+import { KpisGateway } from '@/data/kpis.gateway'
 import { log } from '@/lib/logger'
 import type { Kpi, UpsertKpiPayload } from '@/types/kpi.types'
 import type { AppError } from '@/types/error.types'
@@ -9,6 +9,7 @@ interface KpisState {
   kpis: Kpi[]
   isLoading: boolean
   error: AppError | null
+  currentCustomerId: string | null
   loadForCustomer: (customerId: string) => Promise<void>
   upsert: (payload: UpsertKpiPayload) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -24,12 +25,13 @@ export const useKpisStore = create<KpisState>()((set) => ({
   kpis: [],
   isLoading: false,
   error: null,
+  currentCustomerId: null,
 
   loadForCustomer: async (customerId) => {
     set({ isLoading: true, error: null })
     try {
-      const kpis = await KpiService.getByCustomer(customerId)
-      set({ kpis, isLoading: false })
+      const kpis = await KpisGateway.getByCustomer(customerId)
+      set({ kpis, isLoading: false, currentCustomerId: customerId })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ isLoading: false, error })
@@ -39,7 +41,7 @@ export const useKpisStore = create<KpisState>()((set) => ({
 
   upsert: async (payload) => {
     try {
-      const updated = await KpiService.upsert(payload)
+      const updated = await KpisGateway.upsert(payload)
       set(s => ({ kpis: upsertById(s.kpis, updated) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
@@ -49,7 +51,7 @@ export const useKpisStore = create<KpisState>()((set) => ({
 
   remove: async (id) => {
     try {
-      await KpiService.delete(id)
+      await KpisGateway.delete(id)
       set(s => ({ kpis: s.kpis.filter(k => k.id !== id) }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
