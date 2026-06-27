@@ -2,6 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { supabase } from '@/lib/supabase'
 import { accountPayloadToRow, leadPayloadToAccountRow } from './accounts.mapper'
 import { dealPayloadToRow } from './deals.mapper'
+import { pipelineStageToRow } from './pipeline-stages.mapper'
+import { leadStageToRow } from './lead-stages.mapper'
+import { eventPayloadToRow } from './calendar.mapper'
 import type { Account } from '@/types/account.types'
 import type { Lead, UpsertLeadPayload } from '@/types/lead.types'
 import type { UpsertAccountPayload } from '@/types/account.types'
@@ -183,11 +186,89 @@ export async function migrateActivities(ctx: MigrationCtx): Promise<number> {
   return rows.length
 }
 
+/** JSON-String → Objekt; non-string values pass through unchanged. */
+function parseMaybe(v: unknown): unknown {
+  return typeof v === 'string' ? JSON.parse(v || 'null') : v
+}
+
+/**
+ * Migriert die lokale company_settings-Singleton in die Cloud-Tabelle `company_settings`.
+ * Cloud-Schema: id = workspace_id = cloudWsId (eine Zeile pro Workspace).
+ * Lokale Felder profile/modules/crmConfig können JSON-Strings sein → werden zu Objekten geparst.
+ */
+export async function migrateCompanySettings(ctx: MigrationCtx): Promise<number> {
+  const cs = await invoke<any>('get_company_settings')
+  if (!cs) return 0
+  await upsertRows('company_settings', [{
+    id: ctx.cloudWsId,
+    workspace_id: ctx.cloudWsId,
+    created_by: ctx.uid,
+    profile: parseMaybe(cs.profile),
+    modules: parseMaybe(cs.modules),
+    crm_config: parseMaybe(cs.crmConfig),
+    updated_at: new Date().toISOString(),
+  }])
+  return 1
+}
+
+/**
+ * Migriert lokale Pipeline-Stages in die Cloud-Tabelle `pipeline_stages`.
+ * is_won/is_lost bleiben 0/1 (Cloud: smallint). Preserviert created_at via scope().
+ *
+ * Mapper-Signatur (pipeline-stages.mapper.ts, verifiziert):
+ *   pipelineStageToRow(p: { id, workspaceId, name, label, orderIndex?, color?, isWon?, isLost? })
+ *   — kein ctx-Argument.
+ */
+export async function migratePipelineStages(ctx: MigrationCtx): Promise<number> {
+  const stages = await invoke<any[]>('cmd_get_pipeline_stages', { workspaceId: ctx.localWsId })
+  const rows = stages.map(s => scope(pipelineStageToRow(s), ctx, s.createdAt))
+  await upsertRows('pipeline_stages', rows)
+  return rows.length
+}
+
+/**
+ * Migriert lokale Lead-Stages in die Cloud-Tabelle `lead_stages`.
+ * is_qualified/is_disqualified bleiben 0/1 (Cloud: smallint). Preserviert created_at via scope().
+ *
+ * Mapper-Signatur (lead-stages.mapper.ts, verifiziert):
+ *   leadStageToRow(p: { id, workspaceId, name, label, orderIndex?, color?, isQualified?, isDisqualified? })
+ *   — kein ctx-Argument.
+ */
+export async function migrateLeadStages(ctx: MigrationCtx): Promise<number> {
+  const stages = await invoke<any[]>('cmd_get_lead_stages', { workspaceId: ctx.localWsId })
+  const rows = stages.map(s => scope(leadStageToRow(s), ctx, s.createdAt))
+  await upsertRows('lead_stages', rows)
+  return rows.length
+}
+
+/**
+ * Migriert lokale Kalender-Events in die Cloud-Tabelle `calendar_events`.
+ * Liest alle Events über den maximalen Zeitbereich (1970–2099). Preserviert created_at via scope().
+ *
+ * Mapper-Signatur (calendar.mapper.ts, verifiziert):
+ *   eventPayloadToRow(p: UpsertCalendarEventPayload, ctx: { id: string; now: string })
+ */
+export async function migrateCalendar(ctx: MigrationCtx): Promise<number> {
+  const now = new Date().toISOString()
+  const events = await invoke<any[]>('get_calendar_events', {
+    workspaceId: ctx.localWsId,
+    from: '1970-01-01',
+    to: '2099-12-31',
+  })
+  const rows = events.map(e => scope(eventPayloadToRow(e, { id: e.id, now }), ctx, e.createdAt))
+  await upsertRows('calendar_events', rows)
+  return rows.length
+}
+
 const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number> }> = [
+  { name: 'company_settings', run: migrateCompanySettings },
+  { name: 'pipeline_stages', run: migratePipelineStages },
+  { name: 'lead_stages', run: migrateLeadStages },
   { name: 'accounts', run: migrateAccounts },
   { name: 'contacts', run: migrateContacts },
   { name: 'deals', run: migrateDeals },
   { name: 'activities', run: migrateActivities },
+  { name: 'calendar_events', run: migrateCalendar },
 ]
 
 export async function runMigration(

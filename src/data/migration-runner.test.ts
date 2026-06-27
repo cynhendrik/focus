@@ -5,7 +5,7 @@ const upsertMock = vi.fn().mockResolvedValue({ error: null })
 vi.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ upsert: upsertMock }) } }))
 
 import { invoke } from '@tauri-apps/api/core'
-import { migrateAccounts, migrateContacts, migrateDeals, migrateActivities, runMigration } from './migration-runner'
+import { migrateAccounts, migrateContacts, migrateDeals, migrateActivities, migrateCompanySettings, migratePipelineStages, migrateLeadStages, migrateCalendar, runMigration } from './migration-runner'
 
 beforeEach(() => { upsertMock.mockClear(); vi.mocked(invoke).mockReset() })
 
@@ -188,5 +188,158 @@ describe('migrateActivities', () => {
     expect(row.due_at).toBe('2026-07-01')
     expect(row.payload).toEqual({})
     expect(row.assignee).toBe('bob')
+  })
+})
+
+describe('migrateCompanySettings', () => {
+  it('maps singleton to cloudWsId for id+workspace_id and parses json strings', async () => {
+    vi.mocked(invoke).mockResolvedValue({ profile: '{"name":"X"}', modules: '{}', crmConfig: '{}' })
+    const n = await migrateCompanySettings({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({ id: 'C', workspace_id: 'C', created_by: 'U' })
+    expect(row.profile).toEqual({ name: 'X' })
+    expect(row.modules).toEqual({})
+    expect(row.crm_config).toEqual({})
+  })
+
+  it('passes through object values without reparsing', async () => {
+    vi.mocked(invoke).mockResolvedValue({ profile: { name: 'Y' }, modules: { crm: true }, crmConfig: { stage: 1 } })
+    const n = await migrateCompanySettings({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.profile).toEqual({ name: 'Y' })
+    expect(row.crm_config).toEqual({ stage: 1 })
+  })
+
+  it('returns 0 when no company settings exist (null)', async () => {
+    vi.mocked(invoke).mockResolvedValue(null)
+    const n = await migrateCompanySettings({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migratePipelineStages', () => {
+  it('reads stages and upserts them re-scoped, preserving created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_pipeline_stages')
+        return [{ id: 'ps1', workspaceId: 'L', name: 'Prospect', label: 'Prospect', orderIndex: 0, color: '#fff', isWon: false, isLost: false, createdAt: 'T1' }]
+      return []
+    })
+    const n = await migratePipelineStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({ id: 'ps1', workspace_id: 'C', created_by: 'U', created_at: 'T1' })
+    expect(row.is_won).toBe(0)
+    expect(row.is_lost).toBe(0)
+  })
+
+  it('maps isWon/isLost booleans to 0/1 integers', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_pipeline_stages')
+        return [{ id: 'ps2', workspaceId: 'L', name: 'Won', label: 'Won', orderIndex: 1, color: '#0f0', isWon: true, isLost: false, createdAt: 'T2' }]
+      return []
+    })
+    await migratePipelineStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.is_won).toBe(1)
+    expect(row.is_lost).toBe(0)
+  })
+
+  it('returns 0 and skips upsert when no stages', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_pipeline_stages') return []
+      return []
+    })
+    const n = await migratePipelineStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateLeadStages', () => {
+  it('reads stages and upserts them re-scoped, preserving created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_lead_stages')
+        return [{ id: 'ls1', workspaceId: 'L', name: 'New', label: 'New', orderIndex: 0, color: '#aaa', isQualified: false, isDisqualified: false, createdAt: 'T3' }]
+      return []
+    })
+    const n = await migrateLeadStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({ id: 'ls1', workspace_id: 'C', created_by: 'U', created_at: 'T3' })
+    expect(row.is_qualified).toBe(0)
+    expect(row.is_disqualified).toBe(0)
+  })
+
+  it('maps isQualified/isDisqualified booleans to 0/1 integers', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_lead_stages')
+        return [{ id: 'ls2', workspaceId: 'L', name: 'Qualified', label: 'Qualified', orderIndex: 1, color: '#0f0', isQualified: true, isDisqualified: false, createdAt: 'T4' }]
+      return []
+    })
+    await migrateLeadStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.is_qualified).toBe(1)
+    expect(row.is_disqualified).toBe(0)
+  })
+
+  it('returns 0 and skips upsert when no stages', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_lead_stages') return []
+      return []
+    })
+    const n = await migrateLeadStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateCalendar', () => {
+  it('reads calendar events with full date range and upserts re-scoped, preserving created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_calendar_events' && args.from === '1970-01-01' && args.to === '2099-12-31')
+        return [{
+          id: 'ev1', workspaceId: 'L', createdBy: 'orig',
+          title: 'Meeting', startAt: '2026-01-01T10:00:00Z', endAt: '2026-01-01T11:00:00Z',
+          allDay: false, createdAt: 'EC', updatedAt: 'EU',
+        }]
+      return []
+    })
+    const n = await migrateCalendar({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({ id: 'ev1', workspace_id: 'C', created_by: 'U', created_at: 'EC' })
+    expect(row.all_day).toBe(0)
+    expect(row.title).toBe('Meeting')
+  })
+
+  it('maps allDay:true to 1 and preserves optional fields', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_calendar_events')
+        return [{
+          id: 'ev2', workspaceId: 'L', createdBy: 'orig',
+          accountId: 'acc1', title: 'Holiday', description: 'Off', location: 'Home',
+          startAt: '2026-12-25T00:00:00Z', endAt: '2026-12-25T23:59:59Z',
+          allDay: true, color: 'ok', createdAt: 'HC', updatedAt: 'HU',
+        }]
+      return []
+    })
+    await migrateCalendar({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.all_day).toBe(1)
+    expect(row.account_id).toBe('acc1')
+    expect(row.color).toBe('ok')
+  })
+
+  it('returns 0 and skips upsert when no events', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_calendar_events') return []
+      return []
+    })
+    const n = await migrateCalendar({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
   })
 })
