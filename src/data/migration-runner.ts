@@ -89,15 +89,6 @@ export async function migrateAccounts(ctx: MigrationCtx): Promise<number> {
   return rows.length
 }
 
-/**
- * Collects all local account IDs (clients + leads) for per-account iteration.
- */
-async function localAccountIds(ctx: MigrationCtx): Promise<string[]> {
-  const clients = await invoke<{ id: string }[]>('get_accounts', { workspaceId: ctx.localWsId })
-  const leads   = await invoke<{ id: string }[]>('get_leads', { workspaceId: ctx.localWsId })
-  return [...clients, ...leads].map(a => a.id)
-}
-
 // Cloud column allowlist for `contacts` (derived from contactPayloadToRow write-path
 // + contactRowToContact read-path; excludes local-only `pending_sync`).
 const CONTACT_CLOUD_COLS = new Set([
@@ -396,7 +387,7 @@ export async function bumpSequences(ctx: MigrationCtx): Promise<void> {
   await supabase.from('invoice_sequences').upsert(
     {
       workspace_id: ctx.cloudWsId,
-      next_number:  maxOf(invoices.map(i => i.number)),
+      next_number:  localInvSeq?.next_number ?? maxOf(invoices.map(i => i.number)),
       start_number: localInvSeq?.start_number ?? 1,
       format:       localInvSeq?.format ?? null,
       seq_year:     localInvSeq?.seq_year ?? 0,
@@ -406,7 +397,7 @@ export async function bumpSequences(ctx: MigrationCtx): Promise<void> {
   await supabase.from('offer_sequences').upsert(
     {
       workspace_id: ctx.cloudWsId,
-      next_number:  maxOf(offers.map(o => o.number)),
+      next_number:  localOfferSeq?.next_number ?? maxOf(offers.map(o => o.number)),
       start_number: localOfferSeq?.start_number ?? 1,
     },
     { onConflict: 'workspace_id' },

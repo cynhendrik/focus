@@ -684,7 +684,7 @@ describe('migrateZeiteintraege', () => {
 })
 
 describe('bumpSequences', () => {
-  it('sets invoice next_number to MAX(RE-number) (no +1) and carries format/seq_year/start_number from local seq', async () => {
+  it('uses local seq next_number (not maxOf) and carries format/seq_year/start_number', async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
       if (cmd === 'get_invoices')
         return [
@@ -694,9 +694,9 @@ describe('bumpSequences', () => {
       if (cmd === 'get_offers')
         return [{ id: 'o1', number: 'ANG-2025-003' }]
       if (cmd === 'cmd_dump_table' && args?.table === 'invoice_sequences')
-        return [{ workspace_id: 'L', next_number: 6, start_number: 1, format: 'RE-{YYYY}-{NNN}', seq_year: 2025 }]
+        return [{ workspace_id: 'L', next_number: 41, start_number: 1, format: 'RE-{YYYY}-{NNN}', seq_year: 2025 }]
       if (cmd === 'cmd_dump_table' && args?.table === 'offer_sequences')
-        return [{ workspace_id: 'L', next_number: 2, start_number: 1 }]
+        return [{ workspace_id: 'L', next_number: 12, start_number: 1 }]
       return []
     })
     await bumpSequences({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
@@ -704,13 +704,37 @@ describe('bumpSequences', () => {
     expect(upsertMock.mock.calls).toHaveLength(2)
     const invSeq = upsertMock.mock.calls[0][0]
     expect(invSeq.workspace_id).toBe('C')
-    expect(invSeq.next_number).toBe(7) // MAX(7, 3) — no +1; next cloud call returns 7+1=8
+    // GoBD fix: local seq counter (41) is used, NOT maxOf invoice numbers (7)
+    expect(invSeq.next_number).toBe(41)
     expect(invSeq.start_number).toBe(1)
     expect(invSeq.format).toBe('RE-{YYYY}-{NNN}')
     expect(invSeq.seq_year).toBe(2025)
     const offSeq = upsertMock.mock.calls[1][0]
     expect(offSeq.workspace_id).toBe('C')
-    expect(offSeq.next_number).toBe(3) // MAX(3) — no +1; next cloud call returns 3+1=4
+    // GoBD fix: local seq counter (12) is used, NOT maxOf offer numbers (3)
+    expect(offSeq.next_number).toBe(12)
+    expect(offSeq.start_number).toBe(1)
+  })
+
+  it('falls back to maxOf when no local seq row exists', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_invoices')
+        return [{ id: 'i1', number: 'RE-2025-007' }, { id: 'i2', number: 'RE-2024-003' }]
+      if (cmd === 'get_offers')
+        return [{ id: 'o1', number: 'ANG-2025-003' }]
+      if (cmd === 'cmd_dump_table') return [] // no local seq rows
+      return []
+    })
+    await bumpSequences({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const invSeq = upsertMock.mock.calls[0][0]
+    // Fallback: maxOf trailing digits of RE-2025-007 (7) and RE-2024-003 (3) → 7
+    expect(invSeq.next_number).toBe(7)
+    expect(invSeq.start_number).toBe(1)  // hardcoded fallback
+    expect(invSeq.format).toBeNull()     // hardcoded fallback
+    expect(invSeq.seq_year).toBe(0)      // hardcoded fallback
+    const offSeq = upsertMock.mock.calls[1][0]
+    // Fallback: maxOf trailing digits of ANG-2025-003 → 3
+    expect(offSeq.next_number).toBe(3)
     expect(offSeq.start_number).toBe(1)
   })
 
@@ -718,7 +742,7 @@ describe('bumpSequences', () => {
     vi.mocked(invoke).mockImplementation(async () => [])
     await bumpSequences({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     const invSeq = upsertMock.mock.calls[0][0]
-    expect(invSeq.next_number).toBe(0) // no invoices → MAX = 0; cloud function returns 0+1=1
+    expect(invSeq.next_number).toBe(0) // no invoices + no local seq → maxOf([]) = 0
     expect(invSeq.start_number).toBe(1)     // fallback when no local seq row
     expect(invSeq.format).toBeNull()         // fallback
     expect(invSeq.seq_year).toBe(0)          // fallback

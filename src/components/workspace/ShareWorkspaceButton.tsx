@@ -12,12 +12,14 @@ export function ShareWorkspaceButton() {
   const [joinCode, setJoinCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  if (!local) return null  // nur für lokale Workspaces
+  if (!local && phase !== 'done') return null  // nur für lokale Workspaces (done-Screen bleibt)
 
   const run = async () => {
+    if (!local) return
+    const { id: wsId, name: wsName } = local  // snapshot before async; local is removed after share
     setPhase('running'); setError(null)
     try {
-      const res = await shareWorkspace(local.id, local.name, (entity, n) => setProgress(`${entity}: ${n}`))
+      const res = await shareWorkspace(wsId, wsName, (entity, n) => setProgress(`${entity}: ${n}`))
       setJoinCode(res.joinCode); setPhase('done')
     } catch (e) {
       setError(String(e)); setPhase('confirm')
