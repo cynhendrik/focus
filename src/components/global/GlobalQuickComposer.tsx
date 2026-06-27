@@ -21,9 +21,11 @@ import { detectActionType, ACTION_TYPE_LABELS } from '@/lib/action-keywords'
 import { parseTaskText, type TaskDraft } from '@/components/tasks/prefix-parser'
 import { CalendarEventConfirmCard, type PendingEventDraft } from '@/components/tasks/CalendarEventConfirmCard'
 import {
-  MentionPopover, extractMentionQuery, useMentionPopoverState,
-  type MentionCandidate,
+  extractMentionQuery, useMentionPopoverState,
 } from '@/components/tasks/MentionPopover'
+import { useMembersStore } from '@/store/members.store'
+import { buildTaskMentionCandidates, markerForTask, type TaskMentionCandidate } from '@/components/tasks/task-mentions'
+import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/TaskMentionPopover'
 
 const PRIO_LABEL: Record<string, string> = {
   p1: 'Dringend', p2: 'Hoch', p3: 'Normal', p4: 'Niedrig',
@@ -137,7 +139,9 @@ function Panel({ onClose }: { onClose: () => void }) {
 
 function ComposerInner({ onClose }: { onClose: () => void }) {
   const upsert       = useTodosStore(s => s.upsert)
+  const setAssignee  = useTodosStore(s => s.setAssignee)
   const accounts     = useAccountsStore(s => s.accounts)
+  const members      = useMembersStore(s => s.members())
   const upsertEvent  = useCalendarStore(s => s.upsert)
 
   const selectedCustomerId  = useUiStore(s => s.selectedCustomerId)
@@ -151,7 +155,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   }, [appView, selectedCustomerId, accounts])
 
   const [text, setText]               = useState('')
-  const [mentions, setMentions]       = useState<Array<{ marker: string; customerId: string }>>([])
+  const [mentions, setMentions]       = useState<Array<{ marker: string; kind: 'member' | 'customer'; id: string }>>([])
   const [pendingEvent, setPendingEvent]   = useState<PendingEventDraft | null>(null)
   const [pendingDraft, setPendingDraft]   = useState<TaskDraft | null>(null)
   const [savedHint, setSavedHint]         = useState<string | null>(null)
@@ -165,9 +169,9 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   // Is this a task (starts with !) or a CORRA question?
   const isTaskMode = text.trimStart().startsWith('!')
 
-  const candidates: MentionCandidate[] = useMemo(
-    () => accounts.filter(a => !a.isPrivate).map(a => ({ id: a.id, name: a.name, company: a.industry })),
-    [accounts],
+  const candidates: TaskMentionCandidate[] = useMemo(
+    () => buildTaskMentionCandidates(members, accounts),
+    [members, accounts],
   )
 
   // Typed-name fallback: resolve "@Kunde" without picking from the popover —
@@ -177,8 +181,10 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     const query = q.trim().toLowerCase().replace(/[,;:.!?]+$/, '')
     if (!query) return undefined
     const match = candidates.find(c =>
-      c.name.toLowerCase().includes(query) ||
-      (c.company ?? '').toLowerCase().includes(query)
+      c.kind === 'customer' && (
+        c.name.toLowerCase().includes(query) ||
+        (c.sub ?? '').toLowerCase().includes(query)
+      )
     )
     return match?.id
   }, [candidates])
@@ -241,10 +247,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
   }, [editor, consumePrefill])
 
   const draft = useMemo(() => {
-    const parsed = parseTaskText(text, {
-      mentions: mentions.map(m => ({ marker: m.marker, kind: 'customer' as const, id: m.customerId })),
-      resolveMention,
-    })
+    const parsed = parseTaskText(text, { mentions, resolveMention })
     parsed.actionType = detectActionType(parsed.title) ?? undefined
     return parsed
   }, [text, mentions, resolveMention])
@@ -323,7 +326,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
       }
     }
 
-    await upsert({
+    const created = await upsert({
       title: eventOverride?.title ?? title,
       priority:       sourceDraft.priority ?? 'p3',
       scheduledAt:    sourceDraft.scheduledAt,
@@ -336,6 +339,9 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
         ? (sourceDraft.scheduledAt.slice(0, 10) === todayStr ? 'today' : 'backlog')
         : 'today',
     })
+    if (sourceDraft.assigneeId) {
+      try { await setAssignee(created.id, sourceDraft.assigneeId) } catch { /* Store loggt */ }
+    }
 
     editor.commands.clearContent()
     setText(''); setMentions([]); setPendingEvent(null); setPendingDraft(null)
@@ -372,11 +378,11 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  const pickMention = (cand: MentionCandidate) => {
+  const pickMention = (cand: TaskMentionCandidate) => {
     if (!editor) return
     const m = mentionStateRef.current
     if (!m.ctx.open) return
-    const marker = `@${cand.name.split(' ')[0]}`
+    const marker = markerForTask(cand)
     const fullText = editor.getText()
     const pos = editor.state.selection.from
     const textOffset = Math.max(0, pos - 1)
@@ -386,7 +392,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     editor.commands.setTextSelection((before + marker + ' ').length + 1)
     setMentions(prev => {
       const without = prev.filter(p => p.marker.toLowerCase() !== marker.toLowerCase())
-      return [...without, { marker, customerId: cand.id }]
+      return [...without, { marker, kind: cand.kind, id: cand.id }]
     })
     m.close()
   }
@@ -395,8 +401,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
     const picker = () => {
       const m = mentionStateRef.current
       if (!m.ctx.open) return
-      const q = m.ctx.query.toLowerCase().trim()
-      const filtered = q ? candidates.filter(c => c.name.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q)) : candidates
+      const filtered = filterTaskCandidates(candidates, m.ctx.query)
       const cand = filtered[m.activeIdx]
       if (cand) pickMention(cand)
     }
@@ -557,7 +562,7 @@ function ComposerInner({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      <MentionPopover
+      <TaskMentionPopover
         open={mention.ctx.open} query={mention.ctx.query} candidates={candidates}
         anchor={mention.ctx.anchor} activeIdx={mention.activeIdx}
         setActiveIdx={mention.setActiveIdx} onSelect={pickMention} onClose={mention.close}
