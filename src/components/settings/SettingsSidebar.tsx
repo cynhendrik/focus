@@ -28,7 +28,7 @@ const GROUPS: Group[] = [
 interface Props { active: SettingsTab; onChange: (tab: SettingsTab) => void; showDeveloper: boolean }
 
 export function SettingsSidebar({ active, onChange, showDeveloper }: Props) {
-  const ws = useWorkspaceStore(s => s.workspaces.find(w => w.id === s.activeWorkspaceId))
+  const ws = useWorkspaceStore(s => [...s.workspaces, ...s.localWorkspaces].find(w => w.id === s.activeWorkspaceId))
   const initial = (ws?.name ?? 'W').trim().charAt(0).toUpperCase()
   const sub = ws ? `${ws.isShared ? 'Geteilter Workspace' : 'Workspace'} · ${ws.role}` : 'Lokal'
 

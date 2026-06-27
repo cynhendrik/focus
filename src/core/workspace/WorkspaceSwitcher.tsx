@@ -17,8 +17,9 @@ function initials(name: string): string {
 }
 
 export function WorkspaceSwitcher() {
-  const workspaces  = useWorkspaceStore(s => s.workspaces)
-  const activeId    = useWorkspaceStore(s => s.activeWorkspaceId)
+  const workspaces      = useWorkspaceStore(s => s.workspaces)
+  const localWorkspaces = useWorkspaceStore(s => s.localWorkspaces)
+  const activeId        = useWorkspaceStore(s => s.activeWorkspaceId)
   const setActive   = useWorkspaceStore(s => s.setActiveWorkspace)
   const create      = useWorkspaceStore(s => s.createWorkspace)
   const joinByCode  = useWorkspaceStore(s => s.joinWorkspaceByCode)
@@ -32,7 +33,8 @@ export function WorkspaceSwitcher() {
   const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
-  const active = workspaces.find(w => w.id === activeId)
+  const all    = [...workspaces, ...localWorkspaces]
+  const active = all.find(w => w.id === activeId)
 
   const reset = () => { setMode('menu'); setValue(''); setError(null); setBusy(false) }
   const close = () => { setOpen(false); reset() }
@@ -95,10 +97,10 @@ export function WorkspaceSwitcher() {
               <>
                 <div className="ws-menu__label">Deine Workspaces</div>
                 <div className="ws-menu__list">
-                  {workspaces.length === 0 && (
+                  {all.length === 0 && (
                     <div className="ws-empty">Noch kein Workspace — leg unten einen an oder tritt einem bei.</div>
                   )}
-                  {workspaces.map(ws => {
+                  {all.map(ws => {
                     const isActive = ws.id === activeId
                     return (
                       <button
