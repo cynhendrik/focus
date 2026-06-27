@@ -22,6 +22,9 @@ interface LeadsState {
   deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
   updateStage: (id: string, stage: PipelineStage) => Promise<void>
+  /** Board-Drag: Karte SOFORT lokal in die Zielspalte (leadStatus) setzen, dann im
+   *  Hintergrund persistieren; bei Fehler zurückrollen. Kein await/Reload → kein Ruckeln. */
+  moveLeadStage: (id: string, status: string) => void
   newLeads: () => Lead[]
   attemptedLeads: () => Lead[]
   warmLeads: () => Lead[]
@@ -161,6 +164,18 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err
     }
+  },
+
+  moveLeadStage: (id, status) => {
+    const prev = get().leads
+    // Optimistisch: Karte sofort verschieben (Board gruppiert nach leadStatus).
+    set({ leads: prev.map(l => l.id === id ? { ...l, leadStatus: status } : l), error: null })
+    // Persistenz im Hintergrund; Realtime echo't den Server-Stand zurück (kein Reload nötig).
+    AccountsGateway.bulkUpdate({ ids: [id], status }).catch(err => {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      log.error('Failed to move lead stage', { error })
+      set({ leads: prev, error })   // Rollback
+    })
   },
 
   newLeads: () => get().leads.filter(l => l.pipelineStage === 'inbox'),

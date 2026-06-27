@@ -634,6 +634,7 @@ function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: s
 export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true }: { workspaceId: string; onShowCreate: () => void; showCreateButton?: boolean }) {
   const allLeads      = useLeadsStore(s => s.leads)
   const bulkUpdate    = useLeadsStore(s => s.bulkUpdate)
+  const moveLeadStage = useLeadsStore(s => s.moveLeadStage)
   const deleteLead    = useLeadsStore(s => s.deleteLead)
   const convertToDeal = useLeadsStore(s => s.convertToDeal)
   const userId        = useAuthStore(s => s.user?.id ?? '')
@@ -735,7 +736,7 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
       return
     }
     if (lead.leadStatus !== targetStageName) {
-      bulkUpdate({ ids: [lead.id], status: targetStageName }, workspaceId)
+      moveLeadStage(lead.id, targetStageName)
     }
   }
 

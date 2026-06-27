@@ -108,3 +108,28 @@ describe('useLeadsStore.convertToDeal', () => {
     expect(useDealsStore.getState().deals).toHaveLength(0)
   })
 })
+
+describe('useLeadsStore.moveLeadStage (optimistic board drag)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useLeadsStore.setState({ leads: [mockLead], isLoading: false, error: null })
+  })
+
+  it('updates leadStatus synchronously (before any await) and persists in background', () => {
+    const spy = vi.spyOn(LeadsService, 'bulkUpdate').mockResolvedValue(undefined as any)
+    useLeadsStore.getState().moveLeadStage('lead-1', 'kontaktiert')
+    // Synchronous optimistic move — no await needed before the card reflects the change.
+    expect(useLeadsStore.getState().leads[0].leadStatus).toBe('kontaktiert')
+    expect(spy).toHaveBeenCalledWith({ ids: ['lead-1'], status: 'kontaktiert' })
+  })
+
+  it('rolls back leadStatus if the background persist fails', async () => {
+    vi.spyOn(LeadsService, 'bulkUpdate').mockRejectedValue(new Error('network'))
+    useLeadsStore.getState().moveLeadStage('lead-1', 'kontaktiert')
+    expect(useLeadsStore.getState().leads[0].leadStatus).toBe('kontaktiert') // optimistic first
+    await vi.waitFor(() =>
+      expect(useLeadsStore.getState().leads[0].leadStatus).toBe('warm'),     // rolled back
+    )
+    expect(useLeadsStore.getState().error).not.toBeNull()
+  })
+})
