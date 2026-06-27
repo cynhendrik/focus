@@ -496,6 +496,32 @@ export async function migrateNoteEntries(ctx: MigrationCtx): Promise<number> {
   return rows.length
 }
 
+// Cloud column allowlist for `kpis` (migration 0022; no created_at — cloud kpis table has none).
+const KPI_CLOUD_COLS = new Set([
+  'id', 'workspace_id', 'created_by', 'account_id',
+  'label', 'value', 'unit', 'target', 'period', 'updated_at',
+])
+
+/**
+ * Migriert lokale KPIs in die Cloud-Tabelle `kpis` via workspace-weitem
+ * SQLite-Dump (cmd_dump_table). Projiziert auf die Cloud-Spalten-Allowlist,
+ * re-scoped workspace_id/created_by, preserviert updated_at aus dem Rohzeile.
+ * created_at wird NICHT mitgesendet — cloud `kpis` hat keine created_at-Spalte (Migration 0022).
+ * pending_sync u. a. lokale Spalten fallen durch die Allowlist-Projektion weg.
+ */
+export async function migrateKpis(ctx: MigrationCtx): Promise<number> {
+  const raw = await invoke<any[]>('cmd_dump_table', { table: 'kpis', workspaceId: ctx.localWsId })
+  const rows = raw.map(r => {
+    const row: Record<string, unknown> = {}
+    for (const k of Object.keys(r)) if (KPI_CLOUD_COLS.has(k)) row[k] = r[k]
+    row.workspace_id = ctx.cloudWsId
+    row.created_by = ctx.uid
+    return row   // updated_at bleibt aus der Rohzeile erhalten; kein created_at
+  })
+  await upsertRows('kpis', rows)
+  return rows.length
+}
+
 /**
  * Migriert Aufträge aus localStorage (`cynera-auftraege-v1`) in die Cloud-Tabelle `auftraege`.
  * Preserviert created_at (Mapper liefert es aus a.createdAt).
@@ -531,6 +557,7 @@ const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number
   { name: 'pipeline_stages', run: migratePipelineStages },
   { name: 'lead_stages', run: migrateLeadStages },
   { name: 'accounts', run: migrateAccounts },
+  { name: 'kpis', run: migrateKpis },
   { name: 'contacts', run: migrateContacts },
   { name: 'deals', run: migrateDeals },
   { name: 'activities', run: migrateActivities },

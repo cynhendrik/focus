@@ -20,6 +20,7 @@ import {
   migrateOffers, migrateOfferItems, bumpSequences,
   migrateVertraege, migrateNoteFolders, migrateNoteEntries,
   migrateAuftraege, migrateZeiteintraege,
+  migrateKpis,
   runMigration,
 } from './migration-runner'
 
@@ -678,6 +679,40 @@ describe('migrateZeiteintraege', () => {
 
   it('returns 0 and skips upsert when localStorage is empty', async () => {
     const n = await migrateZeiteintraege({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateKpis', () => {
+  it('migrateKpis dumps workspace kpis and re-scopes (account_id link kept, no created_at)', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) =>
+      cmd === 'cmd_dump_table' && args.table === 'kpis'
+        ? [{ id: 'k1', workspace_id: 'L', created_by: 'old', account_id: 'a1', label: 'MRR', value: 5, unit: '€', target: 10, period: 'M', updated_at: 'T', pending_sync: 0 }]
+        : [])
+    const n = await migrateKpis({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).toMatchObject({ id: 'k1', workspace_id: 'C', created_by: 'U', account_id: 'a1', label: 'MRR', updated_at: 'T' })
+    expect(row).not.toHaveProperty('pending_sync')   // local-only column excluded
+  })
+
+  it('excludes created_at even if present in raw row (cloud kpis has no created_at column)', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) =>
+      cmd === 'cmd_dump_table' && args.table === 'kpis'
+        ? [{ id: 'k2', workspace_id: 'L', created_by: 'old', account_id: 'a2', label: 'ARR', value: 60, unit: '€', target: 100, period: 'Y', updated_at: 'T2', created_at: 'SHOULD_NOT_APPEAR', pending_sync: 0 }]
+        : [])
+    await migrateKpis({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row).not.toHaveProperty('created_at')
+  })
+
+  it('returns 0 and skips upsert when workspace has no kpis', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'kpis') return []
+      return []
+    })
+    const n = await migrateKpis({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(0)
     expect(upsertMock).not.toHaveBeenCalled()
   })
