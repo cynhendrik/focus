@@ -302,6 +302,40 @@ pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), Stri
     Ok(())
 }
 
+/// True, wenn irgendeine workspace-scoped Tabelle Zeilen mit dieser workspace_id hat.
+pub fn has_workspace_data(conn: &rusqlite::Connection, ws_id: &str) -> Result<bool, String> {
+    let tables: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' \
+                      AND name NOT LIKE 'sqlite_%' AND name != 'sync_queue' ORDER BY name")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        rows.filter_map(Result::ok).collect()
+    };
+    for t in &tables {
+        let has_ws = {
+            let mut stmt = match conn.prepare(&format!("PRAGMA table_info(\"{t}\")")) {
+                Ok(s) => s, Err(_) => continue,
+            };
+            let c = stmt.query_map([], |r| r.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            let found = c.filter_map(Result::ok).any(|name| name == "workspace_id");
+            found
+        };
+        if !has_ws { continue; }
+        let n: i64 = conn
+            .query_row(&format!("SELECT count(*) FROM \"{t}\" WHERE workspace_id=?1"), [ws_id], |r| r.get(0))
+            .map_err(|e| format!("{t}: {e}"))?;
+        if n > 0 { return Ok(true); }
+    }
+    Ok(false)
+}
+
+#[tauri::command]
+pub fn cmd_has_local_orphan_data(db: State<'_, DbPool>) -> Result<bool, String> {
+    let conn = db.conn();
+    has_workspace_data(&conn, "dev")
+}
+
 #[tauri::command]
 pub fn cmd_reset_workspace(db: State<'_, DbPool>) -> Result<(), String> {
     let mut conn = db.conn();
@@ -488,6 +522,17 @@ mod tests {
         // Tabelle ohne workspace_id-Spalte bleibt unangetastet, kein Fehler:
         let inv_items: i64 = conn.query_row("SELECT count(*) FROM invoice_items WHERE id='it1'", [], |r| r.get(0)).unwrap();
         assert_eq!(inv_items, 1);
+    }
+
+    #[test]
+    fn has_workspace_data_detects_rows() {
+        let conn = sample_conn();
+        assert_eq!(has_workspace_data(&conn, "dev").unwrap(), false);
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+             VALUES ('a1','dev','u','X','2026-01-01','2026-01-01')", []).unwrap();
+        assert_eq!(has_workspace_data(&conn, "dev").unwrap(), true);
+        assert_eq!(has_workspace_data(&conn, "other").unwrap(), false);
     }
 
     #[test]
