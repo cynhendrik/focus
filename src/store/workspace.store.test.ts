@@ -157,6 +157,37 @@ describe('createWorkspace', () => {
   })
 })
 
+describe('createCloudWorkspaceRecord', () => {
+  it('inserts workspace + membership and returns id, without setting active', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: { id: 'u1' } }, error: null } as any)
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: { id: 'cloud-1' }, error: null }),
+          }),
+        }),
+      } as any)
+      .mockReturnValueOnce({
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      } as any)
+
+    useWorkspaceStore.setState({ activeWorkspaceId: 'local-x' })
+    const id = await useWorkspaceStore.getState().createCloudWorkspaceRecord('Team')
+    expect(id).toBe('cloud-1')
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBe('local-x') // unchanged
+  })
+
+  it('throws when not logged in', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({ data: { user: null }, error: null } as any)
+    await expect(useWorkspaceStore.getState().createCloudWorkspaceRecord('Team'))
+      .rejects.toThrow('Nicht eingeloggt')
+  })
+})
+
 describe('regenerateJoinCode', () => {
   it('setzt einen neuen Code per Update und aktualisiert den lokalen State', async () => {
     const { supabase } = await import('@/lib/supabase')

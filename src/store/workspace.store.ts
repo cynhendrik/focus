@@ -33,6 +33,7 @@ interface WorkspaceState {
   isOnline: boolean
   loadWorkspaces: () => Promise<void>
   createWorkspace: (name: string) => Promise<void>
+  createCloudWorkspaceRecord: (name: string) => Promise<string>
   createLocalWorkspace: (name: string) => string
   joinWorkspaceByCode: (code: string) => Promise<void>
   regenerateJoinCode: (workspaceId: string) => Promise<string>
@@ -114,6 +115,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         await get().loadWorkspaces()
         set({ activeWorkspaceId: ws.id })
+      },
+
+      createCloudWorkspaceRecord: async (name) => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('Nicht eingeloggt')
+        const { data: ws, error: wsErr } = await supabase
+          .from('workspaces')
+          .insert({ name, created_by: user.id, join_code: generateJoinCode() })
+          .select().single()
+        if (wsErr) throw wsErr
+        const { error: memberErr } = await supabase
+          .from('workspace_members')
+          .insert({ workspace_id: ws.id, user_id: user.id, role: 'owner' })
+        if (memberErr) throw memberErr
+        return ws.id as string
       },
 
       createLocalWorkspace: (name) => {
