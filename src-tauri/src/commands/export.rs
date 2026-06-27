@@ -105,6 +105,63 @@ fn dump_table(conn: &rusqlite::Connection, table: &str) -> Result<Vec<serde_json
     Ok(out)
 }
 
+/// Dumps all rows of `table` that belong to `ws_id`, returning them as JSON
+/// objects with snake_case keys (mirrors `dump_table` but scoped by workspace_id).
+///
+/// Safety: the table name is validated against `sqlite_master` before being
+/// interpolated into the SQL string, preventing arbitrary identifier injection.
+/// System tables (sqlite_% and sync_queue) are excluded.
+pub fn dump_table_for_workspace(
+    conn: &rusqlite::Connection,
+    table: &str,
+    ws_id: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    let exists: bool = conn
+        .query_row(
+            "SELECT count(*) > 0 FROM sqlite_master \
+             WHERE type='table' AND name=?1 \
+             AND name NOT LIKE 'sqlite_%' AND name != 'sync_queue'",
+            [table],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        return Err(format!("unknown or forbidden table: {table}"));
+    }
+
+    let mut stmt = conn
+        .prepare(&format!("SELECT * FROM \"{table}\" WHERE workspace_id = ?1"))
+        .map_err(|e| e.to_string())?;
+    let cols: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+    let mut rows = stmt.query([ws_id]).map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let mut obj = serde_json::Map::new();
+        for (i, name) in cols.iter().enumerate() {
+            let v = match row.get_ref(i).map_err(|e| e.to_string())? {
+                rusqlite::types::ValueRef::Null       => serde_json::Value::Null,
+                rusqlite::types::ValueRef::Integer(n) => serde_json::Value::from(n),
+                rusqlite::types::ValueRef::Real(f)    => serde_json::Value::from(f),
+                rusqlite::types::ValueRef::Text(t)    => serde_json::Value::from(String::from_utf8_lossy(t).into_owned()),
+                rusqlite::types::ValueRef::Blob(b)    => serde_json::Value::from(b.to_vec()),
+            };
+            obj.insert(name.clone(), v);
+        }
+        out.push(serde_json::Value::Object(obj));
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn cmd_dump_table(
+    db: State<'_, DbPool>,
+    table: String,
+    workspace_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    let conn = db.conn();
+    dump_table_for_workspace(&conn, &table, &workspace_id)
+}
+
 /// Builds the versioned backup JSON for every user table. Shared by the manual
 /// export command and the automatic on-close backup.
 pub fn build_backup_json(conn: &rusqlite::Connection) -> Result<Vec<u8>, String> {
@@ -521,6 +578,51 @@ mod tests {
         // Tabelle ohne workspace_id-Spalte bleibt unangetastet, kein Fehler:
         let inv_items: i64 = conn.query_row("SELECT count(*) FROM invoice_items WHERE id='it1'", [], |r| r.get(0)).unwrap();
         assert_eq!(inv_items, 1);
+    }
+
+    #[test]
+    fn dump_table_for_workspace_returns_scoped_rows() {
+        let conn = sample_conn();
+        // Two contacts under workspace A, one under B.
+        conn.execute(
+            "INSERT INTO contacts (id, workspace_id, created_by, first_name, created_at, updated_at) \
+             VALUES ('c1','A','u1','Alice','2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO contacts (id, workspace_id, created_by, first_name, created_at, updated_at) \
+             VALUES ('c2','A','u1','Bob','2026-01-01','2026-01-01')", []).unwrap();
+        conn.execute(
+            "INSERT INTO contacts (id, workspace_id, created_by, first_name, created_at, updated_at) \
+             VALUES ('c3','B','u2','Carol','2026-01-01','2026-01-01')", []).unwrap();
+
+        let rows = dump_table_for_workspace(&conn, "contacts", "A").unwrap();
+        assert_eq!(rows.len(), 2, "only workspace A rows returned");
+        let ids: Vec<&str> = rows.iter()
+            .map(|r| r["id"].as_str().unwrap())
+            .collect();
+        assert!(ids.contains(&"c1"));
+        assert!(ids.contains(&"c2"));
+        assert!(!ids.contains(&"c3"), "workspace B row must be excluded");
+
+        // keys are snake_case
+        assert!(rows[0].get("first_name").is_some());
+    }
+
+    #[test]
+    fn dump_table_for_workspace_rejects_unknown_table() {
+        let conn = sample_conn();
+        let err = dump_table_for_workspace(&conn, "nonexistent_table", "ws").unwrap_err();
+        assert!(err.contains("unknown or forbidden table"), "got: {err}");
+    }
+
+    #[test]
+    fn dump_table_for_workspace_rejects_injection_attempt() {
+        let conn = sample_conn();
+        let err = dump_table_for_workspace(
+            &conn,
+            "contacts; DROP TABLE contacts;--",
+            "ws",
+        ).unwrap_err();
+        assert!(err.contains("unknown or forbidden table"), "got: {err}");
     }
 
     #[test]

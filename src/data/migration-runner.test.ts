@@ -67,25 +67,36 @@ describe('runMigration', () => {
 })
 
 describe('migrateContacts', () => {
-  it('iterates accounts and upserts contacts re-scoped, preserving id/created_at', async () => {
+  it('reads raw workspace dump and upserts contacts re-scoped, preserving id/created_at', async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
-      if (cmd === 'get_accounts') return [{ id: 'a1' }]
-      if (cmd === 'get_leads') return []
-      if (cmd === 'get_contacts' && args.accountId === 'a1')
-        return [{ id: 'k1', accountId: 'a1', firstName: 'P', createdBy: 'orig', createdAt: 'T' }]
+      if (cmd === 'cmd_dump_table' && args.table === 'contacts' && args.workspaceId === 'L')
+        return [{
+          id: 'k1', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', first_name: 'P', last_name: null,
+          email: null, phone: null, role: null, is_primary: 0,
+          avatar_url: null, linkedin_url: null, decision_power: null,
+          preferred_channel: null, notes: null, birthday: null,
+          pending_sync: 0,
+          created_at: 'T', updated_at: 'T',
+        }]
       return []
     })
     const n = await migrateContacts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(1)
-    expect(upsertMock.mock.calls.at(-1)![0][0]).toMatchObject({
-      id: 'k1', workspace_id: 'C', created_by: 'U', created_at: 'T',
-    })
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    // Re-scoped
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    // Preserved from raw row
+    expect(row.id).toBe('k1')
+    expect(row.created_at).toBe('T')
+    // Local-only column excluded
+    expect(row.pending_sync).toBeUndefined()
   })
 
-  it('returns 0 when no accounts exist', async () => {
-    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === 'get_accounts') return []
-      if (cmd === 'get_leads') return []
+  it('returns 0 and skips upsert when workspace has no contacts', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'cmd_dump_table' && args.table === 'contacts') return []
       return []
     })
     const n = await migrateContacts({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
@@ -121,43 +132,54 @@ describe('migrateDeals', () => {
 })
 
 describe('migrateActivities', () => {
-  it('iterates accounts and upserts activities with direct row mapping, preserving contact_id/outcome/direction', async () => {
+  it('reads raw workspace dump and upserts activities re-scoped, preserving contact_id/outcome/direction/customer_id', async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
-      if (cmd === 'get_accounts') return [{ id: 'a1' }]
-      if (cmd === 'get_leads') return []
-      if (cmd === 'get_activities_by_account' && args.accountId === 'a1')
+      if (cmd === 'cmd_dump_table' && args.table === 'activities' && args.workspaceId === 'L')
         return [{
-          id: 'act1', accountId: 'a1', contactId: 'c1', dealId: null,
+          id: 'act1', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', contact_id: 'c1', deal_id: null, customer_id: 'cust9',
           type: 'call', title: 'First call', body: null,
-          outcome: 'strong_interest', direction: 'out', emailId: null,
-          assignee: null, status: 'done', dueAt: null,
+          outcome: 'strong_interest', direction: 'out', email_id: null,
+          assignee: null, status: 'done', due_at: null,
           payload: '{"extra":"data"}',
-          createdAt: 'AT', updatedAt: 'AT2',
+          pending_sync: 0,
+          created_at: 'AT', updated_at: 'AT2',
         }]
       return []
     })
     const n = await migrateActivities({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(1)
     const row = upsertMock.mock.calls.at(-1)![0][0]
-    expect(row).toMatchObject({
-      id: 'act1', workspace_id: 'C', created_by: 'U', created_at: 'AT',
-      contact_id: 'c1', outcome: 'strong_interest', direction: 'out',
-    })
+    // Re-scoped
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    // Preserved from raw row
+    expect(row.id).toBe('act1')
+    expect(row.created_at).toBe('AT')
+    // contact_id, outcome, direction carried through
+    expect(row.contact_id).toBe('c1')
+    expect(row.outcome).toBe('strong_interest')
+    expect(row.direction).toBe('out')
+    // customer_id included (not dropped)
+    expect(row.customer_id).toBe('cust9')
+    // payload parsed to object
     expect(row.payload).toEqual({ extra: 'data' })
+    // Local-only column excluded
+    expect(row.pending_sync).toBeUndefined()
   })
 
-  it('parses payload string to object and maps due_at correctly', async () => {
+  it('parses payload string to object and maps due_at/assignee correctly', async () => {
     vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
-      if (cmd === 'get_accounts') return [{ id: 'a1' }]
-      if (cmd === 'get_leads') return []
-      if (cmd === 'get_activities_by_account' && args.accountId === 'a1')
+      if (cmd === 'cmd_dump_table' && args.table === 'activities')
         return [{
-          id: 'act2', accountId: 'a1', contactId: null, dealId: null,
+          id: 'act2', workspace_id: 'L', created_by: 'orig',
+          account_id: 'a1', contact_id: null, deal_id: null, customer_id: null,
           type: 'task', title: 'Task', body: null,
-          outcome: null, direction: null, emailId: null,
-          assignee: 'bob', status: 'open', dueAt: '2026-07-01',
+          outcome: null, direction: null, email_id: null,
+          assignee: 'bob', status: 'open', due_at: '2026-07-01',
           payload: '{}',
-          createdAt: 'CT', updatedAt: 'UT',
+          pending_sync: 0,
+          created_at: 'CT', updated_at: 'UT',
         }]
       return []
     })

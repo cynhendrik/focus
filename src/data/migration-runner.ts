@@ -1,12 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
 import { supabase } from '@/lib/supabase'
 import { accountPayloadToRow, leadPayloadToAccountRow } from './accounts.mapper'
-import { contactPayloadToRow } from './contacts.mapper'
 import { dealPayloadToRow } from './deals.mapper'
 import type { Account } from '@/types/account.types'
 import type { Lead, UpsertLeadPayload } from '@/types/lead.types'
 import type { UpsertAccountPayload } from '@/types/account.types'
-import type { UpsertContactPayload } from '@/types/contact.types'
 import type { UpsertDealPayload } from '@/types/pipeline.types'
 
 export interface MigrationCtx { localWsId: string; cloudWsId: string; uid: string }
@@ -88,27 +86,37 @@ async function localAccountIds(ctx: MigrationCtx): Promise<string[]> {
   return [...clients, ...leads].map(a => a.id)
 }
 
+// Cloud column allowlist for `contacts` (derived from contactPayloadToRow write-path
+// + contactRowToContact read-path; excludes local-only `pending_sync`).
+const CONTACT_CLOUD_COLS = new Set([
+  'id', 'workspace_id', 'created_by', 'account_id',
+  'first_name', 'last_name', 'email', 'phone', 'role',
+  'is_primary', 'avatar_url', 'linkedin_url', 'decision_power',
+  'preferred_channel', 'notes', 'birthday', 'created_at', 'updated_at',
+])
+
 /**
- * Migriert lokale Contacts (pro Account) in die Cloud-Tabelle `contacts`.
- *
- * Mapper-Signatur (contacts.mapper.ts, verifiziert):
- *   contactPayloadToRow(p: UpsertContactPayload, ctx: { id: string; now: string })
- * ctx.now → updated_at; created_by kommt aus p.createdBy; scope() überschreibt workspace_id/created_by/created_at.
+ * Migriert lokale Contacts in die Cloud-Tabelle `contacts` via workspace-weitem
+ * SQLite-Dump (cmd_dump_table). Projiziert auf die Cloud-Spalten-Allowlist,
+ * re-scoped workspace_id/created_by auf Cloud-Werte, preserviert created_at + id
+ * direkt aus dem Rohzeile (snake_case). is_primary bleibt 0/1 (cloud: smallint).
  */
 export async function migrateContacts(ctx: MigrationCtx): Promise<number> {
-  const now = new Date().toISOString()
-  const ids = await localAccountIds(ctx)
-  const rows: Record<string, unknown>[] = []
-  for (const accountId of ids) {
-    const contacts = await invoke<any[]>('get_contacts', { accountId })
-    for (const c of contacts) {
-      rows.push(scope(
-        contactPayloadToRow(c as unknown as UpsertContactPayload, { id: c.id, now }),
-        ctx,
-        c.createdAt,
-      ))
+  const raw = await invoke<Record<string, unknown>[]>('cmd_dump_table', {
+    table: 'contacts',
+    workspaceId: ctx.localWsId,
+  })
+  const rows = raw.map(r => {
+    const row: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(r)) {
+      if (CONTACT_CLOUD_COLS.has(k)) row[k] = v
     }
-  }
+    // Re-scope: cloud ids overwrite whatever the raw row had.
+    row.workspace_id = ctx.cloudWsId
+    row.created_by = ctx.uid
+    // created_at is preserved from the raw row (already copied in the loop above).
+    return row
+  })
   await upsertRows('contacts', rows)
   return rows.length
 }
@@ -133,43 +141,44 @@ export async function migrateDeals(ctx: MigrationCtx): Promise<number> {
   return rows.length
 }
 
+// Cloud column allowlist for `activities` (derived from activityPayloadToRow write-path
+// + activityRowToActivity read-path + local schema; excludes local-only `pending_sync`;
+// includes customer_id — present in both local schema and cloud write-path).
+const ACTIVITY_CLOUD_COLS = new Set([
+  'id', 'workspace_id', 'created_by', 'account_id', 'contact_id', 'deal_id', 'customer_id',
+  'type', 'title', 'body', 'payload', 'status', 'due_at', 'assignee',
+  'outcome', 'direction', 'email_id', 'created_at', 'updated_at',
+])
+
 /**
- * Migriert lokale Activities (pro Account) in die Cloud-Tabelle `activities`.
- * Row wird DIREKT aus dem Activity-Domänenobjekt gebaut (NICHT activityPayloadToRow),
- * damit contact_id/deal_id/outcome/direction/email_id erhalten bleiben.
- * payload: String→Objekt parsen (lokales SQLite speichert als JSON-String).
- *
- * Cloud-Spalten (aus activity.rs SELECT + Activity-Struct verifiziert):
- *   id, workspace_id, created_by, account_id, contact_id, deal_id,
- *   type, title, body, payload (jsonb), status, due_at, assignee,
- *   outcome, direction, email_id, created_at, updated_at
- * Nicht gesendet: customer_id (nur lokal, nicht im Activity-Struct).
+ * Migriert lokale Activities in die Cloud-Tabelle `activities` via workspace-weitem
+ * SQLite-Dump (cmd_dump_table). Projiziert auf die Cloud-Spalten-Allowlist,
+ * re-scoped workspace_id/created_by, preserviert created_at + id aus dem Rohzeile.
+ * payload wird String→Objekt geparst (SQLite speichert als JSON-String, Cloud: jsonb).
+ * customer_id wird mitgesendet (ist Cloud-Spalte und local-column in activities).
  */
 export async function migrateActivities(ctx: MigrationCtx): Promise<number> {
-  const ids = await localAccountIds(ctx)
-  const rows: Record<string, unknown>[] = []
-  for (const accountId of ids) {
-    const acts = await invoke<any[]>('get_activities_by_account', { accountId })
-    for (const a of acts) {
-      rows.push(scope({
-        id: a.id,
-        account_id: a.accountId ?? null,
-        contact_id: a.contactId ?? null,
-        deal_id: a.dealId ?? null,
-        type: a.type,
-        title: a.title ?? null,
-        body: a.body ?? null,
-        outcome: a.outcome ?? null,
-        direction: a.direction ?? null,
-        email_id: a.emailId ?? null,
-        assignee: a.assignee ?? null,
-        status: a.status ?? null,
-        due_at: a.dueAt ?? null,
-        payload: typeof a.payload === 'string' ? JSON.parse(a.payload || '{}') : (a.payload ?? {}),
-        updated_at: a.updatedAt ?? a.createdAt,
-      }, ctx, a.createdAt))
+  const raw = await invoke<Record<string, unknown>[]>('cmd_dump_table', {
+    table: 'activities',
+    workspaceId: ctx.localWsId,
+  })
+  const rows = raw.map(r => {
+    const row: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(r)) {
+      if (ACTIVITY_CLOUD_COLS.has(k)) row[k] = v
     }
-  }
+    // Parse payload: SQLite stores as JSON string, cloud expects jsonb object.
+    if (typeof row.payload === 'string') {
+      try { row.payload = JSON.parse(row.payload || '{}') } catch { row.payload = {} }
+    } else if (row.payload == null) {
+      row.payload = {}
+    }
+    // Re-scope: cloud ids overwrite whatever the raw row had.
+    row.workspace_id = ctx.cloudWsId
+    row.created_by = ctx.uid
+    // created_at is preserved from the raw row (already copied in the loop above).
+    return row
+  })
   await upsertRows('activities', rows)
   return rows.length
 }

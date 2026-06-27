@@ -327,6 +327,7 @@ fn main() {
             commands::export::cmd_reset_workspace,
             commands::export::cmd_rescope_workspace,
             commands::export::cmd_has_local_orphan_data,
+            commands::export::cmd_dump_table,
             commands::calendar::get_calendar_events,
             commands::calendar::upsert_calendar_event,
             commands::calendar::delete_calendar_event,
