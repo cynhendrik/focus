@@ -211,7 +211,8 @@ describe('migrateCompanySettings', () => {
     const n = await migrateCompanySettings({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(1)
     const row = upsertMock.mock.calls.at(-1)![0][0]
-    expect(row).toMatchObject({ id: 'C', workspace_id: 'C', created_by: 'U' })
+    expect(row).toMatchObject({ id: 'C', workspace_id: 'C' })
+    expect(row).not.toHaveProperty('created_by')
     expect(row.profile).toEqual({ name: 'X' })
     expect(row.modules).toEqual({})
     expect(row.crm_config).toEqual({})
@@ -244,7 +245,8 @@ describe('migratePipelineStages', () => {
     const n = await migratePipelineStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(1)
     const row = upsertMock.mock.calls.at(-1)![0][0]
-    expect(row).toMatchObject({ id: 'ps1', workspace_id: 'C', created_by: 'U', created_at: 'T1' })
+    expect(row).toMatchObject({ id: 'ps1', workspace_id: 'C', created_at: 'T1' })
+    expect(row).not.toHaveProperty('created_by')
     expect(row.is_won).toBe(0)
     expect(row.is_lost).toBe(0)
   })
@@ -282,7 +284,8 @@ describe('migrateLeadStages', () => {
     const n = await migrateLeadStages({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(1)
     const row = upsertMock.mock.calls.at(-1)![0][0]
-    expect(row).toMatchObject({ id: 'ls1', workspace_id: 'C', created_by: 'U', created_at: 'T3' })
+    expect(row).toMatchObject({ id: 'ls1', workspace_id: 'C', created_at: 'T3' })
+    expect(row).not.toHaveProperty('created_by')
     expect(row.is_qualified).toBe(0)
     expect(row.is_disqualified).toBe(0)
   })
@@ -442,6 +445,7 @@ describe('migratePayments', () => {
     const row = upsertMock.mock.calls.at(-1)![0][0]
     expect(row.id).toBe('p1')
     expect(row.workspace_id).toBe('C')
+    expect(row).not.toHaveProperty('created_by')
     expect(row.created_at).toBe('PT')
     expect(row.invoice_id).toBe('inv1')
     expect(row.amount).toBe(500)

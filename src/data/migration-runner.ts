@@ -40,8 +40,10 @@ function scope(
   row: Record<string, unknown>,
   ctx: MigrationCtx,
   createdAt?: string,
+  opts?: { withCreatedBy?: boolean },
 ): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...row, workspace_id: ctx.cloudWsId, created_by: ctx.uid }
+  const out: Record<string, unknown> = { ...row, workspace_id: ctx.cloudWsId }
+  if (opts?.withCreatedBy !== false) out.created_by = ctx.uid
   if (createdAt !== undefined) out.created_at = createdAt
   return out
 }
@@ -207,7 +209,6 @@ export async function migrateCompanySettings(ctx: MigrationCtx): Promise<number>
   await upsertRows('company_settings', [{
     id: ctx.cloudWsId,
     workspace_id: ctx.cloudWsId,
-    created_by: ctx.uid,
     profile: parseMaybe(cs.profile),
     modules: parseMaybe(cs.modules),
     crm_config: parseMaybe(cs.crmConfig),
@@ -226,7 +227,7 @@ export async function migrateCompanySettings(ctx: MigrationCtx): Promise<number>
  */
 export async function migratePipelineStages(ctx: MigrationCtx): Promise<number> {
   const stages = await invoke<any[]>('cmd_get_pipeline_stages', { workspaceId: ctx.localWsId })
-  const rows = stages.map(s => scope(pipelineStageToRow(s), ctx, s.createdAt))
+  const rows = stages.map(s => scope(pipelineStageToRow(s), ctx, s.createdAt, { withCreatedBy: false }))
   await upsertRows('pipeline_stages', rows)
   return rows.length
 }
@@ -241,7 +242,7 @@ export async function migratePipelineStages(ctx: MigrationCtx): Promise<number> 
  */
 export async function migrateLeadStages(ctx: MigrationCtx): Promise<number> {
   const stages = await invoke<any[]>('cmd_get_lead_stages', { workspaceId: ctx.localWsId })
-  const rows = stages.map(s => scope(leadStageToRow(s), ctx, s.createdAt))
+  const rows = stages.map(s => scope(leadStageToRow(s), ctx, s.createdAt, { withCreatedBy: false }))
   await upsertRows('lead_stages', rows)
   return rows.length
 }
@@ -320,7 +321,7 @@ export async function migrateInvoiceItems(ctx: MigrationCtx): Promise<number> {
 export async function migratePayments(ctx: MigrationCtx): Promise<number> {
   const now = new Date().toISOString()
   const pays = await invoke<any[]>('cmd_get_payments_by_workspace', { workspaceId: ctx.localWsId })
-  const rows = pays.map(p => scope(paymentPayloadToRow(p, { id: p.id, now }), ctx, p.createdAt))
+  const rows = pays.map(p => scope(paymentPayloadToRow(p, { id: p.id, now }), ctx, p.createdAt, { withCreatedBy: false }))
   await upsertRows('payments', rows)
   return rows.length
 }
