@@ -5,6 +5,11 @@ import { dealPayloadToRow } from './deals.mapper'
 import { pipelineStageToRow } from './pipeline-stages.mapper'
 import { leadStageToRow } from './lead-stages.mapper'
 import { eventPayloadToRow } from './calendar.mapper'
+import {
+  invoicePayloadToRow, invoiceItemPayloadToRow,
+  offerPayloadToRow, offerItemPayloadToRow,
+  paymentPayloadToRow,
+} from './finance.mapper'
 import type { Account } from '@/types/account.types'
 import type { Lead, UpsertLeadPayload } from '@/types/lead.types'
 import type { UpsertAccountPayload } from '@/types/account.types'
@@ -260,6 +265,136 @@ export async function migrateCalendar(ctx: MigrationCtx): Promise<number> {
   return rows.length
 }
 
+/**
+ * Migriert lokale Rechnungen (get_invoices, statusFilter:null) in die Cloud-Tabelle `invoices`.
+ * GoBD-kritisch: das ursprüngliche `number`-Feld wird explizit erhalten;
+ * kein `allocate_invoice_number`-RPC wird aufgerufen.
+ *
+ * Mapper-Signatur (finance.mapper.ts, verifiziert):
+ *   invoicePayloadToRow(p, ctx: { id: string; now: string }) → enthält already number: p.number ?? null
+ */
+export async function migrateInvoices(ctx: MigrationCtx): Promise<number> {
+  const now = new Date().toISOString()
+  const invoices = await invoke<any[]>('get_invoices', { workspaceId: ctx.localWsId, statusFilter: null })
+  const rows = invoices.map(inv => {
+    const row = scope(invoicePayloadToRow(inv, { id: inv.id, now }), ctx, inv.createdAt)
+    row.number = inv.number ?? null  // GoBD: Originalnummer explizit sichern (kein allocate)
+    return row
+  })
+  await upsertRows('invoices', rows)
+  return rows.length
+}
+
+/**
+ * Migriert Rechnungspositionen per Delete+Insert je Rechnung.
+ * Liest vollständige Rechnung via `get_invoice` (inkl. items).
+ * Kein workspace_id auf Items (FK-scoped über invoice_id).
+ *
+ * Mapper-Signatur (finance.mapper.ts, verifiziert):
+ *   invoiceItemPayloadToRow(it, ctx: { id: string; invoiceId: string })
+ */
+export async function migrateInvoiceItems(ctx: MigrationCtx): Promise<number> {
+  const invoices = await invoke<any[]>('get_invoices', { workspaceId: ctx.localWsId, statusFilter: null })
+  let total = 0
+  for (const inv of invoices) {
+    const full = await invoke<any>('get_invoice', { id: inv.id })
+    const items: any[] = full?.items ?? []
+    // Delete+Insert: idempotent, preserviert item-IDs
+    await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
+    if (items.length > 0) {
+      const rows = items.map(it => invoiceItemPayloadToRow(it, { id: it.id, invoiceId: inv.id }))
+      await upsertRows('invoice_items', rows)
+      total += rows.length
+    }
+  }
+  return total
+}
+
+/**
+ * Migriert lokale Zahlungen (cmd_get_payments_by_workspace) in die Cloud-Tabelle `payments`.
+ * Re-scoped auf cloudWsId via scope(). Preserviert created_at aus der Domain.
+ *
+ * Mapper-Signatur (finance.mapper.ts, verifiziert):
+ *   paymentPayloadToRow(p, ctx: { id: string; now: string })
+ */
+export async function migratePayments(ctx: MigrationCtx): Promise<number> {
+  const now = new Date().toISOString()
+  const pays = await invoke<any[]>('cmd_get_payments_by_workspace', { workspaceId: ctx.localWsId })
+  const rows = pays.map(p => scope(paymentPayloadToRow(p, { id: p.id, now }), ctx, p.createdAt))
+  await upsertRows('payments', rows)
+  return rows.length
+}
+
+/**
+ * Migriert lokale Angebote (get_offers) in die Cloud-Tabelle `offers`.
+ * GoBD-kritisch: `number` wird explizit ergänzt (offerPayloadToRow lässt es aus —
+ * normalerweise per allocate_offer_number RPC vergeben).
+ *
+ * Mapper-Signatur (finance.mapper.ts, verifiziert):
+ *   offerPayloadToRow(p, ctx: { id: string; now: string }) → kein `number` im Output
+ */
+export async function migrateOffers(ctx: MigrationCtx): Promise<number> {
+  const now = new Date().toISOString()
+  const offers = await invoke<any[]>('get_offers', { workspaceId: ctx.localWsId })
+  const rows = offers.map(o => {
+    const row = scope(offerPayloadToRow(o, { id: o.id, now }), ctx, o.createdAt)
+    row.number = o.number ?? null  // GoBD: Mapper lässt number weg → aus Domain ergänzen
+    return row
+  })
+  await upsertRows('offers', rows)
+  return rows.length
+}
+
+/**
+ * Migriert Angebotspositionen per Delete+Insert je Angebot.
+ * Liest vollständiges Angebot via `get_offer` (inkl. items).
+ *
+ * Mapper-Signatur (finance.mapper.ts, verifiziert):
+ *   offerItemPayloadToRow(it, ctx: { id: string; offerId: string })
+ */
+export async function migrateOfferItems(ctx: MigrationCtx): Promise<number> {
+  const offers = await invoke<any[]>('get_offers', { workspaceId: ctx.localWsId })
+  let total = 0
+  for (const o of offers) {
+    const full = await invoke<any>('get_offer', { id: o.id })
+    const items: any[] = full?.items ?? []
+    await supabase.from('offer_items').delete().eq('offer_id', o.id)
+    if (items.length > 0) {
+      const rows = items.map(it => offerItemPayloadToRow(it, { id: it.id, offerId: o.id }))
+      await upsertRows('offer_items', rows)
+      total += rows.length
+    }
+  }
+  return total
+}
+
+/**
+ * Setzt die Cloud-Nummernkreise auf MAX(number)+1 der migrierten Belege (lückenlose Fortführung).
+ * Wird vom Orchestrator NACH runMigration aufgerufen — NICHT in ENTITIES registriert.
+ *
+ * Verifikation: invoice_sequences(workspace_id PK, next_number) + offer_sequences(workspace_id PK, next_number)
+ * Annahme: allocate_invoice_number liest next_number als "nächste zu vergebende Nummer" (kein +1 intern).
+ * Regex: RE-YYYY-NNN → trailing NNN; ANG-YYYY-NNN → trailing NNN.
+ */
+export async function bumpSequences(ctx: MigrationCtx): Promise<void> {
+  const nextOf = (nums: (string | null | undefined)[]): number => {
+    const seqs = nums
+      .map(n => Number(String(n ?? '').match(/(\d+)\s*$/)?.[1] ?? 0))
+      .filter(n => Number.isFinite(n) && n > 0)
+    return (seqs.length > 0 ? Math.max(...seqs) : 0) + 1
+  }
+  const invoices = await invoke<any[]>('get_invoices', { workspaceId: ctx.localWsId, statusFilter: null })
+  const offers   = await invoke<any[]>('get_offers', { workspaceId: ctx.localWsId })
+  await supabase.from('invoice_sequences').upsert(
+    { workspace_id: ctx.cloudWsId, next_number: nextOf(invoices.map(i => i.number)) },
+    { onConflict: 'workspace_id' },
+  )
+  await supabase.from('offer_sequences').upsert(
+    { workspace_id: ctx.cloudWsId, next_number: nextOf(offers.map(o => o.number)) },
+    { onConflict: 'workspace_id' },
+  )
+}
+
 const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number> }> = [
   { name: 'company_settings', run: migrateCompanySettings },
   { name: 'pipeline_stages', run: migratePipelineStages },
@@ -269,6 +404,11 @@ const ENTITIES: Array<{ name: string; run: (ctx: MigrationCtx) => Promise<number
   { name: 'deals', run: migrateDeals },
   { name: 'activities', run: migrateActivities },
   { name: 'calendar_events', run: migrateCalendar },
+  { name: 'invoices', run: migrateInvoices },
+  { name: 'invoice_items', run: migrateInvoiceItems },
+  { name: 'payments', run: migratePayments },
+  { name: 'offers', run: migrateOffers },
+  { name: 'offer_items', run: migrateOfferItems },
 ]
 
 export async function runMigration(

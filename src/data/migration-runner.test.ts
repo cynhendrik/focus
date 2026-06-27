@@ -2,12 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 const upsertMock = vi.fn().mockResolvedValue({ error: null })
-vi.mock('@/lib/supabase', () => ({ supabase: { from: () => ({ upsert: upsertMock }) } }))
+const deleteEqMock = vi.fn().mockResolvedValue({ error: null })
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({
+      upsert: upsertMock,
+      delete: () => ({ eq: deleteEqMock }),
+    }),
+  },
+}))
 
 import { invoke } from '@tauri-apps/api/core'
-import { migrateAccounts, migrateContacts, migrateDeals, migrateActivities, migrateCompanySettings, migratePipelineStages, migrateLeadStages, migrateCalendar, runMigration } from './migration-runner'
+import {
+  migrateAccounts, migrateContacts, migrateDeals, migrateActivities,
+  migrateCompanySettings, migratePipelineStages, migrateLeadStages, migrateCalendar,
+  migrateInvoices, migrateInvoiceItems, migratePayments,
+  migrateOffers, migrateOfferItems, bumpSequences,
+  runMigration,
+} from './migration-runner'
 
-beforeEach(() => { upsertMock.mockClear(); vi.mocked(invoke).mockReset() })
+beforeEach(() => { upsertMock.mockClear(); deleteEqMock.mockClear(); vi.mocked(invoke).mockReset() })
 
 describe('migrateAccounts', () => {
   it('reads local clients+leads and upserts them re-scoped, preserving id/created_at', async () => {
@@ -341,5 +355,186 @@ describe('migrateCalendar', () => {
     const n = await migrateCalendar({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
     expect(n).toBe(0)
     expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateInvoices', () => {
+  it('preserves original number and does NOT call allocate RPC', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === 'get_invoices'
+        ? [{ id: 'i1', number: 'RE-2025-007', createdAt: 'T', workspaceId: 'L', createdBy: 'orig', accountId: 'a1', date: '2025-01-01', dueDate: '2025-02-01', status: 'paid', taxMode: 'standard', subtotal: 700, taxAmount: 133, total: 833 }]
+        : [],
+    )
+    const n = await migrateInvoices({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.number).toBe('RE-2025-007')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('T')
+    // allocate_invoice_number must NOT have been invoked
+    const invokedCmds = vi.mocked(invoke).mock.calls.map(c => c[0])
+    expect(invokedCmds).not.toContain('allocate_invoice_number')
+  })
+
+  it('returns 0 and skips upsert when workspace has no invoices', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === 'get_invoices' ? [] : [],
+    )
+    const n = await migrateInvoices({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+
+  it('passes statusFilter: null to get_invoices (all statuses)', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    await migrateInvoices({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('get_invoices', { workspaceId: 'L', statusFilter: null })
+  })
+})
+
+describe('migrateInvoiceItems', () => {
+  it('deletes then inserts items per invoice, preserving item id', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_invoices') return [{ id: 'inv1' }]
+      if (cmd === 'get_invoice' && args?.id === 'inv1')
+        return { items: [{ id: 'it1', invoiceId: 'inv1', title: 'Dev', quantity: 1, unitPrice: 100, taxRate: 0.19, total: 119, sortOrder: 0 }] }
+      return []
+    })
+    const n = await migrateInvoiceItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    expect(deleteEqMock).toHaveBeenCalledWith('invoice_id', 'inv1')
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('it1')
+    expect(row.invoice_id).toBe('inv1')
+  })
+
+  it('skips upsert but still deletes when invoice has no items', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_invoices') return [{ id: 'inv2' }]
+      if (cmd === 'get_invoice') return { items: [] }
+      return []
+    })
+    const n = await migrateInvoiceItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(deleteEqMock).toHaveBeenCalledWith('invoice_id', 'inv2')
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 0 and does nothing when workspace has no invoices', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    const n = await migrateInvoiceItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(deleteEqMock).not.toHaveBeenCalled()
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migratePayments', () => {
+  it('reads payments by workspace and upserts re-scoped, preserving created_at', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'cmd_get_payments_by_workspace')
+        return [{ id: 'p1', workspaceId: 'L', invoiceId: 'inv1', amount: 500, paidAt: '2025-06-01', createdAt: 'PT' }]
+      return []
+    })
+    const n = await migratePayments({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('p1')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_at).toBe('PT')
+    expect(row.invoice_id).toBe('inv1')
+    expect(row.amount).toBe(500)
+  })
+
+  it('returns 0 and skips upsert when no payments', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    const n = await migratePayments({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateOffers', () => {
+  it('preserves original number (mapper omits it) and does NOT call allocate RPC', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) =>
+      cmd === 'get_offers'
+        ? [{ id: 'o1', number: 'ANG-2025-003', createdAt: 'OT', workspaceId: 'L', createdBy: 'orig', accountId: 'a1', title: 'Angebot', status: 'draft', validUntil: '2025-12-31', taxMode: 'standard', subtotal: 300, taxAmount: 57, total: 357 }]
+        : [],
+    )
+    const n = await migrateOffers({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.number).toBe('ANG-2025-003')
+    expect(row.workspace_id).toBe('C')
+    expect(row.created_by).toBe('U')
+    expect(row.created_at).toBe('OT')
+    const invokedCmds = vi.mocked(invoke).mock.calls.map(c => c[0])
+    expect(invokedCmds).not.toContain('allocate_offer_number')
+  })
+
+  it('returns 0 and skips upsert when workspace has no offers', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    const n = await migrateOffers({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('migrateOfferItems', () => {
+  it('deletes then inserts items per offer, preserving item id and offer_id', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args: any) => {
+      if (cmd === 'get_offers') return [{ id: 'off1' }]
+      if (cmd === 'get_offer' && args?.id === 'off1')
+        return { items: [{ id: 'oi1', offerId: 'off1', title: 'Pos 1', quantity: 2, unitPrice: 50, taxRate: 0.19, total: 119, sortOrder: 0 }] }
+      return []
+    })
+    const n = await migrateOfferItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(1)
+    expect(deleteEqMock).toHaveBeenCalledWith('offer_id', 'off1')
+    const row = upsertMock.mock.calls.at(-1)![0][0]
+    expect(row.id).toBe('oi1')
+    expect(row.offer_id).toBe('off1')
+  })
+
+  it('returns 0 and does nothing when workspace has no offers', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    const n = await migrateOfferItems({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    expect(n).toBe(0)
+    expect(deleteEqMock).not.toHaveBeenCalled()
+    expect(upsertMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('bumpSequences', () => {
+  it('sets invoice next_number to MAX(RE-number)+1 and offer next_number to MAX(ANG-number)+1', async () => {
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_invoices')
+        return [
+          { id: 'i1', number: 'RE-2025-007' },
+          { id: 'i2', number: 'RE-2024-003' },
+        ]
+      if (cmd === 'get_offers')
+        return [{ id: 'o1', number: 'ANG-2025-003' }]
+      return []
+    })
+    await bumpSequences({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    // First upsert = invoice_sequences, second = offer_sequences
+    expect(upsertMock.mock.calls).toHaveLength(2)
+    const invSeq = upsertMock.mock.calls[0][0]
+    expect(invSeq.workspace_id).toBe('C')
+    expect(invSeq.next_number).toBe(8) // MAX(7, 3) + 1
+    const offSeq = upsertMock.mock.calls[1][0]
+    expect(offSeq.workspace_id).toBe('C')
+    expect(offSeq.next_number).toBe(4) // MAX(3) + 1
+  })
+
+  it('sets next_number to 1 when there are no invoices/offers (empty workspace)', async () => {
+    vi.mocked(invoke).mockResolvedValue([])
+    await bumpSequences({ localWsId: 'L', cloudWsId: 'C', uid: 'U' })
+    const invSeq = upsertMock.mock.calls[0][0]
+    expect(invSeq.next_number).toBe(1) // 0 + 1
+    const offSeq = upsertMock.mock.calls[1][0]
+    expect(offSeq.next_number).toBe(1)
   })
 })
