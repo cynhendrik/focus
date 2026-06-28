@@ -1,13 +1,14 @@
 import { useUiStore } from '@/store/ui.store'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
 
-/**
- * Öffnet die Team-Chat-Kachel (Team-Kanal). Mit `messageId` springt die
- * MessageList nach dem Öffnen zu dieser Nachricht (Inbox-/Glocken-Sprung).
- * Gemeinsamer Eingang für Glocke, Inbox-Route und künftige Sprünge.
- */
-export function openChat(messageId?: string | null): void {
+interface OpenChatOpts { messageId?: string | null; conversationId?: string | null; peerId?: string | null }
+
+/** Öffnet die Chat-Kachel. Mit conversationId+peerId direkt im DM, sonst im Team.
+ *  messageId → MessageList scrollt nach dem Öffnen dorthin. */
+export function openChat(opts: OpenChatOpts = {}): void {
+  const { messageId, conversationId, peerId } = opts
   if (messageId) useUiStore.getState().setPendingScrollMessageId(messageId)
-  useChatOverlayStore.getState().select('team')
+  if (conversationId && peerId) useChatOverlayStore.getState().select({ conversationId, peerId })
+  else useChatOverlayStore.getState().select('team')
   useChatOverlayStore.getState().openPanel()
 }

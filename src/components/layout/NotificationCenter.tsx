@@ -47,7 +47,7 @@ export function NotificationCenter() {
     void markRead(n.id)
     setOpen(false)
     if (n.refType === 'task') { openTask(n.refId); return }
-    openChat(n.messageId ?? null)
+    openChat({ messageId: n.messageId, conversationId: n.conversationId, peerId: n.actorId })
   }
 
   return (

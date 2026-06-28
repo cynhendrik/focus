@@ -32,8 +32,8 @@ export function InboxRoute() {
   const jump = (n: Notification) => {
     void markRead(n.id)
     if (n.refType === 'task') { openTask(n.refId); return }
-    // ref_type === 'message' → Chat-Kachel öffnen + zur Nachricht scrollen.
-    openChat(n.messageId ?? null)
+    // ref_type === 'message' → Chat-Kachel öffnen + zur Nachricht scrollen (DM oder Team).
+    openChat({ messageId: n.messageId, conversationId: n.conversationId, peerId: n.actorId })
   }
 
   const totalUnread = unread.length

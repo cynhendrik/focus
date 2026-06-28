@@ -9,20 +9,19 @@ beforeEach(() => {
 })
 
 describe('openChat', () => {
-  it('öffnet das Overlay und wählt Team', () => {
+  it('ohne Argumente: Team öffnen', () => {
     openChat()
     expect(useChatOverlayStore.getState().open).toBe(true)
     expect(useChatOverlayStore.getState().selected).toBe('team')
   })
-
-  it('merkt sich die Nachricht für den Scroll-Sprung', () => {
-    openChat('m-42')
+  it('mit messageId: Scroll-Merker setzen', () => {
+    openChat({ messageId: 'm-42' })
     expect(useUiStore.getState().pendingScrollMessageId).toBe('m-42')
-    expect(useChatOverlayStore.getState().open).toBe(true)
   })
-
-  it('ohne messageId bleibt der Scroll-Merker unverändert (null)', () => {
-    openChat()
-    expect(useUiStore.getState().pendingScrollMessageId).toBeNull()
+  it('mit conversationId+peerId: DM auswählen + öffnen', () => {
+    openChat({ messageId: 'm1', conversationId: 'c1', peerId: 'p1' })
+    expect(useChatOverlayStore.getState().selected).toEqual({ conversationId: 'c1', peerId: 'p1' })
+    expect(useUiStore.getState().pendingScrollMessageId).toBe('m1')
+    expect(useChatOverlayStore.getState().open).toBe(true)
   })
 })
