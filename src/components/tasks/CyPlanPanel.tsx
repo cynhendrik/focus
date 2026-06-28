@@ -99,15 +99,6 @@ export function CyPlanPanel({ open, onClose, customerId }: Props) {
               </div>
             ))}
 
-            <button style={{
-              marginTop: 'auto',
-              padding: '12px 18px', borderRadius: 99,
-              background: 'var(--accent)', color: 'var(--accent-ink)',
-              fontSize: 13, fontWeight: 700,
-              opacity: 0.5, cursor: 'not-allowed',
-            }} title="Demnächst">
-              Plan übernehmen
-            </button>
           </motion.div>
         </>
       )}

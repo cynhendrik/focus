@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mail, Video, Webhook, CalendarDays, Landmark, ShoppingBag } from 'lucide-react'
+import { Mail, Video, Webhook } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { IntegrationRow } from '@/components/integrations/IntegrationRow'
 import { ZoomSetupModal } from '@/components/integrations/ZoomSetupModal'
@@ -63,33 +63,6 @@ export function IntegrationsRoute() {
             actionLabel="URL anzeigen"
           />
 
-          <IntegrationRow
-            icon={CalendarDays}
-            name="Google Calendar / Outlook"
-            category="Kalender-Sync"
-            description="Synchronisiere Termine bidirektional mit deinem Google Calendar oder Outlook. Cultera-Termine erscheinen in deinem Kalender und umgekehrt."
-            status="coming_soon"
-          />
-
-          <div style={{ margin: '8px 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            In Entwicklung
-          </div>
-
-          <IntegrationRow
-            icon={Landmark}
-            name="Bank"
-            category="Finanzsystem"
-            description="Verknüpfe dein Geschäftskonto für automatischen Zahlungsabgleich mit deinen Rechnungen in Cultera."
-            status="coming_soon"
-          />
-
-          <IntegrationRow
-            icon={ShoppingBag}
-            name="Shopify"
-            category="E-Commerce"
-            description="Verbinde deinen Shopify-Shop. Bestellungen und Umsatzdaten fließen automatisch in das Finanzsystem."
-            status="coming_soon"
-          />
 
         </div>
       </div>

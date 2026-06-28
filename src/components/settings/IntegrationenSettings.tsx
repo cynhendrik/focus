@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMailStore } from '@/store/mail.store'
 import { useUiStore } from '@/store/ui.store'
-import { Mail, Video, Webhook, CalendarDays, Landmark, ShoppingBag } from 'lucide-react'
+import { Mail, Video } from 'lucide-react'
 import { IntegrationRow } from '@/components/integrations/IntegrationRow'
 import { ZoomSetupModal } from '@/components/integrations/ZoomSetupModal'
 import { SettingsPage, SettingsSection } from './ui'
@@ -40,39 +40,6 @@ export function IntegrationenSettings() {
           actionLabel="Einrichten →"
         />
 
-        <IntegrationRow
-          icon={Webhook}
-          name="Webhook"
-          category="Lead-Eingang"
-          description="Nicht in der Testversion verfügbar — kommt mit der offiziellen Veröffentlichung."
-          status="coming_soon"
-        />
-
-        <IntegrationRow
-          icon={CalendarDays}
-          name="Google Calendar / Outlook"
-          category="Kalender-Sync"
-          description="Synchronisiere Termine bidirektional mit deinem externen Kalender."
-          status="coming_soon"
-        />
-      </SettingsSection>
-
-      <SettingsSection label="In Entwicklung">
-        <IntegrationRow
-          icon={Landmark}
-          name="Bank"
-          category="Finanzsystem"
-          description="Verknüpfe dein Geschäftskonto für automatischen Zahlungsabgleich."
-          status="coming_soon"
-        />
-
-        <IntegrationRow
-          icon={ShoppingBag}
-          name="Shopify"
-          category="E-Commerce"
-          description="Verbinde deinen Shopify-Shop mit dem Finanzsystem."
-          status="coming_soon"
-        />
       </SettingsSection>
 
       {showZoom && <ZoomSetupModal onClose={() => setShowZoom(false)} />}

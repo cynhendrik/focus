@@ -442,7 +442,7 @@ export function DateienPane({ customerId }: Props) {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [sidebarTab,  setSidebarTab]  = useState<'ordner' | 'tags'>('ordner')
+  const [sidebarTab] = useState<'ordner'>('ordner')
   const [search,      setSearch]      = useState('')
   const [creating,    setCreating]    = useState(false)
   const [delTarget,   setDelTarget]   = useState<FolderType | null>(null)
@@ -671,54 +671,36 @@ export function DateienPane({ customerId }: Props) {
           </div>
         </div>
 
-        {/* Ordner / Tags toggle */}
-        <div style={{ display: 'flex', padding: '6px 10px', gap: 4, borderBottom: '1px solid var(--border)' }}>
-          {(['ordner', 'tags'] as const).map(t => (
-            <button key={t} onClick={() => setSidebarTab(t)}
-              style={{ flex: 1, padding: '5px 0', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, background: sidebarTab === t ? 'var(--surface-2)' : 'transparent', color: sidebarTab === t ? 'var(--fg)' : 'var(--fg-muted)', transition: 'background 80ms, color 80ms' }}
-            >
-              {t === 'ordner' ? 'Ordner' : 'Tags'}
-            </button>
-          ))}
-        </div>
 
         {/* tree */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
-          {sidebarTab === 'ordner' ? (
-            <>
-              <div
-                onClick={() => navigate(null)}
-                onMouseEnter={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'var(--surface-2)' }}
-                onMouseLeave={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'transparent' }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1, background: activeFolderId === null ? 'var(--nav-active-bg)' : 'transparent', transition: 'background 80ms' }}
-              >
-                <span style={{ width: 16, flexShrink: 0 }} />
-                <span style={{ display: 'flex', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)', flexShrink: 0 }}>
-                  {activeFolderId === null ? <FolderOpen size={13} /> : <Folder size={13} />}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400, color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg)' }}>
-                  Alle Dateien
-                </span>
-                {rootFolders.length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 500, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, padding: '0 4px', background: activeFolderId === null ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-2)', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)' }}>
-                    {rootFolders.length}
-                  </span>
-                )}
-              </div>
+          <div
+            onClick={() => navigate(null)}
+            onMouseEnter={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'var(--surface-2)' }}
+            onMouseLeave={e => { if (activeFolderId !== null) e.currentTarget.style.background = 'transparent' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', marginBottom: 1, background: activeFolderId === null ? 'var(--nav-active-bg)' : 'transparent', transition: 'background 80ms' }}
+          >
+            <span style={{ width: 16, flexShrink: 0 }} />
+            <span style={{ display: 'flex', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)', flexShrink: 0 }}>
+              {activeFolderId === null ? <FolderOpen size={13} /> : <Folder size={13} />}
+            </span>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: activeFolderId === null ? 600 : 400, color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg)' }}>
+              Alle Dateien
+            </span>
+            {rootFolders.length > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 500, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, padding: '0 4px', background: activeFolderId === null ? 'color-mix(in srgb, var(--accent) 18%, transparent)' : 'var(--surface-2)', color: activeFolderId === null ? 'var(--accent-text)' : 'var(--fg-muted)' }}>
+                {rootFolders.length}
+              </span>
+            )}
+          </div>
 
-              {sidebarFolders.map(f => (
-                <SidebarNode key={f.id} folder={f} all={folders} depth={0} activeId={activeFolderId} onSelect={navigate} />
-              ))}
+          {sidebarFolders.map(f => (
+            <SidebarNode key={f.id} folder={f} all={folders} depth={0} activeId={activeFolderId} onSelect={navigate} />
+          ))}
 
-              {rootFolders.length === 0 && !creating && (
-                <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
-                  Noch keine Ordner.<br />Klicke <strong>+</strong> um einen zu erstellen.
-                </div>
-              )}
-            </>
-          ) : (
+          {rootFolders.length === 0 && !creating && (
             <div style={{ padding: '20px 8px', textAlign: 'center', fontSize: 12, color: 'var(--fg-muted)', lineHeight: 1.6 }}>
-              Tags-Funktion<br />kommt bald
+              Noch keine Ordner.<br />Klicke <strong>+</strong> um einen zu erstellen.
             </div>
           )}
         </div>
