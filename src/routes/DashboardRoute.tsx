@@ -346,7 +346,7 @@ function WorkspaceView() {
           background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 24px',
           color: 'var(--fg-muted)', fontSize: 13,
         }}>
-          Noch nichts zu tun — leg deinen ersten Kunden an.
+          Noch nichts in deiner Queue — du bist auf dem neuesten Stand.
         </div>
       )}
       {!queueLoading && currentItem && (

@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 
+let mockSetAppView: ReturnType<typeof vi.fn>
+
 vi.mock('@/store/ui.store', () => ({
-  useUiStore: (sel: (s: { setAppView: (v: string) => void }) => unknown) =>
-    sel({ setAppView: vi.fn() }),
+  useUiStore: (sel: (s: { setAppView: (v: string) => void }) => unknown) => {
+    mockSetAppView = vi.fn()
+    return sel({ setAppView: mockSetAppView })
+  },
 }))
 
 import { DashboardEmptyState } from './DashboardEmptyState'
@@ -24,5 +28,11 @@ describe('DashboardEmptyState', () => {
     render(<DashboardEmptyState />)
     fireEvent.click(screen.getByText('Tour wiederholen'))
     expect(useTourStore.getState().active).toBe(true)
+  })
+
+  it('Ersten-Kunden-anlegen-Klick setzt AppView auf clients', () => {
+    render(<DashboardEmptyState />)
+    fireEvent.click(screen.getByText('Ersten Kunden anlegen'))
+    expect(mockSetAppView).toHaveBeenCalledWith('clients')
   })
 })
