@@ -81,6 +81,7 @@ export function NavSidebar() {
 
   const chatOpen    = useChatOverlayStore(s => s.open)
   const openChatNav = useChatOverlayStore(s => s.openPanel)
+  const selectChat  = useChatOverlayStore(s => s.select)
 
   const chatTotal = useMessagesStore(s => totalUnread(s.unreadTeam, s.conversations))
 
@@ -150,7 +151,7 @@ export function NavSidebar() {
       {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
       <NavItem icon={MessagesSquare} label="Team" active={chatOpen}
-        onClick={() => openChatNav()} badge={chatTotal || undefined} />
+        onClick={() => { selectChat('team'); openChatNav() }} badge={chatTotal || undefined} />
 
       <div className="nav-spacer" />
       <div className="nav-foot-divider" />
