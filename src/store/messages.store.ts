@@ -25,7 +25,7 @@ export const useMessagesStore = create<MessagesState>()((set, get) => ({
   loadRecent: async (workspaceId) => {
     set({ loading: true })
     try {
-      const msgs = await MessagesGateway.listRecent(workspaceId, PAGE)
+      const msgs = await MessagesGateway.listRecent(workspaceId, null, PAGE)
       set({ messages: msgs, loading: false, hasMore: msgs.length === PAGE })
     } catch (err) {
       log.error('Failed to load messages', { err })
@@ -40,7 +40,7 @@ export const useMessagesStore = create<MessagesState>()((set, get) => ({
     const oldest = messages[0].createdAt
     set({ loadingMore: true })
     try {
-      const older = await MessagesGateway.listBefore(workspaceId, oldest, PAGE)
+      const older = await MessagesGateway.listBefore(workspaceId, oldest, null, PAGE)
       set(s => {
         const existing = new Set(s.messages.map(m => m.id))
         const fresh = older.filter(m => !existing.has(m.id))
