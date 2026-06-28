@@ -41,7 +41,6 @@ const CalendarRoute      = lazy(() => named(import('@/routes/CalendarRoute'), 'C
 const JournalRoute       = lazy(() => named(import('@/routes/JournalRoute'), 'JournalRoute'))
 const CorraRoute         = lazy(() => named(import('@/routes/CorraRoute'), 'CorraRoute'))
 const NotesRoute         = lazy(() => named(import('@/routes/NotesRoute'), 'NotesRoute'))
-const InboxRoute         = lazy(() => named(import('@/routes/InboxRoute'), 'InboxRoute'))
 const AkquiseRoute       = lazy(() => named(import('@/routes/AkquiseRoute'), 'AkquiseRoute'))
 const PosteingangRoute   = lazy(() => named(import('@/routes/PosteingangRoute'), 'PosteingangRoute'))
 const ZeitmanagementRoute = lazy(() => named(import('@/routes/ZeitmanagementRoute'), 'ZeitmanagementRoute'))
@@ -253,7 +252,6 @@ export default function App() {
       case 'followups':       return <AkquiseRoute />
       case 'mail':            return <PosteingangRoute />
       case 'sales':           return <AkquiseRoute />
-      case 'inbox':           return <InboxRoute />
       default:             return <DashboardRoute />
     }
   }

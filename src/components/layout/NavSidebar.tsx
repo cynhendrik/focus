@@ -1,8 +1,6 @@
 import { useUiStore } from '@/store/ui.store'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useAuthStore } from '@/store/auth.store'
-import { useNotificationsStore } from '@/store/notifications.store'
-import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
 import { useMessagesStore } from '@/store/messages.store'
 import { totalUnread } from '@/lib/chat/total-unread'
 import { useCapability } from '@/hooks/useCapability'
@@ -84,7 +82,6 @@ export function NavSidebar() {
   const chatOpen    = useChatOverlayStore(s => s.open)
   const openChatNav = useChatOverlayStore(s => s.openPanel)
 
-  const loudInbox = useNotificationsStore(s => loudUnreadCount(s.notifications))
   const chatTotal = useMessagesStore(s => totalUnread(s.unreadTeam, s.conversations))
 
   const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
@@ -135,9 +132,6 @@ export function NavSidebar() {
         onClick={() => setAppView('clients')} kbd="C" />}
       {mod('finanzen') && canFinances && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
-      <NavItem icon={Inbox} label="Inbox" active={appView === 'inbox'}
-        onClick={() => setAppView('inbox')} badge={loudInbox || undefined} badgeAccent />
-
       {/* ── AKQUISE — Leads → Deals, der Weg zum Neukunden ─────────────── */}
       {!collapsed && <SectionLabel>Akquise</SectionLabel>}
       <NavItem icon={Inbox}      label="Follow-Ups" active={appView === 'leverage_inbox'}

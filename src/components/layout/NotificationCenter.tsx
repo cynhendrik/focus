@@ -3,7 +3,7 @@ import { Bell } from 'lucide-react'
 import { useNotificationsStore } from '@/store/notifications.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useMembersStore } from '@/store/members.store'
-import { useUiStore } from '@/store/ui.store'
+import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useOpenTask } from '@/lib/chat/useOpenTask'
 import { openChat } from '@/lib/open-chat'
 import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
@@ -27,7 +27,6 @@ export function NotificationCenter() {
   const markRead      = useNotificationsStore(s => s.markRead)
   const myId          = useAuthStore(s => s.user?.id)
   const nameOf        = useMembersStore(s => s.nameOf)
-  const setAppView = useUiStore(s => s.setAppView)
   const openTask = useOpenTask()
 
   useEffect(() => { if (myId) void load(myId) }, [myId, load])
@@ -102,7 +101,7 @@ export function NotificationCenter() {
                 </button>
               ))}
               <button
-                onClick={() => { setAppView('inbox'); setOpen(false) }}
+                onClick={() => { useChatOverlayStore.getState().select('inbox'); useChatOverlayStore.getState().openPanel(); setOpen(false) }}
                 style={{ width: '100%', textAlign: 'center', padding: '8px', marginTop: 4, fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}
               >
                 Alle ansehen →
