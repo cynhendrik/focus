@@ -41,10 +41,9 @@ export const ConversationsGateway = {
         .upsert({ user_id: userId, workspace_id: workspaceId, team_last_read_at: now }, { onConflict: 'user_id,workspace_id' })
       if (error) fail(error)
     } else {
-      const userId = useAuthStore.getState().user?.id
-      if (!userId) return
-      const { error } = await supabase.from('conversation_participants')
-        .update({ last_read_at: now }).eq('conversation_id', key).eq('user_id', userId)
+      // DM/Gruppe: über DEFINER-RPC (kein direkter Client-UPDATE auf
+      // conversation_participants → keine conversation_id-Umbiege-Lücke).
+      const { error } = await supabase.rpc('mark_conversation_read', { p_conversation: key })
       if (error) fail(error)
     }
   },
