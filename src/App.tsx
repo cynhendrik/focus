@@ -77,6 +77,7 @@ import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { useVertraege } from '@/store/vertraege.store'
 import { useMembersStore } from '@/store/members.store'
+import { useTourStore } from '@/store/tour.store'
 
 export default function App() {
   const initAuth        = useAuthStore(s => s.init)
@@ -163,6 +164,7 @@ export default function App() {
   }, [user, loadWorkspaces])
 
   useEffect(() => {
+    if (useTourStore.getState().active) return
     if (!activeWorkspaceId) return
 
     // Welle 1 — alles, was die Dashboard-Route beim ersten Paint zeigt.
