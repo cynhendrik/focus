@@ -3,6 +3,7 @@ import { X, Maximize2 } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
 import { useMessagesStore } from '@/store/messages.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { openChat } from '@/lib/open-chat'
 import { MessageList } from './MessageList'
 import { ChatComposer } from './ChatComposer'
 
@@ -10,7 +11,6 @@ import { ChatComposer } from './ChatComposer'
 export function ChatDrawer() {
   const open       = useUiStore(s => s.chatDrawerOpen)
   const setOpen    = useUiStore(s => s.setChatDrawerOpen)
-  const setAppView = useUiStore(s => s.setAppView)
   const loadRecent = useMessagesStore(s => s.loadRecent)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
@@ -30,7 +30,7 @@ export function ChatDrawer() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)' }}>Team-Chat</span>
         <div style={{ display: 'flex', gap: 2 }}>
-          <button className="icon-btn" title="Vollansicht" onClick={() => { setAppView('team'); setOpen(false) }}>
+          <button className="icon-btn" title="Vollansicht" onClick={() => { openChat(); setOpen(false) }}>
             <Maximize2 size={15} />
           </button>
           <button className="icon-btn" title="Schließen" onClick={() => setOpen(false)}>
