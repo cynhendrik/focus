@@ -55,7 +55,7 @@ export const useMessagesStore = create<MessagesState>()((set, get) => ({
     const t = get().threads[key]
     if (!t || !t.hasMore || t.messages.length === 0 || t.loadingMore) return
     const oldest = t.messages[0].createdAt
-    set(s => ({ threads: { ...s.threads, [key]: { ...t, loadingMore: true } } }))
+    set(s => ({ threads: { ...s.threads, [key]: { ...(s.threads[key] ?? emptyThread()), loadingMore: true } } }))
     try {
       const conversationId = key === TEAM_KEY ? null : key
       const older = await MessagesGateway.listBefore(workspaceId, oldest, conversationId, PAGE)

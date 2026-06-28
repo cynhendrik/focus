@@ -79,4 +79,26 @@ describe('useMessagesStore threads', () => {
     expect(useMessagesStore.getState().unreadTeam).toBe(4)
     expect(useMessagesStore.getState().conversations[0].conversationId).toBe('c1')
   })
+
+  it('loadMore prepends older messages and calls listBefore with oldest createdAt', async () => {
+    const oldestMsg = msg('a')
+    useMessagesStore.setState({ threads: { [TEAM_KEY]: { messages: [oldestMsg], hasMore: true, loading: false, loadingMore: false } } })
+    ;(MessagesGateway.listBefore as any).mockResolvedValue([msg('b')])
+    await useMessagesStore.getState().loadMore('ws1', TEAM_KEY)
+    expect(useMessagesStore.getState().threads[TEAM_KEY].messages.map(m => m.id)).toEqual(['b', 'a'])
+    expect(MessagesGateway.listBefore).toHaveBeenCalledWith('ws1', oldestMsg.createdAt, null, expect.any(Number))
+  })
+
+  it('loadMore dedupes messages already present in the thread', async () => {
+    useMessagesStore.setState({ threads: { [TEAM_KEY]: { messages: [msg('a')], hasMore: true, loading: false, loadingMore: false } } })
+    ;(MessagesGateway.listBefore as any).mockResolvedValue([msg('a')])
+    await useMessagesStore.getState().loadMore('ws1', TEAM_KEY)
+    expect(useMessagesStore.getState().threads[TEAM_KEY].messages.map(m => m.id)).toEqual(['a'])
+  })
+
+  it('appendRealtime dedupes: calling twice with the same id yields length 1', () => {
+    useMessagesStore.getState().appendRealtime(msg('x', { conversationId: null }))
+    useMessagesStore.getState().appendRealtime(msg('x', { conversationId: null }))
+    expect(useMessagesStore.getState().threads[TEAM_KEY].messages).toHaveLength(1)
+  })
 })
