@@ -1,5 +1,7 @@
 import { useUiStore } from '@/store/ui.store'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
+import { useMessagesStore } from '@/store/messages.store'
+import { totalUnread } from '@/lib/chat/total-unread'
 import { NotificationCenter } from './NotificationCenter'
 import {
   Sun, Sunrise, Users, CreditCard, Target,
@@ -30,6 +32,7 @@ export function Topbar() {
   const setZeitPanel   = useUiStore(s => s.setZeitPanelOpen)
   const chatOpen   = useChatOverlayStore(s => s.open)
   const toggleChat = useChatOverlayStore(s => s.toggle)
+  const total      = useMessagesStore(s => totalUnread(s.unreadTeam, s.conversations))
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
   const { label, tag } = meta
@@ -70,9 +73,16 @@ export function Topbar() {
           className="icon-btn"
           onClick={toggleChat}
           title="Team-Chat"
-          style={{ color: chatOpen ? 'var(--accent)' : undefined }}
+          style={{ position: 'relative', color: chatOpen ? 'var(--accent)' : undefined }}
         >
           <MessagesSquare size={16} />
+          {total > 0 && (
+            <span style={{
+              position: 'absolute', top: -2, right: -2, minWidth: 14, height: 14, padding: '0 3px',
+              borderRadius: 99, background: 'var(--accent)', color: 'var(--accent-ink)',
+              fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>{total > 99 ? '99+' : total}</span>
+          )}
         </button>
         <NotificationCenter />
       </div>
