@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useMessagesStore } from '@/store/messages.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { TEAM_KEY } from '@/lib/chat/threads'
 import { ChatSidebar } from './ChatSidebar'
 import { MessageList } from './MessageList'
 import { ChatComposer } from './ChatComposer'
@@ -33,13 +34,17 @@ export function TeamChatOverlay() {
 }
 
 function Panel({ onClose }: { onClose: () => void }) {
-  const loadRecent = useMessagesStore(s => s.loadRecent)
+  const loadOverview = useMessagesStore(s => s.loadOverview)
+  const loadThread   = useMessagesStore(s => s.loadThread)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
 
   useEffect(() => {
-    if (activeWorkspaceId && isShared) void loadRecent(activeWorkspaceId)
-  }, [activeWorkspaceId, isShared, loadRecent])
+    if (activeWorkspaceId && isShared) {
+      void loadOverview(activeWorkspaceId)
+      void loadThread(activeWorkspaceId, TEAM_KEY)
+    }
+  }, [activeWorkspaceId, isShared, loadOverview, loadThread])
 
   return createPortal(
     <>

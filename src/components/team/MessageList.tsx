@@ -5,6 +5,7 @@ import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useGlobalComposerStore } from '@/store/global-composer.store'
+import { TEAM_KEY } from '@/lib/chat/threads'
 import { SystemMessageCard } from './SystemMessageCard'
 import { TaskRefChip } from './TaskRefChip'
 import type { Message } from '@/types/message.types'
@@ -15,9 +16,9 @@ function timeOf(iso: string): string {
 }
 
 export function MessageList({ compact = false }: { compact?: boolean }) {
-  const messages  = useMessagesStore(s => s.messages)
-  const hasMore   = useMessagesStore(s => s.hasMore)
-  const loadMore  = useMessagesStore(s => s.loadMore)
+  const t         = useMessagesStore(s => s.threads[TEAM_KEY])
+  const messages  = t?.messages ?? []
+  const hasMore   = t?.hasMore ?? false
   const nameOf    = useMembersStore(s => s.nameOf)
   const myId      = useAuthStore(s => s.user?.id)
   const pendingScroll = useUiStore(s => s.pendingScrollMessageId)
@@ -60,7 +61,7 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
     const el = scrollRef.current
     if (el && el.scrollTop < 40 && hasMore) {
       const wsId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-      if (wsId) void loadMore(wsId)
+      if (wsId) void useMessagesStore.getState().loadMore(wsId, TEAM_KEY)
     }
   }
 

@@ -20,7 +20,7 @@ import { TeamChatOverlay } from './TeamChatOverlay'
 
 beforeEach(() => {
   useChatOverlayStore.setState({ open: false, selected: 'team' })
-  useMessagesStore.setState({ loadRecent: vi.fn() } as any)
+  useMessagesStore.setState({ loadOverview: vi.fn(), loadThread: vi.fn() } as any)
   useWorkspaceStore.setState({ isActiveWorkspaceShared: () => true, activeWorkspaceId: 'ws1' } as any)
 })
 afterEach(cleanup)
