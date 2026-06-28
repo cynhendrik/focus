@@ -73,6 +73,7 @@ import { SplashScreen } from '@/components/ui/SplashScreen'
 import { HelpDrawer } from '@/components/help/HelpDrawer'
 import { TeamChatOverlay } from '@/components/team/TeamChatOverlay'
 import { TourGuide } from '@/components/tour/TourGuide'
+import { TourOfferCard } from '@/components/tour/TourOfferCard'
 import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
@@ -305,6 +306,7 @@ export default function App() {
       <NamePrompt />
       <OnboardingCard />
       <CompanyStep />
+      <TourOfferCard />
       {showWelcome && <WelcomeIntro onDone={markWelcomeSeen} />}
       {splashOverlay}
     </AppShell>
