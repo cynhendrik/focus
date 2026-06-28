@@ -41,7 +41,6 @@ const CalendarRoute      = lazy(() => named(import('@/routes/CalendarRoute'), 'C
 const JournalRoute       = lazy(() => named(import('@/routes/JournalRoute'), 'JournalRoute'))
 const CorraRoute         = lazy(() => named(import('@/routes/CorraRoute'), 'CorraRoute'))
 const NotesRoute         = lazy(() => named(import('@/routes/NotesRoute'), 'NotesRoute'))
-const TeamChatRoute      = lazy(() => named(import('@/routes/TeamChatRoute'), 'TeamChatRoute'))
 const InboxRoute         = lazy(() => named(import('@/routes/InboxRoute'), 'InboxRoute'))
 const AkquiseRoute       = lazy(() => named(import('@/routes/AkquiseRoute'), 'AkquiseRoute'))
 const PosteingangRoute   = lazy(() => named(import('@/routes/PosteingangRoute'), 'PosteingangRoute'))
@@ -73,7 +72,6 @@ import { OnboardingCard } from '@/components/onboarding/OnboardingCard'
 import { CompanyStep } from '@/components/onboarding/CompanyStep'
 import { SplashScreen } from '@/components/ui/SplashScreen'
 import { HelpDrawer } from '@/components/help/HelpDrawer'
-import { ChatDrawer } from '@/components/team/ChatDrawer'
 import { TeamChatOverlay } from '@/components/team/TeamChatOverlay'
 import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
@@ -241,7 +239,6 @@ export default function App() {
       case 'integrations': return <IntegrationsRoute />
       case 'corra':           return <CorraRoute />
       case 'notes':           return <NotesRoute />
-      case 'team':            return <TeamChatRoute />
       case 'zeitmanagement':  return <ZeitmanagementRoute />
       case 'calendar':        return <CalendarRoute />
       // Akquise / Sales (vormals LEVERAGE — jetzt in der einen Shell)
@@ -303,7 +300,6 @@ export default function App() {
       <Suspense fallback={null}><GlobalQuickComposer /></Suspense>
       <TeamChatOverlay />
       <HelpDrawer />
-      <ChatDrawer />
       <NamePrompt />
       <OnboardingCard />
       <CompanyStep />

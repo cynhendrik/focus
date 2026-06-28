@@ -12,8 +12,7 @@ import { ChatComposer } from './ChatComposer'
 /**
  * Team-Chat als große, mittige Overlay-Kachel — global gemountet, öffnet sich
  * über der aktuellen Ansicht (wie Quick Capture). Links die ChatSidebar
- * (Team + Mitglieder), rechts der bestehende Verlauf. Ersetzt den früheren
- * `team`-Tab und den rechten ChatDrawer.
+ * (Team + Mitglieder), rechts der bestehende Verlauf.
  */
 export function TeamChatOverlay() {
   const open   = useChatOverlayStore(s => s.open)

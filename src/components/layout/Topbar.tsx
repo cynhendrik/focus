@@ -19,7 +19,6 @@ const VIEW_META: Partial<Record<string, { label: string; tag: string; Icon: Luci
   settings:       { label: 'Einstellungen',  tag: 'SYSTEM',        Icon: Settings   },
   integrations:   { label: 'Integrationen',  tag: 'VERBINDUNGEN',  Icon: Plug       },
   profile:        { label: 'Profil',         tag: 'KONTO',         Icon: User       },
-  team:           { label: 'Team',           tag: 'CHAT',          Icon: MessagesSquare },
   inbox:          { label: 'Inbox',          tag: 'BENACHRICHTIGUNGEN', Icon: Inbox },
 }
 

@@ -80,7 +80,7 @@ export type AppView =
   | 'posteingang' | 'zeitmanagement'
   | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
   | 'journal'   | 'focus'     | 'corra'
-  | 'notes'     | 'inbox'     | 'sales'     | 'team'
+  | 'notes'     | 'inbox'     | 'sales'
   // Akquise / Sales views (vormals LEVERAGE — jetzt Teil der einen Nav)
   | 'leverage_inbox'
   | 'leverage_leads'
@@ -100,7 +100,6 @@ interface UiState {
   quickCaptureOpen: boolean
   zeitPanelOpen: boolean
   helpOpen: boolean
-  chatDrawerOpen: boolean
   /** Nachricht, zu der die MessageList nach einem Inbox-Sprung scrollen + highlighten soll. */
   pendingScrollMessageId: string | null
   activeCustomerTab: CustomerTab
@@ -123,8 +122,6 @@ interface UiState {
   setQuickCaptureOpen: (open: boolean) => void
   setZeitPanelOpen: (open: boolean) => void
   setHelpOpen: (open: boolean) => void
-  toggleChatDrawer: () => void
-  setChatDrawerOpen: (open: boolean) => void
   setPendingScrollMessageId: (id: string | null) => void
   setActiveCustomerTab: (tab: CustomerTab) => void
   setTasksTab: (tab: TasksTab) => void
@@ -148,7 +145,6 @@ export const useUiStore = create<UiState>()(
       quickCaptureOpen: false,
       zeitPanelOpen: false,
       helpOpen: false,
-      chatDrawerOpen: false,
       pendingScrollMessageId: null,
       activeCustomerTab: 'verlauf',
       tasksTab: 'list',
@@ -192,12 +188,6 @@ export const useUiStore = create<UiState>()(
 
       setHelpOpen: (open) =>
         set({ helpOpen: open }),
-
-      toggleChatDrawer: () =>
-        set(s => ({ chatDrawerOpen: !s.chatDrawerOpen })),
-
-      setChatDrawerOpen: (open) =>
-        set({ chatDrawerOpen: open }),
 
       setPendingScrollMessageId: (id) =>
         set({ pendingScrollMessageId: id }),
@@ -245,7 +235,6 @@ export const useUiStore = create<UiState>()(
         dashboardView: s.dashboardView,
         settingsTab: s.settingsTab,
         sidebarCollapsed: s.sidebarCollapsed,
-        chatDrawerOpen: s.chatDrawerOpen,
       }),
     }
   )
