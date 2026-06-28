@@ -75,6 +75,10 @@ declare v_me uuid := auth.uid(); v_id uuid;
 begin
   if not public.is_workspace_member(p_workspace) then raise exception 'not a member'; end if;
   if p_peer = v_me then raise exception 'cannot dm self'; end if;
+  if not exists (select 1 from public.workspace_members
+                 where workspace_id = p_workspace and user_id = p_peer::text) then
+    raise exception 'peer not a member';
+  end if;
   select c.id into v_id from public.conversations c
    where c.workspace_id = p_workspace and c.kind = 'dm'
      and exists (select 1 from public.conversation_participants p where p.conversation_id=c.id and p.user_id=v_me)
@@ -106,7 +110,7 @@ begin
     select jsonb_build_object(
       'conversationId', c.id,
       'peerId', peer.user_id,
-      'lastMessageAt', (select max(m.created_at) from public.messages m where m.conversation_id = c.id and m.deleted_at is null),
+      'lastMessageAt', (select max(m.created_at::timestamptz)::text from public.messages m where m.conversation_id = c.id and m.deleted_at is null),
       'unread', (
         select count(*) from public.messages m
         where m.conversation_id = c.id and m.deleted_at is null and m.created_by <> v_me
