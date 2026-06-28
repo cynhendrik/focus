@@ -72,6 +72,7 @@ import { CompanyStep } from '@/components/onboarding/CompanyStep'
 import { SplashScreen } from '@/components/ui/SplashScreen'
 import { HelpDrawer } from '@/components/help/HelpDrawer'
 import { TeamChatOverlay } from '@/components/team/TeamChatOverlay'
+import { TourGuide } from '@/components/tour/TourGuide'
 import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useOnboardingStore } from '@/store/onboarding.store'
@@ -299,6 +300,7 @@ export default function App() {
       <ToastViewport />
       <Suspense fallback={null}><GlobalQuickComposer /></Suspense>
       <TeamChatOverlay />
+      <TourGuide />
       <HelpDrawer />
       <NamePrompt />
       <OnboardingCard />
