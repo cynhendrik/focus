@@ -22,4 +22,9 @@ describe('useChatOverlayStore', () => {
     useChatOverlayStore.getState().select('team')
     expect(useChatOverlayStore.getState().selected).toBe('team')
   })
+
+  it('select kann eine DM-Auswahl setzen', () => {
+    useChatOverlayStore.getState().select({ conversationId: 'c1', peerId: 'p1' })
+    expect(useChatOverlayStore.getState().selected).toEqual({ conversationId: 'c1', peerId: 'p1' })
+  })
 })

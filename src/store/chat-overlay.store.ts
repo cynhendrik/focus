@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
-/** Spec 2 erweitert dies auf: 'team' | { dm: string } (Direktnachrichten). */
-export type ChatOverlaySelection = 'team'
+/** Spec 2 erweitert dies auf: 'team' | { conversationId: string; peerId: string } (Direktnachrichten). */
+export type ChatOverlaySelection = 'team' | { conversationId: string; peerId: string }
 
 interface ChatOverlayState {
   open: boolean
