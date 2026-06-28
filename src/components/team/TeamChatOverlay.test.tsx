@@ -15,12 +15,12 @@ vi.mock('framer-motion', () => ({
 vi.mock('./ChatSidebar',  () => ({ ChatSidebar:  () => createElement('div', { 'data-testid': 'chat-sidebar' }) }))
 vi.mock('./MessageList',  () => ({ MessageList:  () => createElement('div', { 'data-testid': 'message-list' }) }))
 vi.mock('./ChatComposer', () => ({ ChatComposer: () => null }))
-vi.mock('./InboxPanel',   () => ({ InboxPanel:   () => null }))
+vi.mock('./InboxPanel',   () => ({ InboxPanel:   () => createElement('div', { 'data-testid': 'inbox-panel' }) }))
 
 import { TeamChatOverlay } from './TeamChatOverlay'
 
 beforeEach(() => {
-  useChatOverlayStore.setState({ open: false, selected: 'team' })
+  useChatOverlayStore.setState({ open: false, selected: 'inbox' })
   useMessagesStore.setState({ loadOverview: vi.fn(), loadThread: vi.fn() } as any)
   useWorkspaceStore.setState({ isActiveWorkspaceShared: () => true, activeWorkspaceId: 'ws1' } as any)
 })
@@ -69,5 +69,13 @@ describe('TeamChatOverlay', () => {
     fireEvent.keyDown(input, { key: 'Escape' })
     expect(useChatOverlayStore.getState().open).toBe(true)
     document.body.removeChild(input)
+  })
+
+  it('zeigt InboxPanel (kein MessageList) bei selected==="inbox" und shared', () => {
+    useWorkspaceStore.setState({ isActiveWorkspaceShared: () => true, activeWorkspaceId: 'ws1' } as any)
+    useChatOverlayStore.setState({ open: true, selected: 'inbox' })
+    render(<TeamChatOverlay />)
+    expect(screen.getByTestId('inbox-panel')).toBeTruthy()
+    expect(screen.queryByTestId('message-list')).toBeNull()
   })
 })
