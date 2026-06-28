@@ -57,6 +57,7 @@ function Panel({ onClose }: { onClose: () => void }) {
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-label="Team-Chat"
+        aria-modal="true"
         style={{
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 860,
           width: 'min(880px, calc(100vw - 64px))', height: 'min(640px, calc(100vh - 96px))',

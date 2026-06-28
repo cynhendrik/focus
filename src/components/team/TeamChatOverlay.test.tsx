@@ -59,4 +59,14 @@ describe('TeamChatOverlay', () => {
     fireEvent.keyDown(window, { key: 'K', ctrlKey: true, shiftKey: true })
     expect(useChatOverlayStore.getState().open).toBe(true)
   })
+
+  it('Escape in einem Eingabefeld schließt NICHT', () => {
+    useChatOverlayStore.setState({ open: true })
+    render(<TeamChatOverlay />)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(useChatOverlayStore.getState().open).toBe(true)
+    document.body.removeChild(input)
+  })
 })

@@ -55,7 +55,7 @@ export function GlobalQuickComposer() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const inField = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); toggle(); return }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); toggle(); return }
       if (e.key === 'Escape' && open && !inField) close()
     }
     window.addEventListener('keydown', onKey)
