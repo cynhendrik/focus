@@ -1,10 +1,17 @@
 import type { AppView } from '@/store/ui.store'
+import { useTourStore } from '@/store/tour.store'
 
-export interface HelpEntry { title: string; body: string; view?: AppView }
+export interface HelpEntry { title: string; body: string; view?: AppView; action?: () => void }
 export interface HelpCategory { id: string; label: string; entries: HelpEntry[] }
 
 /** Kurze Erklärungen aller Funktionen — Quelle für den HelpDrawer. */
 export const HELP_CONTENT: HelpCategory[] = [
+  {
+    id: 'erste_schritte', label: 'Erste Schritte',
+    entries: [
+      { title: 'Tour wiederholen', body: 'KORA führt dich noch einmal durch die App.', action: () => useTourStore.getState().start() },
+    ],
+  },
   {
     id: 'kunden', label: 'Kunden & Kontakte',
     entries: [

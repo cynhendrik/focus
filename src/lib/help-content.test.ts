@@ -31,4 +31,11 @@ describe('help-content', () => {
     const ids = HELP_CONTENT.map(c => c.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
+
+  it('enthält einen "Tour wiederholen"-Eintrag mit action', () => {
+    const all = HELP_CONTENT.flatMap(c => c.entries)
+    const tour = all.find(e => e.title === 'Tour wiederholen')
+    expect(tour).toBeTruthy()
+    expect(typeof tour!.action).toBe('function')
+  })
 })

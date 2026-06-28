@@ -55,7 +55,12 @@ export function HelpDrawer() {
                       <div key={e.title} className="help-entry">
                         <div className="help-entry__title">{e.title}</div>
                         <div className="help-entry__body">{e.body}</div>
-                        {e.view && (
+                        {e.action && (
+                          <button type="button" className="help-entry__link" onClick={() => { e.action!(); setHelpOpen(false) }}>
+                            {e.title} starten <ChevronRight size={12} />
+                          </button>
+                        )}
+                        {!e.action && e.view && (
                           <button type="button" className="help-entry__link" onClick={() => go(e.view!)}>
                             {e.title} öffnen <ChevronRight size={12} />
                           </button>
