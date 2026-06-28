@@ -6,6 +6,7 @@ import { useMessagesStore } from '@/store/messages.store'
 import { useMembersStore } from '@/store/members.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useNotificationsStore } from '@/store/notifications.store'
 
 beforeEach(() => {
   useChatOverlayStore.setState({ open: true, selected: 'team' })
@@ -13,6 +14,7 @@ beforeEach(() => {
   useAuthStore.setState({ user: { id: 'me' } as any })
   useWorkspaceStore.setState({ activeWorkspaceId: 'ws1' } as any)
   useMessagesStore.setState({ threads: {}, conversations: [{ conversationId: 'c1', peerId: 'p1', lastMessageAt: null, unreadCount: 2 }], unreadTeam: 0, getOrCreateDm: vi.fn().mockResolvedValue('c1') } as any)
+  useNotificationsStore.setState({ notifications: [] } as any)
 })
 afterEach(cleanup)
 
@@ -33,5 +35,19 @@ describe('ChatSidebar DMs', () => {
     render(<ChatSidebar />)
     fireEvent.click(screen.getByText('Anna Vogel'))
     await waitFor(() => expect(select).toHaveBeenCalledWith({ conversationId: 'c1', peerId: 'p1' }))
+  })
+})
+
+describe('ChatSidebar Inbox', () => {
+  it('zeigt den Inbox-Eintrag oben, aktiv bei selected==="inbox"', () => {
+    useChatOverlayStore.setState({ open: true, selected: 'inbox' })
+    render(<ChatSidebar />)
+    expect(screen.getByText('Inbox')).toBeTruthy()
+  })
+  it('Klick auf Inbox → select("inbox")', () => {
+    const select = vi.fn(); useChatOverlayStore.setState({ select })
+    render(<ChatSidebar />)
+    fireEvent.click(screen.getByText('Inbox'))
+    expect(select).toHaveBeenCalledWith('inbox')
   })
 })

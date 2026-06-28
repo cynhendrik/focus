@@ -1,9 +1,11 @@
-import { Hash } from 'lucide-react'
+import { Hash, Inbox as InboxIcon } from 'lucide-react'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useMessagesStore } from '@/store/messages.store'
 import { useMembersStore } from '@/store/members.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useNotificationsStore } from '@/store/notifications.store'
+import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
 
 function Badge({ n }: { n: number }) {
   if (n <= 0) return null
@@ -25,8 +27,10 @@ export function ChatSidebar() {
   const unreadTeam    = useMessagesStore(s => s.unreadTeam)
   const getOrCreateDm = useMessagesStore(s => s.getOrCreateDm)
   const workspaceId   = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const inboxUnread   = useNotificationsStore(s => loudUnreadCount(s.notifications))
 
   const teamActive = selected === 'team'
+  const inboxActive = selected === 'inbox'
 
   const openDm = async (peerId: string) => {
     if (!workspaceId) return
@@ -39,6 +43,18 @@ export function ChatSidebar() {
 
   return (
     <div style={{ width: 240, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--surface-2)' }}>
+      <button
+        onClick={() => select('inbox')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: 'none', cursor: 'pointer',
+          textAlign: 'left', width: '100%', background: inboxActive ? 'var(--surface)' : 'transparent',
+          color: inboxActive ? 'var(--fg)' : 'var(--fg-muted)', fontSize: 13.5, fontWeight: inboxActive ? 700 : 600,
+          borderLeft: `2px solid ${inboxActive ? 'var(--accent)' : 'transparent'}`,
+        }}
+      >
+        <InboxIcon size={15} /> <span style={{ flex: 1 }}>Inbox</span> <Badge n={inboxUnread} />
+      </button>
+
       <button
         onClick={() => select('team')}
         style={{
