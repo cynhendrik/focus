@@ -15,8 +15,8 @@ function timeOf(iso: string): string {
   return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('de', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MessageList({ compact = false }: { compact?: boolean }) {
-  const t         = useMessagesStore(s => s.threads[TEAM_KEY])
+export function MessageList({ compact = false, threadKey = TEAM_KEY }: { compact?: boolean; threadKey?: string }) {
+  const t         = useMessagesStore(s => s.threads[threadKey])
   const messages  = t?.messages ?? []
   const hasMore   = t?.hasMore ?? false
   const nameOf    = useMembersStore(s => s.nameOf)
@@ -61,7 +61,7 @@ export function MessageList({ compact = false }: { compact?: boolean }) {
     const el = scrollRef.current
     if (el && el.scrollTop < 40 && hasMore) {
       const wsId = useWorkspaceStore.getState().activeWorkspaceId ?? ''
-      if (wsId) void useMessagesStore.getState().loadMore(wsId, TEAM_KEY)
+      if (wsId) void useMessagesStore.getState().loadMore(wsId, threadKey)
     }
   }
 

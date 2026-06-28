@@ -14,9 +14,10 @@ import {
 
 interface Props {
   contextRef?: { refType: 'task' | 'account'; refId: string }
+  conversationId?: string | null
 }
 
-export function ChatComposer({ contextRef }: Props = {}) {
+export function ChatComposer({ contextRef, conversationId = null }: Props = {}) {
   const send       = useMessagesStore(s => s.send)
   const members    = useMembersStore(s => s.members())
   const allTodos   = useTodosStore(s => s.allTodos)
@@ -71,6 +72,7 @@ export function ChatComposer({ contextRef }: Props = {}) {
         mentions,
         refType: effectiveRef?.refType ?? null,
         refId:   effectiveRef?.refId ?? null,
+        conversationId: conversationId ?? null,
       })
       setText(''); setMarkers([]); setMq({ open: false, query: '', start: -1 })
     } catch {

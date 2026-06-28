@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useMessagesStore } from '@/store/messages.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { TEAM_KEY } from '@/lib/chat/threads'
+import { threadKeyOf } from '@/lib/chat/threads'
 import { ChatSidebar } from './ChatSidebar'
 import { MessageList } from './MessageList'
 import { ChatComposer } from './ChatComposer'
@@ -36,15 +36,20 @@ export function TeamChatOverlay() {
 function Panel({ onClose }: { onClose: () => void }) {
   const loadOverview = useMessagesStore(s => s.loadOverview)
   const loadThread   = useMessagesStore(s => s.loadThread)
+  const markRead     = useMessagesStore(s => s.markRead)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  const selected = useChatOverlayStore(s => s.selected)
+  const threadKey = threadKeyOf(selected)
+  const conversationId = selected === 'team' ? null : selected.conversationId
 
   useEffect(() => {
     if (activeWorkspaceId && isShared) {
       void loadOverview(activeWorkspaceId)
-      void loadThread(activeWorkspaceId, TEAM_KEY)
+      void loadThread(activeWorkspaceId, threadKey)
+      void markRead(activeWorkspaceId, threadKey)
     }
-  }, [activeWorkspaceId, isShared, loadOverview, loadThread])
+  }, [activeWorkspaceId, isShared, threadKey, loadOverview, loadThread, markRead])
 
   return createPortal(
     <>
@@ -90,8 +95,8 @@ function Panel({ onClose }: { onClose: () => void }) {
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
             <ChatSidebar />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <MessageList />
-              <ChatComposer />
+              <MessageList threadKey={threadKey} />
+              <ChatComposer conversationId={conversationId} />
             </div>
           </div>
         )}
