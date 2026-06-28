@@ -12,30 +12,21 @@ const PAGE = 50
 
 export const MessagesGateway = {
   /** Neueste Nachrichten, chronologisch aufsteigend zurückgegeben. Cloud-only. */
-  async listRecent(workspaceId: string, limit = PAGE): Promise<Message[]> {
+  async listRecent(workspaceId: string, conversationId: string | null = null, limit = PAGE): Promise<Message[]> {
     if (!shared()) return []
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    let q = supabase.from('messages').select('*').eq('workspace_id', workspaceId).is('deleted_at', null)
+    q = conversationId === null ? q.is('conversation_id', null) : q.eq('conversation_id', conversationId)
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit)
     if (error) fail(error)
     return (data ?? []).map(messageRowToMessage).reverse()
   },
 
   /** Ältere Seite (Keyset) vor einem created_at; chronologisch aufsteigend. */
-  async listBefore(workspaceId: string, beforeCreatedAt: string, limit = PAGE): Promise<Message[]> {
+  async listBefore(workspaceId: string, beforeCreatedAt: string, conversationId: string | null = null, limit = PAGE): Promise<Message[]> {
     if (!shared()) return []
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
-      .lt('created_at', beforeCreatedAt)
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    let q = supabase.from('messages').select('*').eq('workspace_id', workspaceId).is('deleted_at', null).lt('created_at', beforeCreatedAt)
+    q = conversationId === null ? q.is('conversation_id', null) : q.eq('conversation_id', conversationId)
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit)
     if (error) fail(error)
     return (data ?? []).map(messageRowToMessage).reverse()
   },
@@ -44,13 +35,14 @@ export const MessagesGateway = {
   async create(payload: CreateMessagePayload): Promise<Message> {
     const row = {
       id: crypto.randomUUID(),
-      workspace_id: payload.workspaceId,
-      created_by:   payload.createdBy,
-      kind:         'user' as const,
-      body:         payload.body,
-      ref_type:     payload.refType ?? null,
-      ref_id:       payload.refId ?? null,
-      mentions:     payload.mentions ?? [],
+      workspace_id:    payload.workspaceId,
+      created_by:      payload.createdBy,
+      kind:            'user' as const,
+      body:            payload.body,
+      ref_type:        payload.refType ?? null,
+      ref_id:          payload.refId ?? null,
+      mentions:        payload.mentions ?? [],
+      conversation_id: payload.conversationId ?? null,
     }
     const { data, error } = await supabase.from('messages').insert(row).select('*').single()
     if (error) fail(error)

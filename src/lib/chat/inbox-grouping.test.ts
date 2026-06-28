@@ -14,7 +14,7 @@ describe('groupNotifications', () => {
       mk('1', 'comment', 'taskA'), mk('2', 'comment', 'taskA'),
       mk('3', 'assigned', 'taskB'), mk('4', 'mention', 'msgC'),
     ])
-    expect(order).toEqual(['assigned', 'mention', 'comment', 'completed'])
+    expect(order).toEqual(['assigned', 'mention', 'comment', 'completed', 'dm'])
     expect(byType.comment).toHaveLength(1)        // taskA zusammengefasst
     expect(byType.comment[0].items).toHaveLength(2)
     expect(byType.assigned[0].items).toHaveLength(1)
