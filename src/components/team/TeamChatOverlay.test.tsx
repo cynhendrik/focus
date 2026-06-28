@@ -15,6 +15,7 @@ vi.mock('framer-motion', () => ({
 vi.mock('./ChatSidebar',  () => ({ ChatSidebar:  () => createElement('div', { 'data-testid': 'chat-sidebar' }) }))
 vi.mock('./MessageList',  () => ({ MessageList:  () => createElement('div', { 'data-testid': 'message-list' }) }))
 vi.mock('./ChatComposer', () => ({ ChatComposer: () => null }))
+vi.mock('./InboxPanel',   () => ({ InboxPanel:   () => null }))
 
 import { TeamChatOverlay } from './TeamChatOverlay'
 
@@ -32,7 +33,7 @@ describe('TeamChatOverlay', () => {
   })
 
   it('zeigt MessageList + Sidebar wenn offen und Workspace geteilt', () => {
-    useChatOverlayStore.setState({ open: true })
+    useChatOverlayStore.setState({ open: true, selected: 'team' })
     render(<TeamChatOverlay />)
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByTestId('message-list')).toBeTruthy()
@@ -48,7 +49,7 @@ describe('TeamChatOverlay', () => {
   })
 
   it('Escape schließt', () => {
-    useChatOverlayStore.setState({ open: true })
+    useChatOverlayStore.setState({ open: true, selected: 'team' })
     render(<TeamChatOverlay />)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(useChatOverlayStore.getState().open).toBe(false)
@@ -61,7 +62,7 @@ describe('TeamChatOverlay', () => {
   })
 
   it('Escape in einem Eingabefeld schließt NICHT', () => {
-    useChatOverlayStore.setState({ open: true })
+    useChatOverlayStore.setState({ open: true, selected: 'team' })
     render(<TeamChatOverlay />)
     const input = document.createElement('input')
     document.body.appendChild(input)

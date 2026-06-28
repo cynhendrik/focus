@@ -97,7 +97,7 @@ export const useMessagesStore = create<MessagesState>()((set, get) => ({
     const key = keyOfMessage(msg)
     const myId = useAuthStore.getState().user?.id
     const ov = useChatOverlayStore.getState()
-    const viewing = ov.open && threadKeyOf(ov.selected as any) === key
+    const viewing = ov.open && threadKeyOf(ov.selected) === key
     const fromMe = msg.createdBy === myId
 
     set(s => {

@@ -9,6 +9,7 @@ import { threadKeyOf } from '@/lib/chat/threads'
 import { ChatSidebar } from './ChatSidebar'
 import { MessageList } from './MessageList'
 import { ChatComposer } from './ChatComposer'
+import { InboxPanel } from './InboxPanel'
 
 /**
  * Team-Chat als große, mittige Overlay-Kachel — global gemountet, öffnet sich
@@ -40,16 +41,18 @@ function Panel({ onClose }: { onClose: () => void }) {
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
   const selected = useChatOverlayStore(s => s.selected)
+  const isInbox = selected === 'inbox'
   const threadKey = threadKeyOf(selected)
-  const conversationId = selected === 'team' ? null : selected.conversationId
+  const conversationId = (selected === 'team' || selected === 'inbox') ? null : selected.conversationId
 
   useEffect(() => {
-    if (activeWorkspaceId && isShared) {
-      void loadOverview(activeWorkspaceId)
+    if (!activeWorkspaceId || !isShared) return
+    void loadOverview(activeWorkspaceId)
+    if (selected !== 'inbox') {
       void loadThread(activeWorkspaceId, threadKey)
       void markRead(activeWorkspaceId, threadKey)
     }
-  }, [activeWorkspaceId, isShared, threadKey, loadOverview, loadThread, markRead])
+  }, [activeWorkspaceId, isShared, selected, threadKey, loadOverview, loadThread, markRead])
 
   return createPortal(
     <>
@@ -94,10 +97,16 @@ function Panel({ onClose }: { onClose: () => void }) {
         ) : (
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
             <ChatSidebar />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <MessageList threadKey={threadKey} />
-              <ChatComposer conversationId={conversationId} />
-            </div>
+            {isInbox ? (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <InboxPanel />
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <MessageList threadKey={threadKey} />
+                <ChatComposer conversationId={conversationId} />
+              </div>
+            )}
           </div>
         )}
       </motion.div>

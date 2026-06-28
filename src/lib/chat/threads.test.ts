@@ -4,4 +4,5 @@ import { threadKeyOf, TEAM_KEY } from './threads'
 describe('threadKeyOf', () => {
   it('team selection → TEAM_KEY', () => { expect(threadKeyOf('team')).toBe(TEAM_KEY) })
   it('dm selection → conversationId', () => { expect(threadKeyOf({ conversationId: 'c9' })).toBe('c9') })
+  it('inbox selection → "inbox"', () => { expect(threadKeyOf('inbox')).toBe('inbox') })
 })

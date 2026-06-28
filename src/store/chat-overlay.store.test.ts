@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useChatOverlayStore } from './chat-overlay.store'
 
-beforeEach(() => { useChatOverlayStore.setState({ open: false, selected: 'team' }) })
+beforeEach(() => { useChatOverlayStore.setState({ open: false, selected: 'inbox' }) })
 
 describe('useChatOverlayStore', () => {
   it('openPanel öffnet, close schließt', () => {
@@ -26,5 +26,10 @@ describe('useChatOverlayStore', () => {
   it('select kann eine DM-Auswahl setzen', () => {
     useChatOverlayStore.getState().select({ conversationId: 'c1', peerId: 'p1' })
     expect(useChatOverlayStore.getState().selected).toEqual({ conversationId: 'c1', peerId: 'p1' })
+  })
+
+  it('select inbox', () => {
+    useChatOverlayStore.getState().select('inbox')
+    expect(useChatOverlayStore.getState().selected).toBe('inbox')
   })
 })

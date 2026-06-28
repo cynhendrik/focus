@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 
-/** Spec 2 erweitert dies auf: 'team' | { conversationId: string; peerId: string } (Direktnachrichten). */
-export type ChatOverlaySelection = 'team' | { conversationId: string; peerId: string }
+export type ChatOverlaySelection = 'inbox' | 'team' | { conversationId: string; peerId: string }
 
 interface ChatOverlayState {
   open: boolean
@@ -14,7 +13,7 @@ interface ChatOverlayState {
 
 export const useChatOverlayStore = create<ChatOverlayState>()((set) => ({
   open: false,
-  selected: 'team',
+  selected: 'inbox',
   toggle: () => set(s => ({ open: !s.open })),
   openPanel: () => set({ open: true }),
   close: () => set({ open: false }),
