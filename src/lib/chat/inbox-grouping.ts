@@ -7,7 +7,7 @@ export interface NotificationGroup {
   items:  Notification[]
 }
 
-const ORDER: NotificationType[] = ['assigned', 'mention', 'comment', 'completed']
+const ORDER: NotificationType[] = ['assigned', 'mention', 'comment', 'completed', 'dm']
 
 /**
  * Primär nach Typ, Priorität assigned→mention→comment→completed.
@@ -18,7 +18,7 @@ export function groupNotifications(list: Notification[]): {
   byType: Record<NotificationType, NotificationGroup[]>
   order:  NotificationType[]
 } {
-  const byType = { assigned: [], mention: [], comment: [], completed: [] } as Record<NotificationType, NotificationGroup[]>
+  const byType = { assigned: [], mention: [], comment: [], completed: [], dm: [] } as Record<NotificationType, NotificationGroup[]>
   const collapse = (t: NotificationType) => t === 'comment' || t === 'mention'
 
   for (const t of ORDER) {

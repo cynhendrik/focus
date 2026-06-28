@@ -13,6 +13,7 @@ const TYPE_META: Record<NotificationType, { label: string; Icon: typeof InboxIco
   mention:   { label: 'Erwähnungen',     Icon: AtSign },
   comment:   { label: 'Kommentare',      Icon: MessageCircle },
   completed: { label: 'Abgeschlossen',   Icon: CheckCircle2 },
+  dm:        { label: 'Nachrichten',     Icon: InboxIcon },
 }
 
 export function InboxRoute() {
@@ -117,5 +118,6 @@ function labelFor(n: Notification): string {
     case 'mention':   return 'hat dich erwähnt'
     case 'comment':   return 'hat zu deiner Aufgabe kommentiert'
     case 'completed': return 'hat deine Aufgabe abgeschlossen'
+    case 'dm':        return 'hat dir geschrieben'
   }
 }

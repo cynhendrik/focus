@@ -14,6 +14,7 @@ const LABEL: Record<Notification['type'], string> = {
   mention:   'hat dich erwähnt',
   comment:   'hat zu deiner Aufgabe kommentiert',
   completed: 'hat deine Aufgabe abgeschlossen',
+  dm:        'hat dir geschrieben',
 }
 
 /** Glocke = Vorschau der Inbox: Top-12 ungelesen + „Alle ansehen →". */

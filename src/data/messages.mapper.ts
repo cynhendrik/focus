@@ -19,6 +19,7 @@ export function messageRowToMessage(r: any): Message {
     refId:       r.ref_id ?? null,
     visibility:  r.visibility ?? 'internal',
     mentions:    asStringArray(r.mentions),
+    conversationId: r.conversation_id ?? null,
     createdAt:   r.created_at,
     updatedAt:   r.updated_at,
     deletedAt:   r.deleted_at ?? null,

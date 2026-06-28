@@ -1,4 +1,4 @@
-export type NotificationType = 'assigned' | 'mention' | 'comment' | 'completed'
+export type NotificationType = 'assigned' | 'mention' | 'comment' | 'completed' | 'dm'
 export type NotificationRefType = 'task' | 'message'
 
 export interface Notification {
@@ -10,6 +10,7 @@ export interface Notification {
   refType:     NotificationRefType
   refId:       string
   messageId:   string | null
+  conversationId: string | null
   readAt:      string | null
   createdAt:   string
 }

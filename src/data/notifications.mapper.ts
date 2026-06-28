@@ -11,6 +11,7 @@ export function notificationRowToNotification(r: any): Notification {
     refType:     r.ref_type,
     refId:       r.ref_id,
     messageId:   r.message_id ?? null,
+    conversationId: r.conversation_id ?? null,
     readAt:      r.read_at ?? null,
     createdAt:   r.created_at,
   }

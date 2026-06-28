@@ -13,6 +13,7 @@ export interface Message {
   refId:       string | null
   visibility:  'internal' | 'client'
   mentions:    string[]
+  conversationId: string | null
   createdAt:   string
   updatedAt:   string
   deletedAt:   string | null
@@ -25,4 +26,5 @@ export interface CreateMessagePayload {
   refType?:    MessageRefType | null
   refId?:      string | null
   mentions?:   string[]
+  conversationId?: string | null
 }
