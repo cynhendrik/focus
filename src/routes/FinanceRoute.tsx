@@ -829,7 +829,14 @@ export function FinanceRoute() {
         {isLoading ? (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 13 }}>Laden…</div>
         ) : filteredInvoices.length === 0 ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 13 }}>Keine Rechnungen</div>
+          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <span>Keine Rechnungen</span>
+            {isAdmin && (
+              <button className="btn-primary" onClick={() => setShowInvoiceForm(true)} style={{ fontSize: 12, padding: '7px 16px' }}>
+                Neue Rechnung
+              </button>
+            )}
+          </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

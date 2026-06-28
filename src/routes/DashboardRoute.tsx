@@ -24,6 +24,7 @@ import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
+import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 
 import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -215,6 +216,9 @@ function WorkspaceView() {
 
   const currentItem = queueItems[queueIndex]
 
+  // Workspace leer?  (keine Kunden + keine Todos + keine Rechnungen)
+  const isWorkspaceEmpty = customers.length === 0 && todos.length === 0 && invoices.length === 0
+
   // Umsatz
   const { paidNow, paidPrev, label, hintPrevLabel } = useMemo(() => {
     const now = new Date()
@@ -271,6 +275,7 @@ function WorkspaceView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {isWorkspaceEmpty && <DashboardEmptyState />}
       <DunningNudgeCard />
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
@@ -335,6 +340,15 @@ function WorkspaceView() {
       </div>
 
       {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
+      {!queueLoading && !currentItem && queueItems.length === 0 && !isWorkspaceEmpty && (
+        <div style={{
+          borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 24px',
+          color: 'var(--fg-muted)', fontSize: 13,
+        }}>
+          Noch nichts zu tun — leg deinen ersten Kunden an.
+        </div>
+      )}
       {!queueLoading && currentItem && (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
           {/* Aktuelle Kachel */}

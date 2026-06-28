@@ -447,7 +447,7 @@ function DraggableLeadCard({ lead, selected, onToggle, onContext, onOpen, onWarm
 
 type ColDef = { id: string; label: string; hoverBg: string; dot: string }
 
-function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm }: {
+function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm, onShowCreate }: {
   col: ColDef
   leads: Lead[]
   selected: Set<string>
@@ -455,6 +455,7 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
   onContext: (e: React.MouseEvent, lead: Lead) => void
   onOpen: (lead: Lead) => void
   onWarm: (id: string) => void
+  onShowCreate?: () => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.id })
 
@@ -492,8 +493,16 @@ function LeadColumn({ col, leads, selected, onToggle, onContext, onOpen, onWarm 
           />
         ))}
         {leads.length === 0 && (
-          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center', background: 'var(--surface-2)' }}>
+          <div style={{ border: '1.5px dashed var(--border)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>Leer</span>
+            {onShowCreate && (
+              <button
+                onClick={onShowCreate}
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--fg)', cursor: 'pointer' }}
+              >
+                Ersten Lead anlegen
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -923,7 +932,7 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', flex: 1, overflow: 'auto' }}>
-            {stages.map(stage => (
+            {stages.map((stage, idx) => (
               <LeadColumn
                 key={stage.id}
                 col={{
@@ -938,6 +947,7 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
                 onContext={handleContext}
                 onOpen={setDetailLead}
                 onWarm={handleWarm}
+                onShowCreate={idx === 0 ? onShowCreate : undefined}
               />
             ))}
           </div>
