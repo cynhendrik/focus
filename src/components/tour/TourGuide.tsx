@@ -25,7 +25,6 @@ export function TourGuide() {
   const finish = useTourStore(s => s.finish)
   const setAppView     = useUiStore(s => s.setAppView)
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
-  const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
 
   // Fixtures injizieren solange aktiv; beim Beenden verwerfen.
   useEffect(() => {
@@ -45,7 +44,7 @@ export function TourGuide() {
 
   return createPortal(
     <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 940, background: 'oklch(0% 0 0 / 0.45)', pointerEvents: 'none' }} />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 940, background: 'oklch(0% 0 0 / 0.45)', pointerEvents: 'auto' }} />
       <div style={{
         position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', zIndex: 950,
         width: 'min(460px, calc(100vw - 40px))', background: 'var(--surface)', border: '1px solid var(--border)',
