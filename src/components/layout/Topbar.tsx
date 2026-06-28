@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/ui.store'
+import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { NotificationCenter } from './NotificationCenter'
 import {
   Sun, Sunrise, Users, CreditCard, Target,
@@ -28,8 +29,8 @@ export function Topbar() {
   const toggleTheme    = useUiStore(s => s.toggleTheme)
   const zeitPanelOpen  = useUiStore(s => s.zeitPanelOpen)
   const setZeitPanel   = useUiStore(s => s.setZeitPanelOpen)
-  const chatDrawerOpen   = useUiStore(s => s.chatDrawerOpen)
-  const toggleChatDrawer = useUiStore(s => s.toggleChatDrawer)
+  const chatOpen   = useChatOverlayStore(s => s.open)
+  const toggleChat = useChatOverlayStore(s => s.toggle)
 
   const meta = VIEW_META[appView] ?? VIEW_META['dashboard']!
   const { label, tag } = meta
@@ -68,9 +69,9 @@ export function Topbar() {
         </button>
         <button
           className="icon-btn"
-          onClick={toggleChatDrawer}
+          onClick={toggleChat}
           title="Team-Chat"
-          style={{ color: chatDrawerOpen ? 'var(--accent)' : undefined }}
+          style={{ color: chatOpen ? 'var(--accent)' : undefined }}
         >
           <MessagesSquare size={16} />
         </button>

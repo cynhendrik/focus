@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/ui.store'
+import { useChatOverlayStore } from '@/store/chat-overlay.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useNotificationsStore } from '@/store/notifications.store'
 import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
@@ -78,6 +79,9 @@ export function NavSidebar() {
   }
   const canFinances = useCapability('finances')
 
+  const chatOpen    = useChatOverlayStore(s => s.open)
+  const openChatNav = useChatOverlayStore(s => s.openPanel)
+
   const loudInbox = useNotificationsStore(s => loudUnreadCount(s.notifications))
 
   const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
@@ -148,8 +152,8 @@ export function NavSidebar() {
         onClick={() => setAppView('posteingang')} badge={unreadMails || undefined} badgeAccent />}
       {mod('kalender') && <NavItem icon={Calendar} label="Kalender" active={appView === 'calendar'}
         onClick={() => setAppView('calendar')} />}
-      <NavItem icon={MessagesSquare} label="Team" active={appView === 'team'}
-        onClick={() => setAppView('team')} />
+      <NavItem icon={MessagesSquare} label="Team" active={chatOpen}
+        onClick={() => openChatNav()} />
 
       <div className="nav-spacer" />
       <div className="nav-foot-divider" />

@@ -3,8 +3,8 @@ import { Inbox as InboxIcon, UserPlus, AtSign, MessageCircle, CheckCircle2 } fro
 import { useNotificationsStore } from '@/store/notifications.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useMembersStore } from '@/store/members.store'
-import { useUiStore } from '@/store/ui.store'
 import { useOpenTask } from '@/lib/chat/useOpenTask'
+import { openChat } from '@/lib/open-chat'
 import { groupNotifications, type NotificationGroup } from '@/lib/chat/inbox-grouping'
 import type { Notification, NotificationType } from '@/types/notification.types'
 
@@ -21,8 +21,6 @@ export function InboxRoute() {
   const markRead      = useNotificationsStore(s => s.markRead)
   const myId          = useAuthStore(s => s.user?.id)
   const nameOf        = useMembersStore(s => s.nameOf)
-  const setAppView            = useUiStore(s => s.setAppView)
-  const setPendingScrollMsg   = useUiStore(s => s.setPendingScrollMessageId)
   const openTask = useOpenTask()
 
   useEffect(() => { if (myId) void load(myId) }, [myId, load])
@@ -33,9 +31,8 @@ export function InboxRoute() {
   const jump = (n: Notification) => {
     void markRead(n.id)
     if (n.refType === 'task') { openTask(n.refId); return }
-    // ref_type === 'message' → Kanal öffnen + zur Nachricht scrollen.
-    if (n.messageId) setPendingScrollMsg(n.messageId)
-    setAppView('team')
+    // ref_type === 'message' → Chat-Kachel öffnen + zur Nachricht scrollen.
+    openChat(n.messageId ?? null)
   }
 
   const totalUnread = unread.length

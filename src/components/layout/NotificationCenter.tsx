@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useMembersStore } from '@/store/members.store'
 import { useUiStore } from '@/store/ui.store'
 import { useOpenTask } from '@/lib/chat/useOpenTask'
+import { openChat } from '@/lib/open-chat'
 import { loudUnreadCount } from '@/lib/chat/inbox-grouping'
 import type { Notification } from '@/types/notification.types'
 
@@ -25,8 +26,7 @@ export function NotificationCenter() {
   const markRead      = useNotificationsStore(s => s.markRead)
   const myId          = useAuthStore(s => s.user?.id)
   const nameOf        = useMembersStore(s => s.nameOf)
-  const setAppView          = useUiStore(s => s.setAppView)
-  const setPendingScrollMsg = useUiStore(s => s.setPendingScrollMessageId)
+  const setAppView = useUiStore(s => s.setAppView)
   const openTask = useOpenTask()
 
   useEffect(() => { if (myId) void load(myId) }, [myId, load])
@@ -46,8 +46,7 @@ export function NotificationCenter() {
     void markRead(n.id)
     setOpen(false)
     if (n.refType === 'task') { openTask(n.refId); return }
-    if (n.messageId) setPendingScrollMsg(n.messageId)
-    setAppView('team')
+    openChat(n.messageId ?? null)
   }
 
   return (
