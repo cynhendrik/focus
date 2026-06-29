@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html,body { margin:0; padding:0; background:transparent; }
+  .icon { width:1024px; height:1024px; border-radius:230px; position:relative; overflow:hidden;
+          background:linear-gradient(150deg, #262A31, #14161A); }
+  .icon::before { content:""; position:absolute; inset:0; z-index:9; pointer-events:none;
+          background:radial-gradient(130% 80% at 28% 0%, rgba(255,255,255,.16), transparent 52%); }
+  .icon::after { content:""; position:absolute; inset:0; z-index:10; pointer-events:none; border-radius:230px;
+          box-shadow:inset 0 6px 0 rgba(255,255,255,.10), inset 0 0 0 2px rgba(255,255,255,.04); }
+  .ctr { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .sheet { position:absolute; width:452px; height:586px; border-radius:108px;
+    background:linear-gradient(158deg, rgba(255,255,255,.16), rgba(255,255,255,.04));
+    border:3px solid rgba(255,255,255,.20);
+    box-shadow:0 70px 150px -55px rgba(0,0,0,.6), inset 0 6px 0 rgba(255,255,255,.30); }
+  .coral { background:linear-gradient(158deg,#FF9576,#F2754F); border-color:rgba(255,255,255,.28);
+    box-shadow:0 80px 170px -55px rgba(242,117,79,.7), inset 0 6px 0 rgba(255,255,255,.40); }
+  .fa1 { transform-origin:50% 90%; transform:rotate(-19deg); opacity:.42; }
+  .fa2 { transform-origin:50% 90%; transform:rotate(-2deg); opacity:.66; }
+  .fa3 { transform-origin:50% 90%; transform:rotate(15deg); }
+  .bar { position:absolute; left:86px; border-radius:18px; }
+  .b-chip { top:108px; width:196px; height:54px; background:#33343B; }
+  .b-l1 { top:220px; width:280px; height:30px; background:#282930; }
+  .b-l2 { top:292px; width:208px; height:30px; background:rgba(40,41,48,.5); }
+</style></head><body>
+  <div class="icon">
+    <div class="ctr"><div class="sheet fa1"></div></div>
+    <div class="ctr"><div class="sheet fa2"></div></div>
+    <div class="ctr"><div class="sheet coral fa3"><div class="bar b-chip"></div><div class="bar b-l1"></div><div class="bar b-l2"></div></div></div>
+  </div>
+</body></html>
