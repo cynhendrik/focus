@@ -5,8 +5,11 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useActivitiesStore } from '@/store/activities.store'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useMailStore } from '@/store/mail.store'
 import {
   tourCustomers, tourAccounts, tourTodos, tourInvoices, tourKpis, tourLeads, tourFollowUps, tourActivities,
+  tourCalendarEvents, tourEmails, TOUR_MAIL_ACCOUNT_ID,
 } from './fixtures'
 
 /** Schau-Daten NUR im Speicher in die Stores setzen — kein Gateway, nichts persistiert. */
@@ -18,6 +21,9 @@ export function applyTourFixtures(): void {
   useLeadsStore.setState({ leads: tourLeads } as any)
   useCrmStore.setState({ followUps: tourFollowUps, allFollowUps: tourFollowUps } as any)
   useActivitiesStore.setState({ activities: tourActivities } as any)
+  useCalendarStore.setState({ todayEvents: tourCalendarEvents } as any)
+  // selectedAccountId nötig, sonst zeigt die Inbox-Karte „Kein Mail-Konto verbunden".
+  useMailStore.setState({ emails: tourEmails, selectedAccountId: TOUR_MAIL_ACCOUNT_ID } as any)
 }
 
 /** Tour-Daten verwerfen + echte (im frischen Workspace leere) Daten zurückladen. */
@@ -29,6 +35,9 @@ export function clearTourFixtures(workspaceId: string): void {
   useLeadsStore.setState({ leads: [] } as any)
   useCrmStore.setState({ followUps: [], allFollowUps: [] } as any)
   useActivitiesStore.setState({ activities: [] } as any)
+  useCalendarStore.setState({ todayEvents: [] } as any)
+  // Demo-Mail-Konto wieder entfernen → echtes Konto (falls verbunden) übernimmt.
+  useMailStore.setState({ emails: [], selectedAccountId: null } as any)
   // Echte Daten neu laden (mirror App.tsx Lade-Welle 1 + Finanzen).
   // Echte Loader-Namen aus stores/App.tsx verifiziert:
   //   useAccountsStore    → init()
@@ -45,4 +54,6 @@ export function clearTourFixtures(workspaceId: string): void {
   fin.loadAll?.(workspaceId)
   fin.loadKpis?.(workspaceId)
   ;(useLeadsStore.getState() as any).load?.(workspaceId)
+  ;(useCalendarStore.getState() as any).loadToday?.(workspaceId)
+  // Mails: echtes Konto lädt beim Öffnen der Mail-Ansicht; hier nur zurückgesetzt.
 }

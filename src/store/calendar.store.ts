@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { CalendarGateway } from '@/data/calendar.gateway'
+import { useTourStore } from '@/store/tour.store'
 import { log } from '@/lib/logger'
 import type { CalendarEvent, UpsertCalendarEventPayload } from '@/types/calendar.types'
 
@@ -77,6 +78,10 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
   },
 
   loadToday: async (workspaceId) => {
+    // Während der KORA-Tour zeigen wir Demo-Termine im Speicher (applyTourFixtures).
+    // Das Dashboard lädt beim Mount neu — das würde sie mit dem echten (leeren)
+    // Workspace überschreiben. Siehe finance.store.
+    if (useTourStore.getState().active) return
     const today = new Date()
     const from = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0))
     const to   = localIso(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59))

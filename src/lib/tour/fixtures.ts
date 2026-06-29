@@ -5,6 +5,8 @@ import type { Invoice, FinanceKpis } from '@/types/finance.types'
 import type { Lead } from '@/types/lead.types'
 import type { FollowUp } from '@/types/crm.types'
 import type { Activity } from '@/types/pipeline.types'
+import type { CalendarEvent } from '@/types/calendar.types'
+import type { EmailHeader } from '@/types/mail.types'
 
 export const TOUR_WS = 'tour-ws'
 export const TOUR_CUSTOMER_ID = 'tour-cust-1'
@@ -19,6 +21,8 @@ const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
 const shift = (days: number) => { const d = new Date(NOW); d.setDate(d.getDate() + days); return d }
 const dayBefore = (days: number) => ymd(shift(-days))
 const isoAt = (days: number, hour: number) => { const d = shift(days); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+const atToday = (hour: number, min = 0) => { const d = new Date(NOW); d.setHours(hour, min, 0, 0); return d.toISOString() }
+const nowShift = (mins: number) => { const d = new Date(NOW); d.setMinutes(d.getMinutes() + mins); return d.toISOString() }
 
 const TODAY = ymd(NOW)
 // Bezahlte Demo-Rechnung auf HEUTE → immer in der laufenden Woche UND im laufenden Monat,
@@ -60,6 +64,8 @@ export const tourTodos: Todo[] = [
     dueDate: TODAY, scheduledAt: isoAt(0, 14) },
   { id: 'tour-todo-2', title: 'Rechnung Nordlicht nachfassen', status: 'open', priority: 'p2', bucket: 'backlog',
     checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: 'tour-cust-2', dueDate: dayBefore(9) },
+  { id: 'tour-todo-4', title: 'Rückruf Frau Dr. Klein', status: 'open', priority: 'p2', bucket: 'today',
+    checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: 'tour-cust-3', dueDate: TODAY },
   { id: 'tour-todo-3', title: 'Kickoff-Notizen verschickt', status: 'done', priority: 'p3', bucket: 'done',
     checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: TOUR_CUSTOMER_ID },
 ]
@@ -112,3 +118,29 @@ export const tourActivities: Activity[] = [
     customerId: TOUR_CUSTOMER_ID, type: 'task', status: 'open', title: 'Angebot finalisieren',
     dueAt: isoAt(0, 14), createdAt: TS, updatedAt: TS },
 ]
+
+// Kalender-Termine HEUTE → füllen „Mein Tagesplan" mit Uhrzeiten; einer läuft gerade („Jetzt").
+const baseEvent = { workspaceId: TOUR_WS, createdBy: 'tour-user', allDay: false, createdAt: TS, updatedAt: TS }
+export const tourCalendarEvents: CalendarEvent[] = [
+  { ...baseEvent, id: 'tour-ev-1', title: 'Team-Standup', startAt: atToday(9, 0), endAt: atToday(9, 15), location: 'Video' },
+  { ...baseEvent, id: 'tour-ev-2', title: 'Call mit Bergmann Design', accountId: TOUR_CUSTOMER_ID,
+    startAt: nowShift(-20), endAt: nowShift(40), location: 'Google Meet' },
+  { ...baseEvent, id: 'tour-ev-3', title: 'Angebot-Review Nordlicht', accountId: 'tour-cust-2',
+    startAt: atToday(16, 0), endAt: atToday(17, 0), location: 'Büro' },
+]
+
+// Demo-Mails für die Inbox-Karte auf dem Dashboard (ungelesen oben).
+const TOUR_MAIL_ACCOUNT = 'tour-mail-acc'
+export const tourEmails: EmailHeader[] = [
+  { id: 'tour-mail-1', accountId: TOUR_MAIL_ACCOUNT, uid: 1, folder: 'INBOX',
+    subject: 'Re: Angebot – kurze Rückfrage', fromAddr: 'kontakt@bergmann.example', fromName: 'Lena Bergmann',
+    toAddrs: ['ich@example.com'], sentAt: nowShift(-45), isRead: false, customerId: TOUR_CUSTOMER_ID, notALead: false },
+  { id: 'tour-mail-2', accountId: TOUR_MAIL_ACCOUNT, uid: 2, folder: 'INBOX',
+    subject: 'Anfrage: Website-Relaunch', fromAddr: 'voss@example.com', fromName: 'Studio Voss',
+    toAddrs: ['ich@example.com'], sentAt: nowShift(-180), isRead: false, customerId: null, notALead: false },
+  { id: 'tour-mail-3', accountId: TOUR_MAIL_ACCOUNT, uid: 3, folder: 'INBOX',
+    subject: 'Rechnung erhalten – danke!', fromAddr: 'hallo@nordlicht.example', fromName: 'Nordlicht Studios',
+    toAddrs: ['ich@example.com'], sentAt: atToday(8, 30), isRead: true, customerId: 'tour-cust-2', notALead: false },
+]
+
+export const TOUR_MAIL_ACCOUNT_ID = TOUR_MAIL_ACCOUNT

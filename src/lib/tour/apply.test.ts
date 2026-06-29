@@ -11,13 +11,19 @@ import { applyTourFixtures, clearTourFixtures } from './apply'
 import { useCustomersStore } from '@/store/customers.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useCalendarStore } from '@/store/calendar.store'
+import { useMailStore } from '@/store/mail.store'
+import { useTourStore } from '@/store/tour.store'
 import { tourCustomers } from './fixtures'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useTourStore.setState({ active: false } as any)
   useCustomersStore.setState({ customers: [] } as any)
   useFinanceStore.setState({ invoices: [], kpis: null } as any)
   useLeadsStore.setState({ leads: [] } as any)
+  useCalendarStore.setState({ todayEvents: [] } as any)
+  useMailStore.setState({ emails: [], selectedAccountId: null } as any)
 })
 
 describe('tour apply/clear', () => {
@@ -38,5 +44,26 @@ describe('tour apply/clear', () => {
     clearTourFixtures('real-ws')
     expect(useCustomersStore.getState().customers.every(c => !c.id.startsWith('tour-'))).toBe(true)
     expect(useFinanceStore.getState().invoices.every(i => !i.id.startsWith('tour-'))).toBe(true)
+  })
+
+  it('füllt auch Kalender-Termine + Demo-Mails', () => {
+    applyTourFixtures()
+    expect(useCalendarStore.getState().todayEvents.length).toBeGreaterThan(0)
+    expect(useMailStore.getState().emails.length).toBeGreaterThan(0)
+    expect(useMailStore.getState().selectedAccountId).toBeTruthy()
+  })
+
+  it('clear leert Kalender-Termine + Mails wieder', () => {
+    applyTourFixtures()
+    clearTourFixtures('real-ws')
+    expect(useCalendarStore.getState().todayEvents.every(e => !e.id.startsWith('tour-'))).toBe(true)
+    expect(useMailStore.getState().emails.every(e => !e.id.startsWith('tour-'))).toBe(true)
+  })
+
+  it('calendar.loadToday überschreibt die Tour-Termine während der Tour nicht (Guard)', async () => {
+    useTourStore.setState({ active: true } as any)
+    applyTourFixtures()
+    await useCalendarStore.getState().loadToday('real-ws')
+    expect(useCalendarStore.getState().todayEvents.length).toBeGreaterThan(0)
   })
 })

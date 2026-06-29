@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tourCustomers, tourAccounts, tourTodos, tourInvoices, tourKpis, tourLeads, tourActivities, TOUR_CUSTOMER_ID } from './fixtures'
+import { tourCustomers, tourAccounts, tourTodos, tourInvoices, tourKpis, tourLeads, tourActivities, tourCalendarEvents, tourEmails, TOUR_CUSTOMER_ID } from './fixtures'
 
 describe('tour fixtures', () => {
   it('alle IDs sind tour-präfixiert (nichts kollidiert mit echten Daten)', () => {
@@ -38,5 +38,16 @@ describe('tour fixtures', () => {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     expect(tourTodos.some(t => t.dueDate === today || t.scheduledAt?.slice(0, 10) === today)).toBe(true)
+  })
+
+  it('hat einen Kalender-Termin, der gerade läuft (Tagesplan zeigt „Jetzt")', () => {
+    const now = new Date()
+    expect(tourCalendarEvents.length).toBeGreaterThan(0)
+    expect(tourCalendarEvents.some(e => new Date(e.startAt) <= now && new Date(e.endAt) >= now)).toBe(true)
+  })
+
+  it('hat Demo-Mails inkl. ungelesener (Inbox-Karte gefüllt)', () => {
+    expect(tourEmails.length).toBeGreaterThan(0)
+    expect(tourEmails.some(e => !e.isRead)).toBe(true)
   })
 })
