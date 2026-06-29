@@ -1,7 +1,7 @@
 [package]
 name = "focus"
 version = "0.0.1"
-description = "Cultera Focus — Business Management Desktop App"
+description = "Cultera OS — Business Management Desktop App"
 authors = ["Cultera"]
 edition = "2021"
 rust-version = "1.77"

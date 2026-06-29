@@ -231,7 +231,7 @@ export function LoginScreen() {
               fontSize: 11.5, fontFamily: 'var(--font-sans)', fontWeight: 500,
               color: 'rgba(255,255,255,0.7)', letterSpacing: '0.01em',
             }}>
-              Cultera Focus<sup style={{ fontSize: 8 }}>®</sup>
+              Cultera OS<sup style={{ fontSize: 8 }}>®</sup>
             </div>
 
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

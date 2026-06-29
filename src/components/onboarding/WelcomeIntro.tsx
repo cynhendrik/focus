@@ -47,7 +47,7 @@ export function WelcomeIntro({ onDone }: Props) {
           marginTop: 14, fontFamily: 'var(--font-mono, monospace)', fontSize: 11,
           letterSpacing: '0.34em', textTransform: 'uppercase', color: 'rgba(180,200,235,0.62)',
         }}>
-          Dein Cultera Focus ist bereit
+          Dein Cultera OS ist bereit
         </p>
         <button
           type="button"
