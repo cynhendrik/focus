@@ -24,6 +24,7 @@ import { messageRowToMessage } from '@/data/messages.mapper'
 import { notificationRowToNotification } from '@/data/notifications.mapper'
 import { useAuthStore } from '@/store/auth.store'
 import { applyAccountsRealtimeChange } from './accountsRealtime'
+import { debounce } from '@/lib/debounce'
 import { log } from '@/lib/logger'
 
 export function useWorkspaceRealtime() {
@@ -33,6 +34,30 @@ export function useWorkspaceRealtime() {
 
   useEffect(() => {
     if (!activeWorkspaceId || !isShared) return
+
+    // Die `activities`-Tabelle speist gleich mehrere (historisch getrennte) Stores:
+    // offene Follow-ups, Kunden-Aktivitäten, Notizen, Aufgaben/Deadlines, CRM-Follow-ups,
+    // Zeiteinträge. Eine einzelne Nutzeraktion schreibt oft mehrere Zeilen → ohne Debounce
+    // feuert jeder Insert einen kompletten Reload-Zyklus. Debounced kollabiert ein Event-
+    // Bündel zu EINEM Reload (Korrektheit unberührt, nur ~150 ms später).
+    const reloadActivities = debounce(() => {
+      const actState = useActivitiesStore.getState()
+      actState.loadOpenFollowups(activeWorkspaceId)
+      if (actState.currentCustomerId) actState.loadForCustomer(actState.currentCustomerId)
+      const notesState = useNotesStore.getState()
+      if (notesState.currentCustomerId) notesState.loadForCustomer(notesState.currentCustomerId)
+      useTodosStore.getState().loadAll(activeWorkspaceId)
+      const todoState = useTodosStore.getState()
+      if (todoState.currentCustomerId) todoState.loadForCustomer(todoState.currentCustomerId)
+      // Deadlines (= activities type='task') and per-customer follow-ups
+      // (crmStore) are separate stores over the same table — keep them fresh too.
+      const deadlinesState = useDeadlinesStore.getState()
+      if (deadlinesState.currentCustomerId) deadlinesState.loadForCustomer(deadlinesState.currentCustomerId)
+      const crmState = useCrmStore.getState()
+      if (crmState.currentCustomerId) crmState.loadForCustomer(crmState.currentCustomerId)
+      const timeState = useTimeStore.getState()
+      if (timeState.currentCustomerId) timeState.loadForCustomer(timeState.currentCustomerId)
+    }, 150)
 
     const channel = supabase
       .channel(`ws-accounts-${activeWorkspaceId}`)
@@ -136,26 +161,9 @@ export function useWorkspaceRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'zeiteintraege', filter: `workspace_id=eq.${activeWorkspaceId}` },
           () => { useAuftraege.getState().loadAuftraege(activeWorkspaceId) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activities', filter: `workspace_id=eq.${activeWorkspaceId}` },
-          () => {
-            const actState = useActivitiesStore.getState()
-            actState.loadOpenFollowups(activeWorkspaceId)
-            if (actState.currentCustomerId) actState.loadForCustomer(actState.currentCustomerId)
-            const notesState = useNotesStore.getState()
-            if (notesState.currentCustomerId) notesState.loadForCustomer(notesState.currentCustomerId)
-            useTodosStore.getState().loadAll(activeWorkspaceId)
-            const todoState = useTodosStore.getState()
-            if (todoState.currentCustomerId) todoState.loadForCustomer(todoState.currentCustomerId)
-            // Deadlines (= activities type='task') and per-customer follow-ups
-            // (crmStore) are separate stores over the same table — keep them fresh too.
-            const deadlinesState = useDeadlinesStore.getState()
-            if (deadlinesState.currentCustomerId) deadlinesState.loadForCustomer(deadlinesState.currentCustomerId)
-            const crmState = useCrmStore.getState()
-            if (crmState.currentCustomerId) crmState.loadForCustomer(crmState.currentCustomerId)
-            const timeState = useTimeStore.getState()
-            if (timeState.currentCustomerId) timeState.loadForCustomer(timeState.currentCustomerId)
-          })
+          () => reloadActivities())
       .subscribe()
 
-    return () => { supabase.removeChannel(channel); supabase.removeChannel(finance) }
+    return () => { reloadActivities.cancel(); supabase.removeChannel(channel); supabase.removeChannel(finance) }
   }, [activeWorkspaceId, isShared])
 }
