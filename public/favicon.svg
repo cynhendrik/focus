@@ -1,8 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
-  <rect width="160" height="160" rx="36" fill="#3B6DF4"/>
-  <g fill="#FFFFFF" transform="translate(1 0) skewX(-14)">
-    <rect x="78" y="36" width="56" height="23" rx="11"/>
-    <rect x="56" y="69" width="56" height="23" rx="11"/>
-    <rect x="68" y="102" width="33" height="23" rx="11"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs>
+    <linearGradient id="graphite" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#262A31"/><stop offset="1" stop-color="#14161A"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FF9576"/><stop offset="1" stop-color="#F2754F"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+    <radialGradient id="gloss" cx="0.28" cy="0" r="0.9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.52" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tile"><rect width="1080" height="1080" rx="243"/></clipPath>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="60"/></filter>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect width="1080" height="1080" fill="url(#graphite)"/>
+    <ellipse cx="620" cy="830" rx="360" ry="300" fill="#F2754F" opacity="0.22" filter="url(#glow)"/>
+
+    <!-- back glass cards -->
+    <g transform="rotate(-19 540 787.2)" opacity="0.42">
+      <rect x="301.5" y="231" width="477" height="618" rx="114" fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.2" stroke-width="3"/>
+    </g>
+    <g transform="rotate(-2 540 787.2)" opacity="0.66">
+      <rect x="301.5" y="231" width="477" height="618" rx="114" fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.2" stroke-width="3"/>
+    </g>
+
+    <!-- coral front sheet + document lines -->
+    <g transform="rotate(15 540 787.2)">
+      <rect x="301.5" y="231" width="477" height="618" rx="114" fill="url(#coral)" stroke="#ffffff" stroke-opacity="0.28" stroke-width="3"/>
+      <rect x="392.5" y="345" width="207" height="57" rx="19" fill="#33343B"/>
+      <rect x="392.5" y="463" width="295" height="32" rx="16" fill="#282930"/>
+      <rect x="392.5" y="539" width="219" height="32" rx="16" fill="#282930" opacity="0.5"/>
+    </g>
+
+    <!-- top gloss -->
+    <rect width="1080" height="1080" fill="url(#gloss)"/>
   </g>
 </svg>
