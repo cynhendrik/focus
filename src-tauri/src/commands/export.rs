@@ -392,6 +392,37 @@ pub fn cmd_has_local_orphan_data(db: State<'_, DbPool>) -> Result<bool, String> 
     has_workspace_data(&conn, "dev")
 }
 
+/// Wie reset_workspace_local, aber für DELETE: leert ALLE Inhalts-Tabellen inkl.
+/// Firmenprofil/Nummernkreise. Nur der App-Shell-State (app_state) bleibt erhalten.
+pub fn delete_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), String> {
+    const KEEP: &[&str] = &["app_state"];
+
+    let tables: Vec<String> = {
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' \
+                      AND name NOT LIKE 'sqlite_%' AND name != 'sync_queue' ORDER BY name")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+        rows.filter_map(Result::ok).collect()
+    };
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute_batch("PRAGMA defer_foreign_keys=ON;").map_err(|e| e.to_string())?;
+    for t in &tables {
+        if KEEP.contains(&t.as_str()) { continue; }
+        tx.execute(&format!("DELETE FROM \"{t}\""), [])
+            .map_err(|e| format!("{t}: {e}"))?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cmd_delete_workspace(db: State<'_, DbPool>) -> Result<(), String> {
+    let mut conn = db.conn();
+    delete_workspace_local(&mut conn)
+}
+
 #[tauri::command]
 pub fn cmd_reset_workspace(db: State<'_, DbPool>) -> Result<(), String> {
     let mut conn = db.conn();
@@ -684,5 +715,28 @@ mod tests {
         assert_eq!(settings, 1);
         assert_eq!(seq, 5);
         assert_eq!(oseq, 3);
+    }
+
+    #[test]
+    fn delete_workspace_local_clears_even_kept_tables() {
+        use rusqlite::Connection;
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE accounts (id TEXT PRIMARY KEY, workspace_id TEXT, name TEXT);
+             CREATE TABLE company_settings (id TEXT PRIMARY KEY, name TEXT);
+             CREATE TABLE app_state (k TEXT PRIMARY KEY, v TEXT);
+             INSERT INTO accounts VALUES ('a1','ws1','A');
+             INSERT INTO company_settings VALUES ('c1','Meine Firma');
+             INSERT INTO app_state VALUES ('theme','dark');",
+        ).unwrap();
+
+        delete_workspace_local(&mut conn).unwrap();
+
+        let accounts: i64 = conn.query_row("SELECT count(*) FROM accounts", [], |r| r.get(0)).unwrap();
+        let company:  i64 = conn.query_row("SELECT count(*) FROM company_settings", [], |r| r.get(0)).unwrap();
+        let appstate: i64 = conn.query_row("SELECT count(*) FROM app_state", [], |r| r.get(0)).unwrap();
+        assert_eq!(accounts, 0);
+        assert_eq!(company, 0);   // anders als reset_workspace_local: company_settings wird MIT geleert
+        assert_eq!(appstate, 1);  // App-Shell-State bleibt
     }
 }

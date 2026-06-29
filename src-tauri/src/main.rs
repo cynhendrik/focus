@@ -325,6 +325,7 @@ fn main() {
             commands::export::cmd_export_backup,
             commands::export::cmd_import_backup,
             commands::export::cmd_reset_workspace,
+            commands::export::cmd_delete_workspace,
             commands::export::cmd_rescope_workspace,
             commands::export::cmd_has_local_orphan_data,
             commands::export::cmd_dump_table,
