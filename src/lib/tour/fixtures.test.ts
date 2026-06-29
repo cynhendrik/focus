@@ -19,15 +19,19 @@ describe('tour fixtures', () => {
     expect(tourKpis.yearRevenue).toBeGreaterThan(0)
   })
 
-  // Dashboard berechnet „Umsatz diesen Monat" aus bezahlten Rechnungen mit date >= Monatsanfang.
-  // Mit fixen Mai-Daten wäre das Ende Juni leer → relativ zu heute datieren.
-  it('hat eine bezahlte Rechnung im aktuellen Monat (Dashboard-Umsatz > 0)', () => {
+  // Dashboard zeigt „Umsatz" default für die LAUFENDE WOCHE (revRange='week') aus bezahlten
+  // Rechnungen mit date >= Wochenanfang. Eine Rechnung „vor 4 Tagen" kann in der Vorwoche
+  // liegen → paidNow=0 / -100%. Darum muss die bezahlte Demo-Rechnung in die aktuelle Woche fallen.
+  it('hat eine bezahlte Rechnung in der laufenden Woche (Dashboard-Umsatz > 0, nicht -100%)', () => {
     const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const paidThisMonth = tourInvoices.filter(
-      i => i.status === 'paid' && new Date(i.date) >= startOfMonth && new Date(i.date) <= now,
+    const sow = new Date(now)
+    const day = sow.getDay()
+    sow.setHours(0, 0, 0, 0)
+    sow.setDate(now.getDate() + (day === 0 ? -6 : 1 - day))   // Montag dieser Woche (wie DashboardRoute)
+    const paidThisWeek = tourInvoices.filter(
+      i => i.status === 'paid' && new Date(i.date) >= sow && new Date(i.date) <= now,
     )
-    expect(paidThisMonth.length).toBeGreaterThan(0)
+    expect(paidThisWeek.length).toBeGreaterThan(0)
   })
 
   it('hat mindestens eine heute fällige Aufgabe (Tagesplan/Heute-fällig gefüllt)', () => {

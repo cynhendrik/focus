@@ -21,8 +21,8 @@ const dayBefore = (days: number) => ymd(shift(-days))
 const isoAt = (days: number, hour: number) => { const d = shift(days); d.setHours(hour, 0, 0, 0); return d.toISOString() }
 
 const TODAY = ymd(NOW)
-// Bezahlte Demo-Rechnung sicher im aktuellen Monat (am Monatsanfang noch kein „vor 4 Tagen").
-const PAID_THIS_MONTH = NOW.getDate() >= 5 ? dayBefore(4) : ymd(new Date(NOW.getFullYear(), NOW.getMonth(), 1))
+// Bezahlte Demo-Rechnung auf HEUTE → immer in der laufenden Woche UND im laufenden Monat,
+// damit der Dashboard-Umsatz (Default = Woche) gefüllt ist (nicht 0 / -100%).
 const PAID_LAST_MONTH = ymd(new Date(NOW.getFullYear(), NOW.getMonth() - 1, 15))
 const TS = isoAt(-25, 9)                          // generische created/updated-Zeit (vor ~25 Tagen)
 
@@ -70,9 +70,9 @@ const baseInv = {
 }
 
 export const tourInvoices: Invoice[] = [
-  // Bezahlt, dieser Monat → Dashboard-Umsatz „diesen Monat".
+  // Bezahlt heute → Dashboard-Umsatz (Default: diese Woche) gefüllt.
   { ...baseInv, id: 'tour-inv-1', accountId: TOUR_CUSTOMER_ID, number: 'RE-001',
-    date: PAID_THIS_MONTH, dueDate: dayBefore(-10), status: 'paid', subtotal: 3000, taxAmount: 570, total: 3570 },
+    date: TODAY, dueDate: dayBefore(-10), status: 'paid', subtotal: 3000, taxAmount: 570, total: 3570 },
   // Bezahlt im Vormonat → liefert den „vs Vormonat"-Vergleich.
   { ...baseInv, id: 'tour-inv-3', accountId: TOUR_CUSTOMER_ID, number: 'RE-000',
     date: PAID_LAST_MONTH, dueDate: PAID_LAST_MONTH, status: 'paid', subtotal: 2000, taxAmount: 380, total: 2380 },
