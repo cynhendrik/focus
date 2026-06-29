@@ -442,7 +442,6 @@ export function DateienPane({ customerId }: Props) {
 
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [sidebarTab] = useState<'ordner'>('ordner')
   const [search,      setSearch]      = useState('')
   const [creating,    setCreating]    = useState(false)
   const [delTarget,   setDelTarget]   = useState<FolderType | null>(null)

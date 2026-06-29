@@ -38,9 +38,7 @@ const SettingsRoute      = lazy(() => named(import('@/routes/SettingsRoute'), 'S
 const IntegrationsRoute  = lazy(() => named(import('@/routes/IntegrationsRoute'), 'IntegrationsRoute'))
 const ProfileRoute       = lazy(() => named(import('@/routes/ProfileRoute'), 'ProfileRoute'))
 const CalendarRoute      = lazy(() => named(import('@/routes/CalendarRoute'), 'CalendarRoute'))
-const JournalRoute       = lazy(() => named(import('@/routes/JournalRoute'), 'JournalRoute'))
 const CorraRoute         = lazy(() => named(import('@/routes/CorraRoute'), 'CorraRoute'))
-const NotesRoute         = lazy(() => named(import('@/routes/NotesRoute'), 'NotesRoute'))
 const AkquiseRoute       = lazy(() => named(import('@/routes/AkquiseRoute'), 'AkquiseRoute'))
 const PosteingangRoute   = lazy(() => named(import('@/routes/PosteingangRoute'), 'PosteingangRoute'))
 const ZeitmanagementRoute = lazy(() => named(import('@/routes/ZeitmanagementRoute'), 'ZeitmanagementRoute'))
@@ -237,11 +235,9 @@ export default function App() {
       case 'invoices':     return <FinanceRoute />
       case 'akquise':      return <AkquiseRoute />
       case 'posteingang':  return <PosteingangRoute />
-      case 'journal':      return <JournalRoute />
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
       case 'corra':           return <CorraRoute />
-      case 'notes':           return <NotesRoute />
       case 'zeitmanagement':  return <ZeitmanagementRoute />
       case 'calendar':        return <CalendarRoute />
       // Akquise / Sales (vormals LEVERAGE — jetzt in der einen Shell)

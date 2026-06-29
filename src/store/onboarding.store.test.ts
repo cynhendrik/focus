@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useOnboardingStore, ONBOARDING_STEP_IDS, ONBOARDING_STEPS, selectAllDone } from './onboarding.store'
+import { useUiStore } from './ui.store'
 import { useCustomersStore } from './customers.store'
 import { useNotesStore } from './notes.store'
 import { useTodosStore } from './todos.store'
@@ -29,6 +30,16 @@ describe('onboarding.store', () => {
   it('has 5 steps with valid metadata', () => {
     expect(ONBOARDING_STEP_IDS).toEqual(['kunde', 'notiz', 'aufgabe', 'lead', 'corra'])
     expect(ONBOARDING_STEPS.map(s => s.id)).toEqual(ONBOARDING_STEP_IDS)
+  })
+
+  it('"notiz" öffnet Quick Capture statt einer eigenen Notizen-Ansicht', () => {
+    const notiz = ONBOARDING_STEPS.find(s => s.id === 'notiz')!
+    // Notizen leben nur noch in Quick Capture + Kunden-Tab → kein eigener 'notes'-AppView mehr.
+    expect(notiz.view).toBeUndefined()
+    expect(typeof notiz.action).toBe('function')
+    useUiStore.setState({ quickCaptureOpen: false })
+    notiz.action!()
+    expect(useUiStore.getState().quickCaptureOpen).toBe(true)
   })
 
   it('latches "kunde" when a real customer exists (ignores Privat)', () => {

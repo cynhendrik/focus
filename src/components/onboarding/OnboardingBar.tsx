@@ -1,7 +1,7 @@
 import { Check, X } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
 import {
-  useOnboardingStore, ONBOARDING_STEPS, selectAllDone, selectDoneCount,
+  useOnboardingStore, ONBOARDING_STEPS, runOnboardingStep, selectAllDone, selectDoneCount,
 } from '@/store/onboarding.store'
 
 /**
@@ -38,7 +38,7 @@ export function OnboardingBar() {
               className="onboarding-pill"
               data-done={isDone ? 'true' : 'false'}
               data-current={isCur ? 'true' : 'false'}
-              onClick={() => setAppView(step.view)}
+              onClick={() => runOnboardingStep(step, setAppView)}
               title={step.hint}
             >
               <span className="onboarding-pill__dot">

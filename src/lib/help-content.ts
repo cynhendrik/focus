@@ -1,4 +1,5 @@
 import type { AppView } from '@/store/ui.store'
+import { useUiStore } from '@/store/ui.store'
 import { useTourStore } from '@/store/tour.store'
 
 export interface HelpEntry { title: string; body: string; view?: AppView; action?: () => void }
@@ -22,7 +23,7 @@ export const HELP_CONTENT: HelpCategory[] = [
   {
     id: 'notizen', label: 'Notizen',
     entries: [
-      { title: 'Notizen festhalten', body: 'Schreibe freie Notizen — global oder direkt an einem Kunden. Ideal für Gesprächsnotizen und Ideen.', view: 'notes' },
+      { title: 'Notiz festhalten', body: 'Halte Notizen per Schnell-Erfassung (⌘⇧N) fest — optional direkt an einem Kunden. In der Kundenakte findest du sie unter „Notizen".', action: () => useUiStore.getState().setQuickCaptureOpen(true) },
     ],
   },
   {

@@ -4,7 +4,7 @@ import { HELP_CONTENT } from './help-content'
 const VALID_VIEWS = new Set([
   'dashboard','profile','clients','akquise','invoices','settings','integrations',
   'posteingang','zeitmanagement','pipeline','calendar','mail','followups','leads',
-  'journal','focus','corra','notes','sales',
+  'corra','sales',
   'leverage_inbox','leverage_leads','leverage_pipeline','leverage_mail','leverage_lead_detail',
 ])
 

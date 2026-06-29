@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X, Check, ChevronRight } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
-import { useOnboardingStore, ONBOARDING_STEPS, selectDoneCount } from '@/store/onboarding.store'
+import { useOnboardingStore, ONBOARDING_STEPS, runOnboardingStep, selectDoneCount } from '@/store/onboarding.store'
 import { HELP_CONTENT } from '@/lib/help-content'
 import type { AppView } from '@/store/ui.store'
 
@@ -33,7 +33,7 @@ export function HelpDrawer() {
           <div className="help-drawer__group-label">Erste Schritte · {doneCount} / {ONBOARDING_STEPS.length}</div>
           {ONBOARDING_STEPS.map(step => (
             <button key={step.id} type="button" className="help-step" data-done={done[step.id] ? 'true' : 'false'}
-              onClick={() => go(step.view)}>
+              onClick={() => { runOnboardingStep(step, setAppView); setHelpOpen(false) }}>
               <span className="help-step__dot">{done[step.id] ? <Check size={11} /> : null}</span>
               <span>{step.label}</span>
             </button>

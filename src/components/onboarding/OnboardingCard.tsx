@@ -1,9 +1,8 @@
 import { Check, X, ArrowRight } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
 import {
-  useOnboardingStore, ONBOARDING_STEPS, selectAllDone, selectDoneCount,
+  useOnboardingStore, ONBOARDING_STEPS, runOnboardingStep, selectAllDone, selectDoneCount,
 } from '@/store/onboarding.store'
-import type { AppView } from '@/store/ui.store'
 
 /**
  * Pop-up-Karte beim Erststart: die 5 Schritte als Kacheln, die man abarbeitet.
@@ -24,7 +23,6 @@ export function OnboardingCard() {
   // Erst nach dem Unternehmensdaten-Schritt.
   if (!welcomeSeen || !companyDone || cardCollapsed || barDismissed || allDone) return null
 
-  const go = (view: AppView) => { setAppView(view); collapseCard() }
 
   return (
     <div className="onboarding-card__overlay" onClick={collapseCard}>
@@ -59,7 +57,7 @@ export function OnboardingCard() {
                 type="button"
                 className="onboarding-tile"
                 data-done={isDone ? 'true' : 'false'}
-                onClick={() => go(step.view)}
+                onClick={() => { runOnboardingStep(step, setAppView); collapseCard() }}
               >
                 <span className="onboarding-tile__dot">
                   {isDone ? <Check size={13} /> : i + 1}

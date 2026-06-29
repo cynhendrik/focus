@@ -33,10 +33,18 @@ describe('OnboardingCard', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('clicking a tile navigates and collapses the card', () => {
+  it('clicking a navigating tile navigates and collapses the card', () => {
+    render(<OnboardingCard />)
+    fireEvent.click(screen.getByRole('button', { name: /Kunde anlegen/i }))
+    expect(useUiStore.getState().appView).toBe('clients')
+    expect(useOnboardingStore.getState().cardCollapsed).toBe(true)
+  })
+
+  it('clicking the "Notiz anlegen" tile opens Quick Capture and collapses the card', () => {
+    useUiStore.setState({ quickCaptureOpen: false })
     render(<OnboardingCard />)
     fireEvent.click(screen.getByRole('button', { name: /Notiz anlegen/i }))
-    expect(useUiStore.getState().appView).toBe('notes')
+    expect(useUiStore.getState().quickCaptureOpen).toBe(true)
     expect(useOnboardingStore.getState().cardCollapsed).toBe(true)
   })
 

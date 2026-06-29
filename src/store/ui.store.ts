@@ -79,8 +79,8 @@ export type AppView =
   | 'settings'  | 'integrations'
   | 'posteingang' | 'zeitmanagement'
   | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
-  | 'journal'   | 'focus'     | 'corra'
-  | 'notes'     | 'sales'
+  | 'corra'
+  | 'sales'
   // Akquise / Sales views (vormals LEVERAGE — jetzt Teil der einen Nav)
   | 'leverage_inbox'
   | 'leverage_leads'

@@ -5,6 +5,7 @@ import { useNotesStore } from '@/store/notes.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useDealsStore } from '@/store/deals.store'
+import { useUiStore } from '@/store/ui.store'
 import { PRIVATE_CUSTOMER_ID } from '@/types/customer.types'
 import type { AppView } from '@/store/ui.store'
 
@@ -14,17 +15,27 @@ export interface OnboardingStepMeta {
   id: OnboardingStepId
   label: string
   hint: string
-  view: AppView
+  /** Ziel-Ansicht: Klick navigiert dorthin … */
+  view?: AppView
+  /** … ODER eine Aktion statt Navigation (z. B. Quick Capture öffnen). Hat Vorrang vor `view`. */
+  action?: () => void
 }
 
 /** Schritt-Metadaten — geteilt von OnboardingBar und HelpDrawer (DRY). */
 export const ONBOARDING_STEPS: OnboardingStepMeta[] = [
   { id: 'kunde',   label: 'Kunde anlegen',     hint: 'Lege deinen ersten echten Kunden an.',        view: 'clients' },
-  { id: 'notiz',   label: 'Notiz anlegen',     hint: 'Halte deine erste Notiz fest.',               view: 'notes' },
+  // Notizen leben nur noch in Quick Capture + im Kunden-Notizen-Tab → kein eigener 'notes'-View.
+  { id: 'notiz',   label: 'Notiz anlegen',     hint: 'Halte deine erste Notiz fest.',               action: () => useUiStore.getState().setQuickCaptureOpen(true) },
   { id: 'aufgabe', label: 'Aufgabe erstellen', hint: 'Erstelle deine erste Aufgabe.',               view: 'dashboard' },
   { id: 'lead',    label: 'Lead anlegen',      hint: 'Bring deinen ersten Lead in die Pipeline.',   view: 'leverage_leads' },
   { id: 'corra',   label: 'KI-Briefing öffnen',hint: 'Probier KORA — deinen KI-Assistenten.',       view: 'corra' },
 ]
+
+/** Führt einen Onboarding-Schritt aus: bevorzugt `action`, sonst Navigation via `navigate(view)`. */
+export function runOnboardingStep(step: OnboardingStepMeta, navigate: (view: AppView) => void) {
+  if (step.action) step.action()
+  else if (step.view) navigate(step.view)
+}
 
 export const ONBOARDING_STEP_IDS: OnboardingStepId[] = ONBOARDING_STEPS.map(s => s.id)
 

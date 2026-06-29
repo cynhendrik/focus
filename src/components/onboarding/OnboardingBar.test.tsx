@@ -39,8 +39,15 @@ describe('OnboardingBar', () => {
 
   it('navigates when a step pill is clicked', () => {
     render(<OnboardingBar />)
+    fireEvent.click(screen.getByRole('button', { name: /Kunde anlegen/i }))
+    expect(useUiStore.getState().appView).toBe('clients')
+  })
+
+  it('opens Quick Capture for the "Notiz anlegen" step (no separate notes view)', () => {
+    useUiStore.setState({ quickCaptureOpen: false })
+    render(<OnboardingBar />)
     fireEvent.click(screen.getByRole('button', { name: /Notiz anlegen/i }))
-    expect(useUiStore.getState().appView).toBe('notes')
+    expect(useUiStore.getState().quickCaptureOpen).toBe(true)
   })
 
   it('dismisses on the close button', () => {
