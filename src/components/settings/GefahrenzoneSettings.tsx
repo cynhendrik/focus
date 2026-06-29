@@ -63,7 +63,8 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
     const sharedWarn = isShared
       ? '\n\nACHTUNG: Dieser Workspace ist GETEILT — er wird für ALLE Mitglieder gelöscht.'
       : ''
-    if (!window.confirm(`Workspace „${activeId}" endgültig löschen? Alle Inhalte UND der Workspace selbst werden entfernt. Unwiderruflich.${sharedWarn}`)) return
+    const wsName = [...workspaces, ...localWorkspaces].find(w => w.id === activeId)?.name ?? activeId
+    if (!window.confirm(`Workspace „${wsName}" endgültig löschen? Alle Inhalte UND der Workspace selbst werden entfernt. Unwiderruflich.${sharedWarn}`)) return
     setBusy('delete')
     try {
       await deleteWorkspace(activeId)

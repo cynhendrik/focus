@@ -25,6 +25,11 @@ declare
   is_owner boolean;
   t record;
 begin
+  -- Idempotent: bereits gelöschter / unbekannter Workspace → stiller No-op (vor dem Owner-Check).
+  if not exists (select 1 from public.workspaces where id = ws_id) then
+    return;
+  end if;
+
   select exists(
     select 1 from public.workspace_members
     where workspace_id = ws_id and user_id = auth.uid()::text and role = 'owner'
@@ -33,8 +38,12 @@ begin
     raise exception 'not authorized: only the workspace owner can delete this workspace';
   end if;
 
+  -- Nur BASE TABLEs (keine Views mit workspace_id → sonst würde delete from <view> die TX abbrechen).
   for t in
     select c.table_name from information_schema.columns c
+    join information_schema.tables tb
+      on tb.table_schema = c.table_schema and tb.table_name = c.table_name
+     and tb.table_type = 'BASE TABLE'
     where c.table_schema = 'public'
       and c.column_name = 'workspace_id'
       and c.table_name <> 'workspaces'
