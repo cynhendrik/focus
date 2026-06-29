@@ -255,7 +255,7 @@ function FeedbackSection() {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
     const fname = `cultera-feedback-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.txt`
-    const content = `Cultera Focus — Feedback\nExportiert: ${now.toLocaleString('de-DE')}\n\n${text}`
+    const content = `Cultera OS — Feedback\nExportiert: ${now.toLocaleString('de-DE')}\n\n${text}`
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

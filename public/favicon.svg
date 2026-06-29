@@ -3,12 +3,13 @@
     <linearGradient id="coral" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#FF6850"/><stop offset="1" stop-color="#FF5D6D"/>
     </linearGradient>
-    <clipPath id="tile"><rect width="1080" height="1080" rx="243"/></clipPath>
+    <clipPath id="tile"><rect width="1080" height="1080" rx="250"/></clipPath>
   </defs>
   <g clip-path="url(#tile)">
     <rect width="1080" height="1080" fill="url(#coral)"/>
-    <text x="556" y="772" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
-          font-size="760" fill="#ffffff">C</text>
-    <circle cx="726" cy="360" r="46" fill="#ffffff"/>
+    <!-- 3 bars: links niedrig · Mitte am höchsten · rechts mittel -->
+    <rect x="195" y="519" width="188" height="316" rx="53" fill="#fff"/>
+    <rect x="446" y="244" width="188" height="591" rx="53" fill="#fff"/>
+    <rect x="697" y="392" width="188" height="443" rx="53" fill="#fff"/>
   </g>
 </svg>

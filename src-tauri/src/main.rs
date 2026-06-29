@@ -167,7 +167,7 @@ fn main() {
             app.manage(EmailDb(std::sync::Mutex::new(conn)));
 
             let window = app.get_webview_window("main").unwrap();
-            window.set_title("Cultera Focus").unwrap();
+            window.set_title("Cultera OS").unwrap();
             // Im Fenster-Vollbild (maximiert) starten.
             window.maximize().unwrap();
 

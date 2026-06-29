@@ -1092,12 +1092,6 @@ textarea.mock-input { resize: vertical; line-height: 1.5; }
   100% { opacity: 1;    transform: translate3d(0, 0, 0);    filter: blur(0); }
 }
 
-/* Login intro — gentler, single smooth deceleration (no mid-keyframe kink) */
-@keyframes intro-word-rise {
-  0%   { opacity: 0; transform: translate3d(0, 14px, 0); filter: blur(7px); }
-  100% { opacity: 1; transform: translate3d(0, 0, 0);    filter: blur(0); }
-}
-
 /* Brand mark — small accent dot, fades in then breathes */
 .splash__mark {
   position: absolute;
