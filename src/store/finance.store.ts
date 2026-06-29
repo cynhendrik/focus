@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { FinanceService } from '@/services/finance.service'
 import { FinanceGateway } from '@/data/finance.gateway'
+import { toastError } from '@/store/toast.store'
 // getInvoicePdfBytes is imported lazily at call time. This store is in the main
 // bundle, so a static import here would drag the heavy react-pdf lib into the
 // initial load even though PDFs are only generated on demand.
@@ -41,6 +42,20 @@ async function tryAutoSaveToAblage(invoice: Invoice): Promise<void> {
     })
   } catch {
     // Ablage-Fehler unterdrücken — Hauptoperation bleibt unberührt
+  }
+}
+
+// Schreib-Operationen dürfen nicht still scheitern: ein fehlgeschlagener Write (z. B.
+// Rechnung anlegen) wurde bisher nur an die Komponente geworfen und dort selten angezeigt.
+// Dieser Wrapper zeigt eine nutzerverständliche Fehlermeldung und wirft weiter, damit
+// bestehende Aufrufer-Logik (await/Result-Nutzung) unverändert bleibt.
+async function withErrorToast<T>(message: string, op: () => Promise<T>): Promise<T> {
+  try {
+    return await op()
+  } catch (err) {
+    log.error(message, { err })
+    toastError(message)
+    throw err
   }
 }
 
@@ -142,38 +157,38 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
   clearSelectedOffer: () => set({ selectedOffer: null }),
 
-  createInvoice: async (payload) => {
+  createInvoice: (payload) => withErrorToast('Rechnung konnte nicht gespeichert werden.', async () => {
     const result = await FinanceGateway.createInvoice(payload)
     set(s => ({ invoices: [result.invoice, ...s.invoices] }))
     return result
-  },
+  }),
 
-  updateInvoice: async (id, payload) => {
+  updateInvoice: (id, payload) => withErrorToast('Rechnung konnte nicht gespeichert werden.', async () => {
     const result = await FinanceGateway.updateInvoice(id, payload)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? result.invoice : i),
       selectedInvoice: s.selectedInvoice?.invoice.id === id ? result : s.selectedInvoice,
     }))
-  },
+  }),
 
-  deleteInvoice: async (id) => {
+  deleteInvoice: (id) => withErrorToast('Rechnung konnte nicht gelöscht werden.', async () => {
     await FinanceGateway.deleteInvoice(id)
     set(s => ({
       invoices: s.invoices.filter(i => i.id !== id),
       selectedInvoice: s.selectedInvoice?.invoice.id === id ? null : s.selectedInvoice,
     }))
-  },
+  }),
 
-  approveInvoiceSuggestion: async (id, approvedBy, workspaceId) => {
+  approveInvoiceSuggestion: (id, approvedBy, workspaceId) => withErrorToast('Rechnung konnte nicht freigegeben werden.', async () => {
     const approved = await FinanceGateway.approveInvoiceSuggestion(id, approvedBy, workspaceId)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? approved : i),
     }))
     // Neue Rechnung → automatisch in Kunden-Ablage speichern
     tryAutoSaveToAblage(approved)
-  },
+  }),
 
-  updateInvoiceStatus: async (id, status) => {
+  updateInvoiceStatus: (id, status) => withErrorToast('Rechnungsstatus konnte nicht gespeichert werden.', async () => {
     const updated = await FinanceGateway.updateInvoiceStatus(id, status)
     set(s => ({
       invoices: s.invoices.map(i => i.id === id ? updated : i),
@@ -182,7 +197,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     if (status === 'paid' || status === 'open') {
       tryAutoSaveToAblage(updated)
     }
-  },
+  }),
 
   loadPayments: async (workspaceId) => {
     try {
@@ -193,7 +208,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     }
   },
 
-  addPayment: async (payload) => {
+  addPayment: (payload) => withErrorToast('Zahlung konnte nicht gespeichert werden.', async () => {
     await FinanceGateway.addPayment(payload)
     // Rechnungen + Zahlungen neu laden — Status kann auf "bezahlt" kippen.
     const [invoices, payments] = await Promise.all([
@@ -201,54 +216,54 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       FinanceGateway.getPaymentsByWorkspace(payload.workspaceId),
     ])
     set({ invoices, payments })
-  },
+  }),
 
-  deletePayment: async (id, workspaceId) => {
+  deletePayment: (id, workspaceId) => withErrorToast('Zahlung konnte nicht gelöscht werden.', async () => {
     await FinanceGateway.deletePayment(id)
     const [invoices, payments] = await Promise.all([
       FinanceGateway.getInvoices(workspaceId),
       FinanceGateway.getPaymentsByWorkspace(workspaceId),
     ])
     set({ invoices, payments })
-  },
+  }),
 
-  createOffer: async (payload) => {
+  createOffer: (payload) => withErrorToast('Angebot konnte nicht gespeichert werden.', async () => {
     const result = await FinanceGateway.createOffer(payload)
     set(s => ({ offers: [result.offer, ...s.offers] }))
     return result
-  },
+  }),
 
-  updateOffer: async (id, payload) => {
+  updateOffer: (id, payload) => withErrorToast('Angebot konnte nicht gespeichert werden.', async () => {
     const result = await FinanceGateway.updateOffer(id, payload)
     set(s => ({
       offers: s.offers.map(o => o.id === id ? result.offer : o),
       selectedOffer: s.selectedOffer?.offer.id === id ? result : s.selectedOffer,
     }))
-  },
+  }),
 
-  deleteOffer: async (id) => {
+  deleteOffer: (id) => withErrorToast('Angebot konnte nicht gelöscht werden.', async () => {
     await FinanceGateway.deleteOffer(id)
     set(s => ({
       offers: s.offers.filter(o => o.id !== id),
       selectedOffer: s.selectedOffer?.offer.id === id ? null : s.selectedOffer,
     }))
-  },
+  }),
 
-  updateOfferStatus: async (id, status) => {
+  updateOfferStatus: (id, status) => withErrorToast('Angebotsstatus konnte nicht gespeichert werden.', async () => {
     const updated = await FinanceGateway.updateOfferStatus(id, status)
     set(s => ({
       offers: s.offers.map(o => o.id === id ? updated : o),
       selectedOffer: s.selectedOffer?.offer.id === id ? { ...s.selectedOffer, offer: updated } : s.selectedOffer,
     }))
-  },
+  }),
 
-  convertOfferToInvoice: async (offerId, workspaceId, createdBy) => {
+  convertOfferToInvoice: (offerId, workspaceId, createdBy) => withErrorToast('Angebot konnte nicht in eine Rechnung umgewandelt werden.', async () => {
     const result = await FinanceGateway.convertOfferToInvoice(offerId, workspaceId, createdBy)
     set(s => ({
       invoices: [result.invoice, ...s.invoices],
       offers: s.offers.map(o => o.id === offerId ? { ...o, status: 'accepted' as const, convertedInvoiceId: result.invoice.id } : o),
     }))
-  },
+  }),
 
   setActiveTab: (activeTab) => set({ activeTab }),
   setInvoiceFilter: (invoiceFilter) => set({ invoiceFilter }),

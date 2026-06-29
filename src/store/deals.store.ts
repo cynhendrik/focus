@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { DealsGateway } from '@/data/deals.gateway'
+import { toastError } from '@/store/toast.store'
 import { log } from '@/lib/logger'
 import type { Deal, UpsertDealPayload } from '@/types/pipeline.types'
 import type { AppError } from '@/types/error.types'
@@ -66,7 +67,9 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
       })
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
-      set({ error }); throw err
+      set({ error })
+      toastError('Deal konnte nicht gespeichert werden.')
+      throw err
     }
   },
 
@@ -80,7 +83,9 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
       }))
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
-      set({ error }); throw err
+      set({ error })
+      toastError('Deal konnte nicht gelöscht werden.')
+      throw err
     }
   },
 
@@ -103,6 +108,7 @@ export const useDealsStore = create<DealsState>()((set, get) => ({
           customerDeals: s.customerDeals.map(d => d.id === dealId ? { ...d, stage: prev } : d),
         }))
       }
+      toastError('Deal-Phase konnte nicht gespeichert werden.')
       throw err
     }
   },

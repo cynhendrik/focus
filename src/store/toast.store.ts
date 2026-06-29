@@ -33,3 +33,12 @@ export const useToastStore = create<ToastState>()((set, get) => ({
     set(s => ({ toasts: s.toasts.filter(t => t.id !== id) }))
   },
 }))
+
+/**
+ * Einheitlicher Fehler-Toast für fehlgeschlagene Schreib-Operationen aus den Stores.
+ * Bisher haben viele Stores `error` gesetzt, aber kaum eine Komponente las ihn aus →
+ * Schreibfehler blieben für den Nutzer unsichtbar. Stores rufen diesen Helfer im catch.
+ */
+export function toastError(message: string) {
+  useToastStore.getState().show({ message, variant: 'error', durationMs: 8000 })
+}

@@ -107,6 +107,22 @@ describe('useLeadsStore.convertToDeal', () => {
     expect(useLeadsStore.getState().leads).toHaveLength(1)
     expect(useDealsStore.getState().deals).toHaveLength(0)
   })
+
+  it('deal step fails AFTER conversion → no half state: lead reconciled (gone), deals empty, error surfaced', async () => {
+    // Konvertierung gelingt, aber das Anlegen des Deals schlägt fehl.
+    vi.spyOn(LeadsService, 'convertToClient').mockResolvedValue({ ...mockLead, accountType: 'customer' as any })
+    vi.spyOn(DealsService, 'upsert').mockRejectedValue(new Error('network'))
+
+    await expect(
+      useLeadsStore.getState().convertToDeal('lead-1', 'ws1', 'user-1')
+    ).rejects.toThrow()
+
+    // Kein „halber" Zustand: der Lead ist in der DB jetzt Kunde → lokal nicht mehr als Lead führen,
+    // kein Deal, und der Fehler darf nicht still sein.
+    expect(useLeadsStore.getState().leads).toHaveLength(0)
+    expect(useDealsStore.getState().deals).toHaveLength(0)
+    expect(useLeadsStore.getState().error).not.toBeNull()
+  })
 })
 
 describe('useLeadsStore.moveLeadStage (optimistic board drag)', () => {

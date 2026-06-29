@@ -12,6 +12,7 @@ vi.mock('@/data/deals.gateway', () => ({
 
 import { DealsGateway } from '@/data/deals.gateway'
 import { useDealsStore } from './deals.store'
+import { useToastStore } from './toast.store'
 
 const deal = (over: Record<string, unknown> = {}) => ({
   id: 'd1', workspaceId: 'ws', createdBy: 'u1', accountId: 'a1',
@@ -45,5 +46,27 @@ describe('useDealsStore', () => {
     vi.mocked(DealsGateway.updateStage).mockRejectedValueOnce(new Error('network'))
     try { await useDealsStore.getState().moveToStage('d1', 'qualified') } catch {}
     expect(useDealsStore.getState().deals.find(d => d.id === 'd1')?.stage).toBe('lead')
+  })
+
+  it('upsert: bei Fehler nicht still — Fehler-Toast + weiterwerfen', async () => {
+    useToastStore.setState({ toasts: [] })
+    vi.mocked(DealsGateway.upsert).mockRejectedValueOnce(new Error('network'))
+    await expect(useDealsStore.getState().upsert({ workspaceId: 'ws', createdBy: 'u1', accountId: 'a1', title: 'X', stage: 'lead', value: 0 } as any)).rejects.toThrow()
+    expect(useToastStore.getState().toasts.some(t => t.variant === 'error')).toBe(true)
+  })
+
+  it('remove: bei Fehler nicht still — Fehler-Toast + weiterwerfen', async () => {
+    useToastStore.setState({ toasts: [] })
+    vi.mocked(DealsGateway.delete).mockRejectedValueOnce(new Error('network'))
+    await expect(useDealsStore.getState().remove('d1')).rejects.toThrow()
+    expect(useToastStore.getState().toasts.some(t => t.variant === 'error')).toBe(true)
+  })
+
+  it('moveToStage: bei Fehler Fehler-Toast (zusätzlich zum Revert)', async () => {
+    useToastStore.setState({ toasts: [] })
+    useDealsStore.setState({ deals: [deal()] })
+    vi.mocked(DealsGateway.updateStage).mockRejectedValueOnce(new Error('network'))
+    try { await useDealsStore.getState().moveToStage('d1', 'qualified') } catch {}
+    expect(useToastStore.getState().toasts.some(t => t.variant === 'error')).toBe(true)
   })
 })

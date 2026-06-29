@@ -5,6 +5,7 @@ import { usePipelineStore } from './pipeline.store'
 import { useDealsStore } from './deals.store'
 import { useCustomersStore } from './customers.store'
 import { DealsService } from '@/services/deals.service'
+import { useToastStore } from '@/store/toast.store'
 import { log } from '@/lib/logger'
 import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
@@ -106,31 +107,55 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     }
     const firstStage = stages[0]
 
-    // 1) Convert lead → customer (changes account_type in DB)
-    await AccountsGateway.convertToClient(id)
+    set({ error: null })
 
-    // 2) Create deal pointing to the now-customer (same ID)
+    // 1) Convert lead → customer (changes account_type in DB).
+    //    Schlägt das hier fehl, hat sich nichts geändert → Lead bleibt, laut melden.
+    try {
+      await AccountsGateway.convertToClient(id)
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to convert lead to customer', { error })
+      useToastStore.getState().show({ message: 'Lead konnte nicht in einen Kunden umgewandelt werden.', variant: 'error' })
+      throw err
+    }
+
+    // Ab hier ist die Umwandlung in der DB vollzogen und ein für sich gültiger Zustand
+    // (ein Kunde ohne Deal ist erlaubt). Lokalen Zustand jetzt konsistent zur DB ziehen –
+    // unabhängig davon, ob der Deal-Schritt noch gelingt. So entsteht kein „halber" Zustand,
+    // bei dem die Karte als Lead UND als Kunde existiert.
+    useLeadsStore.setState(s => ({ leads: s.leads.filter(l => l.id !== id) }))
+    await useCustomersStore.getState().init()
+
+    // 2) Create deal pointing to the now-customer (same ID).
     const userIdSafe = userId || lead.workspaceId  // never empty, but createdBy is required
     const sourceNote = lead.leadSourceDetail
       ? `Lead-Quelle: ${lead.leadSourceDetail}`
       : `Lead-Quelle: ${lead.leadSource}`
-    const deal = await DealsService.upsert({
-      workspaceId,
-      createdBy: userIdSafe,
-      accountId: id,
-      customerId: id,
-      title: lead.name,
-      stage: firstStage.name,
-      value: 0,
-      notes: sourceNote,
-    })
-
-    // 3) Refresh customers — the converted lead is now a customer in DB
-    await useCustomersStore.getState().init()
-
-    // 4) Update local state — remove lead, add deal
-    useLeadsStore.setState(s => ({ leads: s.leads.filter(l => l.id !== id) }))
-    useDealsStore.setState(s => ({ deals: [...s.deals, deal] }))
+    try {
+      const deal = await DealsService.upsert({
+        workspaceId,
+        createdBy: userIdSafe,
+        accountId: id,
+        customerId: id,
+        title: lead.name,
+        stage: firstStage.name,
+        value: 0,
+        notes: sourceNote,
+      })
+      useDealsStore.setState(s => ({ deals: [...s.deals, deal] }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to create deal after conversion', { error })
+      useToastStore.getState().show({
+        message: `${lead.name} wurde als Kunde angelegt, aber der Deal konnte nicht erstellt werden. Bitte den Deal manuell anlegen.`,
+        variant: 'error',
+        durationMs: 10000,
+      })
+      throw err
+    }
   },
 
   deleteLead: async (id, workspaceId) => {

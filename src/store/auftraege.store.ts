@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { AuftraegeGateway } from '@/data/auftraege.gateway'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useToastStore } from '@/store/toast.store'
 import { log } from '@/lib/logger'
 import type { Auftrag, Zeiteintrag, CreateAuftragPayload, AddZeiteintragPayload } from '@/types/auftrag.types'
 
@@ -11,6 +12,18 @@ function uid() {
 function entryAmount(entry: Zeiteintrag, auftraege: Auftrag[]): number {
   const rate = entry.hourlyRate ?? auftraege.find(a => a.id === entry.auftragId)?.defaultHourlyRate ?? 0
   return Math.round((entry.minutes / 60) * rate * 100) / 100
+}
+
+// Persistierung der „abgerechnet"-Markierung fehlgeschlagen → die Zeiteinträge stehen in der
+// DB weiter offen und könnten auf der nächsten Rechnung erneut auftauchen. Laut + wiederholbar
+// melden statt still loggen.
+function warnBillingPersistFailed(retry: () => void) {
+  useToastStore.getState().show({
+    message: 'Abrechnung konnte nicht gespeichert werden – die Zeiteinträge sind evtl. doppelt abrechenbar.',
+    variant: 'error',
+    durationMs: 12000,
+    action: { label: 'Erneut versuchen', onClick: retry },
+  })
 }
 
 export interface UnbilledSummary {
@@ -91,16 +104,25 @@ export const useAuftraege = create<AuftraegeState>()((set, get) => ({
   },
 
   markBilledForAccount(accountId, invoiceId) {
+    // Optimistisch sofort als abgerechnet markieren — verhindert In-Session-Neuabrechnung.
     set(s => ({
       zeiteintraege: s.zeiteintraege.map(z => z.accountId === accountId && !z.billed ? { ...z, billed: true, invoiceId } : z),
     }))
-    void AuftraegeGateway.markBilledForAccount(accountId, invoiceId).catch(e => log.error('Abrechnung markieren', { e }))
+    void AuftraegeGateway.markBilledForAccount(accountId, invoiceId).catch(e => {
+      log.error('Abrechnung markieren', { e })
+      // KEIN stilles Schlucken: schlägt der DB-Write fehl, bleiben die Einträge in der DB offen
+      // und würden bei der nächsten Rechnung doppelt abgerechnet. Laut + wiederholbar melden.
+      warnBillingPersistFailed(() => get().markBilledForAccount(accountId, invoiceId))
+    })
   },
 
   markBilledEntries(entryIds, invoiceId) {
     const idSet = new Set(entryIds)
     set(s => ({ zeiteintraege: s.zeiteintraege.map(z => idSet.has(z.id) ? { ...z, billed: true, invoiceId } : z) }))
-    void AuftraegeGateway.markBilled(entryIds, invoiceId).catch(e => log.error('Abrechnung markieren', { e }))
+    void AuftraegeGateway.markBilled(entryIds, invoiceId).catch(e => {
+      log.error('Abrechnung markieren', { e })
+      warnBillingPersistFailed(() => get().markBilledEntries(entryIds, invoiceId))
+    })
   },
 
   unbilledForAccount(accountId) {
