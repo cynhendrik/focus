@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useWorkspaceStore, generateJoinCode } from './workspace.store'
 import { makeLocalWorkspace } from '@/data/workspace-local'
 
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }))
+
 beforeEach(() => {
   useWorkspaceStore.setState({
     workspaces: [],
@@ -223,5 +225,45 @@ describe('regenerateJoinCode', () => {
     expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
     expect(eqFail).toHaveBeenCalledTimes(1)
     expect(eqOk).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('deleteWorkspace', () => {
+  it('lokal: ruft cmd_delete_workspace, entfernt den Eintrag, schaltet aktiv auf null', async () => {
+    const { invoke } = await import('@tauri-apps/api/core')
+    useWorkspaceStore.setState({
+      workspaces: [],
+      localWorkspaces: [makeLocalWorkspace('l1', 'Lokal')],
+      activeWorkspaceId: 'l1',
+    })
+    await useWorkspaceStore.getState().deleteWorkspace('l1')
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('cmd_delete_workspace')
+    expect(useWorkspaceStore.getState().localWorkspaces).toHaveLength(0)
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
+  })
+
+  it('geteilt: ruft die RPC mit ws_id und entfernt den Workspace', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: null } as any)
+    useWorkspaceStore.setState({
+      workspaces: [{ id: 'c1', name: 'Cloud', logo_url: null, role: 'owner', isShared: true, join_code: null, capabilities: [] }],
+      localWorkspaces: [],
+      activeWorkspaceId: 'c1',
+    })
+    await useWorkspaceStore.getState().deleteWorkspace('c1')
+    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith('delete_workspace', { ws_id: 'c1' })
+    expect(useWorkspaceStore.getState().workspaces).toHaveLength(0)
+    expect(useWorkspaceStore.getState().activeWorkspaceId).toBeNull()
+  })
+
+  it('geteilt: RPC-Fehler wirft, Workspace bleibt', async () => {
+    const { supabase } = await import('@/lib/supabase')
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Nur der Inhaber' } } as any)
+    useWorkspaceStore.setState({
+      workspaces: [{ id: 'c1', name: 'Cloud', logo_url: null, role: 'member', isShared: true, join_code: null, capabilities: [] }],
+      localWorkspaces: [], activeWorkspaceId: 'c1',
+    })
+    await expect(useWorkspaceStore.getState().deleteWorkspace('c1')).rejects.toThrow('Nur der Inhaber')
+    expect(useWorkspaceStore.getState().workspaces).toHaveLength(1)
   })
 })

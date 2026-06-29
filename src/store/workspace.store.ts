@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { invoke } from '@tauri-apps/api/core'
 import { supabase } from '@/lib/supabase'
 import type { Role, Capability } from '@/lib/capabilities'
 import { makeLocalWorkspace, hasLocalOrphanData, rescopeWorkspace } from '@/data/workspace-local'
@@ -36,6 +37,7 @@ interface WorkspaceState {
   createCloudWorkspaceRecord: (name: string) => Promise<string>
   createLocalWorkspace: (name: string) => string
   joinWorkspaceByCode: (code: string) => Promise<void>
+  deleteWorkspace: (id: string) => Promise<void>
   regenerateJoinCode: (workspaceId: string) => Promise<string>
   setActiveWorkspace: (id: string) => void
   setPendingCount: (count: number) => void
@@ -145,6 +147,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (error) throw new Error(error.message || 'Beitritt fehlgeschlagen')
         await get().loadWorkspaces()
         if (typeof data === 'string') set({ activeWorkspaceId: data })
+      },
+
+      deleteWorkspace: async (id) => {
+        const all = [...get().workspaces, ...get().localWorkspaces]
+        const ws = all.find((w) => w.id === id)
+        if (!ws) return
+        if (ws.isShared) {
+          const { error } = await supabase.rpc('delete_workspace', { ws_id: id })
+          if (error) throw new Error(error.message || 'Löschen fehlgeschlagen')
+          set((s) => ({ workspaces: s.workspaces.filter((w) => w.id !== id) }))
+        } else {
+          await invoke('cmd_delete_workspace')
+          set((s) => ({ localWorkspaces: s.localWorkspaces.filter((w) => w.id !== id) }))
+        }
+        if (get().activeWorkspaceId === id) {
+          const remaining = [...get().workspaces, ...get().localWorkspaces]
+          set({ activeWorkspaceId: remaining.length > 0 ? remaining[0].id : null })
+        }
       },
 
       regenerateJoinCode: async (workspaceId) => {
