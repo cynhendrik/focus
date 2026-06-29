@@ -1,6 +1,7 @@
 import { useTourStore } from '@/store/tour.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useAuthStore } from '@/store/auth.store'
 
 export function TourOfferCard() {
   const seen   = useTourStore(s => s.seen)
@@ -9,9 +10,13 @@ export function TourOfferCard() {
   const finish = useTourStore(s => s.finish)
   const companyDone   = useOnboardingStore(s => s.companyDone)
   const bootstrapped  = useOnboardingStore(s => s.bootstrapped)
+  const nameDone      = useOnboardingStore(s => s.nameDone)
+  const user          = useAuthStore(s => s.user)
   const activeWorkspaceId = useWorkspaceStore(s => s.activeWorkspaceId)
 
-  if (!companyDone || !bootstrapped || !activeWorkspaceId || seen || active) return null
+  // Reihenfolge: erst die Namensabfrage (NamePrompt) erledigen, DANN die Tour anbieten.
+  const nameResolved = nameDone || !!((user?.user_metadata?.full_name as string | undefined)?.trim())
+  if (!companyDone || !bootstrapped || !activeWorkspaceId || !nameResolved || seen || active) return null
 
   return (
     <>

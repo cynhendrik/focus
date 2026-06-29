@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { FinanceService } from '@/services/finance.service'
 import { FinanceGateway } from '@/data/finance.gateway'
 import { toastError } from '@/store/toast.store'
+import { useTourStore } from '@/store/tour.store'
 // getInvoicePdfBytes is imported lazily at call time. This store is in the main
 // bundle, so a static import here would drag the heavy react-pdf lib into the
 // initial load even though PDFs are only generated on demand.
@@ -114,6 +115,10 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   error: null,
 
   loadAll: async (workspaceId) => {
+    // Während der KORA-Tour zeigen wir Schau-Daten im Speicher (applyTourFixtures).
+    // Routen laden beim Mount neu — das würde die Fixtures mit dem echten (leeren)
+    // Workspace überschreiben. Deshalb hier kein echter Load, solange die Tour läuft.
+    if (useTourStore.getState().active) return
     set({ isLoading: true, error: null })
     try {
       const [invoices, offers, payments] = await Promise.all([
@@ -129,6 +134,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   loadKpis: async (workspaceId) => {
+    if (useTourStore.getState().active) return   // siehe loadAll: Tour-Fixtures nicht überschreiben
     try {
       const kpis = await FinanceService.getFinanceKpis(workspaceId)
       set({ kpis })

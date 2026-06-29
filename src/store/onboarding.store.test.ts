@@ -17,7 +17,7 @@ beforeEach(() => {
   localStorage.clear()
   useOnboardingStore.setState({
     done: { kunde: false, notiz: false, aufgabe: false, lead: false, corra: false },
-    corraOpened: false, welcomeSeen: false, companyDone: false, cardCollapsed: false, barDismissed: false, bootstrapped: false,
+    corraOpened: false, welcomeSeen: false, companyDone: false, nameDone: false, cardCollapsed: false, barDismissed: false, bootstrapped: false,
   })
   useCustomersStore.setState({ customers: [] })
   useNotesStore.setState({ notes: [] })
@@ -66,6 +66,18 @@ describe('onboarding.store', () => {
     useDealsStore.setState({ deals: [{ id: 'd1' } as any] })
     useOnboardingStore.getState().reconcile()
     expect(useOnboardingStore.getState().done.lead).toBe(true)
+  })
+
+  it('markNameDone setzt nameDone (Namensabfrage einmalig)', () => {
+    expect(useOnboardingStore.getState().nameDone).toBe(false)
+    useOnboardingStore.getState().markNameDone()
+    expect(useOnboardingStore.getState().nameDone).toBe(true)
+  })
+
+  it('bootstrap mit Bestandsdaten überspringt auch die Namensabfrage', () => {
+    useCustomersStore.setState({ customers: [cust('c1')] })
+    useOnboardingStore.getState().bootstrap()
+    expect(useOnboardingStore.getState().nameDone).toBe(true)
   })
 
   it('markCorraOpened latches the corra step', () => {

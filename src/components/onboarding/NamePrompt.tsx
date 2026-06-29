@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth.store'
 import { useMembersStore } from '@/store/members.store'
+import { useOnboardingStore } from '@/store/onboarding.store'
 
 /**
  * Einmaliger Hinweis beim ersten Login ohne gesetzten Namen: damit niemand als
@@ -12,12 +13,14 @@ import { useMembersStore } from '@/store/members.store'
  */
 export function NamePrompt() {
   const user = useAuthStore(s => s.user)
+  const nameDone = useOnboardingStore(s => s.nameDone)
+  const markNameDone = useOnboardingStore(s => s.markNameDone)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
 
   const hasName = !!((user?.user_metadata?.full_name as string | undefined)?.trim())
-  if (!user || hasName || dismissed) return null
+  // Einmalig: sobald gesetzt ODER „Später" gewählt (nameDone, persistiert) nie wieder.
+  if (!user || hasName || nameDone) return null
 
   const save = async () => {
     const n = name.trim()
@@ -26,12 +29,11 @@ export function NamePrompt() {
     try {
       await supabase.auth.updateUser({ data: { full_name: n } })
       await useMembersStore.getState().setMyDisplayName(n)
-      setDismissed(true)
     } catch {
       // Fehler nicht blockierend — der Nutzer kann es später im Profil setzen.
-      setDismissed(true)
     } finally {
       setSaving(false)
+      markNameDone()
     }
   }
 
@@ -61,7 +63,7 @@ export function NamePrompt() {
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
           <button
-            onClick={() => setDismissed(true)}
+            onClick={() => markNameDone()}
             style={{ fontSize: 12.5, color: 'var(--fg-dim)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px 12px' }}
           >
             Später

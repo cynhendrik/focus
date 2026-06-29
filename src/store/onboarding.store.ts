@@ -48,12 +48,15 @@ interface OnboardingState {
   welcomeSeen: boolean
   /** Unternehmensdaten-Schritt (direkt nach dem Willkommen) erledigt/übersprungen? */
   companyDone: boolean
+  /** Namensabfrage (NamePrompt) erledigt — gesetzt ODER „Später". Einmalig, persistiert. */
+  nameDone: boolean
   /** Pop-up-Kachel-Karte zur schmalen Leiste eingeklappt? */
   cardCollapsed: boolean
   barDismissed: boolean
   bootstrapped: boolean
   markWelcomeSeen: () => void
   markCompanyDone: () => void
+  markNameDone: () => void
   collapseCard: () => void
   dismissBar: () => void
   markCorraOpened: () => void
@@ -78,12 +81,14 @@ export const useOnboardingStore = create<OnboardingState>()(
       corraOpened: false,
       welcomeSeen: false,
       companyDone: false,
+      nameDone: false,
       cardCollapsed: false,
       barDismissed: false,
       bootstrapped: false,
 
       markWelcomeSeen: () => set({ welcomeSeen: true }),
       markCompanyDone: () => set({ companyDone: true }),
+      markNameDone: () => set({ nameDone: true }),
       collapseCard: () => set({ cardCollapsed: true }),
       dismissBar: () => set({ barDismissed: true }),
       markCorraOpened: () => { set({ corraOpened: true }); get().reconcile() },
@@ -110,7 +115,7 @@ export const useOnboardingStore = create<OnboardingState>()(
 
       bootstrap: () => {
         if (get().bootstrapped) return
-        if (hasAnyRealData()) set({ welcomeSeen: true, companyDone: true, cardCollapsed: true, barDismissed: true })
+        if (hasAnyRealData()) set({ welcomeSeen: true, companyDone: true, nameDone: true, cardCollapsed: true, barDismissed: true })
         set({ bootstrapped: true })
         get().reconcile()
       },
@@ -122,6 +127,7 @@ export const useOnboardingStore = create<OnboardingState>()(
         corraOpened: s.corraOpened,
         welcomeSeen: s.welcomeSeen,
         companyDone: s.companyDone,
+        nameDone: s.nameDone,
         cardCollapsed: s.cardCollapsed,
         barDismissed: s.barDismissed,
         bootstrapped: s.bootstrapped,

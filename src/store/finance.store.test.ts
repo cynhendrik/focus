@@ -29,8 +29,10 @@ vi.mock('@/services/finance.service', () => ({
 }))
 
 import { FinanceGateway } from '@/data/finance.gateway'
+import { FinanceService } from '@/services/finance.service'
 import { useFinanceStore } from './finance.store'
 import { useToastStore } from './toast.store'
+import { useTourStore } from './tour.store'
 
 describe('useFinanceStore — Schreibfehler sind nicht still (Toast + weiterwerfen)', () => {
   beforeEach(() => {
@@ -61,5 +63,30 @@ describe('useFinanceStore — Schreibfehler sind nicht still (Toast + weiterwerf
     vi.mocked(FinanceGateway.createOffer).mockRejectedValueOnce(new Error('network'))
     await expect(useFinanceStore.getState().createOffer({} as any)).rejects.toThrow()
     expect(useToastStore.getState().toasts.some(t => t.variant === 'error')).toBe(true)
+  })
+})
+
+describe('useFinanceStore — während der KORA-Tour keine Loads (Schau-Daten nicht überschreiben)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useTourStore.setState({ active: false })
+    useFinanceStore.setState({ invoices: [], offers: [], payments: [], kpis: null })
+  })
+
+  it('loadAll: bei aktiver Tour kein Gateway-Aufruf (Fixtures bleiben erhalten)', async () => {
+    useTourStore.setState({ active: true })
+    await useFinanceStore.getState().loadAll('ws1')
+    expect(FinanceGateway.getInvoices).not.toHaveBeenCalled()
+  })
+
+  it('loadKpis: bei aktiver Tour kein Service-Aufruf', async () => {
+    useTourStore.setState({ active: true })
+    await useFinanceStore.getState().loadKpis('ws1')
+    expect(FinanceService.getFinanceKpis).not.toHaveBeenCalled()
+  })
+
+  it('loadAll: ohne Tour normal laden', async () => {
+    await useFinanceStore.getState().loadAll('ws1')
+    expect(FinanceGateway.getInvoices).toHaveBeenCalledWith('ws1')
   })
 })

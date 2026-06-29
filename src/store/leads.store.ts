@@ -6,6 +6,7 @@ import { useDealsStore } from './deals.store'
 import { useCustomersStore } from './customers.store'
 import { DealsService } from '@/services/deals.service'
 import { useToastStore } from '@/store/toast.store'
+import { useTourStore } from '@/store/tour.store'
 import { log } from '@/lib/logger'
 import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
@@ -39,6 +40,8 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
   error: null,
 
   load: async (workspaceId) => {
+    // Tour-Schau-Daten nicht durch den echten (leeren) Workspace überschreiben. Siehe finance.store.
+    if (useTourStore.getState().active) return
     set({ isLoading: true, error: null })
     try {
       const leads = await AccountsGateway.getLeads(workspaceId)

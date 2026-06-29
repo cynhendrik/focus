@@ -5,6 +5,7 @@ import { useDealsStore } from './deals.store'
 import { useCustomersStore } from './customers.store'
 import { LeadsService } from '@/services/leads.service'
 import { DealsService } from '@/services/deals.service'
+import { useTourStore } from './tour.store'
 import type { Lead } from '@/types/lead.types'
 
 vi.mock('@/services/leads.service', () => ({
@@ -122,6 +123,25 @@ describe('useLeadsStore.convertToDeal', () => {
     expect(useLeadsStore.getState().leads).toHaveLength(0)
     expect(useDealsStore.getState().deals).toHaveLength(0)
     expect(useLeadsStore.getState().error).not.toBeNull()
+  })
+})
+
+describe('useLeadsStore.load — Tour-Guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useTourStore.setState({ active: false })
+    useLeadsStore.setState({ leads: [], isLoading: false, error: null })
+  })
+
+  it('lädt bei aktiver Tour nicht (Schau-Daten bleiben erhalten)', async () => {
+    useTourStore.setState({ active: true })
+    await useLeadsStore.getState().load('ws1')
+    expect(LeadsService.getAll).not.toHaveBeenCalled()
+  })
+
+  it('lädt ohne Tour normal', async () => {
+    await useLeadsStore.getState().load('ws1')
+    expect(LeadsService.getAll).toHaveBeenCalledWith('ws1')
   })
 })
 
