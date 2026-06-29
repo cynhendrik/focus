@@ -13,13 +13,16 @@ interface ImportSummary { tables: number; rows: number; skipped_unknown_columns:
 
 export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
   const [confirmText, setConfirmText] = useState('')
-  const [busy, setBusy] = useState<'export' | 'import' | 'reset' | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState('')
+  const [busy, setBusy] = useState<'export' | 'import' | 'reset' | 'delete' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const toast = useToastStore(s => s.show)
   const activeId = useWorkspaceStore(s => s.activeWorkspaceId)
   const workspaces = useWorkspaceStore(s => s.workspaces)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
   const isOwner = workspaces.find(w => w.id === activeId)?.role === 'owner'
+  const deleteWorkspace = useWorkspaceStore(s => s.deleteWorkspace)
+  const localWorkspaces = useWorkspaceStore(s => s.localWorkspaces)
 
   const handleReset = async () => {
     if (!isOwner) {
@@ -47,6 +50,27 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
       setTimeout(() => window.location.reload(), 1200)
     } catch (e) {
       toast({ message: `Reset fehlgeschlagen: ${String(e)}`, variant: 'error' })
+      setBusy(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!activeId) return
+    if (isShared && !isOwner) {
+      toast({ message: 'Nur der Inhaber dieses Workspace kann ihn löschen.', variant: 'error' })
+      return
+    }
+    const sharedWarn = isShared
+      ? '\n\nACHTUNG: Dieser Workspace ist GETEILT — er wird für ALLE Mitglieder gelöscht.'
+      : ''
+    if (!window.confirm(`Workspace „${activeId}" endgültig löschen? Alle Inhalte UND der Workspace selbst werden entfernt. Unwiderruflich.${sharedWarn}`)) return
+    setBusy('delete')
+    try {
+      await deleteWorkspace(activeId)
+      toast({ message: 'Workspace gelöscht — App lädt neu…', variant: 'success', durationMs: 2000 })
+      setTimeout(() => window.location.reload(), 1200)
+    } catch (e) {
+      toast({ message: `Löschen fehlgeschlagen: ${String(e)}`, variant: 'error' })
       setBusy(null)
     }
   }
@@ -166,6 +190,53 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
           }}
         >
           {busy === 'reset' ? 'Setzt zurück…' : 'Workspace zurücksetzen'}
+        </button>
+      </SettingCard>
+
+      {/* Löschen */}
+      <SettingCard danger>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <AlertTriangle size={15} style={{ color: '#f87171' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#f87171' }}>Workspace löschen</div>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--fg-dim)', margin: '0 0 14px' }}>
+          Entfernt diesen Workspace vollständig — alle Inhalte und den Workspace selbst. Nicht rückgängig machbar.
+          {isShared ? ' Bei geteilten Workspaces für alle Mitglieder.' : ''}
+        </p>
+        {isShared && !isOwner && (
+          <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '0 0 10px' }}>
+            Nur der Inhaber dieses Workspace kann ihn löschen.
+          </p>
+        )}
+        {!isShared && localWorkspaces.length > 1 && (
+          <p style={{ fontSize: 12, color: '#f87171', margin: '0 0 10px' }}>
+            Hinweis: Lokale Workspaces teilen sich eine Datenbank — dies leert die lokalen Daten aller lokalen Workspaces.
+          </p>
+        )}
+        <input
+          value={confirmDelete}
+          onChange={e => setConfirmDelete(e.target.value)}
+          placeholder='Tippe "löschen" zum Bestätigen'
+          style={{
+            width: '100%', padding: '8px 12px', fontSize: 13,
+            borderRadius: 'var(--radius-sm)', marginBottom: 10,
+            border: '1px solid var(--border)', background: 'var(--surface-2)',
+            color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const,
+          }}
+        />
+        <button
+          disabled={confirmDelete !== 'löschen' || (isShared && !isOwner) || busy !== null}
+          onClick={handleDelete}
+          style={{
+            padding: '7px 16px', borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 600,
+            cursor: confirmDelete === 'löschen' && !(isShared && !isOwner) && busy === null ? 'pointer' : 'not-allowed',
+            background: confirmDelete === 'löschen' && !(isShared && !isOwner) && busy === null ? '#ef4444' : 'var(--surface-2)',
+            border: '1px solid ' + (confirmDelete === 'löschen' && !(isShared && !isOwner) && busy === null ? '#ef4444' : 'var(--border)'),
+            color: confirmDelete === 'löschen' && !(isShared && !isOwner) && busy === null ? '#fff' : 'var(--fg-dim)',
+            transition: 'background 140ms, color 140ms',
+          }}
+        >
+          {busy === 'delete' ? 'Lösche…' : 'Workspace löschen'}
         </button>
       </SettingCard>
     </SettingsPage>
