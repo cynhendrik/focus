@@ -209,7 +209,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
             {kleinunternehmer && (
               <span style={{
                 display: 'inline-flex', marginTop: 8, fontSize: 10,
-                color: 'oklch(56% 0.19 264)', background: 'oklch(56% 0.19 264 / 0.2)',
+                color: 'oklch(68% 0.16 41)', background: 'oklch(68% 0.16 41 / 0.2)',
                 padding: '3px 9px', borderRadius: 99,
                 fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase',
               }}>
@@ -326,8 +326,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                 {formatDateDE(leistungsdatum)}
               </span>
               <span style={{
-                fontSize: 9.5, color: 'oklch(56% 0.19 264)',
-                background: 'oklch(56% 0.19 264 / 0.2)',
+                fontSize: 9.5, color: 'oklch(68% 0.16 41)',
+                background: 'oklch(68% 0.16 41 / 0.2)',
                 padding: '2px 8px', borderRadius: 99,
                 fontFamily: 'var(--font-mono)', letterSpacing: '0.04em',
               }}>
@@ -342,8 +342,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
           {/* Offene Zeiteinträge */}
           {accountId && unbilled.entries.length > 0 && (
             <div style={{
-              borderRadius: 10, border: '1px solid oklch(56% 0.19 264 / 0.25)',
-              background: 'oklch(56% 0.19 264 / 0.04)', padding: '12px 14px',
+              borderRadius: 10, border: '1px solid oklch(68% 0.16 41 / 0.25)',
+              background: 'oklch(68% 0.16 41 / 0.04)', padding: '12px 14px',
               display: 'flex', flexDirection: 'column', gap: 8,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -376,8 +376,8 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
-                      background: checked ? 'oklch(56% 0.19 264 / 0.1)' : 'transparent',
-                      border: `1px solid ${checked ? 'oklch(56% 0.19 264 / 0.35)' : 'transparent'}`,
+                      background: checked ? 'oklch(68% 0.16 41 / 0.1)' : 'transparent',
+                      border: `1px solid ${checked ? 'oklch(68% 0.16 41 / 0.35)' : 'transparent'}`,
                       transition: 'all 150ms',
                     }}
                   >

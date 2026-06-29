@@ -551,7 +551,7 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
   }
   switch (kind) {
     case 'now':   return { ...base, background: 'var(--accent)',                  color: 'var(--accent-ink)' }
-    case 'block': return { ...base, background: 'oklch(78% 0.13 235 / 0.18)',     color: 'oklch(78% 0.13 235)' }
+    case 'block': return { ...base, background: 'oklch(72% 0.10 195 / 0.18)',     color: 'oklch(72% 0.10 195)' }
     case 'pause': return { ...base, background: 'var(--surface-2)',               color: 'var(--fg-muted)' }
     case 'live':  return { ...base, background: 'oklch(72% 0.18 25 / 0.15)',      color: 'oklch(72% 0.18 25)' }
     case 'fokus': return { ...base, background: 'oklch(82% 0.16 70 / 0.15)',      color: 'oklch(82% 0.16 70)' }
@@ -628,7 +628,7 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           width: 10, height: 10, borderRadius: 99,
           background: isNow ? 'var(--accent)' : 'transparent',
           border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
-          boxShadow: isNow ? '0 0 0 4px oklch(56% 0.19 264 / 0.16)' : 'none',
+          boxShadow: isNow ? '0 0 0 4px oklch(68% 0.16 41 / 0.16)' : 'none',
         }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>

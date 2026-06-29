@@ -47,7 +47,7 @@ function AuftragRow({ auftrag, onEdit }: { auftrag: Auftrag; onEdit: () => void 
       {unbilledMins > 0 && !isArchived && (
         <span style={{
           fontSize: 10, padding: '2px 7px', borderRadius: 99,
-          background: 'oklch(56% 0.19 264 / 0.12)', color: 'var(--accent)',
+          background: 'oklch(68% 0.16 41 / 0.12)', color: 'var(--accent)',
           fontFamily: 'var(--font-mono)', fontWeight: 700,
         }}>
           {fmtMinutes(unbilledMins)} offen

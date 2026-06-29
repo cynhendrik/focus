@@ -220,7 +220,7 @@ export default function App() {
     ? <SplashScreen exiting={splashPhase === 'exiting'} />
     : null
 
-  if (authLoading) return <><div style={{ position: 'fixed', inset: 0, background: '#3B6DF4' }} />{splashOverlay}</>
+  if (authLoading) return <><div style={{ position: 'fixed', inset: 0, background: '#14161A' }} />{splashOverlay}</>
 
   if (!user) return <><LoginScreen />{splashOverlay}</>
 

@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const IS_DEV = import.meta.env.DEV
-const BLUE   = '#3B6DF4'
+const BLUE   = '#F2754F'
 
 async function minimizeWin() { await getCurrentWindow().minimize() }
 async function closeWin()    { await getCurrentWindow().close() }
