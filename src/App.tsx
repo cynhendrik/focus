@@ -39,7 +39,6 @@ const IntegrationsRoute  = lazy(() => named(import('@/routes/IntegrationsRoute')
 const ProfileRoute       = lazy(() => named(import('@/routes/ProfileRoute'), 'ProfileRoute'))
 const CalendarRoute      = lazy(() => named(import('@/routes/CalendarRoute'), 'CalendarRoute'))
 const CorraRoute         = lazy(() => named(import('@/routes/CorraRoute'), 'CorraRoute'))
-const AkquiseRoute       = lazy(() => named(import('@/routes/AkquiseRoute'), 'AkquiseRoute'))
 const PosteingangRoute   = lazy(() => named(import('@/routes/PosteingangRoute'), 'PosteingangRoute'))
 const ZeitmanagementRoute = lazy(() => named(import('@/routes/ZeitmanagementRoute'), 'ZeitmanagementRoute'))
 const LeverageInboxRoute    = lazy(() => named(import('@/routes/leverage/LeverageInboxRoute'), 'LeverageInboxRoute'))
@@ -110,13 +109,20 @@ export default function App() {
   const bootstrapped    = useOnboardingStore(s => s.bootstrapped)
   const markWelcomeSeen = useOnboardingStore(s => s.markWelcomeSeen)
 
-  // Intro-Splash ("If we build, we build to lead") bei jedem Start.
-  const [splashPhase, setSplashPhase] = useState<'show' | 'exiting' | 'done'>('show')
+  // Intro-Splash ("you create yourself") nur beim ALLERERSTEN Start zeigen —
+  // danach ist hasSeenIntro persistiert und der Splash bleibt aus (kein 3,8-s-
+  // Zoll bei jedem Öffnen).
+  const hasSeenIntro  = useUiStore(s => s.hasSeenIntro)
+  const markIntroSeen = useUiStore(s => s.markIntroSeen)
+  const [splashPhase, setSplashPhase] = useState<'show' | 'exiting' | 'done'>(
+    hasSeenIntro ? 'done' : 'show',
+  )
   useEffect(() => {
+    if (hasSeenIntro) return
     const t1 = setTimeout(() => setSplashPhase('exiting'), 3200)
-    const t2 = setTimeout(() => setSplashPhase('done'), 3800)
+    const t2 = setTimeout(() => { setSplashPhase('done'); markIntroSeen() }, 3800)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [])
+  }, [hasSeenIntro, markIntroSeen])
 
   // Auto-Update: ~3 s nach Start prüfen, danach alle 6 h. No-op außerhalb Tauri.
   useEffect(() => {
@@ -233,7 +239,6 @@ export default function App() {
       case 'profile':      return <ProfileRoute />
       case 'clients':      return <ClientsRoute />
       case 'invoices':     return <FinanceRoute />
-      case 'akquise':      return <AkquiseRoute />
       case 'posteingang':  return <PosteingangRoute />
       case 'settings':     return <SettingsRoute />
       case 'integrations': return <IntegrationsRoute />
@@ -246,25 +251,18 @@ export default function App() {
       case 'leverage_pipeline':    return <LeveragePipelineRoute />
       case 'leverage_mail':        return <LeverageMailRoute />
       case 'leverage_lead_detail': return <LeverageLeadRoute />
-      // Redirects
-      case 'leads':           return <AkquiseRoute />
-      case 'pipeline':        return <AkquiseRoute />
-      case 'followups':       return <AkquiseRoute />
+      // Redirect: Mail-Alias auf den Posteingang
       case 'mail':            return <PosteingangRoute />
-      case 'sales':           return <AkquiseRoute />
       default:             return <DashboardRoute />
     }
   }
 
   // Use selected customer ID as part of the key so opening different customers
   // also triggers the transition (CustomerRoute is rendered via appView='clients').
-  // Sales sub-views share one route key so AkquiseRoute isn't re-mounted on tab switch
-  const SALES_VIEWS = new Set<string>(['akquise', 'leads', 'pipeline', 'followups', 'sales'])
   const routeKey = appView === 'clients' && selectedCustomerId
     ? `clients:${selectedCustomerId}`
     : appView === 'leverage_lead_detail' && selectedLeverageLeadId
     ? `lead:${selectedLeverageLeadId}`
-    : SALES_VIEWS.has(appView) ? 'akquise'
     : appView
 
   // Erststart: WelcomeIntro nur nach Bootstrap und solange nicht gesehen.

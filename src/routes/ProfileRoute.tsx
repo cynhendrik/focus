@@ -197,16 +197,16 @@ function AboSection() {
       }}>
         <div>
           <div style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-            Aktueller Plan
+            Status
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 700 }}>Cultera</span>
+            <span style={{ fontSize: 15, fontWeight: 700 }}>Cultera OS</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-              background: 'var(--accent-soft)', color: 'var(--accent-text)',
+              background: 'var(--surface-3)', color: 'var(--fg-2)',
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
-              Aktiv
+              Testphase
             </span>
           </div>
         </div>

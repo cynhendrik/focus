@@ -75,12 +75,11 @@ export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'inte
 
 export type AppView =
   | 'dashboard' | 'profile'
-  | 'clients'   | 'akquise'        | 'invoices'
+  | 'clients'   | 'invoices'
   | 'settings'  | 'integrations'
   | 'posteingang' | 'zeitmanagement'
-  | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
+  | 'calendar'  | 'mail'
   | 'corra'
-  | 'sales'
   // Akquise / Sales views (vormals LEVERAGE — jetzt Teil der einen Nav)
   | 'leverage_inbox'
   | 'leverage_leads'

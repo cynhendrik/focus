@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { ContactsGateway } from '@/data/contacts.gateway'
 import { useWorkspaceStore } from './workspace.store'
 import { useAuthStore } from './auth.store'
+import { log } from '@/lib/logger'
 import type { Contact, UpsertContactPayload } from '@/types/contact.types'
 
 interface ContactsState {
@@ -23,7 +24,9 @@ export const useContactsStore = create<ContactsState>()((set) => ({
     try {
       const contacts = await ContactsGateway.getByAccount(accountId)
       set({ contacts, isLoading: false })
-    } catch {
+    } catch (err) {
+      // Vorher still verschluckt → Nutzer sah leere Kontaktliste statt Fehler.
+      log.error('Kontakte konnten nicht geladen werden', { accountId, err })
       set({ isLoading: false })
     }
   },
