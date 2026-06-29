@@ -9,7 +9,22 @@ import type { Activity } from '@/types/pipeline.types'
 export const TOUR_WS = 'tour-ws'
 export const TOUR_CUSTOMER_ID = 'tour-cust-1'
 
-const TS = '2026-06-01T09:00:00.000Z'           // generische created/updated-Zeit
+// ── Datums-Helfer: relativ zu HEUTE ──────────────────────────────────────────
+// Feste Datumswerte (z. B. Mai 2026) fielen bei laufender App aus „diesem Monat"
+// und „heute fällig" → Dashboard-Umsatz/Tagesplan blieben leer. Darum alle
+// datums-abhängigen Felder relativ zum echten Datum (beim Laden des Moduls).
+const NOW = new Date()
+const pad = (n: number) => String(n).padStart(2, '0')
+const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+const shift = (days: number) => { const d = new Date(NOW); d.setDate(d.getDate() + days); return d }
+const dayBefore = (days: number) => ymd(shift(-days))
+const isoAt = (days: number, hour: number) => { const d = shift(days); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+
+const TODAY = ymd(NOW)
+// Bezahlte Demo-Rechnung sicher im aktuellen Monat (am Monatsanfang noch kein „vor 4 Tagen").
+const PAID_THIS_MONTH = NOW.getDate() >= 5 ? dayBefore(4) : ymd(new Date(NOW.getFullYear(), NOW.getMonth(), 1))
+const PAID_LAST_MONTH = ymd(new Date(NOW.getFullYear(), NOW.getMonth() - 1, 15))
+const TS = isoAt(-25, 9)                          // generische created/updated-Zeit (vor ~25 Tagen)
 
 const baseCust = {
   tags: [] as string[], goals: [] as string[], isPrivate: false, workspaceId: TOUR_WS,
@@ -39,11 +54,12 @@ export const tourAccounts: Account[] = [
 ]
 
 export const tourTodos: Todo[] = [
+  // Heute fällig → erscheint im Tagesplan und in „Heute fällig".
   { id: 'tour-todo-1', title: 'Angebot für Bergmann finalisieren', status: 'open', priority: 'p1', bucket: 'today',
     checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: TOUR_CUSTOMER_ID,
-    dueDate: '2026-06-28', scheduledAt: '2026-06-28T14:00:00.000Z' },
+    dueDate: TODAY, scheduledAt: isoAt(0, 14) },
   { id: 'tour-todo-2', title: 'Rechnung Nordlicht nachfassen', status: 'open', priority: 'p2', bucket: 'backlog',
-    checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: 'tour-cust-2', dueDate: '2026-06-20' },
+    checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: 'tour-cust-2', dueDate: dayBefore(9) },
   { id: 'tour-todo-3', title: 'Kickoff-Notizen verschickt', status: 'done', priority: 'p3', bucket: 'done',
     checklist: [], tags: [], createdAt: TS, updatedAt: TS, customerId: TOUR_CUSTOMER_ID },
 ]
@@ -54,10 +70,15 @@ const baseInv = {
 }
 
 export const tourInvoices: Invoice[] = [
-  { ...baseInv, id: 'tour-inv-1', accountId: TOUR_CUSTOMER_ID, number: 'RE-2026-001',
-    date: '2026-05-02', dueDate: '2026-05-16', status: 'paid', subtotal: 3000, taxAmount: 570, total: 3570 },
-  { ...baseInv, id: 'tour-inv-2', accountId: 'tour-cust-2', number: 'RE-2026-002',
-    date: '2026-05-20', dueDate: '2026-06-03', status: 'overdue', subtotal: 1200, taxAmount: 228, total: 1428 },
+  // Bezahlt, dieser Monat → Dashboard-Umsatz „diesen Monat".
+  { ...baseInv, id: 'tour-inv-1', accountId: TOUR_CUSTOMER_ID, number: 'RE-001',
+    date: PAID_THIS_MONTH, dueDate: dayBefore(-10), status: 'paid', subtotal: 3000, taxAmount: 570, total: 3570 },
+  // Bezahlt im Vormonat → liefert den „vs Vormonat"-Vergleich.
+  { ...baseInv, id: 'tour-inv-3', accountId: TOUR_CUSTOMER_ID, number: 'RE-000',
+    date: PAID_LAST_MONTH, dueDate: PAID_LAST_MONTH, status: 'paid', subtotal: 2000, taxAmount: 380, total: 2380 },
+  // Überfällig → Mahnwesen leuchtet.
+  { ...baseInv, id: 'tour-inv-2', accountId: 'tour-cust-2', number: 'RE-002',
+    date: dayBefore(40), dueDate: dayBefore(26), status: 'overdue', subtotal: 1200, taxAmount: 228, total: 1428 },
 ]
 
 export const tourKpis: FinanceKpis = {
@@ -80,7 +101,7 @@ export const tourLeads: Lead[] = [
 
 export const tourFollowUps: FollowUp[] = [
   { id: 'tour-fu-1', customerId: TOUR_CUSTOMER_ID, title: 'Nach Angebot nachfassen',
-    dueDate: '2026-06-30', status: 'offen', priority: 'high', createdAt: TS },
+    dueDate: TODAY, status: 'offen', priority: 'high', createdAt: TS },
 ]
 
 export const tourActivities: Activity[] = [
@@ -89,5 +110,5 @@ export const tourActivities: Activity[] = [
     body: 'Projekt-Scope besprochen, Angebot zugesagt.', createdAt: TS, updatedAt: TS },
   { id: 'tour-act-2', workspaceId: TOUR_WS, createdBy: 'tour-user', accountId: TOUR_CUSTOMER_ID,
     customerId: TOUR_CUSTOMER_ID, type: 'task', status: 'open', title: 'Angebot finalisieren',
-    dueAt: '2026-06-28T14:00:00.000Z', createdAt: TS, updatedAt: TS },
+    dueAt: isoAt(0, 14), createdAt: TS, updatedAt: TS },
 ]
