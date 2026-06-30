@@ -112,8 +112,10 @@ SELECT
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
-    ps.name   AS pipeline_phase,
-    ps.label  AS pipeline_phase_label,
+    d.stage   AS pipeline_phase,
+    (SELECT ps.label FROM pipeline_stages ps
+      WHERE ps.name = d.stage AND ps.workspace_id = a.workspace_id
+      LIMIT 1) AS pipeline_phase_label,
     a.vat_id
 FROM accounts a
 LEFT JOIN deals d ON d.id = COALESCE(
@@ -126,7 +128,6 @@ LEFT JOIN deals d ON d.id = COALESCE(
        )
      ORDER BY d2.updated_at DESC LIMIT 1)
 )
-LEFT JOIN pipeline_stages ps ON ps.name = d.stage AND ps.workspace_id = a.workspace_id
 WHERE a.is_private = 0 AND a.workspace_id = ?1
 ORDER BY a.name ASC";
 
@@ -137,8 +138,10 @@ SELECT
     a.is_private, a.social_links, a.primary_deal_id, a.lead_score, a.score_factors,
     a.street, a.zip, a.city, a.country,
     a.created_at, a.updated_at, a.archived_at, a.email, a.phone,
-    ps.name   AS pipeline_phase,
-    ps.label  AS pipeline_phase_label,
+    d.stage   AS pipeline_phase,
+    (SELECT ps.label FROM pipeline_stages ps
+      WHERE ps.name = d.stage AND ps.workspace_id = a.workspace_id
+      LIMIT 1) AS pipeline_phase_label,
     a.vat_id
 FROM accounts a
 LEFT JOIN deals d ON d.id = COALESCE(
@@ -151,7 +154,6 @@ LEFT JOIN deals d ON d.id = COALESCE(
        )
      ORDER BY d2.updated_at DESC LIMIT 1)
 )
-LEFT JOIN pipeline_stages ps ON ps.name = d.stage AND ps.workspace_id = a.workspace_id
 WHERE a.id = ?1";
 
 pub fn get_all(conn: &Connection, workspace_id: &str) -> Result<Vec<Account>, AppError> {
@@ -444,6 +446,43 @@ mod tests {
         let acc = accounts.iter().find(|a| a.id == "acc-1").unwrap();
         assert_eq!(acc.pipeline_phase.as_deref(), Some("qualified"));
         assert_eq!(acc.pipeline_phase_label.as_deref(), Some("Qualifiziert"));
+    }
+
+    #[test]
+    fn get_all_does_not_duplicate_account_on_duplicate_stage_names() {
+        // Regression: a workspace whose pipeline_stages got seeded more than once
+        // can hold several rows with the SAME name. The accounts query joined
+        // pipeline_stages by name, so an account with a deal in that stage was
+        // returned once PER duplicate stage row — the customer showed up 2-3x and
+        // deleting one removed the single underlying account. get_all must return
+        // each account exactly once regardless of duplicate stage names.
+        let conn = setup();
+        let now = "2026-01-01T00:00:00Z";
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-d', 'ws-1', '', 'DupCo', 'company', 0, ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
+        // Same stage name 'qualified' three times (duplicate seed).
+        for id in ["ps-q1", "ps-q2", "ps-q3"] {
+            conn.execute(
+                "INSERT INTO pipeline_stages (id, workspace_id, name, label, order_index, color, is_won, is_lost, created_at, updated_at)
+                 VALUES (?1, 'ws-1', 'qualified', 'Qualifiziert', 1, '#3B82F6', 0, 0, ?2, ?3)",
+                rusqlite::params![id, now, now],
+            ).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-d', 'ws-1', 'acc-d', 'Deal', 'qualified', ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
+        set_primary_deal(&conn, "acc-d", Some("deal-d")).unwrap();
+
+        let accounts = get_all(&conn, "ws-1").unwrap();
+        let matches: Vec<_> = accounts.iter().filter(|a| a.id == "acc-d").collect();
+        assert_eq!(matches.len(), 1, "account must appear exactly once despite duplicate stage names");
+        assert_eq!(matches[0].pipeline_phase.as_deref(), Some("qualified"));
+        assert_eq!(matches[0].pipeline_phase_label.as_deref(), Some("Qualifiziert"));
     }
 
     #[test]
