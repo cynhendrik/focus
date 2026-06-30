@@ -19,10 +19,12 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
   const toast = useToastStore(s => s.show)
   const activeId = useWorkspaceStore(s => s.activeWorkspaceId)
   const workspaces = useWorkspaceStore(s => s.workspaces)
-  const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
-  const isOwner = workspaces.find(w => w.id === activeId)?.role === 'owner'
-  const deleteWorkspace = useWorkspaceStore(s => s.deleteWorkspace)
   const localWorkspaces = useWorkspaceStore(s => s.localWorkspaces)
+  const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  // Lokale Workspaces (role 'owner') stehen in localWorkspaces, nicht in workspaces.
+  // Beide berücksichtigen — sonst ist der Reset bei „Mein Workspace" faelschlich gesperrt.
+  const isOwner = [...workspaces, ...localWorkspaces].find(w => w.id === activeId)?.role === 'owner'
+  const deleteWorkspace = useWorkspaceStore(s => s.deleteWorkspace)
 
   const handleReset = async () => {
     if (!isOwner) {
