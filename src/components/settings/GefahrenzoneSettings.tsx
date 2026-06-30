@@ -37,16 +37,21 @@ export function GefahrenzoneSettings({ workspaceId: _workspaceId }: Props) {
     if (!window.confirm(`Workspace wirklich zurücksetzen? Alle Inhalte werden gelöscht (Firmenprofil & Einstellungen bleiben). Unwiderruflich.${sharedWarn}`)) {
       return
     }
+    if (!activeId) return
     setBusy('reset')
     try {
-      await invoke('cmd_reset_workspace')
-      if (isShared && activeId) {
+      // STRIKTE Isolation: lokal und Cloud dürfen sich nie schneiden.
+      if (isShared) {
+        // Geteilte Workspace → NUR Cloud zurücksetzen, lokale Daten NIE anfassen.
         const { error } = await supabase.rpc('reset_workspace', { ws_id: activeId })
         if (error) {
-          toast({ message: `Lokal geleert, aber Cloud-Reset fehlgeschlagen: ${error.message}. Bitte erneut ausführen.`, variant: 'error', durationMs: 8000 })
+          toast({ message: `Cloud-Reset fehlgeschlagen: ${error.message}. Bitte erneut ausführen.`, variant: 'error', durationMs: 8000 })
           setBusy(null)
           return
         }
+      } else {
+        // Lokale Workspace → NUR lokal, und nur DIESE eine Workspace.
+        await invoke('cmd_reset_workspace', { workspaceId: activeId })
       }
       toast({ message: 'Workspace zurückgesetzt — App lädt neu…', variant: 'success', durationMs: 2000 })
       setTimeout(() => window.location.reload(), 1200)
