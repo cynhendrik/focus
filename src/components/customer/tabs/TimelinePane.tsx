@@ -64,7 +64,7 @@ export function TimelinePane({ customerId }: Props) {
           <InsightsStrip customerId={customerId} />
           <ActivityStream
             accountId={customerId}
-            sources={{ todos: true, notes: true, files: true, crmFollowUps: true, deadlines: true, mails: true }}
+            sources={{ todos: true, notes: true, noteDocs: true, files: true, crmFollowUps: true, deadlines: true, mails: true }}
           />
         </div>
       </div>
