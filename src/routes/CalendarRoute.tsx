@@ -6,6 +6,8 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import type { CalendarEvent, UpsertCalendarEventPayload, EventColor } from '@/types/calendar.types'
+import { extractMeetingLink } from '@/lib/calendar/meeting-link'
+import { openExternal } from '@/lib/open-external'
 
 // ── Konstanten ────────────────────────────────────────────────────────────────
 
@@ -546,6 +548,7 @@ function DayView({
 
         {dayEvents.map((ev, ei) => {
           const cust = accountName(ev.accountId)
+          const link = extractMeetingLink(ev)
           return (
           <div
             key={ei}
@@ -580,11 +583,24 @@ function DayView({
             <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {ev.title}
             </div>
-            {ev.location && (
+            {link ? (
+              <button
+                type="button"
+                title={`${link.label}-Meeting öffnen`}
+                onClick={e => { e.stopPropagation(); void openExternal(link.url) }}
+                style={{
+                  alignSelf: 'flex-start', marginTop: 2, fontSize: 10.5, fontWeight: 700,
+                  borderRadius: 99, padding: '3px 10px', border: 'none',
+                  background: 'var(--accent-gradient)', color: '#fff', cursor: 'pointer',
+                }}
+              >
+                🎥 Beitreten
+              </button>
+            ) : ev.location ? (
               <div style={{ fontSize: 10.5, opacity: 0.65, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 📍 {ev.location}
               </div>
-            )}
+            ) : null}
           </div>
           )
         })}

@@ -24,6 +24,8 @@ import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
 import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
+import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
+import { openExternal } from '@/lib/open-external'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { useLeadsStore } from '@/store/leads.store'
@@ -582,6 +584,7 @@ interface PlanItem {
   title:    string
   subtitle: string
   status:   { kind: 'now' | 'block' | 'pause' | 'live' | 'fokus' | 'short'; label: string }
+  meetingLink?: MeetingLink
 }
 
 function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
@@ -605,6 +608,7 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
       title: ev.title || '(Termin)',
       subtitle: ev.location || ev.description || '',
       status,
+      meetingLink: extractMeetingLink(ev) ?? undefined,
     })
   }
 
@@ -744,7 +748,22 @@ function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void })
           </span>
         )}
       </div>
-      <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
+        {item.meetingLink && (
+          <button
+            type="button"
+            title={`${item.meetingLink.label}-Meeting öffnen`}
+            onClick={e => { e.stopPropagation(); void openExternal(item.meetingLink!.url) }}
+            style={{
+              fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '4px 12px',
+              border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>
+            Beitreten →
+          </button>
+        )}
+        <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
+      </div>
     </div>
   )
 }
