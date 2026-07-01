@@ -122,8 +122,10 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
 
         CREATE INDEX IF NOT EXISTS idx_pipeline_stages_workspace
             ON pipeline_stages(workspace_id, order_index);
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_ws_name
-            ON pipeline_stages(workspace_id, name);
+        -- Der UNIQUE(workspace_id,name)-Index wird NICHT hier angelegt: bestehende
+        -- DBs koennen noch Duplikate haben und create_tables laeuft VOR den
+        -- Migrationen. Migration 33 dedupt zuerst und legt den Index dann an
+        -- (deckt frische Installs mit ab, da Migrationen 1..33 auf neuer DB laufen).
 
         CREATE TABLE IF NOT EXISTS automation_rules (
             id             TEXT PRIMARY KEY,
