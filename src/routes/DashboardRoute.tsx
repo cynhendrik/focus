@@ -22,6 +22,8 @@ import { useCrmStore } from '@/store/crm.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
+import { isTodoForToday } from '@/lib/heute/due'
+import { snoozeInvoice } from '@/lib/heute/snooze'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
@@ -205,6 +207,11 @@ function WorkspaceView() {
             dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
           })
         }
+      } else if (item.type === 'invoice_reminder') {
+        // Rechnung wird nicht „erledigt" (das entscheidet die Zahlung), aber nach
+        // dem Senden einer Erinnerung 7 Tage ruhen lassen — sonst steht sie morgen
+        // wieder auf #1 (Broken-Record). Mahn-Cooldown respektiert.
+        snoozeInvoice(item.id, 7)
       }
     } catch {
       showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
@@ -213,6 +220,14 @@ function WorkspaceView() {
   }, [queueItems, queueIndex, todos, upsertTodo, followUps, crmUpsert, advance, showToast])
 
   const handleSkip = useCallback(() => advance(), [advance])
+
+  // „Später erinnern" für eine Rechnung: 7 Tage ruhen lassen (persistiert), damit
+  // eine bewusst liegengelassene Rechnung kein Broken-Record wird.
+  const handleSnooze = useCallback(() => {
+    const item = queueItems[queueIndex]
+    if (item?.type === 'invoice_reminder') snoozeInvoice(item.id, 7)
+    advance()
+  }, [queueItems, queueIndex, advance])
 
   const currentItem = queueItems[queueIndex]
 
@@ -268,7 +283,7 @@ function WorkspaceView() {
   // Heute faellig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
-    const tasks = myTodos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
+    const tasks = myTodos.filter(t => isTodoForToday(t, todayIso)).length
     const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
@@ -368,6 +383,7 @@ function WorkspaceView() {
                   total={queueItems.length}
                   onDone={handleDone}
                   onSkip={handleSkip}
+                  onSnooze={handleSnooze}
                 />
               </motion.div>
             </AnimatePresence>
@@ -387,7 +403,8 @@ function WorkspaceView() {
                 const typeLabel =
                   next.type === 'invoice_reminder' ? 'Mahnung' :
                   next.type === 'mail_reply'        ? 'Mail' :
-                  next.type === 'followup'          ? 'Follow-up' : 'Todo'
+                  next.type === 'followup'          ? 'Follow-up' :
+                  next.type === 'lead_followup'     ? 'Follow-up' : 'Todo'
                 return (
                   <div key={next.id} style={{
                     borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',

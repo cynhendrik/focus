@@ -9,6 +9,7 @@ import { useCrmStore } from '@/store/crm.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useAuthStore } from '@/store/auth.store'
 import { filterMine } from '@/lib/todos/ownership'
+import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { staticHeuteQueue } from '@/lib/ai/heute-queue'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
 
@@ -19,9 +20,10 @@ export function useHeuteQueue() {
   const load = useCallback(async () => {
     setLoading(true)
     const myId = useAuthStore.getState().user?.id
+    const snoozed = snoozedInvoiceIds()
     const input = {
       todos:          filterMine(useTodosStore.getState().allTodos, myId),
-      invoices:       useFinanceStore.getState().invoices,
+      invoices:       useFinanceStore.getState().invoices.filter(i => !snoozed.has(i.id)),
       emails:         useMailStore.getState().emails,
       deals:          useDealsStore.getState().deals,
       calendarEvents: useCalendarStore.getState().events,

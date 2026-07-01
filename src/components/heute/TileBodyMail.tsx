@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Send, Sparkles, Loader, Check } from 'lucide-react'
+import { Send, Sparkles, Loader, Check, Clock } from 'lucide-react'
 import { ContactsGateway } from '@/data/contacts.gateway'
 import { useAccountsStore } from '@/store/accounts.store'
 import { useMailStore } from '@/store/mail.store'
@@ -19,6 +19,8 @@ import type { FollowUp } from '@/types/crm.types'
 interface BaseProps {
   onDone: () => Promise<void>
   onSkip: () => void
+  /** Nur invoice_reminder: 7 Tage ruhen lassen statt „erledigt". */
+  onSnooze?: () => void
 }
 
 interface TodoMailProps extends BaseProps {
@@ -47,7 +49,7 @@ interface LeadFollowUpProps extends BaseProps {
 
 type Props = TodoMailProps | InvoiceReminderProps | LeadFollowUpProps
 
-export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSkip }: Props) {
+export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSkip, onSnooze }: Props) {
   const accounts     = useAccountsStore(s => s.accounts)
   const mailAccounts = useMailStore(s => s.accounts)
   const showToast    = useToastStore(s => s.show)
@@ -332,6 +334,19 @@ export function TileBodyMail({ mode, todo, invoice, lead, followUp, onDone, onSk
             }}>
             {marking ? <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
             Erledigt
+          </button>
+        )}
+
+        {mode === 'invoice_reminder' && onSnooze && (
+          <button type="button" onClick={onSnooze} disabled={sending}
+            title="7 Tage ruhen lassen — verschwindet solange aus HEUTE (Mahn-Cooldown)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7, padding: '11px 18px',
+              borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface-2)',
+              color: 'var(--fg)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            }}>
+            <Clock size={14} />
+            7 Tage ruhen
           </button>
         )}
 

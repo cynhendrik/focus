@@ -20,3 +20,9 @@ src-tauri/.cargo/config.toml
 test-output.log
 tsc-output.log
 tsc-check.log
+.superpowers/
+
+# Alte/rotierte Updater-Schluessel (nie committen)
+cultera-focus-updater.key.*
+cultera-updater.key
+cultera-updater.key.pub
