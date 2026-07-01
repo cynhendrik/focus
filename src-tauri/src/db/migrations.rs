@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 32;
+const CURRENT_VERSION: u32 = 33;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -780,6 +780,22 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             "#)?;
             Ok(())
         }
+        33 => {
+            // pipeline_stages: gleichnamige Duplikate entfernen (durch rescope/
+            // Share-Migration konnten sich Stages stapeln → "3× im Board") und
+            // UNIQUE(workspace_id, name) erzwingen — analog lead_stages (Migration 19).
+            // Deals referenzieren die Stage per NAME; der Keeper behält den Namen,
+            // also bleiben Deals konsistent.
+            conn.execute_batch(r#"
+                DELETE FROM pipeline_stages
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM pipeline_stages GROUP BY workspace_id, name
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_ws_name
+                    ON pipeline_stages(workspace_id, name);
+            "#)?;
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -1056,6 +1072,38 @@ mod tests {
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
             [name], |r| r.get::<_, i64>(0),
         ).unwrap_or(0) > 0
+    }
+
+    #[test]
+    fn migration_33_dedupes_pipeline_stages_and_enforces_unique() {
+        // pipeline_stages OHNE Unique-Index (Zustand vor Migration 33), mit Duplikaten
+        // wie sie durch rescope/Share-Migration entstehen konnten.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(r#"
+            CREATE TABLE pipeline_stages (
+                id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL,
+                label TEXT NOT NULL, order_index INTEGER, color TEXT,
+                is_won INTEGER, is_lost INTEGER, created_at TEXT, updated_at TEXT
+            );
+            INSERT INTO pipeline_stages VALUES ('a','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('b','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('c','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('d','ws','lost','Lost',1,'#fff',0,1,'t','t');
+            INSERT INTO pipeline_stages VALUES ('e','ws2','won','Won',0,'#fff',1,0,'t','t');
+        "#).unwrap();
+
+        apply(&conn, 33).unwrap();
+
+        let won_ws: i64 = conn.query_row(
+            "SELECT count(*) FROM pipeline_stages WHERE workspace_id='ws' AND name='won'", [], |r| r.get(0)).unwrap();
+        let total: i64 = conn.query_row("SELECT count(*) FROM pipeline_stages", [], |r| r.get(0)).unwrap();
+        assert_eq!(won_ws, 1, "Duplikate in ws entfernt");
+        assert_eq!(total, 3, "ws: won+lost, ws2: won = 3 (andere Workspace unberührt)");
+
+        // UNIQUE-Index verhindert ein neues Duplikat.
+        let dup = conn.execute(
+            "INSERT INTO pipeline_stages VALUES ('f','ws','won','Won',0,'#fff',1,0,'t','t')", []);
+        assert!(dup.is_err(), "UNIQUE(workspace_id,name) muss greifen");
     }
 
     #[test]
