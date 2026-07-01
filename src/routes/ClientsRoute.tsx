@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   UserPlus,
-  Search, ChevronRight, Archive, Pin,
+  Search, ChevronRight, Archive, ArchiveRestore, Pin, Trash2,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useCustomersStore } from '@/store/customers.store'
+import { useToastStore } from '@/store/toast.store'
 import { useUiStore } from '@/store/ui.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useDealsStore } from '@/store/deals.store'
@@ -154,10 +156,53 @@ const COL_TEMPLATE = '1.6fr 1fr 0.6fr 0.45fr 0.6fr 28px'
 function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) {
   const pinnedIds = useClientPickerStore(s => s.pinnedIds)
   const togglePin = useClientPickerStore(s => s.togglePin)
+  const setArchived    = useCustomersStore(s => s.setArchived)
+  const removeCustomer = useCustomersStore(s => s.remove)
+  const showToast      = useToastStore(s => s.show)
   const pinned = pinnedIds.includes(row.customer.id)
+  const archived = !!row.customer.archivedAt
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+
+  // Kontextmenü schließen bei Klick/Scroll/Escape.
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null) }
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('keydown', esc)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('keydown', esc)
+    }
+  }, [menu])
+
+  async function handleArchive() {
+    setMenu(null)
+    try {
+      await setArchived(row.customer.id, !archived)
+      showToast({ message: archived ? `${row.customer.name} wiederhergestellt.` : `${row.customer.name} archiviert.`, variant: 'success' })
+    } catch (e) {
+      showToast({ message: `Archivieren fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+    }
+  }
+
+  async function handleDelete() {
+    setMenu(null)
+    if (!window.confirm(`Kunde „${row.customer.name}" wirklich löschen? Inkl. Deals, Rechnungen und Aktivitäten. Unwiderruflich.`)) return
+    try {
+      await removeCustomer(row.customer.id)
+      showToast({ message: `${row.customer.name} gelöscht.`, variant: 'success' })
+    } catch (e) {
+      showToast({ message: `Löschen fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
+    }
+  }
+
   return (
     <div
       onClick={onOpen}
+      onContextMenu={e => { e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }) }}
       style={{
         display: 'grid', gridTemplateColumns: COL_TEMPLATE,
         alignItems: 'center', columnGap: 18,
@@ -264,7 +309,48 @@ function ClientListRow({ row, onOpen }: { row: ClientRow; onOpen: () => void }) 
         </button>
         <ChevronRight size={16} style={{ color: 'var(--fg-dim)' }} />
       </div>
+
+      {menu && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: menu.x, top: menu.y, zIndex: 1000,
+            minWidth: 190, padding: 4, borderRadius: 10,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-2)',
+          }}
+        >
+          <ContextItem
+            icon={archived ? ArchiveRestore : Archive}
+            label={archived ? 'Wiederherstellen' : 'Archivieren'}
+            onClick={handleArchive}
+          />
+          <ContextItem icon={Trash2} label="Löschen" danger onClick={handleDelete} />
+        </div>
+      )}
     </div>
+  )
+}
+
+// ── Context menu item (Rechtsklick auf Kundenzeile) ──────────────────────────
+
+function ContextItem({ icon: Icon, label, danger, onClick }: {
+  icon: LucideIcon; label: string; danger?: boolean; onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+        padding: '8px 10px', borderRadius: 7, border: 'none', cursor: 'pointer',
+        background: 'transparent', textAlign: 'left', fontFamily: 'inherit',
+        fontSize: 13, color: danger ? 'var(--danger)' : 'var(--fg)',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-3)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+    >
+      <Icon size={14} /> {label}
+    </button>
   )
 }
 
