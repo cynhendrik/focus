@@ -1,0 +1,78 @@
+/* Fokus+ Dashboard („Heute") — Layout + Interleave-Liste + Neueste Mails.
+   Scoped unter .hd, damit keine App-weiten Klassen kollidieren. Tokens aus globals.css. */
+
+.hd { display: flex; flex-direction: column; gap: 20px; }
+
+/* Kopf */
+.hd-greet { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.hd-greet h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+.hd-greet h1 em { font-style: normal; color: var(--accent); }
+.hd-kora { font-size: 13px; color: var(--fg-muted); margin: 8px 0 0; line-height: 1.55; max-width: 640px; }
+.hd-kora b { color: var(--fg-2); font-weight: 600; }
+.hd-kora .eur { color: var(--accent-text); font-weight: 600; }
+.hd-date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+
+/* KPIs */
+.hd-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* 2 gleich hohe Spalten */
+.hd-main { display: grid; grid-template-columns: 1.62fr 1fr; gap: 16px; align-items: stretch; }
+.hd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: 100%; }
+@media (max-width: 940px) { .hd-main { grid-template-columns: 1fr; } .hd-kpis { grid-template-columns: 1fr; } }
+
+/* Karte, die die Resthöhe füllt (Liste / Mails) — Footer am Grund */
+.hd-fill { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25), 0 14px 30px -18px rgb(0 0 0 / 0.55); }
+.hd-lhead { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px 11px; }
+.hd-lhead .t { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-dim); }
+.hd-lhead .c { font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim); }
+
+/* Interleave-Zeile */
+.hd-row { display: grid; grid-template-columns: 20px 74px 1fr auto; align-items: center; gap: 12px;
+  padding: 8px 20px; min-height: 56px; border-top: 1px solid var(--border); transition: background 100ms; }
+.hd-row:hover { background: var(--surface-2); }
+.hd-row.mny { box-shadow: inset 3px 0 0 var(--accent); }
+.hd-check { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-strong);
+  background: transparent; cursor: pointer; padding: 0; transition: border-color 120ms, background 120ms; }
+.hd-check:hover { border-color: var(--ok); background: rgb(120 200 150 / 0.15); }
+.hd-mmark { width: 19px; height: 19px; display: flex; align-items: center; justify-content: center; color: var(--accent-text); font-size: 12px; font-weight: 800; }
+.hd-kind { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 0; text-align: center; border-radius: var(--radius-xs); }
+.hd-kind.mahnung { color: var(--accent-text); background: var(--accent-soft); }
+.hd-kind.followup { color: var(--info); background: rgb(120 180 210 / 0.12); }
+.hd-kind.todo { color: var(--fg-muted); background: var(--surface-2); border: 1px solid var(--border); }
+.hd-body { min-width: 0; }
+.hd-ti { font-size: 13px; font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-mt { font-size: 11px; color: var(--fg-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-mt .eur { color: var(--accent-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.hd-quick { display: flex; gap: 6px; }
+.hd-qbtn { font-size: 11px; font-weight: 600; border-radius: 99px; padding: 5px 12px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--fg-2); cursor: pointer; white-space: nowrap; transition: border-color 120ms; }
+.hd-qbtn:hover { border-color: var(--border-strong); }
+.hd-lfoot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-top: 1px solid var(--border); background: var(--surface-2); }
+.hd-lfoot .txt { font-size: 12px; color: var(--fg-muted); }
+.hd-lfoot .txt b { color: var(--fg-2); }
+.hd-lfoot button { font-size: 12px; font-weight: 700; color: var(--fg-2); background: none; border: none; cursor: pointer; }
+.hd-lfoot button:hover { color: var(--accent-text); }
+
+/* Neueste Mails */
+.hd-mrow { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 11px;
+  padding: 8px 20px; min-height: 56px; border-top: 1px solid var(--border); transition: background 100ms; cursor: pointer; }
+.hd-mrow:hover { background: var(--surface-2); }
+.hd-av { width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--surface-3);
+  display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--fg-muted); }
+.hd-mbody { min-width: 0; }
+.hd-from { font-size: 13px; color: var(--fg-2); display: flex; align-items: center; gap: 7px; }
+.hd-from .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hd-mrow.unread .hd-from { color: var(--fg); font-weight: 700; }
+.hd-mrow.unread .hd-from .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.hd-subj { font-size: 11px; color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.hd-mtime { font-family: var(--font-mono); font-size: 10px; color: var(--fg-dim); white-space: nowrap; }
+.hd-reply { font-size: 11px; font-weight: 600; border-radius: 99px; padding: 5px 11px; border: 1px solid var(--border); background: var(--surface-2); color: var(--fg-2); cursor: pointer; }
+.hd-reply:hover { border-color: var(--border-strong); }
+
+/* Ruhiger Tag — sanfter Hinweis */
+.hd-nudge { display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-top: 1px solid var(--border); }
+.hd-nudge .txt { font-size: 12px; color: var(--fg-muted); }
+.hd-nudge button { font-size: 12px; font-weight: 700; color: var(--fg-2); background: none; border: none; cursor: pointer; }
+.hd-nudge button:hover { color: var(--accent-text); }

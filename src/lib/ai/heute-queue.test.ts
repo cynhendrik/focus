@@ -28,6 +28,23 @@ describe('staticHeuteQueue', () => {
     expect(queue[0].id).toBe('inv-1')
   })
 
+  it('verschränkt Geld und Beziehung (Rechnung, Follow-up, Rechnung, Follow-up)', () => {
+    const todayStr = todayLocalIso()
+    const inv = (id: string, total: number): CorraContextInput['invoices'][number] =>
+      ({ id, status: 'overdue', total, dueDate: '2026-05-01', accountId: 'a', workspaceId: 'w', createdBy: 'u', date: '2026-04-01', taxMode: 'standard', subtotal: total, taxAmount: 0, bankInfo: '', isSuggestion: false, pendingSync: false, createdAt: '', updatedAt: '' })
+    const input: CorraContextInput = {
+      ...emptyInput,
+      invoices: [inv('inv-big', 5000), inv('inv-small', 500)],
+      followUps: [
+        { id: 'fu-1', customerId: 'l', title: 'A', dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '' },
+        { id: 'fu-2', customerId: 'l', title: 'B', dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '' },
+      ],
+    }
+    const q = staticHeuteQueue(input)
+    expect(q.map(x => x.type)).toEqual(['invoice_reminder', 'lead_followup', 'invoice_reminder', 'lead_followup'])
+    expect(q[0].id).toBe('inv-big') // größte Rechnung als #1
+  })
+
   it('maps todo actionType reply_mail to mail_reply', () => {
     const input: CorraContextInput = {
       ...emptyInput,
