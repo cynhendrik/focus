@@ -193,6 +193,7 @@ function WorkspaceView() {
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const upsertTodo = useTodosStore(s => s.upsert)
+  const postponeTodo = useTodosStore(s => s.postpone)
   const crmUpsert  = useCrmStore(s => s.upsert)
   const showToast  = useToastStore(s => s.show)
   const emails     = useMailStore(s => s.emails)
@@ -327,8 +328,6 @@ function WorkspaceView() {
     if (events.length) parts.push(`${events.length} Termin${events.length === 1 ? '' : 'e'}`)
     return parts.length ? `Heute stehen an: ${joinDe(parts)}.` : 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.'
   }, [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
-  const now = new Date()
-  const dateLine = `${WEEKDAYS[now.getDay()].slice(0, 2)} · ${String(now.getDate()).padStart(2, '0')}. ${now.toLocaleDateString('de-DE', { month: 'long' })} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
 
@@ -359,6 +358,30 @@ function WorkspaceView() {
     snoozeInvoice(item.id, 7); setSnoozeTick(t => t + 1); reshuffle()
   }, [reshuffle])
 
+  // „Später" — To-do/Follow-up um einen Tag verschieben (kein Broken-Record).
+  const laterItem = useCallback(async (item: HeuteQueueItem) => {
+    try {
+      if (item.type === 'lead_followup') {
+        const fu = fuById.get(item.id)
+        if (fu) {
+          const d = new Date(); d.setDate(d.getDate() + 1)
+          await crmUpsert({ id: fu.id, customerId: fu.customerId, title: fu.title, dueDate: d.toLocaleDateString('sv'), status: 'offen', priority: fu.priority })
+        }
+      } else {
+        await postponeTodo(item.id)
+      }
+      reshuffle()
+    } catch {
+      showToast({ message: 'Konnte nicht verschieben.', variant: 'error' })
+    }
+  }, [fuById, crmUpsert, postponeTodo, reshuffle, showToast])
+
+  // Ein Listen-Item in den Fokus („Dein nächster Zug") holen — z.B. um eine
+  // Rechnung von dort aus zu senden.
+  const promoteToHero = useCallback((absIndex: number) => {
+    setDirection(1); setQueueIndex(absIndex)
+  }, [])
+
   const listAll   = queueItems.slice(queueIndex + 1)
   const listShown = listAll.slice(0, 6)
   const hidden    = listAll.slice(6)
@@ -374,14 +397,8 @@ function WorkspaceView() {
     <div className="hd">
       {isWorkspaceEmpty && <DashboardEmptyState />}
 
-      {/* Kopf: Gruß + KORA-Zeile */}
-      <div className="hd-greet">
-        <div>
-          <h1>{greeting()}<em>.</em></h1>
-          <p className="hd-kora">{koraLine}</p>
-        </div>
-        <div className="hd-date">{dateLine}</div>
-      </div>
+      {/* KORA-Zeile — Gruß + Datum liefert bereits der PageHeader oben */}
+      <p className="hd-kora" style={{ margin: 0 }}>{koraLine}</p>
 
       {/* KPIs */}
       <div className="hd-kpis">
@@ -445,7 +462,8 @@ function WorkspaceView() {
           {(currentItem || listShown.length > 0) && (
             <div className="hd-fill">
               <div className="hd-lhead"><span className="t">Als nächstes</span><span className="c">Geld &amp; Beziehung im Wechsel</span></div>
-              {listShown.map(item => {
+              {listShown.map((item, i) => {
+                const absIndex = queueIndex + 1 + i
                 const isMoney = item.type === 'invoice_reminder'
                 const isFollow = item.type === 'lead_followup' || item.type === 'followup'
                 const kindLabel = isMoney ? 'Mahnung' : isFollow ? 'Follow-up' : item.type === 'mail_reply' ? 'Mail' : 'To-do'
@@ -470,11 +488,13 @@ function WorkspaceView() {
                       ? <span className="hd-mmark">€</span>
                       : <button className="hd-check" title="Als erledigt markieren" onClick={() => completeItem(item)} />}
                     <span className={`hd-kind ${kindClass}`}>{kindLabel}</span>
-                    <div className="hd-body"><div className="hd-ti">{title}</div><div className="hd-mt">{meta}</div></div>
+                    <div className="hd-body" style={{ cursor: 'pointer' }} title="In den Fokus holen" onClick={() => promoteToHero(absIndex)}>
+                      <div className="hd-ti">{title}</div><div className="hd-mt">{meta}</div>
+                    </div>
                     <div className="hd-quick">
                       {isMoney
-                        ? <button className="hd-qbtn" onClick={() => snoozeItem(item)}>7 Tage ruhen</button>
-                        : <button className="hd-qbtn" onClick={() => completeItem(item)}>Erledigt</button>}
+                        ? <><button className="hd-qbtn" onClick={() => promoteToHero(absIndex)}>Erinnern</button><button className="hd-qbtn" onClick={() => snoozeItem(item)}>Ruhen</button></>
+                        : <button className="hd-qbtn" onClick={() => laterItem(item)}>Später</button>}
                     </div>
                   </div>
                 )
@@ -729,151 +749,6 @@ function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void })
   )
 }
 
-// ── Inbox-Card ──────────────────────────────────────────────────────────────
-
-function InboxCard() {
-  const emails            = useMailStore(s => s.emails)
-  const loadEmails        = useMailStore(s => s.loadEmails)
-  const selectEmail       = useMailStore(s => s.selectEmail)
-  const selectedAccountId = useMailStore(s => s.selectedAccountId)
-  const setAppView        = useUiStore(s => s.setAppView)
-  const customers         = useCustomersStore(s => s.customers)
-
-  useEffect(() => {
-    if (selectedAccountId && emails.length === 0) loadEmails()
-  }, [selectedAccountId, emails.length, loadEmails])
-
-  const customerByEmail = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const c of customers) if (c.email) m.set(c.email.toLowerCase(), c.name)
-    return m
-  }, [customers])
-
-  const sorted = useMemo(
-    () => [...emails].sort((a, b) =>
-      (Number(!!a.isRead) - Number(!!b.isRead)) ||   // ungelesene zuerst
-      (b.sentAt || '').localeCompare(a.sentAt || ''),
-    ),
-    [emails],
-  )
-  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
-
-  return (
-    <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-      background: 'var(--surface)', boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', minHeight: 0,
-      maxHeight: 480, overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        padding: '20px 22px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0,
-      }}>
-        <h2 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-          letterSpacing: '-0.01em',
-        }}>
-          Inbox
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.04em',
-            color: unreadCount > 0 ? 'var(--accent)' : 'var(--fg-dim)',
-            fontWeight: unreadCount > 0 ? 700 : 400,
-          }}>
-            {unreadCount > 0 ? `${unreadCount} ungelesen` : `${sorted.length} ${sorted.length === 1 ? 'Mail' : 'Mails'}`}
-          </span>
-          <button
-            onClick={() => setAppView('mail')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              color: 'var(--fg)', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 11.5,
-            }}
-          >
-            Alle <ArrowRight size={11} />
-          </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: '6px 14px 12px' }}>
-        {sorted.length === 0 ? (
-          <div style={{ padding: '28px 12px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-            {selectedAccountId ? 'Inbox leer' : 'Kein Mail-Konto verbunden'}
-          </div>
-        ) : (
-          sorted.map(e => (
-            <InboxRow
-              key={e.id}
-              email={e}
-              customerName={customerByEmail.get(e.fromAddr?.toLowerCase() ?? '') ?? null}
-              onClick={() => { selectEmail(e); setAppView('mail') }}
-            />
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-function InboxRow({
-  email, customerName, onClick,
-}: {
-  email: EmailHeader
-  customerName: string | null
-  onClick: () => void
-}) {
-  const time = new Date(email.sentAt)
-  const today = new Date()
-  const isToday = time.toDateString() === today.toDateString()
-  const timeLabel = isToday
-    ? `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`
-    : time.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
-
-  const unread = !email.isRead
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: '8px 1fr auto', gap: 10,
-        alignItems: 'center', padding: '10px 8px', borderRadius: 10,
-        cursor: 'pointer', transition: 'background 140ms',
-        opacity: unread ? 1 : 0.6,
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-    >
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%',
-        background: unread ? 'var(--accent)' : 'transparent',
-      }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{
-          fontSize: 13, fontWeight: unread ? 700 : 500,
-          color: unread ? 'var(--fg)' : 'var(--fg-muted)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {customerName ?? email.fromName ?? email.fromAddr}
-        </span>
-        <span style={{
-          fontSize: 11.5, color: unread ? 'var(--fg-muted)' : 'var(--fg-dim)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {email.subject || '(ohne Betreff)'}
-        </span>
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-        color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
-      }}>
-        {timeLabel}
-      </span>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main route
