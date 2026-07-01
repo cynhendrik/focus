@@ -23,7 +23,7 @@ import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
-import { snoozeInvoice } from '@/lib/heute/snooze'
+import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { useLeadsStore } from '@/store/leads.store'
@@ -124,8 +124,8 @@ function KpiCard({
       borderRadius: 'var(--radius)', border: '1px solid var(--border)',
       background: 'var(--surface)', padding: '18px 20px',
       boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', gap: 12,
-      position: 'relative', minHeight: 152,
+      display: 'flex', flexDirection: 'column', gap: 10,
+      position: 'relative', minHeight: 116,
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
@@ -164,9 +164,9 @@ function KpiCard({
       </div>
 
       <div style={{
-        fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.04em',
-        color: accentValue ? 'var(--accent)' : 'var(--fg)',
-        fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+        fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em',
+        color: accentValue ? 'var(--accent-text)' : 'var(--fg)',
+        fontVariantNumeric: 'tabular-nums',
       }}>
         {value}
       </div>
@@ -202,6 +202,7 @@ function WorkspaceView() {
   useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
+  const [snoozeTick, setSnoozeTick] = useState(0)   // erzwingt Neuberechnung nach „7 Tage ruhen"
 
   // Heute-Cockpit queue
   const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
@@ -301,37 +302,31 @@ function WorkspaceView() {
   }, [invoices, revRange])
 
   // Aktive Kunden — alle nicht-privaten, +Anzahl der diese Woche neu erstellten
-  const activeCount = useMemo(
-    () => customers.filter(c => !c.isPrivate).length,
-    [customers],
-  )
-  const newThisWeek = useMemo(() => {
-    const sow = startOfWeek(new Date()).toISOString()
-    return customers.filter(c => !c.isPrivate && c.createdAt && c.createdAt >= sow).length
-  }, [customers])
 
   // Heute faellig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
     const tasks = myTodos.filter(t => isTodoForToday(t, todayIso)).length
-    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
+    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate.slice(0, 10) <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
 
   // ── Fokus+ abgeleitete Werte ────────────────────────────────────────────────
-  const overdueInvoices = useMemo(
-    () => invoices.filter(i => i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
-      && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now())),
-    [invoices],
-  )
+  const overdueInvoices = useMemo(() => {
+    const snoozed = snoozedInvoiceIds()   // gesnoozte zählen nicht als „drängt heute"
+    return invoices.filter(i => !snoozed.has(i.id) && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
+      && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, snoozeTick])
   const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
   const koraLine = useMemo(() => {
     const parts: string[] = []
     if (overdueInvoices.length) parts.push(`${overdueInvoices.length} ${overdueInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'} (${eur0(geldUnterwegs)})`)
     if (dueToday.fus) parts.push(`${dueToday.fus} Follow-up${dueToday.fus === 1 ? '' : 's'}`)
+    if (dueToday.tasks) parts.push(`${dueToday.tasks} To-do${dueToday.tasks === 1 ? '' : 's'}`)
     if (events.length) parts.push(`${events.length} Termin${events.length === 1 ? '' : 'e'}`)
-    return parts.length ? `Heute drängen ${joinDe(parts)}.` : 'Heute drängt nichts Akutes — ein guter Tag für Fokusarbeit.'
-  }, [overdueInvoices, geldUnterwegs, dueToday.fus, events.length])
+    return parts.length ? `Heute stehen an: ${joinDe(parts)}.` : 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.'
+  }, [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
   const now = new Date()
   const dateLine = `${WEEKDAYS[now.getDay()].slice(0, 2)} · ${String(now.getDate()).padStart(2, '0')}. ${now.toLocaleDateString('de-DE', { month: 'long' })} · ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
@@ -354,14 +349,14 @@ function WorkspaceView() {
         const t = todoById.get(item.id)
         if (t) await upsertTodo({ id: t.id, title: t.title, status: 'done', bucket: 'done', priority: t.priority, customerId: t.customerId, actionType: t.actionType, sourceRef: t.sourceRef, notes: t.notes, checklist: t.checklist, tags: t.tags })
       }
-      setQueueIndex(0); reshuffle()
+      reshuffle()   // Index erhalten — Hero springt nicht zurück auf #1
     } catch {
       showToast({ message: 'Konnte nicht als erledigt markieren.', variant: 'error' })
     }
   }, [fuById, todoById, crmUpsert, upsertTodo, reshuffle, showToast])
 
   const snoozeItem = useCallback((item: HeuteQueueItem) => {
-    snoozeInvoice(item.id, 7); setQueueIndex(0); reshuffle()
+    snoozeInvoice(item.id, 7); setSnoozeTick(t => t + 1); reshuffle()
   }, [reshuffle])
 
   const listAll   = queueItems.slice(queueIndex + 1)
@@ -392,8 +387,8 @@ function WorkspaceView() {
       <div className="hd-kpis">
         <KpiCard
           label="Umsatz"
-          value={<span>{fmtKEur(paidNow)}<span style={{ fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>k€</span></span>}
-          hint={<><span style={{ color: paidNow >= paidPrev ? 'var(--accent)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>{paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{hintPrevLabel}</span><span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span></>}
+          value={<span>{fmtKEur(paidNow)}<span style={{ fontSize: 15, color: 'var(--fg-dim)', marginLeft: 2, fontWeight: 600 }}>k€</span></span>}
+          hint={<><span style={{ color: paidNow >= paidPrev ? 'var(--ok)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>{paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{hintPrevLabel}</span><span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span></>}
         >
           <WeekMonthToggle range={revRange} onChange={setRevRange} />
         </KpiCard>
@@ -410,7 +405,7 @@ function WorkspaceView() {
           label="Offen heute"
           value={String(dueToday.total)}
           accentValue={dueToday.total > 0}
-          hint={<><span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.fus} FU</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{events.length} Termine</span></>}
+          hint={<><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.fus} FU</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{events.length} Termine</span></>}
           action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
         />
       </div>
@@ -429,7 +424,7 @@ function WorkspaceView() {
             </AnimatePresence>
           )}
           {!queueLoading && !currentItem && !isWorkspaceEmpty && (
-            <div className="card" style={{ borderLeft: '3px solid var(--ok)', padding: '22px 24px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div className="card" style={{ flex: '1 1 auto', borderLeft: '3px solid var(--ok)', padding: '22px 24px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--ok)' }} />
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ok)' }}>HEUTE</span>
@@ -494,7 +489,7 @@ function WorkspaceView() {
 
         {/* Rechts: Tagesplan + Neueste Mails */}
         <div className="hd-col">
-          <TagesplanCard events={events} todos={myTodos} customers={customers} />
+          <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} />
           <div className="hd-fill">
             <div className="hd-lhead"><span className="t">Neueste Mails</span><span className="c">{unreadCount} ungelesen</span></div>
             {recentMails.length === 0 && (
@@ -634,8 +629,8 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
 }
 
 function TagesplanCard({
-  events, todos, customers: _customers,
-}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[] }) {
+  events, todos, customers: _customers, onOpen,
+}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[]; onOpen?: () => void }) {
   const items = useMemo(() => buildTagesplan(events, todos), [events, todos])
 
   return (
@@ -675,7 +670,12 @@ function TagesplanCard({
             background: 'var(--border)',
           }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {items.map(item => <TagesplanRow key={item.id} item={item} />)}
+            {items.slice(0, 6).map(item => <TagesplanRow key={item.id} item={item} onOpen={onOpen} />)}
+            {items.length > 6 && (
+              <button type="button" onClick={onOpen} style={{ marginTop: 6, background: 'none', border: 'none', color: 'var(--fg-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', padding: '6px 0' }}>
+                + {items.length - 6} weitere im Kalender →
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -683,13 +683,16 @@ function TagesplanCard({
   )
 }
 
-function TagesplanRow({ item }: { item: PlanItem }) {
+function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void }) {
   const isNow = item.status.kind === 'now'
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
-      alignItems: 'center', gap: 12, padding: '12px 0',
-    }}>
+    <div
+      onClick={onOpen}
+      style={{
+        display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
+        alignItems: 'center', gap: 12, padding: '12px 0',
+        cursor: onOpen ? 'pointer' : 'default',
+      }}>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: isNow ? 'var(--accent)' : 'var(--fg-dim)',
