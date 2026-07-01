@@ -9,7 +9,7 @@ import type { CalendarEvent, UpsertCalendarEventPayload, EventColor } from '@/ty
 import { extractMeetingLink } from '@/lib/calendar/meeting-link'
 import { openExternal } from '@/lib/open-external'
 import { useMembersStore } from '@/store/members.store'
-import { resolveOwner } from '@/lib/calendar/owner'
+import { resolveOwner, maskEvent, isPrivateForOthers } from '@/lib/calendar/owner'
 
 // ── Konstanten ────────────────────────────────────────────────────────────────
 
@@ -868,6 +868,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
   const [location,    setLocation]    = useState(initial?.location ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [color,       setColor]       = useState<EventColor | ''>(initial?.color ?? '')
+  const [isPrivate,   setIsPrivate]   = useState(initial?.isPrivate ?? false)
   const [isSaving,    setIsSaving]    = useState(false)
   const [isDeleting,  setIsDeleting]  = useState(false)
   const [error,       setError]       = useState<string | null>(null)
@@ -891,6 +892,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
         endAt:   allDay ? `${startAt.slice(0,10)}T23:59:59` : end,
         allDay,
         color: color || undefined,
+        isPrivate,
       }
       await upsert(payload)
       onSaved()
@@ -997,6 +999,14 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
               style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '2px 0' }}>
+            <input type="checkbox" checked={isPrivate} onChange={e => setIsPrivate(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+            <span style={{ fontSize: 13, color: 'var(--fg)' }}>
+              🔒 Privat <span style={{ color: 'var(--fg-dim)', fontSize: 12 }}>— im Team sehen andere nur „Gebucht"</span>
+            </span>
+          </label>
+
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Farbe</label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1074,6 +1084,8 @@ export function CalendarRoute() {
     () => (scope === 'mine' && myId ? events.filter(e => e.createdBy === myId) : events),
     [events, scope, myId],
   )
+  // Fremde Privat-Termine zu „Gebucht" maskieren (Details raus) — eine Stelle für alle Views.
+  const displayEvents = useMemo(() => visibleEvents.map(maskEvent), [visibleEvents])
   useEffect(() => { if (workspaceId && isShared) loadMembers(workspaceId) }, [workspaceId, isShared, loadMembers])
 
   const [formOpen,      setFormOpen]      = useState(false)
@@ -1110,6 +1122,7 @@ export function CalendarRoute() {
     setEditingEvent(undefined); setDefaultDate(date); setDefaultHour(hour); setFormOpen(true)
   }
   function openEdit(event: CalendarEvent) {
+    if (isPrivateForOthers(event)) return   // fremder Privat-Termin: nicht öffnen/bearbeiten
     setEditingEvent(event); setDefaultDate(undefined); setDefaultHour(undefined); setFormOpen(true)
   }
   function onFormSaved() {
@@ -1257,14 +1270,14 @@ export function CalendarRoute() {
         )}
 
         {!isLoading && view === 'week' && (
-          <WeekView events={visibleEvents} days={days} onSlotClick={openNew} onEventClick={openEdit} />
+          <WeekView events={displayEvents} days={days} onSlotClick={openNew} onEventClick={openEdit} />
         )}
         {!isLoading && view === 'day' && (
-          <DayView events={visibleEvents} day={currentDate} onSlotClick={openNew} onEventClick={openEdit} />
+          <DayView events={displayEvents} day={currentDate} onSlotClick={openNew} onEventClick={openEdit} />
         )}
         {!isLoading && view === 'month' && (
           <MonthView
-            events={visibleEvents}
+            events={displayEvents}
             anchor={currentDate}
             onDayClick={d => { useCalendarStore.setState({ view: 'day', currentDate: d }) }}
             onEventClick={openEdit}

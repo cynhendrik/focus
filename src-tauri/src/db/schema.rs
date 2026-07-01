@@ -435,6 +435,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             end_at          TEXT NOT NULL,
             all_day         INTEGER NOT NULL DEFAULT 0,
             color           TEXT,
+            is_private      INTEGER NOT NULL DEFAULT 0,
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL
         );

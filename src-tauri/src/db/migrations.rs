@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 33;
+const CURRENT_VERSION: u32 = 34;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -794,6 +794,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_ws_name
                     ON pipeline_stages(workspace_id, name);
             "#)?;
+            Ok(())
+        }
+        34 => {
+            // calendar_events.is_private — Termin-Privatsphäre (im geteilten
+            // Workspace sehen andere nur „Gebucht"). Guard: create_tables legt die
+            // Spalte bei frischen Installs bereits an, dann darf ALTER nicht erneut laufen.
+            if !column_exists(conn, "calendar_events", "is_private") {
+                conn.execute_batch(
+                    "ALTER TABLE calendar_events ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0;",
+                )?;
+            }
             Ok(())
         }
         _ => Ok(()),

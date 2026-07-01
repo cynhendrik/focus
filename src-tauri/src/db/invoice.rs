@@ -936,11 +936,16 @@ mod tests {
     #[test]
     fn get_finance_kpis_returns_correct_counts() {
         let conn = setup();
-        // paid invoice
-        let inv1 = create(&conn, sample_payload(vec![])).unwrap();
+        let today = chrono::Utc::now();
+        // paid invoice — Datum in DIESEM Monat (month_revenue), robust gegen Datums-Drift
+        let mut p1 = sample_payload(vec![]);
+        p1.date = today.format("%Y-%m-05").to_string();
+        let inv1 = create(&conn, p1).unwrap();
         update_status(&conn, &inv1.invoice.id, "paid").unwrap();
-        // open invoice
-        let inv2 = create(&conn, sample_payload(vec![])).unwrap();
+        // open invoice — Fälligkeit in der Zukunft (zählt als offen)
+        let mut p2 = sample_payload(vec![]);
+        p2.due_date = (today + chrono::Duration::days(20)).format("%Y-%m-%d").to_string();
+        let inv2 = create(&conn, p2).unwrap();
         update_status(&conn, &inv2.invoice.id, "open").unwrap();
         // suggestion
         let mut p = sample_payload(vec![]);
@@ -956,8 +961,10 @@ mod tests {
     #[test]
     fn get_finance_kpis_open_total_subtracts_partial_payments() {
         let conn = setup();
-        // Offene Rechnung über 119,00 (due_date in der Zukunft → zählt als "offen")
-        let inv = create(&conn, sample_payload(vec![])).unwrap();
+        // Offene Rechnung über 119,00 — Fälligkeit in der Zukunft (robust gegen Datums-Drift)
+        let mut p = sample_payload(vec![]);
+        p.due_date = (chrono::Utc::now() + chrono::Duration::days(20)).format("%Y-%m-%d").to_string();
+        let inv = create(&conn, p).unwrap();
         update_status(&conn, &inv.invoice.id, "open").unwrap();
 
         // Teilzahlung über 19,00 → Restbetrag 100,00

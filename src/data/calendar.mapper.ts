@@ -14,6 +14,7 @@ export function calendarRowToEvent(r: any): CalendarEvent {
     endAt: r.end_at,
     allDay: r.all_day === 1 || r.all_day === true,
     color: (r.color ?? undefined) as EventColor | undefined,
+    isPrivate: r.is_private === 1 || r.is_private === true,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -40,6 +41,7 @@ export function eventPayloadToRow(
     end_at: p.endAt,
     all_day: p.allDay ? 1 : 0,
     color: p.color ?? null,
+    is_private: p.isPrivate ?? false,
     updated_at: ctx.now,
   }
 }

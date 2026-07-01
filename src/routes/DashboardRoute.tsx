@@ -26,6 +26,7 @@ import { isTodoForToday } from '@/lib/heute/due'
 import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
 import { openExternal } from '@/lib/open-external'
+import { maskEvent } from '@/lib/calendar/owner'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { useLeadsStore } from '@/store/leads.store'
@@ -591,8 +592,9 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
   const now = new Date()
   const items: PlanItem[] = []
 
-  // Termine heute → mit Zeit
-  for (const ev of events) {
+  // Termine heute → mit Zeit (fremde Privat-Termine als „Gebucht" maskiert)
+  for (const raw of events) {
+    const ev = maskEvent(raw)
     const start = new Date(ev.startAt)
     const end = ev.endAt ? new Date(ev.endAt) : new Date(start.getTime() + 60 * 60_000)
     const isNow = start <= now && end >= now

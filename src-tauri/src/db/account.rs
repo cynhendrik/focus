@@ -463,14 +463,15 @@ mod tests {
              VALUES ('acc-d', 'ws-1', '', 'DupCo', 'company', 0, ?1, ?2)",
             rusqlite::params![now, now],
         ).unwrap();
-        // Same stage name 'qualified' three times (duplicate seed).
-        for id in ["ps-q1", "ps-q2", "ps-q3"] {
-            conn.execute(
-                "INSERT INTO pipeline_stages (id, workspace_id, name, label, order_index, color, is_won, is_lost, created_at, updated_at)
-                 VALUES (?1, 'ws-1', 'qualified', 'Qualifiziert', 1, '#3B82F6', 0, 0, ?2, ?3)",
-                rusqlite::params![id, now, now],
-            ).unwrap();
-        }
+        // Genau EINE Stage 'qualified': gleichnamige Duplikate sind seit Migration 33
+        // (UNIQUE(workspace_id, name)) DB-seitig unmöglich. get_all muss den Account
+        // trotzdem exakt einmal liefern — die Query nutzt d.stage direkt (kein JOIN
+        // auf pipeline_stages, der früher pro Duplikat multiplizierte).
+        conn.execute(
+            "INSERT INTO pipeline_stages (id, workspace_id, name, label, order_index, color, is_won, is_lost, created_at, updated_at)
+             VALUES ('ps-q1', 'ws-1', 'qualified', 'Qualifiziert', 1, '#3B82F6', 0, 0, ?1, ?2)",
+            rusqlite::params![now, now],
+        ).unwrap();
         conn.execute(
             "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
              VALUES ('deal-d', 'ws-1', 'acc-d', 'Deal', 'qualified', ?1, ?2)",

@@ -16,7 +16,7 @@ describe('calendar.mapper', () => {
       id: 'e1', workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1',
       title: 'Call', description: 'Quartal', location: 'Zoom',
       startAt: '2026-05-23T14:00:00', endAt: '2026-05-23T15:00:00',
-      allDay: false, color: 'accent',
+      allDay: false, color: 'accent', isPrivate: false,
       createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
     })
   })
@@ -42,7 +42,7 @@ describe('calendar.mapper', () => {
       id: 'e1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1',
       title: 'Call', description: 'Quartal', location: 'Zoom',
       start_at: '2026-05-23T14:00:00', end_at: '2026-05-23T15:00:00',
-      all_day: 1, color: 'warn', updated_at: '2026-06-22T10:00:00Z',
+      all_day: 1, color: 'warn', is_private: false, updated_at: '2026-06-22T10:00:00Z',
     })
     expect(row).not.toHaveProperty('created_at')
   })
