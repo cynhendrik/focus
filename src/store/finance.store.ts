@@ -215,6 +215,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
   },
 
   addPayment: (payload) => withErrorToast('Zahlung konnte nicht gespeichert werden.', async () => {
+    const prevStatus = get().invoices.find(i => i.id === payload.invoiceId)?.status
     await FinanceGateway.addPayment(payload)
     // Rechnungen + Zahlungen neu laden — Status kann auf "bezahlt" kippen.
     const [invoices, payments] = await Promise.all([
@@ -222,6 +223,13 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
       FinanceGateway.getPaymentsByWorkspace(payload.workspaceId),
     ])
     set({ invoices, payments })
+    // Geld-Event: Rechnung ist durch diese Zahlung vollständig bezahlt worden.
+    const inv = invoices.find(i => i.id === payload.invoiceId)
+    if (inv && inv.status === 'paid' && prevStatus !== 'paid') {
+      const { notify } = await import('@/services/notify.service')
+      void notify('money', 'Zahlung eingegangen ✓',
+        `Rechnung ${inv.number ?? ''} ist vollständig bezahlt.`)
+    }
   }),
 
   deletePayment: (id, workspaceId) => withErrorToast('Zahlung konnte nicht gelöscht werden.', async () => {

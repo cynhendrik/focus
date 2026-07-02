@@ -74,6 +74,7 @@ import { TourOfferCard } from '@/components/tour/TourOfferCard'
 import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useBriefingScheduler } from '@/hooks/useBriefingScheduler'
+import { useMoneyEvents } from '@/hooks/useMoneyEvents'
 import { useOnboardingStore } from '@/store/onboarding.store'
 import { useVertraege } from '@/store/vertraege.store'
 import { useMembersStore } from '@/store/members.store'
@@ -221,6 +222,7 @@ export default function App() {
   useMailAutoSync()
   useOnboardingSync()
   useBriefingScheduler()
+  useMoneyEvents()
 
   // Intro-Splash bei JEDEM Start zeigen — als Overlay über allen Render-Pfaden,
   // damit ihn die Auth-Early-Returns (Login / Workspace-Picker) nicht überspringen.
