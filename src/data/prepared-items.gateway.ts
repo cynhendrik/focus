@@ -59,7 +59,7 @@ export const PreparedItemsGateway = {
     const { data, error } = await supabase.from('prepared_items')
       .update({ status, snooze_until: opts?.snoozeUntil ?? null, approved_at: opts?.approvedAt ?? null, updated_at: new Date().toISOString() })
       .eq('id', id).select('*').single()
-    if (error) fail(error)
+    if (error || !data) fail(error ?? { message: 'Kein Datensatz zurückgegeben.' })
     return rowToPreparedItem(data)
   },
 
@@ -69,7 +69,7 @@ export const PreparedItemsGateway = {
     }
     const { data, error } = await supabase.from('prepared_items')
       .update({ payload, updated_at: new Date().toISOString() }).eq('id', id).select('*').single()
-    if (error) fail(error)
+    if (error || !data) fail(error ?? { message: 'Kein Datensatz zurückgegeben.' })
     return rowToPreparedItem(data)
   },
 
@@ -79,7 +79,7 @@ export const PreparedItemsGateway = {
     }
     const { data, error } = await supabase.from('prepared_items')
       .update({ assignee, updated_at: new Date().toISOString() }).eq('id', id).select('*').single()
-    if (error) fail(error)
+    if (error || !data) fail(error ?? { message: 'Kein Datensatz zurückgegeben.' })
     return rowToPreparedItem(data)
   },
 

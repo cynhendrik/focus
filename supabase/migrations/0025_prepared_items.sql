@@ -23,4 +23,4 @@ create index if not exists idx_prepared_items_ws_status on public.prepared_items
 alter table public.prepared_items enable row level security;
 
 create policy "workspace member" on public.prepared_items
-  for all using (is_workspace_member(workspace_id)) with check (is_workspace_member(workspace_id));
+  for all using (is_workspace_member(workspace_id::text)) with check (is_workspace_member(workspace_id::text));
