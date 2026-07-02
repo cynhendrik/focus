@@ -16,7 +16,7 @@ function eur0(n: number): string {
   // Normalise to a plain space so notification strings are predictable.
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
     .format(n)
-    .replace(/ | /g, ' ')
+    .replace(/[  ]/g, ' ')
 }
 
 function joinDe(parts: string[]): string {

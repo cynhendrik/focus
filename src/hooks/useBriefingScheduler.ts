@@ -7,6 +7,7 @@ import { useNotificationSettingsStore } from '@/store/notification-settings.stor
 import { shouldFireBriefing } from '@/lib/notifications/quiet-hours'
 import { buildTodayLine } from '@/lib/notifications/briefing'
 import { notify } from '@/services/notify.service'
+import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 
 const TICK_MS = 60_000
 
@@ -28,8 +29,10 @@ export function useBriefingScheduler() {
       if (!shouldFireBriefing(now, s, s.lastBriefingDate, todayIso)) return
 
       const invoices = useFinanceStore.getState().invoices
+      const snoozed = snoozedInvoiceIds()
       const overdue = invoices.filter(i =>
-        i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
+        !snoozed.has(i.id)
+        && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
         && (i.status === 'overdue' || i.dueDate.slice(0, 10) < todayIso))
       const followUps = useCrmStore.getState().allFollowUps
       const fusDue = followUps.filter(f => f.status === 'offen' && f.dueDate.slice(0, 10) <= todayIso).length
