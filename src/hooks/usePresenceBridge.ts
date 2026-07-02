@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { usePreparedItemsStore } from '@/store/prepared-items.store'
 import { useNotificationSettingsStore } from '@/store/notification-settings.store'
+import { useAuthStore } from '@/store/auth.store'
+import { visiblePreparedItems } from '@/lib/stapel/visible'
 
 /**
  * Verbindet Frontend-Zustand mit der Rust-Präsenz-Schicht:
@@ -11,10 +13,9 @@ import { useNotificationSettingsStore } from '@/store/notification-settings.stor
 export function usePresenceBridge() {
   const closeToTray = useNotificationSettingsStore(s => s.closeToTray)
 
-  const openCount = usePreparedItemsStore(s => {
-    const now = new Date().toISOString()
-    return s.items.filter(i => i.status === 'pending' || (i.status === 'snoozed' && i.snoozeUntil != null && i.snoozeUntil <= now)).length
-  })
+  const openCount = usePreparedItemsStore(s =>
+    visiblePreparedItems(s.items, useAuthStore.getState().user?.id, new Date().toISOString()).length
+  )
 
   useEffect(() => {
     void invoke('cmd_set_close_to_tray', { enabled: closeToTray }).catch(() => {})

@@ -7,6 +7,7 @@ import { PreparedItemsGateway } from '@/data/prepared-items.gateway'
 import { generateCardDrafts, reconcileResolvedIds, type GenerateInput } from '@/lib/stapel/generate'
 import { usePreparedItemsStore } from '@/store/prepared-items.store'
 import { useStapelSettingsStore } from '@/store/stapel-settings.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -22,9 +23,10 @@ export async function runPreparation(workspaceId: string): Promise<void> {
   if (running) return
   running = true
   try {
+    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return
     const input: GenerateInput = {
       workspaceId,
-      invoices: useFinanceStore.getState().invoices,
+      invoices: useFinanceStore.getState().invoices.filter(i => i.workspaceId === workspaceId),
       todos: useTodosStore.getState().allTodos,
       followUps: useCrmStore.getState().allFollowUps,
       accounts: useAccountsStore.getState().accounts.map(a => ({ id: a.id, name: a.name })),
@@ -35,14 +37,16 @@ export async function runPreparation(workspaceId: string): Promise<void> {
       todayIso: new Date().toLocaleDateString('sv'),
     }
 
+    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return
     for (const card of generateCardDrafts(input)) {
       await PreparedItemsGateway.insertIgnore(card)
     }
 
+    if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return
     const active = await PreparedItemsGateway.listActive(workspaceId)
     for (const id of reconcileResolvedIds(active, input)) {
-      // Erledigung außerhalb des Stapels ist kein Verwerfen → approved ohne Versand.
-      await PreparedItemsGateway.updateStatus(id, 'approved', { approvedAt: new Date().toISOString() })
+      // Quelle hat sich außerhalb des Stapels erledigt — zählt nicht als Freigabe (Wochensumme bleibt ehrlich).
+      await PreparedItemsGateway.updateStatus(id, 'resolved', { approvedAt: null })
     }
 
     await usePreparedItemsStore.getState().load(workspaceId)

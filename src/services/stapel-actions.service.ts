@@ -4,6 +4,7 @@
  */
 import type { PreparedItem } from '@/types/prepared-item.types'
 import { sendReminder } from '@/services/dunning.service'
+import { getDunningState } from '@/hooks/useOverdueTaskSync'
 import { MailService } from '@/services/mail.service'
 import { ActivitiesGateway } from '@/data/activities.gateway'
 import { useFinanceStore } from '@/store/finance.store'
@@ -36,7 +37,16 @@ async function approveMahnung(item: PreparedItem): Promise<ApproveResult> {
   const invoiceId = item.sourceId.split(':')[0]
   const invoice = useFinanceStore.getState().invoices.find(i => i.id === invoiceId)
   if (!invoice) return { ok: false, error: 'Rechnung nicht mehr vorhanden — Karte wird beim nächsten Abgleich geschlossen.' }
+  if (invoice.status === 'paid' || invoice.status === 'cancelled') {
+    return { ok: false, error: 'Rechnung ist inzwischen bezahlt oder storniert — Karte wird beim nächsten Abgleich geschlossen.' }
+  }
+  // Paralleler Kanal (Mahnwesen-Panel) kann die Stufe bereits gesendet haben —
+  // vor dem Versand den echten Mahn-Zustand pruefen, sonst Doppel-Mahnung im Tick-Fenster.
+  const state = getDunningState(invoice, useTodosStore.getState().allTodos)
   const level = item.payload.level ?? 0
+  if (state.phase !== 'due' || state.level !== level) {
+    return { ok: false, error: 'Diese Mahnung ist nicht mehr fällig (bereits gesendet oder in Wartefrist) — Karte wird beim nächsten Abgleich geschlossen.' }
+  }
   const result = await sendReminder(invoice, level, item.payload.draftBody ? { bodyOverride: item.payload.draftBody } : undefined)
   if (!result.ok) return { ok: false, error: result.error ?? 'Versand fehlgeschlagen.' }
   return { ok: true }
@@ -96,8 +106,6 @@ async function approveRechnungsentwurf(item: PreparedItem): Promise<ApproveResul
 async function approveAufgabe(item: PreparedItem): Promise<ApproveResult> {
   const t = useTodosStore.getState().allTodos.find(x => x.id === item.sourceId)
   if (!t) return { ok: false, error: 'Aufgabe nicht mehr vorhanden.' }
-  await useTodosStore.getState().upsert({
-    id: t.id, title: t.title, status: 'done', bucket: 'done',
-  })
+  await useTodosStore.getState().complete(t.id)
   return { ok: true }
 }

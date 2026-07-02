@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { StapelCard } from './StapelCard'
 import { usePreparedItemsStore } from '@/store/prepared-items.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -8,6 +8,7 @@ import { useStapelSettingsStore } from '@/store/stapel-settings.store'
 import { useMembersStore } from '@/store/members.store'
 import { approvePreparedItem } from '@/services/stapel-actions.service'
 import { recordDismissal, shouldOfferSuppression, RULE_LABEL } from '@/lib/stapel/dismiss-learning'
+import { visiblePreparedItems } from '@/lib/stapel/visible'
 import type { PreparedItem } from '@/types/prepared-item.types'
 
 const VISIBLE_CAP = 7
@@ -22,7 +23,15 @@ export function StapelSection() {
   const myId = useAuthStore(s => s.user?.id)
   const items = usePreparedItemsStore(s => s.items)
   const weekApproved = usePreparedItemsStore(s => s.weekApproved)
+  const loading = usePreparedItemsStore(s => s.loading)
+  const loadError = usePreparedItemsStore(s => s.loadError)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!workspaceId) return
+    void usePreparedItemsStore.getState().load(workspaceId)
+    void usePreparedItemsStore.getState().loadWeekApproved(workspaceId)
+  }, [workspaceId])
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
   const members = useMembersStore(s => s.members())
   const delegatable = isShared
@@ -31,9 +40,7 @@ export function StapelSection() {
 
   const visible = useMemo(() => {
     const now = new Date().toISOString()
-    return items
-      .filter(i => i.status === 'pending' || (i.status === 'snoozed' && i.snoozeUntil != null && i.snoozeUntil <= now))
-      .filter(i => !i.assignee || i.assignee === myId)
+    return visiblePreparedItems(items, myId, now)
       .sort((a, b) => b.score - a.score || a.createdAt.localeCompare(b.createdAt))
   }, [items, myId])
 
@@ -72,6 +79,22 @@ export function StapelSection() {
         action: { label: 'Nicht mehr vorbereiten', onClick: () => useStapelSettingsStore.getState().suppressRule(item.ruleId) },
       })
     }
+  }
+
+  if (loading && visible.length === 0) {
+    return (
+      <div style={{ padding: '28px 32px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-muted)' }}>Stapel wird geladen …</p>
+      </div>
+    )
+  }
+
+  if (loadError && visible.length === 0) {
+    return (
+      <div style={{ padding: '28px 32px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-muted)' }}>Stapel konnte nicht geladen werden — Verbindung prüfen und App neu öffnen.</p>
+      </div>
+    )
   }
 
   if (!focusItem) {

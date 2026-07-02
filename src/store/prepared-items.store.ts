@@ -8,6 +8,7 @@ interface PreparedItemsState {
   items: PreparedItem[]
   weekApproved: PreparedItem[]
   loading: boolean
+  loadError: boolean
   load: (workspaceId: string) => Promise<void>
   loadWeekApproved: (workspaceId: string) => Promise<void>
   applyStatus: (id: string, status: PreparedItemStatus, opts?: { snoozeUntil?: string | null; approvedAt?: string | null }) => Promise<void>
@@ -27,16 +28,17 @@ export const usePreparedItemsStore = create<PreparedItemsState>()((set, get) => 
   items: [],
   weekApproved: [],
   loading: false,
+  loadError: false,
 
   load: async (workspaceId) => {
     set({ loading: true })
     try {
       const items = await PreparedItemsGateway.listActive(workspaceId)
-      set({ items, loading: false })
+      set({ items, loading: false, loadError: false })
     } catch (err) {
       log.error('prepared items load failed', { err })
       toastError('Stapel konnte nicht geladen werden.')
-      set({ loading: false })
+      set({ loading: false, loadError: true })
     }
   },
 

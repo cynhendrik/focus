@@ -165,7 +165,7 @@ export interface PreparedReminder {
 }
 
 /**
- * Bereitet eine Mahnung vor (Empfänger, Betreff, KORA-Text, PDF-Anhang) OHNE zu senden.
+ * Bereitet eine Mahnung vor (Empfänger, Betreff, Template-Text, PDF-Anhang) OHNE zu senden.
  * Für den Einzel-Versand, der die Mail im Editor öffnet. Wirft nie.
  */
 export async function prepareReminder(
@@ -228,7 +228,7 @@ export async function prepareReminder(
 }
 
 /**
- * Versendet eine Mahnung: Kontakt-Mail → KORA-Text → PDF (optional) → SMTP →
+ * Versendet eine Mahnung: Kontakt-Mail → Template-Text → PDF (optional) → SMTP →
  * bei Erfolg recordReminderSent (Stufe zählt hoch). Wirft nie — gibt ein Result zurück
  * (für isolierten Batch-Versand).
  */

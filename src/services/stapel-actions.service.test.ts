@@ -25,14 +25,15 @@ describe('approvePreparedItem', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('mahnung: ruft sendReminder mit Karten-Entwurf als bodyOverride', async () => {
+    useTodosStore.setState({ allTodos: [] } as never)
     useFinanceStore.setState({ invoices: [{ id: 'inv1', accountId: 'a', total: 100, dueDate: '2026-06-01', status: 'overdue' }] } as never)
     vi.mocked(sendReminder).mockResolvedValueOnce({ invoiceId: 'inv1', ok: true })
     const r = await approvePreparedItem({
       ...base, type: 'mahnung', sourceKind: 'invoice_reminder', sourceId: 'inv1:1',
-      payload: { title: '', why: '', level: 1, draftBody: 'ENTWURF' },
+      payload: { title: '', why: '', level: 0, draftBody: 'ENTWURF' },
     } as never)
     expect(r.ok).toBe(true)
-    expect(sendReminder).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv1' }), 1, { bodyOverride: 'ENTWURF' })
+    expect(sendReminder).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv1' }), 0, { bodyOverride: 'ENTWURF' })
   })
 
   it('mahnung: fehlende Rechnung → verstaendlicher Fehler', async () => {
@@ -43,6 +44,17 @@ describe('approvePreparedItem', () => {
     } as never)
     expect(r.ok).toBe(false)
     expect(r.error).toContain('Rechnung')
+  })
+
+  it('mahnung: Karte level 1 aber Mahn-Zustand sagt level 0 → nicht mehr fällig', async () => {
+    useTodosStore.setState({ allTodos: [] } as never)
+    useFinanceStore.setState({ invoices: [{ id: 'inv2', accountId: 'a', total: 100, dueDate: '2026-06-01', status: 'overdue' }] } as never)
+    const r = await approvePreparedItem({
+      ...base, type: 'mahnung', sourceKind: 'invoice_reminder', sourceId: 'inv2:1',
+      payload: { title: '', why: '', level: 1 },
+    } as never)
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('nicht mehr fällig')
   })
 
   it('followup: sendet Mail an Kontakt und markiert das Follow-up erledigt', async () => {
@@ -76,17 +88,17 @@ describe('approvePreparedItem', () => {
     expect(r.error).toContain('E-Mail')
   })
 
-  it('aufgabe: hakt das Todo ab', async () => {
-    const upsert = vi.fn().mockResolvedValue(undefined)
+  it('aufgabe: hakt das Todo ab via complete (kein Datenverlust)', async () => {
+    const complete = vi.fn().mockResolvedValue(undefined)
     useTodosStore.setState({
       allTodos: [{ id: 't1', title: 'Anrufen', status: 'open', priority: 'p2', bucket: 'today', checklist: [], tags: [], createdAt: '', updatedAt: '' }],
-      upsert,
+      complete,
     } as never)
     const r = await approvePreparedItem({
       ...base, type: 'aufgabe', sourceKind: 'todo', sourceId: 't1',
       payload: { title: 'Anrufen', why: '' },
     } as never)
     expect(r.ok).toBe(true)
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ id: 't1', status: 'done', bucket: 'done' }))
+    expect(complete).toHaveBeenCalledWith('t1')
   })
 })

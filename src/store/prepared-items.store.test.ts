@@ -23,7 +23,7 @@ const item = {
 
 describe('usePreparedItemsStore', () => {
   beforeEach(() => {
-    usePreparedItemsStore.setState({ items: [], loading: false, weekApproved: [] })
+    usePreparedItemsStore.setState({ items: [], loading: false, loadError: false, weekApproved: [] })
     vi.clearAllMocks()
   })
 
