@@ -10,6 +10,8 @@ interface StapelCardProps {
   onSaveDraft: (payload: PreparedItemPayload) => void
   onSnooze: (days: number) => void
   onDismiss: () => void
+  onDelegate?: (assignee: string | null) => void
+  delegatable?: { id: string; displayName: string }[]
   busy?: boolean
 }
 
@@ -18,9 +20,10 @@ const TYPE_LABEL: Record<PreparedItem['type'], string> = {
 }
 
 /** Karte des Stapels: Was habe ich vorbereitet · Warum · das Ergebnis — plus 4 Aktionen. */
-export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, onDismiss, busy }: StapelCardProps) {
+export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, onDismiss, onDelegate, delegatable, busy }: StapelCardProps) {
   const [editing, setEditing] = useState(false)
   const [snoozeOpen, setSnoozeOpen] = useState(false)
+  const [delegateOpen, setDelegateOpen] = useState(false)
   const [draftSubject, setDraftSubject] = useState(item.payload.draftSubject ?? '')
   const [draftBody, setDraftBody] = useState(item.payload.draftBody ?? '')
   const [koraBusy, setKoraBusy] = useState(false)
@@ -32,6 +35,7 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
     setDraftBody(item.payload.draftBody ?? '')
     setEditing(false)
     setSnoozeOpen(false)
+    setDelegateOpen(false)
     setKoraError(null)
   }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -141,6 +145,7 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
           {btn('Freigeben', onApprove, { primary: true, disabled: busy })}
           {hasDraft && btn('Anpassen', () => setEditing(true), { disabled: busy })}
           {btn('Später', () => setSnoozeOpen(o => !o), { disabled: busy })}
+          {onDelegate && delegatable && delegatable.length > 0 && btn('Übergeben', () => setDelegateOpen(o => !o), { disabled: busy })}
           {btn('Verwerfen', onDismiss, { disabled: busy })}
           {snoozeOpen && (
             <div style={{
@@ -151,6 +156,20 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
               {btn('Morgen', () => { setSnoozeOpen(false); onSnooze(1) })}
               {btn('In 3 Tagen', () => { setSnoozeOpen(false); onSnooze(3) })}
               {btn('Nächste Woche', () => { setSnoozeOpen(false); onSnooze(7) })}
+            </div>
+          )}
+          {delegateOpen && onDelegate && delegatable && (
+            <div style={{
+              position: 'absolute', top: '110%', left: 90, zIndex: 10,
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+              padding: 8, display: 'flex', flexDirection: 'column', gap: 4, boxShadow: 'var(--card-shadow)',
+            }}>
+              {delegatable.map(m => (
+                <button key={m.id} type="button" onClick={() => { setDelegateOpen(false); onDelegate(m.id) }}
+                  style={{ background: 'none', border: 'none', padding: '6px 10px', fontSize: 13, textAlign: 'left', cursor: 'pointer', color: 'var(--fg)' }}>
+                  An {m.displayName} übergeben
+                </button>
+              ))}
             </div>
           )}
         </div>

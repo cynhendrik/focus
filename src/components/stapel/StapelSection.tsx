@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 import { useStapelSettingsStore } from '@/store/stapel-settings.store'
+import { useMembersStore } from '@/store/members.store'
 import { approvePreparedItem } from '@/services/stapel-actions.service'
 import { recordDismissal, shouldOfferSuppression, RULE_LABEL } from '@/lib/stapel/dismiss-learning'
 import type { PreparedItem } from '@/types/prepared-item.types'
@@ -22,6 +23,11 @@ export function StapelSection() {
   const items = usePreparedItemsStore(s => s.items)
   const weekApproved = usePreparedItemsStore(s => s.weekApproved)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  const members = useMembersStore(s => s.members())
+  const delegatable = isShared
+    ? members.filter(m => m.id !== myId).map(m => ({ id: m.id, displayName: m.displayName }))
+    : undefined
 
   const visible = useMemo(() => {
     const now = new Date().toISOString()
@@ -98,6 +104,8 @@ export function StapelSection() {
         onSaveDraft={(p) => void usePreparedItemsStore.getState().applyPayload(focusItem.id, p)}
         onSnooze={(d) => handleSnooze(focusItem, d)}
         onDismiss={() => handleDismiss(focusItem)}
+        onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(focusItem.id, a)}
+        delegatable={delegatable}
       />
 
       {rest.map(item => (
@@ -107,6 +115,8 @@ export function StapelSection() {
           onSaveDraft={(p) => void usePreparedItemsStore.getState().applyPayload(item.id, p)}
           onSnooze={(d) => handleSnooze(item, d)}
           onDismiss={() => handleDismiss(item)}
+          onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(item.id, a)}
+          delegatable={delegatable}
         />
       ))}
 

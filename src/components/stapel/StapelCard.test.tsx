@@ -64,4 +64,18 @@ describe('StapelCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'In 3 Tagen' }))
     expect(onSnooze).toHaveBeenCalledWith(3)
   })
+
+  it('Delegations-Menue zeigt Mitglieder und liefert die Auswahl', () => {
+    const onDelegate = vi.fn()
+    render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()}
+      onDelegate={onDelegate} delegatable={[{ id: 'u2', displayName: 'Marie' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Übergeben' }))
+    fireEvent.click(screen.getByRole('button', { name: 'An Marie übergeben' }))
+    expect(onDelegate).toHaveBeenCalledWith('u2')
+  })
+
+  it('ohne delegatable gibt es keinen Uebergeben-Knopf', () => {
+    render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Übergeben' })).toBeNull()
+  })
 })
