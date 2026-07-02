@@ -40,6 +40,18 @@ fn cmd_set_close_to_tray(state: tauri::State<'_, CloseToTray>, enabled: bool) {
 }
 
 #[tauri::command]
+fn cmd_update_tray_status(app: tauri::AppHandle, open_count: u32) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let tip = if open_count > 0 {
+            format!("Cultera OS — {open_count} offene Punkte")
+        } else {
+            "Cultera OS — alles erledigt".to_string()
+        };
+        let _ = tray.set_tooltip(Some(tip));
+    }
+}
+
+#[tauri::command]
 async fn focus_ai_chat(window: tauri::WebviewWindow, messages: Vec<Message>) -> Result<(), String> {
     let key = groq_key();
     if key.is_empty() {
@@ -248,6 +260,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             focus_ai_chat,
             cmd_set_close_to_tray,
+            cmd_update_tray_status,
             commands::account::get_accounts,
             commands::account::upsert_account,
             commands::account::delete_account,
