@@ -31,7 +31,7 @@ export async function notify(kind: NotifyKind, title: string, body: string): Pro
     let granted = await isPermissionGranted()
     if (!granted) granted = (await requestPermission()) === 'granted'
     if (!granted) return
-    sendNotification({ title, body })
+    await sendNotification({ title, body })
   } catch (err) {
     log.warn('notify failed', { kind, err })
   }
