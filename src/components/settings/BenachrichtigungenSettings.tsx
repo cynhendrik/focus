@@ -3,14 +3,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { SettingsPage, SettingCard } from './ui'
 import { useNotificationSettingsStore } from '@/store/notification-settings.store'
 
-function ToggleRow({ id, label, hint, checked, onChange }: {
-  id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void
+function ToggleRow({ id, label, hint, checked, onChange, disabled }: {
+  id: string; label: string; hint: string; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', opacity: disabled ? 0.5 : 1 }}>
       <input
         id={id} type="checkbox" checked={checked}
         onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
         style={{ marginTop: 3 }}
       />
       <div style={{ flex: 1 }}>
@@ -107,7 +108,7 @@ export function BenachrichtigungenSettings() {
           onChange={toggleCloseToTray} />
         <ToggleRow id="autostart" label="Mit Windows starten" checked={autostart === true}
           hint={autostart === null ? 'Status wird geladen …' : 'Startet Cultera OS beim Anmelden minimiert im Hintergrund.'}
-          onChange={toggleAutostart} />
+          onChange={toggleAutostart} disabled={autostart === null} />
       </Section>
     </SettingsPage>
   )
