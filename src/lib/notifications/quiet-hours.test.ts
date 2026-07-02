@@ -25,6 +25,14 @@ describe('isWeekend', () => {
   it('Samstag/Sonntag true, Mittwoch false', () => {
     expect(isWeekend(sat(10))).toBe(true)
     expect(isWeekend(wed(10))).toBe(false)
+    expect(isWeekend(new Date(2026, 6, 5, 10))).toBe(true) // Sonntag
+  })
+})
+
+describe('minutesOf-Robustheit', () => {
+  it('leere Zeitangabe macht das Fenster nicht faelschlich aktiv', () => {
+    const cfg = { quietHoursEnabled: true, quietFrom: '', quietUntil: '', weekendQuiet: false }
+    expect(isQuietTime(new Date(2026, 6, 1, 10), cfg)).toBe(false)
   })
 })
 

@@ -21,11 +21,15 @@ export function isWeekend(d: Date): boolean {
 }
 
 function minutesOf(hhmm: string): number {
+  // Ungültige/leere Zeitangaben nicht still als 00:00 interpretieren.
+  if (!hhmm || !hhmm.includes(':')) return 0
   const [h, m] = hhmm.split(':').map(Number)
-  return (h || 0) * 60 + (m || 0)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0
+  return h * 60 + m
 }
 
 export function isQuietTime(d: Date, cfg: QuietConfig): boolean {
+  // weekendQuiet wirkt unabhängig von quietHoursEnabled — Wochenende ist auch dann stumm, wenn Ruhezeiten aus sind.
   if (cfg.weekendQuiet && isWeekend(d)) return true
   if (!cfg.quietHoursEnabled) return false
   const now = d.getHours() * 60 + d.getMinutes()
