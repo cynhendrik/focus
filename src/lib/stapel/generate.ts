@@ -7,7 +7,7 @@ import type { Todo } from '@/types/todo.types'
 import type { FollowUp } from '@/types/crm.types'
 import type { CreatePreparedItem, PreparedItem } from '@/types/prepared-item.types'
 import { dueReminders, reminderBreakdown } from '@/services/dunning.service'
-import { mahnungBody, mahnungSubject, fmtEur, levelLabel } from '@/lib/templates/mahnung'
+import { mahnungBody, mahnungSubject, fmtEur, levelLabel, begleitmailBody } from '@/lib/templates/mahnung'
 import { followupBody, followupSubject } from '@/lib/templates/followup'
 import { isTodoForToday } from '@/lib/heute/due'
 
@@ -99,6 +99,8 @@ export function generateCardDrafts(input: GenerateInput): CreatePreparedItem[] {
           title: `Rechnungsentwurf ${fmtEur(inv.total)} an ${customer}`,
           why: 'Automatisch vorbereitet — Freigeben vergibt die Rechnungsnummer.',
           customerName: customer, amount: inv.total,
+          invoiceNumber: inv.number ?? undefined,
+          draftBody: begleitmailBody({ invoiceNumber: inv.number ?? '(Rechnungsnummer wird vergeben)', total: inv.total, dueDate: inv.dueDate }),
         },
         score: 600 + Math.min(inv.total / 100, 200),
       })
