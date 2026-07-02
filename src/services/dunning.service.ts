@@ -14,6 +14,9 @@ import { FinanceGateway } from '@/data/finance.gateway'
 import { generateCorraDraft } from '@/lib/ai/corra'
 import { log } from '@/lib/logger'
 import type { Contact } from '@/types/contact.types'
+import { ActivitiesGateway } from '@/data/activities.gateway'
+import { useAuthStore } from '@/store/auth.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 
 /** Default-Mahngebühr je Stufe in Euro: [Zahlungserinnerung, 1. Mahnung, 2. Mahnung]. */
 export const DEFAULT_DUNNING_FEES = [0, 5, 10]
@@ -211,7 +214,11 @@ export async function prepareReminder(
         const filename = `${levelLabel(level)}_${invoice.number ?? invoice.id.slice(0, 8)}_${safe}.pdf`
         const path = await invoke<string>('save_pdf', { bytes: Array.from(bytes), suggestedName: filename })
         attachmentPaths = [path]
-      } catch { /* PDF optional */ }
+      } catch (err) {
+        // Kein stilles Degradieren: eine Mahnung ohne Rechnungs-PDF geht nicht raus.
+        log.warn('reminder PDF generation failed', { invoiceId: invoice.id, err })
+        return { ok: false, error: 'Rechnungs-PDF konnte nicht erzeugt werden — Mahnung nicht gesendet. Bitte erneut versuchen.' }
+      }
     }
 
     return {
@@ -255,6 +262,19 @@ export async function sendReminder(invoice: Invoice, level: number): Promise<Dun
   } catch (recErr) {
     log.error('reminder sent but recording the dunning step failed', { invoiceId: invoice.id, recErr })
     return { invoiceId: invoice.id, ok: true, warning: 'Mahnung gesendet, aber der Mahnschritt konnte nicht protokolliert werden — die Stufe wurde evtl. nicht hochgezählt.' }
+  }
+  // Protokollbuch: Der Versand ist am Kunden nachlesbar (was, wann, an wen).
+  try {
+    await ActivitiesGateway.create({
+      workspaceId: useWorkspaceStore.getState().getActiveWorkspaceId() ?? '',
+      createdBy: useAuthStore.getState().user?.id ?? '',
+      accountId: invoice.accountId,
+      type: 'note',
+      title: `${levelLabel(level)} versendet · Rechnung ${invoice.number ?? invoice.id.slice(0, 8)}`,
+      body: `Per E-Mail an ${prep.data.to.join(', ')} — mit Rechnungs-PDF.`,
+    })
+  } catch (protoErr) {
+    log.warn('reminder protocol activity failed', { invoiceId: invoice.id, protoErr })
   }
   return { invoiceId: invoice.id, ok: true }
 }
