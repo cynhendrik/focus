@@ -1,5 +1,6 @@
 import type { CalendarEvent } from '@/types/calendar.types'
 import { useAccountsStore } from '@/store/accounts.store'
+import { maskEvent } from '@/lib/calendar/owner'
 
 interface TagesplanCardProps {
   events: CalendarEvent[]
@@ -32,6 +33,7 @@ function isPast(event: CalendarEvent): boolean {
 export function TagesplanCard({ events, isLoading }: TagesplanCardProps) {
   const accounts = useAccountsStore(s => s.accounts)
   const accountName = (id?: string) => id ? accounts.find(a => a.id === id)?.name : undefined
+  const shown = events.map(maskEvent)   // fremde Privat-Termine → „Gebucht"
   return (
     <div style={{ padding: '4px 0' }}>
       {/* Header */}
@@ -76,7 +78,7 @@ export function TagesplanCard({ events, isLoading }: TagesplanCardProps) {
       {/* Events */}
       {!isLoading && events.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {events.map(event => {
+          {shown.map(event => {
             const isNow  = isEventNow(event)
             const past   = isPast(event)
             return (

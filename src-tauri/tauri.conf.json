@@ -1,7 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Cultera Focus",
-  "version": "1.1.2",
+  "productName": "Cultera OS",
+  "mainBinaryName": "cultera-os",
+  "version": "0.0.1",
   "identifier": "de.cultera.focus",
   "build": {
     "frontendDist": "../dist",
@@ -13,17 +14,17 @@
     "windows": [
       {
         "label": "main",
-        "title": "Cultera Focus",
+        "title": "Cultera OS",
         "width": 1280,
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
-        "maximized": true,
         "decorations": true,
         "transparent": false,
-        "center": true
+        "center": true,
+        "visible": false
       }
     ],
     "security": {
@@ -45,7 +46,7 @@
     "copyright": "© 2026 Cultera",
     "category": "Business",
     "shortDescription": "Kunden- und Projektverwaltung für Selbstständige",
-    "longDescription": "Cultera Focus ist eine Desktop-App für Selbstständige und kleine Agenturen zur professionellen Kunden- und Projektverwaltung.",
+    "longDescription": "Cultera OS ist eine Desktop-App für Selbstständige und kleine Agenturen zur professionellen Kunden- und Projektverwaltung.",
     "windows": {
       "nsis": {
         "installMode": "perMachine",
@@ -59,7 +60,7 @@
       "endpoints": [
         "https://github.com/cynhendrik/focus/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM4QjVBRTBCMzlDNzlCNwpSV1MzZVp5ejRGcUxBeVRaOHFsS3NERjgyUnkzcGV0OEJJdGFRajFQVkFWU2RJejFLWTRLTFoydAo="
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDQkRBODdCQTJBQUM0RkIKUldUN3hLcWllNmk5VEU5d3FiZkZjSnR5cXRJNlJGRkpsa1JXWVRuUGpRSU5HWEJaem1HbW81U1IK"
     }
   }
 }

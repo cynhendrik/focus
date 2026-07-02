@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, Users, Mail, FileText, Bell, AlarmClock,
+  Phone, Users, Mail, FileText, Bell, AlarmClock, NotebookPen,
   Paperclip, CheckCircle2, Trash2, ChevronDown, Calendar as CalIcon,
   Search, X, Inbox, CheckSquare,
 } from 'lucide-react'
@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useNotesStore } from '@/store/notes.store'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useFilesStore } from '@/store/files.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
@@ -21,13 +22,14 @@ import { MailService } from '@/services/mail.service'
 import type { EmailBody } from '@/types/mail.types'
 import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import type { FollowUpQueueItem } from '@/types/follow-up-queue.types'
+import { htmlToExcerpt } from '@/lib/text/htmlExcerpt'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event model — every source collapses into one shape.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type EventKind =
-  | 'call' | 'meeting' | 'email' | 'note' | 'note_text'
+  | 'call' | 'meeting' | 'email' | 'note' | 'note_text' | 'note_doc'
   | 'followup' | 'todo' | 'file' | 'deadline' | 'mail_in'
 
 export interface TimelineEvent {
@@ -51,6 +53,7 @@ const KIND_META: Record<EventKind, KindMeta> = {
   mail_in:   { Icon: Mail,         label: 'Mail',       color: 'oklch(78% 0.13 210)', tint: 'oklch(78% 0.13 210 / 0.14)' },
   note:      { Icon: FileText,     label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
   note_text: { Icon: FileText,     label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
+  note_doc:  { Icon: NotebookPen,  label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
   followup:  { Icon: Bell,         label: 'Follow-up',  color: 'oklch(86% 0.18 95)',  tint: 'oklch(86% 0.18 95 / 0.16)'  },
   todo:      { Icon: CheckCircle2, label: 'Aufgabe',    color: 'oklch(80% 0.18 150)', tint: 'oklch(80% 0.18 150 / 0.16)' },
   file:      { Icon: Paperclip,    label: 'Datei',      color: 'oklch(72% 0.04 240)', tint: 'oklch(72% 0.04 240 / 0.14)' },
@@ -154,6 +157,8 @@ export interface ActivityStreamSources {
   deadlines?: boolean
   mails?: boolean
   followUpQueue?: boolean
+  /** Dokument-Notizen (note_entries / Notizen-Tab) in den Verlauf mischen. */
+  noteDocs?: boolean
 }
 
 interface ActivityStreamProps {
@@ -176,6 +181,8 @@ export function ActivityStream({
   const activities = useActivitiesStore(s => s.activities)
   const todos      = useTodosStore(s => s.todos)
   const notes      = useNotesStore(s => s.notes)
+  const noteDocs   = useNotesModuleStore(s => s.entries)
+  const loadNoteDocs = useNotesModuleStore(s => s.loadForAccount)
   const files      = useFilesStore(s => s.files)
   const followUps  = useCrmStore(s => s.followUps)
   const deadlines  = useDeadlinesStore(s => s.deadlines)
@@ -195,6 +202,12 @@ export function ActivityStream({
   useEffect(() => {
     if (sources.mails) loadEmails()
   }, [accountId, sources.mails, loadEmails])
+
+  // Dokument-Notizen (note_entries) für diesen Kunden laden, falls der Verlauf
+  // sie mitmischt. Derselbe Store, den der Notizen-Tab nutzt — idempotent.
+  useEffect(() => {
+    if (sources.noteDocs) loadNoteDocs(accountId)
+  }, [accountId, sources.noteDocs, loadNoteDocs])
 
   // Auto follow-up sequence (lead) — fetched locally so we don't disturb the
   // global follow-up-queue store that the Follow-Ups dashboard relies on.
@@ -264,6 +277,20 @@ export function ActivityStream({
       })
     }
 
+    // Dokument-Notizen (Notizen-Tab) als gelabelte "Notiz" in den Verlauf — so
+    // taucht eine Quick-Capture-Notiz nicht mehr nur im Tab, sondern auch hier auf.
+    if (sources.noteDocs) for (const e of noteDocs) {
+      if (e.accountId !== accountId) continue
+      out.push({
+        id: `notedoc-${e.id}`,
+        kind: 'note_doc',
+        timestamp: e.createdAt,
+        title: e.title || 'Notiz',
+        body: htmlToExcerpt(e.content),
+        isFuture: false,
+      })
+    }
+
     if (sources.files) for (const f of files) {
       out.push({
         id: `file-${f.id}`,
@@ -323,9 +350,9 @@ export function ActivityStream({
 
     return out
   }, [
-    activities, todos, notes, files, followUps, deadlines, allEmails, queueItems,
+    activities, todos, notes, noteDocs, files, followUps, deadlines, allEmails, queueItems,
     accountId, nowMs, removeActivity,
-    sources.todos, sources.notes, sources.files, sources.crmFollowUps,
+    sources.todos, sources.notes, sources.noteDocs, sources.files, sources.crmFollowUps,
     sources.deadlines, sources.mails, sources.followUpQueue,
   ])
 
@@ -337,7 +364,7 @@ export function ActivityStream({
   const STREAM_FILTER_KINDS: Record<StreamFilter, ReadonlySet<EventKind> | null> = {
     all:    null,
     calls:  new Set<EventKind>(['call', 'meeting']),
-    notes:  new Set<EventKind>(['note', 'note_text']),
+    notes:  new Set<EventKind>(['note', 'note_text', 'note_doc']),
     mails:  new Set<EventKind>(['email', 'mail_in']),
     tasks:  new Set<EventKind>(['todo', 'followup', 'deadline', 'file']),
   }

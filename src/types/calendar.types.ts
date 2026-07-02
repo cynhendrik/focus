@@ -12,6 +12,8 @@ export interface CalendarEvent {
   endAt: string     // ISO 8601
   allDay: boolean
   color?: EventColor
+  /** Privat — im geteilten Workspace sehen andere nur „Gebucht", keine Details. */
+  isPrivate?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -28,4 +30,5 @@ export interface UpsertCalendarEventPayload {
   endAt: string
   allDay: boolean
   color?: EventColor
+  isPrivate?: boolean
 }

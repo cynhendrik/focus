@@ -6,6 +6,10 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import type { CalendarEvent, UpsertCalendarEventPayload, EventColor } from '@/types/calendar.types'
+import { extractMeetingLink } from '@/lib/calendar/meeting-link'
+import { openExternal } from '@/lib/open-external'
+import { useMembersStore } from '@/store/members.store'
+import { resolveOwner, maskEvent, isPrivateForOthers } from '@/lib/calendar/owner'
 
 // ── Konstanten ────────────────────────────────────────────────────────────────
 
@@ -287,6 +291,7 @@ function WeekView({
             {/* Events */}
             {computeLanes(dayEvents).map(({ event: ev, lane, totalLanes }, ei) => {
               const cust = accountName(ev.accountId)
+              const owner = resolveOwner(ev)
               const h = eventHeight(ev)
               const compact = h < 48
               return (
@@ -299,6 +304,7 @@ function WeekView({
                     top: eventTop(ev) + 2, height: h,
                     background: evtBg(ev.color), color: evtFg(ev.color),
                     border: `1px solid ${evtBorder(ev.color)}`,
+                    borderLeft: owner.show ? `3px solid ${owner.color}` : `1px solid ${evtBorder(ev.color)}`,
                     borderRadius: 8, padding: '5px 9px',
                     fontSize: 11.5, lineHeight: 1.3,
                     overflow: 'hidden', cursor: 'pointer',
@@ -320,6 +326,12 @@ function WeekView({
                   {cust && !compact && (
                     <div style={{ fontSize: 10.5, opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       · {cust}
+                    </div>
+                  )}
+                  {owner.show && !compact && (
+                    <div style={{ fontSize: 10, opacity: 0.75, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: owner.color, flexShrink: 0 }} />
+                      {owner.name}
                     </div>
                   )}
                 </div>
@@ -546,6 +558,8 @@ function DayView({
 
         {dayEvents.map((ev, ei) => {
           const cust = accountName(ev.accountId)
+          const link = extractMeetingLink(ev)
+          const owner = resolveOwner(ev)
           return (
           <div
             key={ei}
@@ -554,6 +568,7 @@ function DayView({
               top: eventTop(ev) + 2, height: eventHeight(ev),
               background: evtBg(ev.color), color: evtFg(ev.color),
               border: `1px solid ${evtBorder(ev.color)}`,
+              borderLeft: owner.show ? `3px solid ${owner.color}` : `1px solid ${evtBorder(ev.color)}`,
               borderRadius: 8, padding: '8px 14px',
               fontSize: 12, cursor: 'pointer',
               transition: 'transform 140ms ease', zIndex: 5,
@@ -580,9 +595,28 @@ function DayView({
             <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {ev.title}
             </div>
-            {ev.location && (
+            {link ? (
+              <button
+                type="button"
+                title={`${link.label}-Meeting öffnen`}
+                onClick={e => { e.stopPropagation(); void openExternal(link.url) }}
+                style={{
+                  alignSelf: 'flex-start', marginTop: 2, fontSize: 10.5, fontWeight: 700,
+                  borderRadius: 99, padding: '3px 10px', border: 'none',
+                  background: 'var(--accent-gradient)', color: '#fff', cursor: 'pointer',
+                }}
+              >
+                🎥 Beitreten
+              </button>
+            ) : ev.location ? (
               <div style={{ fontSize: 10.5, opacity: 0.65, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 📍 {ev.location}
+              </div>
+            ) : null}
+            {owner.show && (
+              <div style={{ fontSize: 10, opacity: 0.75, display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: owner.color, flexShrink: 0 }} />
+                von {owner.name}
               </div>
             )}
           </div>
@@ -834,6 +868,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
   const [location,    setLocation]    = useState(initial?.location ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [color,       setColor]       = useState<EventColor | ''>(initial?.color ?? '')
+  const [isPrivate,   setIsPrivate]   = useState(initial?.isPrivate ?? false)
   const [isSaving,    setIsSaving]    = useState(false)
   const [isDeleting,  setIsDeleting]  = useState(false)
   const [error,       setError]       = useState<string | null>(null)
@@ -857,6 +892,7 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
         endAt:   allDay ? `${startAt.slice(0,10)}T23:59:59` : end,
         allDay,
         color: color || undefined,
+        isPrivate,
       }
       await upsert(payload)
       onSaved()
@@ -963,6 +999,14 @@ function EventForm({ initial, defaultDate, defaultHour, onClose, onSaved }: Even
               style={{ width: '100%', padding: '9px 12px', fontSize: 13, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg)', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '2px 0' }}>
+            <input type="checkbox" checked={isPrivate} onChange={e => setIsPrivate(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+            <span style={{ fontSize: 13, color: 'var(--fg)' }}>
+              🔒 Privat <span style={{ color: 'var(--fg-dim)', fontSize: 12 }}>— im Team sehen andere nur „Gebucht"</span>
+            </span>
+          </label>
+
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Farbe</label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1032,6 +1076,18 @@ export function CalendarRoute() {
   const isTodayLoading = useCalendarStore(s => s.isTodayLoading)
   const loadToday      = useCalendarStore(s => s.loadToday)
 
+  const myId       = useAuthStore(s => s.user?.id)
+  const isShared   = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  const loadMembers = useMembersStore(s => s.load)
+  const [scope, setScope] = useState<'team' | 'mine'>('team')
+  const visibleEvents = useMemo(
+    () => (scope === 'mine' && myId ? events.filter(e => e.createdBy === myId) : events),
+    [events, scope, myId],
+  )
+  // Fremde Privat-Termine zu „Gebucht" maskieren (Details raus) — eine Stelle für alle Views.
+  const displayEvents = useMemo(() => visibleEvents.map(maskEvent), [visibleEvents])
+  useEffect(() => { if (workspaceId && isShared) loadMembers(workspaceId) }, [workspaceId, isShared, loadMembers])
+
   const [formOpen,      setFormOpen]      = useState(false)
   const [editingEvent,  setEditingEvent]  = useState<CalendarEvent | undefined>()
   const [defaultDate,   setDefaultDate]   = useState<Date | undefined>()
@@ -1066,6 +1122,7 @@ export function CalendarRoute() {
     setEditingEvent(undefined); setDefaultDate(date); setDefaultHour(hour); setFormOpen(true)
   }
   function openEdit(event: CalendarEvent) {
+    if (isPrivateForOthers(event)) return   // fremder Privat-Termin: nicht öffnen/bearbeiten
     setEditingEvent(event); setDefaultDate(undefined); setDefaultHour(undefined); setFormOpen(true)
   }
   function onFormSaved() {
@@ -1122,6 +1179,26 @@ export function CalendarRoute() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isShared && (
+            <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              {(['mine', 'team'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setScope(s)}
+                  title={s === 'mine' ? 'Nur meine Termine' : 'Alle Termine im Team'}
+                  style={{
+                    padding: '6px 12px', fontSize: 12, fontWeight: 500,
+                    border: 'none', cursor: 'pointer',
+                    background: scope === s ? 'var(--nav-active-bg)' : 'none',
+                    color: scope === s ? 'var(--accent-text)' : 'var(--fg-muted)',
+                    transition: 'background 150ms, color 150ms',
+                  }}
+                >
+                  {s === 'mine' ? 'Nur meine' : 'Team'}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{ display: 'flex', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
             {(['day','week','month'] as const).map(v => (
               <button
@@ -1184,21 +1261,23 @@ export function CalendarRoute() {
           </div>
         )}
 
-        {!isLoading && events.length === 0 && (
+        {!isLoading && visibleEvents.length === 0 && (
           <div style={{ padding: '12px 24px', fontSize: 12, color: 'var(--fg-dim)', fontStyle: 'italic', borderBottom: view !== 'month' ? '1px solid var(--border)' : 'none' }}>
-            Keine Termine in diesem Zeitraum — klicke auf einen Slot oder drücke N.
+            {scope === 'mine' && isShared
+              ? 'Keine eigenen Termine in diesem Zeitraum — wechsle auf „Team" oder drücke N.'
+              : 'Keine Termine in diesem Zeitraum — klicke auf einen Slot oder drücke N.'}
           </div>
         )}
 
         {!isLoading && view === 'week' && (
-          <WeekView events={events} days={days} onSlotClick={openNew} onEventClick={openEdit} />
+          <WeekView events={displayEvents} days={days} onSlotClick={openNew} onEventClick={openEdit} />
         )}
         {!isLoading && view === 'day' && (
-          <DayView events={events} day={currentDate} onSlotClick={openNew} onEventClick={openEdit} />
+          <DayView events={displayEvents} day={currentDate} onSlotClick={openNew} onEventClick={openEdit} />
         )}
         {!isLoading && view === 'month' && (
           <MonthView
-            events={events}
+            events={displayEvents}
             anchor={currentDate}
             onDayClick={d => { useCalendarStore.setState({ view: 'day', currentDate: d }) }}
             onEventClick={openEdit}

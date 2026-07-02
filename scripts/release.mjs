@@ -1,4 +1,4 @@
-// Release-Helfer für Cultera Focus.
+// Release-Helfer für Cultera OS.
 //
 // Setzt die Version synchron in allen Manifesten, committet, taggt und pusht —
 // danach musst du auf GitHub nur noch das Entwurfs-Release "Publish"-en.
@@ -88,5 +88,5 @@ ok(`Gepusht (Branch ${branch} + Tag ${tag}) — die CI baut jetzt`)
 
 console.log(`\n🚀  Fast fertig! Es fehlt nur noch der manuelle Klick:\n` +
             `   1. GitHub → Actions: warten bis der Build grün ist (~10 Min)\n` +
-            `   2. GitHub → Releases: Entwurf "Cultera Focus ${tag}" öffnen → "Publish release"\n` +
+            `   2. GitHub → Releases: Entwurf "Cultera OS ${tag}" öffnen → "Publish release"\n` +
             `   → Danach sehen die Kunden den Update-Banner.\n`)

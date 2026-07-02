@@ -24,10 +24,25 @@ export const useNotificationsStore = create<NotificationsState>()((set, get) => 
     }
   },
 
-  upsertRealtime: (n) => set(s => {
-    const without = s.notifications.filter(x => x.id !== n.id)
-    return { notifications: [n, ...without] }
-  }),
+  upsertRealtime: (n) => {
+    set(s => {
+      const without = s.notifications.filter(x => x.id !== n.id)
+      return { notifications: [n, ...without] }
+    })
+    // Team-Event → OS: die In-App-Glocke reicht nur, wenn man hinschaut.
+    if (!n.readAt) {
+      const TITLES: Record<string, string> = {
+        assigned:  'Neue Aufgabe für dich',
+        mention:   'Du wurdest erwähnt',
+        comment:   'Neuer Kommentar',
+        completed: 'Aufgabe erledigt',
+        dm:        'Neue Nachricht',
+      }
+      void import('@/services/notify.service').then(({ notify }) =>
+        notify('team', TITLES[n.type] ?? 'Team-Benachrichtigung', 'In Cultera OS ansehen.'),
+      ).catch(() => { /* Notification ist optional, Store-Update nicht */ })
+    }
+  },
 
   markRead: async (id) => {
     const stamp = new Date().toISOString()

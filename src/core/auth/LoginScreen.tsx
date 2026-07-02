@@ -1,53 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuthStore } from '@/store/auth.store'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-const IS_DEV = import.meta.env.DEV
-const BLUE   = '#3B6DF4'
+// Coral is an accent only — the screen background stays dark gray, matching the
+// startup splash. The intro word-animation lives solely in the app-level
+// SplashScreen (App.tsx), which only plays on a cold app start — not on logout.
+const CORAL = '#F2754F'
+const BG    = 'radial-gradient(circle at 50% 45%, #262A31 0%, #14161A 100%)'
 
 async function minimizeWin() { await getCurrentWindow().minimize() }
 async function closeWin()    { await getCurrentWindow().close() }
-
-// ── Intro ─────────────────────────────────────────────────────────────────────
-
-const INTRO_WORDS = ['You', "don't", 'find', 'yourself,', 'you', 'create', 'yourself.']
-
-function IntroOverlay({ fading }: { fading: boolean }) {
-  return (
-    <div style={{
-      position: 'absolute', inset: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      opacity: fading ? 0 : 1,
-      transition: 'opacity 500ms cubic-bezier(.4,0,.2,1)',
-      pointerEvents: fading ? 'none' : 'auto',
-    }}>
-      <p style={{
-        margin: 0,
-        fontFamily: 'var(--font-sans)',
-        fontSize: 'clamp(17px, 2.1vw, 27px)',
-        fontWeight: 300,
-        letterSpacing: '-0.025em',
-        lineHeight: 1,
-        color: '#fff',
-        textShadow: '0 2px 48px rgba(255,255,255,0.12)',
-        display: 'flex', gap: '0.3em', flexWrap: 'wrap', justifyContent: 'center',
-      }}>
-        {INTRO_WORDS.map((word, i) => (
-          <span
-            key={i}
-            style={{
-              display: 'inline-block',
-              willChange: 'transform, opacity, filter',
-              animation: `intro-word-rise 1500ms cubic-bezier(.16,1,.3,1) ${220 + i * 150}ms both`,
-            }}
-          >
-            {word}
-          </span>
-        ))}
-      </p>
-    </div>
-  )
-}
 
 // ── Starburst ─────────────────────────────────────────────────────────────────
 
@@ -124,19 +86,12 @@ export function LoginScreen() {
   const signIn = useAuthStore(s => s.signIn)
   const signUp = useAuthStore(s => s.signUp)
 
-  const [phase,    setPhase]    = useState<'intro' | 'fading' | 'login'>('intro')
   const [mode,     setMode]     = useState<'login' | 'register'>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
   const [success,  setSuccess]  = useState<string | null>(null)
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('fading'), IS_DEV ?  100 : 3200)
-    const t2 = setTimeout(() => setPhase('login'),  IS_DEV ?  200 : 3700)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -162,7 +117,7 @@ export function LoginScreen() {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: BLUE, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, background: BG, overflow: 'hidden' }}>
 
       {/* placeholder color for login inputs */}
       <style>{`.login-field::placeholder { color: rgba(255,255,255,0.28); }`}</style>
@@ -208,16 +163,12 @@ export function LoginScreen() {
         ))}
       </div>
 
-      {/* ── Intro overlay ───────────────────────────────────────────────── */}
-      {phase !== 'login' && <IntroOverlay fading={phase === 'fading'} />}
-
       {/* ── Login form ──────────────────────────────────────────────────── */}
-      {phase !== 'intro' && (
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'grid', gridTemplateColumns: '40% 60%',
-          animation: 'login-card-in 700ms cubic-bezier(.2,.7,.1,1) both',
-        }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'grid', gridTemplateColumns: '40% 60%',
+        animation: 'login-card-in 700ms cubic-bezier(.2,.7,.1,1) both',
+      }}>
 
           {/* LEFT: decorative */}
           <div style={{
@@ -231,7 +182,7 @@ export function LoginScreen() {
               fontSize: 11.5, fontFamily: 'var(--font-sans)', fontWeight: 500,
               color: 'rgba(255,255,255,0.7)', letterSpacing: '0.01em',
             }}>
-              Cultera Focus<sup style={{ fontSize: 8 }}>®</sup>
+              Cultera OS<sup style={{ fontSize: 8 }}>®</sup>
             </div>
 
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -320,7 +271,7 @@ export function LoginScreen() {
                     style={{
                       width: 62, height: 62, borderRadius: '50%',
                       background: loading ? 'rgba(255,255,255,0.75)' : '#fff',
-                      color: BLUE, border: 'none',
+                      color: CORAL, border: 'none',
                       cursor: loading ? 'not-allowed' : 'pointer',
                       fontSize: loading ? 11 : 18,
                       fontFamily: loading ? 'var(--font-mono)' : 'var(--font-sans)',
@@ -343,7 +294,6 @@ export function LoginScreen() {
           </div>
 
         </div>
-      )}
 
     </div>
   )

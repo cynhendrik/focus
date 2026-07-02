@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useNotificationsStore } from './notifications.store'
 import type { Notification } from '@/types/notification.types'
+
+vi.mock('@/services/notify.service', () => ({ notify: vi.fn() }))
+
+/** Flusht Microtask-Queue + einen Makro-Tick (nötig für dynamische Imports in jsdom). */
+const flushPromises = () => new Promise<void>(resolve => setTimeout(resolve, 0))
 
 const mk = (id: string, readAt: string | null = null): Notification => ({
   id, workspaceId: 'ws1', userId: 'u2', type: 'mention', actorId: 'u1',
@@ -21,5 +26,35 @@ describe('notifications.store', () => {
     expect(useNotificationsStore.getState().notifications.map(n => n.id)).toEqual(['b', 'a'])
     useNotificationsStore.getState().upsertRealtime(mk('a', 'T9'))
     expect(useNotificationsStore.getState().notifications.find(n => n.id === 'a')?.readAt).toBe('T9')
+  })
+})
+
+describe('upsertRealtime → OS-Notification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('meldet ungelesene Team-Events an den Notify-Service', async () => {
+    const { notify } = await import('@/services/notify.service')
+    const { useNotificationsStore } = await import('./notifications.store')
+    useNotificationsStore.getState().upsertRealtime({
+      id: 'n1', workspaceId: 'ws', userId: 'u1', type: 'mention', actorId: 'u2',
+      refType: 'task', refId: 't1', messageId: null, conversationId: null,
+      readAt: null, createdAt: '2026-07-02T10:00:00Z',
+    } as never)
+    await flushPromises() // dynamischer Import + .then()-Kette auflösen
+    expect(vi.mocked(notify)).toHaveBeenCalledWith('team', 'Du wurdest erwähnt', 'In Cultera OS ansehen.')
+  })
+
+  it('meldet bereits gelesene Events NICHT', async () => {
+    const { notify } = await import('@/services/notify.service')
+    const { useNotificationsStore } = await import('./notifications.store')
+    useNotificationsStore.getState().upsertRealtime({
+      id: 'n2', workspaceId: 'ws', userId: 'u1', type: 'dm', actorId: 'u2',
+      refType: 'task', refId: 't1', messageId: null, conversationId: null,
+      readAt: '2026-07-02T10:00:00Z', createdAt: '2026-07-02T10:00:00Z',
+    } as never)
+    await flushPromises()
+    expect(vi.mocked(notify)).not.toHaveBeenCalled()
   })
 })

@@ -25,11 +25,15 @@ const CHUNK = 500
  * Idempotenter Cloud-Write: upsert per id, in Blöcken.
  * No-op bei leerem Array.
  */
-export async function upsertRows(table: string, rows: Record<string, unknown>[]): Promise<void> {
+export async function upsertRows(
+  table: string,
+  rows: Record<string, unknown>[],
+  onConflict = 'id',
+): Promise<void> {
   if (rows.length === 0) return
   for (let i = 0; i < rows.length; i += CHUNK) {
     const slice = rows.slice(i, i + CHUNK)
-    const { error } = await supabase.from(table).upsert(slice, { onConflict: 'id' })
+    const { error } = await supabase.from(table).upsert(slice, { onConflict })
     if (error) throw new Error(`${table}: ${error.message}`)
   }
 }
@@ -221,7 +225,10 @@ export async function migrateCompanySettings(ctx: MigrationCtx): Promise<number>
 export async function migratePipelineStages(ctx: MigrationCtx): Promise<number> {
   const stages = await invoke<any[]>('cmd_get_pipeline_stages', { workspaceId: ctx.localWsId })
   const rows = stages.map(s => scope(pipelineStageToRow(s), ctx, s.createdAt, { withCreatedBy: false }))
-  await upsertRows('pipeline_stages', rows)
+  // Dedup per (workspace_id, name): mehrere Geräte haben pro Stage-Name andere
+  // Random-IDs — onConflict:'id' würde stapeln (3×). Der neue UNIQUE-Constraint
+  // + Namens-Konflikt mergen sie stattdessen.
+  await upsertRows('pipeline_stages', rows, 'workspace_id,name')
   return rows.length
 }
 
@@ -236,7 +243,7 @@ export async function migratePipelineStages(ctx: MigrationCtx): Promise<number> 
 export async function migrateLeadStages(ctx: MigrationCtx): Promise<number> {
   const stages = await invoke<any[]>('cmd_get_lead_stages', { workspaceId: ctx.localWsId })
   const rows = stages.map(s => scope(leadStageToRow(s), ctx, s.createdAt, { withCreatedBy: false }))
-  await upsertRows('lead_stages', rows)
+  await upsertRows('lead_stages', rows, 'workspace_id,name')
   return rows.length
 }
 

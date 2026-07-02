@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
+import { log } from '@/lib/logger'
 import type { AutomationRule } from '@/types/automation.types'
 
 interface AutomationState {
@@ -19,7 +20,9 @@ export const useAutomationStore = create<AutomationState>()((set) => ({
     try {
       const rules = await invoke<AutomationRule[]>('cmd_get_automation_rules', { workspaceId })
       set({ rules, isLoading: false })
-    } catch {
+    } catch (err) {
+      // Vorher still verschluckt → Regeln verschwanden lautlos.
+      log.error('Automationsregeln konnten nicht geladen werden', { workspaceId, err })
       set({ isLoading: false })
     }
   },

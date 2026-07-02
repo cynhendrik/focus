@@ -34,11 +34,13 @@ pub async fn run_loop(app: tauri::AppHandle, state: SyncState, pool: DbPool) {
         if is_online {
             if let Err(e) = push::flush_pending(&client, &state, &pool).await {
                 eprintln!("[SyncWorker] Push failed: {e}");
-            } else {
-                let conn = pool.conn();
-                if let Ok(count) = super::get_pending_count(&conn) {
-                    let _ = app.emit("cultera://pending-count", count);
-                }
+            }
+            let conn = pool.conn();
+            if let Ok(count) = super::get_pending_count(&conn) {
+                let _ = app.emit("cultera://pending-count", count);
+            }
+            if let Ok(fcount) = super::get_failed_count(&conn) {
+                let _ = app.emit("cultera://sync-failed-count", fcount);
             }
         }
     }

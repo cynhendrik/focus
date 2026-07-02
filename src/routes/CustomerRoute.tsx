@@ -322,7 +322,14 @@ export function CustomerRoute({ customerId }: Props) {
                 <AktionItem icon={<DollarSign size={14} />} label="Rechnung schreiben"   onClick={() => { setShowInvoiceForm(true); setAktionenOpen(false) }} />
                 <AktionItem icon={<Clock size={14} />}       label="Zeiterfassung"         onClick={() => { setShowTimeLog(true); setAktionenOpen(false) }} />
                 <AktionItem icon={<CalendarClock size={14} />} label="Follow-Up erstellen" onClick={() => {
-                  createActivity({ workspaceId, createdBy: user?.id ?? '', accountId: customerId, type: 'followup', title: 'Follow-Up', status: 'open' })
+                  // Follow-up = Aktivität type='task' mit is_follow_up-Flag (das EINE Konzept,
+                  // das alle Follow-up-Listen lesen). Früher 'followup' → war überall unsichtbar.
+                  createActivity({
+                    workspaceId, createdBy: user?.id ?? '', accountId: customerId,
+                    type: 'task', title: 'Follow-Up', status: 'open',
+                    dueAt: new Date().toISOString(),
+                    payload: JSON.stringify({ is_follow_up: true }),
+                  })
                   setAktionenOpen(false)
                 }} />
 

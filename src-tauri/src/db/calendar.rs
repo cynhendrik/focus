@@ -18,6 +18,7 @@ pub struct CalendarEvent {
     pub end_at: String,
     pub all_day: bool,
     pub color: Option<String>,
+    pub is_private: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -36,6 +37,8 @@ pub struct UpsertCalendarEventPayload {
     pub end_at: String,
     pub all_day: bool,
     pub color: Option<String>,
+    #[serde(default)]
+    pub is_private: bool,
 }
 
 // ── Mapper ────────────────────────────────────────────────────────────────────
@@ -55,12 +58,13 @@ fn map_event(r: &rusqlite::Row<'_>) -> rusqlite::Result<CalendarEvent> {
         color:        r.get(10)?,
         created_at:   r.get(11)?,
         updated_at:   r.get(12)?,
+        is_private:   r.get::<_, i32>(13)? != 0,
     })
 }
 
 const EVENT_COLS: &str =
     "id, workspace_id, created_by, account_id, title, description, location, \
-     start_at, end_at, all_day, color, created_at, updated_at";
+     start_at, end_at, all_day, color, created_at, updated_at, is_private";
 
 // ── DB-Funktionen ─────────────────────────────────────────────────────────────
 
@@ -89,22 +93,24 @@ pub fn upsert_event(
     let now = chrono::Utc::now().to_rfc3339();
     let id = payload.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let all_day_int: i32 = if payload.all_day { 1 } else { 0 };
+    let is_private_int: i32 = if payload.is_private { 1 } else { 0 };
 
     conn.execute(
         "INSERT INTO calendar_events \
          (id, workspace_id, created_by, account_id, title, description, location, \
-          start_at, end_at, all_day, color, created_at, updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) \
+          start_at, end_at, all_day, color, created_at, updated_at, is_private) \
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14) \
          ON CONFLICT(id) DO UPDATE SET \
           account_id=excluded.account_id, title=excluded.title, \
           description=excluded.description, location=excluded.location, \
           start_at=excluded.start_at, end_at=excluded.end_at, \
-          all_day=excluded.all_day, color=excluded.color, updated_at=excluded.updated_at",
+          all_day=excluded.all_day, color=excluded.color, \
+          is_private=excluded.is_private, updated_at=excluded.updated_at",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.account_id,
             payload.title, payload.description, payload.location,
             payload.start_at, payload.end_at, all_day_int, payload.color,
-            now, now,
+            now, now, is_private_int,
         ],
     )?;
 
@@ -153,6 +159,7 @@ mod tests {
             end_at: "2026-05-23T11:00:00".into(),
             all_day: false,
             color: None,
+            is_private: false,
         }
     }
 

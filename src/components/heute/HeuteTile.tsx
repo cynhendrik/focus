@@ -7,6 +7,7 @@ import { useLeadsStore } from '@/store/leads.store'
 import { TileBodyTodo } from './TileBodyTodo'
 import { TileBodyMail } from './TileBodyMail'
 import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
+import type { Lead } from '@/types/lead.types'
 
 interface Props {
   item: HeuteQueueItem
@@ -14,6 +15,8 @@ interface Props {
   total: number
   onDone: () => Promise<void>
   onSkip: () => void
+  /** Nur für Rechnungen: 7 Tage ruhen lassen statt „erledigt". */
+  onSnooze?: () => void
 }
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
@@ -48,7 +51,7 @@ function deriveHeadline(item: HeuteQueueItem, name: string, total?: number): str
   return ''
 }
 
-export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
+export function HeuteTile({ item, index, total, onDone, onSkip, onSnooze }: Props) {
   const invoices  = useFinanceStore(s => s.invoices)
   const todos     = useTodosStore(s => s.allTodos)
   const emails    = useMailStore(s => s.emails)
@@ -68,12 +71,19 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
     ? emails.find(e => e.id === item.id) ?? null
     : null
 
-  // Echtes Lead/Kunden-Follow-Up aus dem CRM — Empfänger ist der Lead.
+  // Echtes Lead/Kunden-Follow-Up aus dem CRM — Empfänger ist ein Lead ODER ein
+  // Kunde (Account). staticHeuteQueue emittiert beide; wenn wir hier nur Leads
+  // auflösen, fällt ein Kunden-Follow-up auf „Aufgabe konnte nicht geladen
+  // werden" durch. Deshalb Lead ODER Account als Kontakt auflösen.
   const followUp = item.type === 'lead_followup'
     ? followUps.find(f => f.id === item.id) ?? null
     : null
-  const followUpLead = followUp
-    ? leads.find(l => l.id === followUp.customerId) ?? null
+  const followUpContact: Lead | null = followUp
+    ? leads.find(l => l.id === followUp.customerId)
+      ?? (() => {
+        const a = accounts.find(acc => acc.id === followUp.customerId)
+        return a ? ({ id: a.id, name: a.name, email: a.email } as Lead) : null
+      })()
     : null
 
   const accountId = invoice?.accountId ?? todo?.customerId
@@ -81,7 +91,7 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
 
   const headline = (() => {
     if (item.type === 'invoice_reminder' && invoice) return deriveHeadline(item, account?.name ?? '', invoice.total)
-    if (item.type === 'lead_followup') return deriveHeadline(item, followUpLead?.name ?? 'Lead')
+    if (item.type === 'lead_followup') return deriveHeadline(item, followUpContact?.name ?? 'Kontakt')
     if (todo) return todo.actionType ? deriveHeadline(item, account?.name ?? '') : todo.title
     if (email) return `${email.fromName ?? email.fromAddr} antworten`
     return item.type.replace('_', ' ')
@@ -89,13 +99,13 @@ export function HeuteTile({ item, index, total, onDone, onSkip }: Props) {
 
   const renderBody = () => {
     if (item.type === 'invoice_reminder' && invoice) {
-      return <TileBodyMail mode="invoice_reminder" invoice={invoice} onDone={onDone} onSkip={onSkip} />
+      return <TileBodyMail mode="invoice_reminder" invoice={invoice} onDone={onDone} onSkip={onSkip} onSnooze={onSnooze} />
     }
     if (item.type === 'followup' && todo) {
       return <TileBodyMail mode="followup" todo={todo} onDone={onDone} onSkip={onSkip} />
     }
-    if (item.type === 'lead_followup' && followUp && followUpLead) {
-      return <TileBodyMail mode="lead_followup" lead={followUpLead} followUp={followUp} onDone={onDone} onSkip={onSkip} />
+    if (item.type === 'lead_followup' && followUp && followUpContact) {
+      return <TileBodyMail mode="lead_followup" lead={followUpContact} followUp={followUp} onDone={onDone} onSkip={onSkip} />
     }
     if (item.type === 'mail_reply' && todo) {
       return <TileBodyMail mode="reply_mail" todo={todo} onDone={onDone} onSkip={onSkip} />

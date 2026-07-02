@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { UserCheck } from 'lucide-react'
+import { UserCheck, Trash2 } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
 import { useToastStore } from '@/store/toast.store'
 import { leadToUpsertPayload } from '@/lib/lead-payload'
@@ -13,12 +13,14 @@ interface Props {
   onClose: () => void
 }
 
-export function LeadDetailModal({ lead, onClose }: Props) {
+export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const upsertLead      = useLeadsStore(s => s.upsert)
   const convertToClient = useLeadsStore(s => s.convertToClient)
+  const deleteLead      = useLeadsStore(s => s.deleteLead)
   const showToast       = useToastStore(s => s.show)
   const dialogRef       = useDialogFocus(true)
   const [converting, setConverting] = useState(false)
+  const [deleting, setDeleting]     = useState(false)
 
   async function handleConvert() {
     setConverting(true)
@@ -29,6 +31,19 @@ export function LeadDetailModal({ lead, onClose }: Props) {
     } catch {
       showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
       setConverting(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Lead „${lead.name}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`)) return
+    setDeleting(true)
+    try {
+      await deleteLead(lead.id, workspaceId)
+      showToast({ message: `${lead.name} gelöscht.`, variant: 'success' })
+      onClose()
+    } catch {
+      showToast({ message: `${lead.name} konnte nicht gelöscht werden.`, variant: 'error' })
+      setDeleting(false)
     }
   }
 
@@ -114,6 +129,20 @@ export function LeadDetailModal({ lead, onClose }: Props) {
                 }}
               >
                 <UserCheck size={14} /> {converting ? 'Wird umgewandelt…' : 'Zu Kunde machen'}
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                title="Lead löschen"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 8, cursor: deleting ? 'default' : 'pointer',
+                  border: '1px solid var(--danger)', background: 'transparent',
+                  color: 'var(--danger)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                <Trash2 size={14} /> {deleting ? 'Wird gelöscht…' : 'Löschen'}
               </button>
               <button
                 aria-label="Schließen"

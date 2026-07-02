@@ -22,9 +22,18 @@ import { useCrmStore } from '@/store/crm.store'
 import { useToastStore } from '@/store/toast.store'
 import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
+import { isTodoForToday } from '@/lib/heute/due'
+import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
+import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
+import { openExternal } from '@/lib/open-external'
+import { maskEvent } from '@/lib/calendar/owner'
+import { buildTodayLine } from '@/lib/notifications/briefing'
 import { HeuteTile } from '@/components/heute/HeuteTile'
-import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { useLeadsStore } from '@/store/leads.store'
+import { useAccountsStore } from '@/store/accounts.store'
+import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
+import '@/styles/heute.css'
 
 import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -76,6 +85,24 @@ function pct(delta: number, base: number): string {
   return `${v > 0 ? '+' : ''}${v}%`
 }
 
+function initials(name: string): string {
+  return (name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()) || '?'
+}
+
+function relTime(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '–'
+  const hrs = Math.floor((Date.now() - d.getTime()) / 3_600_000)
+  if (hrs < 1) return 'gerade'
+  if (hrs < 24) return `${hrs} Std`
+  const y = new Date(); y.setDate(y.getDate() - 1)
+  if (d.toDateString() === y.toDateString()) return 'gestern'
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+}
+
+function eur0(n: number): string {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI Card (gemeinsam fuer alle Views)
@@ -95,8 +122,8 @@ function KpiCard({
       borderRadius: 'var(--radius)', border: '1px solid var(--border)',
       background: 'var(--surface)', padding: '18px 20px',
       boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', gap: 12,
-      position: 'relative', minHeight: 152,
+      display: 'flex', flexDirection: 'column', gap: 10,
+      position: 'relative', minHeight: 116,
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
@@ -135,9 +162,9 @@ function KpiCard({
       </div>
 
       <div style={{
-        fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.04em',
-        color: accentValue ? 'var(--accent)' : 'var(--fg)',
-        fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+        fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em',
+        color: accentValue ? 'var(--accent-text)' : 'var(--fg)',
+        fontVariantNumeric: 'tabular-nums',
       }}>
         {value}
       </div>
@@ -164,12 +191,17 @@ function WorkspaceView() {
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const upsertTodo = useTodosStore(s => s.upsert)
+  const postponeTodo = useTodosStore(s => s.postpone)
   const crmUpsert  = useCrmStore(s => s.upsert)
   const showToast  = useToastStore(s => s.show)
+  const emails     = useMailStore(s => s.emails)
+  const leads      = useLeadsStore(s => s.leads)
+  const accounts   = useAccountsStore(s => s.accounts)
 
   useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
+  const [snoozeTick, setSnoozeTick] = useState(0)   // erzwingt Neuberechnung nach „7 Tage ruhen"
 
   // Heute-Cockpit queue
   const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
@@ -205,6 +237,11 @@ function WorkspaceView() {
             dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
           })
         }
+      } else if (item.type === 'invoice_reminder') {
+        // Rechnung wird nicht „erledigt" (das entscheidet die Zahlung), aber nach
+        // dem Senden einer Erinnerung 7 Tage ruhen lassen — sonst steht sie morgen
+        // wieder auf #1 (Broken-Record). Mahn-Cooldown respektiert.
+        snoozeInvoice(item.id, 7)
       }
     } catch {
       showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
@@ -213,6 +250,14 @@ function WorkspaceView() {
   }, [queueItems, queueIndex, todos, upsertTodo, followUps, crmUpsert, advance, showToast])
 
   const handleSkip = useCallback(() => advance(), [advance])
+
+  // „Später erinnern" für eine Rechnung: 7 Tage ruhen lassen (persistiert), damit
+  // eine bewusst liegengelassene Rechnung kein Broken-Record wird.
+  const handleSnooze = useCallback(() => {
+    const item = queueItems[queueIndex]
+    if (item?.type === 'invoice_reminder') snoozeInvoice(item.id, 7)
+    advance()
+  }, [queueItems, queueIndex, advance])
 
   const currentItem = queueItems[queueIndex]
 
@@ -256,198 +301,241 @@ function WorkspaceView() {
   }, [invoices, revRange])
 
   // Aktive Kunden — alle nicht-privaten, +Anzahl der diese Woche neu erstellten
-  const activeCount = useMemo(
-    () => customers.filter(c => !c.isPrivate).length,
-    [customers],
-  )
-  const newThisWeek = useMemo(() => {
-    const sow = startOfWeek(new Date()).toISOString()
-    return customers.filter(c => !c.isPrivate && c.createdAt && c.createdAt >= sow).length
-  }, [customers])
 
   // Heute faellig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
-    const tasks = myTodos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
-    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
+    const tasks = myTodos.filter(t => isTodoForToday(t, todayIso)).length
+    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate.slice(0, 10) <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
 
+  // ── Fokus+ abgeleitete Werte ────────────────────────────────────────────────
+  const overdueInvoices = useMemo(() => {
+    const snoozed = snoozedInvoiceIds()   // gesnoozte zählen nicht als „drängt heute"
+    return invoices.filter(i => !snoozed.has(i.id) && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
+      && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, snoozeTick])
+  const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
+  const koraLine = useMemo(() =>
+    buildTodayLine({
+      overdueCount: overdueInvoices.length,
+      overdueSum: geldUnterwegs,
+      fusDue: dueToday.fus,
+      tasksDue: dueToday.tasks,
+      eventsToday: events.length,
+    }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
+  [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
+  const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
+  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
+
+  const invById  = useMemo(() => new Map(invoices.map(i => [i.id, i])), [invoices])
+  const fuById   = useMemo(() => new Map(followUps.map(f => [f.id, f])), [followUps])
+  const todoById = useMemo(() => new Map(todos.map(t => [t.id, t])), [todos])
+  const contactName = useCallback(
+    (id: string) => leads.find(l => l.id === id)?.name ?? accounts.find(a => a.id === id)?.name ?? 'Kontakt',
+    [leads, accounts],
+  )
+
+  const completeItem = useCallback(async (item: HeuteQueueItem) => {
+    try {
+      if (item.type === 'lead_followup') {
+        const fu = fuById.get(item.id)
+        if (fu) await crmUpsert({ id: fu.id, customerId: fu.customerId, title: fu.title, dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority })
+      } else {
+        const t = todoById.get(item.id)
+        if (t) await upsertTodo({ id: t.id, title: t.title, status: 'done', bucket: 'done', priority: t.priority, customerId: t.customerId, actionType: t.actionType, sourceRef: t.sourceRef, notes: t.notes, checklist: t.checklist, tags: t.tags })
+      }
+      reshuffle()   // Index erhalten — Hero springt nicht zurück auf #1
+    } catch {
+      showToast({ message: 'Konnte nicht als erledigt markieren.', variant: 'error' })
+    }
+  }, [fuById, todoById, crmUpsert, upsertTodo, reshuffle, showToast])
+
+  const snoozeItem = useCallback((item: HeuteQueueItem) => {
+    snoozeInvoice(item.id, 7); setSnoozeTick(t => t + 1); reshuffle()
+  }, [reshuffle])
+
+  // „Später" — To-do/Follow-up um einen Tag verschieben (kein Broken-Record).
+  const laterItem = useCallback(async (item: HeuteQueueItem) => {
+    try {
+      if (item.type === 'lead_followup') {
+        const fu = fuById.get(item.id)
+        if (fu) {
+          const d = new Date(); d.setDate(d.getDate() + 1)
+          await crmUpsert({ id: fu.id, customerId: fu.customerId, title: fu.title, dueDate: d.toLocaleDateString('sv'), status: 'offen', priority: fu.priority })
+        }
+      } else {
+        await postponeTodo(item.id)
+      }
+      reshuffle()
+    } catch {
+      showToast({ message: 'Konnte nicht verschieben.', variant: 'error' })
+    }
+  }, [fuById, crmUpsert, postponeTodo, reshuffle, showToast])
+
+  // Ein Listen-Item in den Fokus („Dein nächster Zug") holen — z.B. um eine
+  // Rechnung von dort aus zu senden.
+  const promoteToHero = useCallback((absIndex: number) => {
+    setDirection(1); setQueueIndex(absIndex)
+  }, [])
+
+  const listAll   = queueItems.slice(queueIndex + 1)
+  const listShown = listAll.slice(0, 6)
+  const hidden    = listAll.slice(6)
+  const hInv  = hidden.filter(x => x.type === 'invoice_reminder').length
+  const hFu   = hidden.filter(x => x.type === 'lead_followup').length
+  const hTodo = hidden.length - hInv - hFu
+  const hiddenBreak = [hTodo ? `${hTodo} To-dos` : '', hFu ? `${hFu} Follow-ups` : '', hInv ? `${hInv} Rechn.` : ''].filter(Boolean).join(', ')
+  const listFootTxt = hidden.length > 0
+    ? `Noch ${hidden.length} weitere${hiddenBreak ? ` — ${hiddenBreak}` : ''}. Nichts fällt still weg.`
+    : 'Alles Aktuelle im Blick — nichts fällt still weg.'
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="hd">
       {isWorkspaceEmpty && <DashboardEmptyState />}
-      <DunningNudgeCard />
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
-      }}>
+
+      {/* KORA-Zeile — Gruß + Datum liefert bereits der PageHeader oben */}
+      <p className="hd-kora" style={{ margin: 0 }}>{koraLine}</p>
+
+      {/* KPIs */}
+      <div className="hd-kpis">
         <KpiCard
           label="Umsatz"
-          value={
-            <span>
-              {fmtKEur(paidNow)}
-              <span style={{
-                fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2,
-                fontFamily: 'var(--font-mono)', fontWeight: 600,
-              }}>
-                k€
-              </span>
-            </span>
-          }
-          hint={
-            <>
-              <span style={{ color: paidNow >= paidPrev ? 'var(--accent)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>
-                {paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}
-              </span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>{hintPrevLabel}</span>
-              <span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span>
-            </>
-          }
+          value={<span>{fmtKEur(paidNow)}<span style={{ fontSize: 15, color: 'var(--fg-dim)', marginLeft: 2, fontWeight: 600 }}>k€</span></span>}
+          hint={<><span style={{ color: paidNow >= paidPrev ? 'var(--ok)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>{paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{hintPrevLabel}</span><span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span></>}
         >
           <WeekMonthToggle range={revRange} onChange={setRevRange} />
         </KpiCard>
 
         <KpiCard
-          label="Aktive Kunden"
-          value={String(activeCount)}
-          hint={
-            <>
-              <span style={{ color: newThisWeek > 0 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>
-                {newThisWeek > 0 ? `+${newThisWeek}` : '0'}
-              </span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>diese Woche</span>
-            </>
-          }
-          action={{ label: 'Zu Kunden', onClick: () => setAppView('clients') }}
+          label="Geld unterwegs"
+          value={<span>{eur0(geldUnterwegs)}</span>}
+          accentValue={geldUnterwegs > 0}
+          hint={<><span style={{ color: overdueInvoices.length > 0 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>{overdueInvoices.length}</span><span>überfällige {overdueInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'}</span></>}
+          action={{ label: 'Zu Rechnungen', onClick: () => setAppView('invoices') }}
         />
 
         <KpiCard
-          label="Heute fällig"
+          label="Offen heute"
           value={String(dueToday.total)}
           accentValue={dueToday.total > 0}
-          hint={
-            <>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.fus} FU</span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>{events.length} Termine</span>
-            </>
-          }
+          hint={<><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.fus} FU</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{events.length} Termine</span></>}
           action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
         />
       </div>
 
-      {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
-      {!queueLoading && !currentItem && queueItems.length === 0 && !isWorkspaceEmpty && (
-        <div style={{
-          borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 24px',
-          color: 'var(--fg-muted)', fontSize: 13,
-        }}>
-          Noch nichts in deiner Queue — du bist auf dem neuesten Stand.
-        </div>
-      )}
-      {!queueLoading && currentItem && (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          {/* Aktuelle Kachel */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+      {/* 2 gleich hohe Spalten */}
+      <div className="hd-main">
+
+        {/* Links: Fokus-Karte + Interleave-Liste */}
+        <div className="hd-col">
+          {!queueLoading && currentItem && (
             <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={`${currentItem.id}-${queueIndex}`}
-                custom={direction}
-                initial={{ opacity: 0, x: direction * 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction * -30 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-              >
-                <HeuteTile
-                  item={currentItem}
-                  index={queueIndex}
-                  total={queueItems.length}
-                  onDone={handleDone}
-                  onSkip={handleSkip}
-                />
+              <motion.div key={`${currentItem.id}-${queueIndex}`} custom={direction}
+                initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
+                <HeuteTile item={currentItem} index={queueIndex} total={queueItems.length} onDone={handleDone} onSkip={handleSkip} onSnooze={handleSnooze} />
               </motion.div>
             </AnimatePresence>
-          </div>
+          )}
+          {!queueLoading && !currentItem && !isWorkspaceEmpty && (
+            <div className="card" style={{ flex: '1 1 auto', borderLeft: '3px solid var(--ok)', padding: '22px 24px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--ok)' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ok)' }}>HEUTE</span>
+              </div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', margin: 0, color: 'var(--fg)' }}>
+                {queueItems.length === 0 ? 'Heute ist frei für Fokus.' : 'Alles Dringende erledigt.'}
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--fg-muted)', margin: '9px 0 0', lineHeight: 1.55 }}>
+                Kein dringender Zug. Ein guter Moment für Tiefarbeit — oder plane deinen Tag.
+              </p>
+              <button type="button" onClick={() => { setQueueIndex(0); reshuffle() }}
+                style={{ marginTop: 14, background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+                Neu prüfen →
+              </button>
+            </div>
+          )}
 
-          {/* Als nächstes */}
-          {queueItems.slice(queueIndex + 1, queueIndex + 4).length > 0 && (
-            <div style={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{
-                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
-                textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600,
-                padding: '0 2px',
-              }}>
-                Als nächstes
-              </span>
-              {queueItems.slice(queueIndex + 1, queueIndex + 4).map((next, i) => {
-                const typeLabel =
-                  next.type === 'invoice_reminder' ? 'Mahnung' :
-                  next.type === 'mail_reply'        ? 'Mail' :
-                  next.type === 'followup'          ? 'Follow-up' : 'Todo'
+          {(currentItem || listShown.length > 0) && (
+            <div className="hd-fill">
+              <div className="hd-lhead"><span className="t">Als nächstes</span><span className="c">Geld &amp; Beziehung im Wechsel</span></div>
+              {listShown.map((item, i) => {
+                const absIndex = queueIndex + 1 + i
+                const isMoney = item.type === 'invoice_reminder'
+                const isFollow = item.type === 'lead_followup' || item.type === 'followup'
+                const kindLabel = isMoney ? 'Mahnung' : isFollow ? 'Follow-up' : item.type === 'mail_reply' ? 'Mail' : 'To-do'
+                const kindClass = isMoney ? 'mahnung' : isFollow ? 'followup' : 'todo'
+                let title = ''
+                let meta = item.reason
+                if (isMoney) {
+                  const inv = invById.get(item.id)
+                  const c = inv ? accounts.find(a => a.id === inv.accountId)?.name : undefined
+                  title = inv ? ([c, inv.number].filter(Boolean).join(' · ') || 'Rechnung') : 'Rechnung'
+                } else if (item.type === 'lead_followup') {
+                  const fu = fuById.get(item.id)
+                  title = contactName(fu?.customerId ?? '')
+                  meta = fu?.title ?? item.reason
+                } else {
+                  const t = todoById.get(item.id)
+                  title = t?.title ?? item.reason
+                }
                 return (
-                  <div key={next.id} style={{
-                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
-                    background: 'var(--surface)', padding: '12px 14px',
-                    boxShadow: 'var(--card-shadow)',
-                    opacity: 1 - i * 0.2,
-                    display: 'flex', flexDirection: 'column', gap: 5,
-                  }}>
-                    <span style={{
-                      fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
-                      textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700,
-                    }}>
-                      {typeLabel}
-                    </span>
-                    <span style={{
-                      fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.4,
-                      display: '-webkit-box', WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}>
-                      {next.reason}
-                    </span>
+                  <div key={item.id} className={`hd-row${isMoney ? ' mny' : ''}`}>
+                    {isMoney
+                      ? <span className="hd-mmark">€</span>
+                      : <button className="hd-check" title="Als erledigt markieren" onClick={() => completeItem(item)} />}
+                    <span className={`hd-kind ${kindClass}`}>{kindLabel}</span>
+                    <div className="hd-body" style={{ cursor: 'pointer' }} title="In den Fokus holen" onClick={() => promoteToHero(absIndex)}>
+                      <div className="hd-ti">{title}</div><div className="hd-mt">{meta}</div>
+                    </div>
+                    <div className="hd-quick">
+                      {isMoney
+                        ? <><button className="hd-qbtn" onClick={() => promoteToHero(absIndex)}>Erinnern</button><button className="hd-qbtn" onClick={() => snoozeItem(item)}>Ruhen</button></>
+                        : <button className="hd-qbtn" onClick={() => laterItem(item)}>Später</button>}
+                    </div>
                   </div>
                 )
               })}
+              <div className="hd-lfoot">
+                <span className="txt">{listFootTxt}</span>
+                <button type="button" onClick={() => setAppView('leverage_inbox')}>Alle anzeigen →</button>
+              </div>
             </div>
           )}
         </div>
-      )}
-      {!queueLoading && queueIndex >= queueItems.length && queueItems.length > 0 && (
-        <div style={{
-          borderRadius: 'var(--radius)', border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)',
-          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '24px 32px',
-          display: 'flex', alignItems: 'center', gap: 16,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-gradient)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 30px -8px var(--accent-glow)', flexShrink: 0,
-          }}>
-            <span style={{ color: '#fff', fontSize: 16 }}>✓</span>
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>Alles erledigt für heute.</div>
-            <button
-              type="button"
-              onClick={() => { setQueueIndex(0); reshuffle() }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--accent)',
-                fontSize: 12, cursor: 'pointer', padding: 0, marginTop: 4,
-              }}
-            >
-              Neu prüfen →
-            </button>
+
+        {/* Rechts: Tagesplan + Neueste Mails */}
+        <div className="hd-col">
+          <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} />
+          <div className="hd-fill">
+            <div className="hd-lhead"><span className="t">Neueste Mails</span><span className="c">{unreadCount} ungelesen</span></div>
+            {recentMails.length === 0 && (
+              <div style={{ padding: 20, fontSize: 13, color: 'var(--fg-dim)' }}>Keine Mails.</div>
+            )}
+            {recentMails.map(m => {
+              const unread = !m.isRead
+              return (
+                <div key={m.id} className={`hd-mrow${unread ? ' unread' : ''}`} onClick={() => setAppView('mail')}>
+                  <span className="hd-av">{initials(m.fromName || m.fromAddr)}</span>
+                  <div className="hd-mbody">
+                    <div className="hd-from">{unread && <span className="dot" />}<span className="nm">{m.fromName || m.fromAddr}</span></div>
+                    <div className="hd-subj">{m.subject || '(Kein Betreff)'}</div>
+                  </div>
+                  {unread
+                    ? <button className="hd-reply" onClick={e => { e.stopPropagation(); setAppView('mail') }}>Antworten</button>
+                    : <span className="hd-mtime">{relTime(m.sentAt)}</span>}
+                </div>
+              )
+            })}
+            <div className="hd-lfoot">
+              <span className="txt">Postfach</span>
+              <button type="button" onClick={() => setAppView('mail')}>Öffnen →</button>
+            </div>
           </div>
         </div>
-      )}
-
-      <TagesplanCard events={events} todos={myTodos} customers={customers} />
-
-      <InboxCard />
+      </div>
     </div>
   )
 }
@@ -493,14 +581,16 @@ interface PlanItem {
   title:    string
   subtitle: string
   status:   { kind: 'now' | 'block' | 'pause' | 'live' | 'fokus' | 'short'; label: string }
+  meetingLink?: MeetingLink
 }
 
 function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
   const now = new Date()
   const items: PlanItem[] = []
 
-  // Termine heute → mit Zeit
-  for (const ev of events) {
+  // Termine heute → mit Zeit (fremde Privat-Termine als „Gebucht" maskiert)
+  for (const raw of events) {
+    const ev = maskEvent(raw)
     const start = new Date(ev.startAt)
     const end = ev.endAt ? new Date(ev.endAt) : new Date(start.getTime() + 60 * 60_000)
     const isNow = start <= now && end >= now
@@ -516,6 +606,7 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
       title: ev.title || '(Termin)',
       subtitle: ev.location || ev.description || '',
       status,
+      meetingLink: extractMeetingLink(ev) ?? undefined,
     })
   }
 
@@ -551,7 +642,7 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
   }
   switch (kind) {
     case 'now':   return { ...base, background: 'var(--accent)',                  color: 'var(--accent-ink)' }
-    case 'block': return { ...base, background: 'oklch(78% 0.13 235 / 0.18)',     color: 'oklch(78% 0.13 235)' }
+    case 'block': return { ...base, background: 'oklch(72% 0.10 195 / 0.18)',     color: 'oklch(72% 0.10 195)' }
     case 'pause': return { ...base, background: 'var(--surface-2)',               color: 'var(--fg-muted)' }
     case 'live':  return { ...base, background: 'oklch(72% 0.18 25 / 0.15)',      color: 'oklch(72% 0.18 25)' }
     case 'fokus': return { ...base, background: 'oklch(82% 0.16 70 / 0.15)',      color: 'oklch(82% 0.16 70)' }
@@ -560,8 +651,8 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
 }
 
 function TagesplanCard({
-  events, todos, customers: _customers,
-}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[] }) {
+  events, todos, customers: _customers, onOpen,
+}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[]; onOpen?: () => void }) {
   const items = useMemo(() => buildTagesplan(events, todos), [events, todos])
 
   return (
@@ -601,7 +692,12 @@ function TagesplanCard({
             background: 'var(--border)',
           }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {items.map(item => <TagesplanRow key={item.id} item={item} />)}
+            {items.slice(0, 6).map(item => <TagesplanRow key={item.id} item={item} onOpen={onOpen} />)}
+            {items.length > 6 && (
+              <button type="button" onClick={onOpen} style={{ marginTop: 6, background: 'none', border: 'none', color: 'var(--fg-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', padding: '6px 0' }}>
+                + {items.length - 6} weitere im Kalender →
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -609,13 +705,16 @@ function TagesplanCard({
   )
 }
 
-function TagesplanRow({ item }: { item: PlanItem }) {
+function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void }) {
   const isNow = item.status.kind === 'now'
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
-      alignItems: 'center', gap: 12, padding: '12px 0',
-    }}>
+    <div
+      onClick={onOpen}
+      style={{
+        display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
+        alignItems: 'center', gap: 12, padding: '12px 0',
+        cursor: onOpen ? 'pointer' : 'default',
+      }}>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: isNow ? 'var(--accent)' : 'var(--fg-dim)',
@@ -628,7 +727,7 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           width: 10, height: 10, borderRadius: 99,
           background: isNow ? 'var(--accent)' : 'transparent',
           border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
-          boxShadow: isNow ? '0 0 0 4px oklch(56% 0.19 264 / 0.16)' : 'none',
+          boxShadow: isNow ? '0 0 0 4px oklch(68% 0.16 41 / 0.16)' : 'none',
         }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
@@ -647,156 +746,26 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           </span>
         )}
       </div>
-      <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
-    </div>
-  )
-}
-
-// ── Inbox-Card ──────────────────────────────────────────────────────────────
-
-function InboxCard() {
-  const emails            = useMailStore(s => s.emails)
-  const loadEmails        = useMailStore(s => s.loadEmails)
-  const selectEmail       = useMailStore(s => s.selectEmail)
-  const selectedAccountId = useMailStore(s => s.selectedAccountId)
-  const setAppView        = useUiStore(s => s.setAppView)
-  const customers         = useCustomersStore(s => s.customers)
-
-  useEffect(() => {
-    if (selectedAccountId && emails.length === 0) loadEmails()
-  }, [selectedAccountId, emails.length, loadEmails])
-
-  const customerByEmail = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const c of customers) if (c.email) m.set(c.email.toLowerCase(), c.name)
-    return m
-  }, [customers])
-
-  const sorted = useMemo(
-    () => [...emails].sort((a, b) =>
-      (Number(!!a.isRead) - Number(!!b.isRead)) ||   // ungelesene zuerst
-      (b.sentAt || '').localeCompare(a.sentAt || ''),
-    ),
-    [emails],
-  )
-  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
-
-  return (
-    <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-      background: 'var(--surface)', boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', minHeight: 0,
-      maxHeight: 480, overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        padding: '20px 22px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0,
-      }}>
-        <h2 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-          letterSpacing: '-0.01em',
-        }}>
-          Inbox
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.04em',
-            color: unreadCount > 0 ? 'var(--accent)' : 'var(--fg-dim)',
-            fontWeight: unreadCount > 0 ? 700 : 400,
-          }}>
-            {unreadCount > 0 ? `${unreadCount} ungelesen` : `${sorted.length} ${sorted.length === 1 ? 'Mail' : 'Mails'}`}
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
+        {item.meetingLink && (
           <button
-            onClick={() => setAppView('mail')}
+            type="button"
+            title={`${item.meetingLink.label}-Meeting öffnen`}
+            onClick={e => { e.stopPropagation(); void openExternal(item.meetingLink!.url) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              color: 'var(--fg)', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 11.5,
-            }}
-          >
-            Alle <ArrowRight size={11} />
+              fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '4px 12px',
+              border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>
+            Beitreten →
           </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: '6px 14px 12px' }}>
-        {sorted.length === 0 ? (
-          <div style={{ padding: '28px 12px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-            {selectedAccountId ? 'Inbox leer' : 'Kein Mail-Konto verbunden'}
-          </div>
-        ) : (
-          sorted.map(e => (
-            <InboxRow
-              key={e.id}
-              email={e}
-              customerName={customerByEmail.get(e.fromAddr?.toLowerCase() ?? '') ?? null}
-              onClick={() => { selectEmail(e); setAppView('mail') }}
-            />
-          ))
         )}
+        <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
       </div>
     </div>
   )
 }
 
-function InboxRow({
-  email, customerName, onClick,
-}: {
-  email: EmailHeader
-  customerName: string | null
-  onClick: () => void
-}) {
-  const time = new Date(email.sentAt)
-  const today = new Date()
-  const isToday = time.toDateString() === today.toDateString()
-  const timeLabel = isToday
-    ? `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`
-    : time.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
-
-  const unread = !email.isRead
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: '8px 1fr auto', gap: 10,
-        alignItems: 'center', padding: '10px 8px', borderRadius: 10,
-        cursor: 'pointer', transition: 'background 140ms',
-        opacity: unread ? 1 : 0.6,
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-    >
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%',
-        background: unread ? 'var(--accent)' : 'transparent',
-      }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{
-          fontSize: 13, fontWeight: unread ? 700 : 500,
-          color: unread ? 'var(--fg)' : 'var(--fg-muted)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {customerName ?? email.fromName ?? email.fromAddr}
-        </span>
-        <span style={{
-          fontSize: 11.5, color: unread ? 'var(--fg-muted)' : 'var(--fg-dim)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {email.subject || '(ohne Betreff)'}
-        </span>
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-        color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
-      }}>
-        {timeLabel}
-      </span>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main route

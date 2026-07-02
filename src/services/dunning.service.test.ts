@@ -10,8 +10,12 @@ import type { Invoice } from '@/types/finance.types'
 // sonst "Cannot access 'mockUpsert' before initialization".
 const { mockUpsert } = vi.hoisted(() => ({ mockUpsert: vi.fn() }))
 vi.mock('@/store/todos.store', () => ({
-  useTodosStore: { getState: () => ({ upsert: mockUpsert }) },
+  useTodosStore: { getState: () => ({ upsert: mockUpsert, allTodos: [] }) },
 }))
+
+vi.mock('@/data/finance.gateway', () => ({ FinanceGateway: { getInvoice: vi.fn() } }))
+vi.mock('@/data/contacts.gateway', () => ({ ContactsGateway: { getByAccount: vi.fn().mockResolvedValue([]) } }))
+vi.mock('@/lib/ai/corra', () => ({ generateCorraDraft: vi.fn().mockRejectedValue(new Error('offline')) }))
 
 const inv = (over: Partial<Invoice> = {}): Invoice => ({
   id: 'inv1', workspaceId: 'w', createdBy: 'u', accountId: 'a',
@@ -128,5 +132,27 @@ describe('recordReminderSent', () => {
     expect(payload.sourceRef).toBe('inv1')
     expect(payload.customerId).toBe('a')
     expect(payload.tags).toEqual(['fee:500'])
+  })
+})
+
+describe('prepareReminder: PDF-Pflicht', () => {
+  it('bricht ab, wenn das Rechnungs-PDF nicht erzeugt werden kann', async () => {
+    const { prepareReminder } = await import('./dunning.service')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+    const { FinanceGateway } = await import('@/data/finance.gateway')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    useAccountsStore.setState({ accounts: [{ id: 'acc1', name: 'Meyer GmbH', email: 'info@meyer.de' }] } as never)
+    vi.mocked(FinanceGateway.getInvoice).mockRejectedValueOnce(new Error('db locked'))
+
+    const invoice = {
+      id: 'inv1', accountId: 'acc1', number: 'R-100', dueDate: '2026-06-01',
+      total: 1190, status: 'overdue',
+    } as never
+
+    const result = await prepareReminder(invoice, 0)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('PDF')
   })
 })

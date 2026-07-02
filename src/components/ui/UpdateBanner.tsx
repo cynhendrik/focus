@@ -25,7 +25,7 @@ export function UpdateBanner() {
       <style>{`@keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>
-        <div style={{ flexShrink: 0, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: phase === 'error' ? 'oklch(28% 0.06 25)' : 'oklch(56% 0.19 264)' }}>
+        <div style={{ flexShrink: 0, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, background: phase === 'error' ? 'oklch(28% 0.06 25)' : 'oklch(68% 0.16 41)' }}>
           {phase === 'error'
             ? <AlertCircle size={20} style={{ color: 'oklch(75% 0.2 25)' }} />
             : phase === 'ready'
@@ -66,7 +66,7 @@ export function UpdateBanner() {
 
       {phase === 'downloading' && (
         <div style={{ height: 3, background: 'oklch(25% 0 0)' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: 'oklch(56% 0.19 264)', transition: 'width 180ms ease' }} />
+          <div style={{ height: '100%', width: `${progress}%`, background: 'oklch(68% 0.16 41)', transition: 'width 180ms ease' }} />
         </div>
       )}
     </div>
@@ -75,7 +75,7 @@ export function UpdateBanner() {
 
 const btnPrimary: CSSProperties = {
   fontSize: 11, fontWeight: 700, color: '#fff', border: 'none', borderRadius: 8,
-  padding: '6px 10px', background: 'oklch(56% 0.19 264)', cursor: 'pointer',
+  padding: '6px 10px', background: 'oklch(68% 0.16 41)', cursor: 'pointer',
 }
 const btnGhost: CSSProperties = {
   fontSize: 11, fontWeight: 600, color: 'oklch(70% 0 0)', border: 'none', borderRadius: 8,

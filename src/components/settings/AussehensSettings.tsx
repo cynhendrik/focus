@@ -28,12 +28,12 @@ const COLOR_STYLES = [
   {
     id: 'default' as const,
     label: 'Standard',
-    accent: '#3B6DF4',
+    accent: '#F2754F',
     preview: (
       <div style={{ width: '100%', height: 80, background: 'oklch(24% 0.008 270)', borderRadius: 8, padding: 8, boxSizing: 'border-box' as const, display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
-        <div style={{ height: 12, background: '#3B6DF4', borderRadius: 4, width: '55%' }} />
+        <div style={{ height: 12, background: '#F2754F', borderRadius: 4, width: '55%' }} />
         <div style={{ display: 'flex', gap: 5 }}>
-          <div style={{ height: 20, width: 36, background: '#3B6DF4', borderRadius: 4 }} />
+          <div style={{ height: 20, width: 36, background: '#F2754F', borderRadius: 4 }} />
           <div style={{ height: 20, flex: 1, background: 'oklch(30% 0.008 270)', borderRadius: 4 }} />
         </div>
       </div>

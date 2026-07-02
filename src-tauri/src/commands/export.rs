@@ -329,13 +329,30 @@ pub fn cmd_import_backup(db: State<'_, DbPool>, json: String, active_workspace_i
 /// Leert alle User-Inhalts-Tabellen in einer Transaktion, behält aber das Setup
 /// (Firmenprofil + Rechnungs-Nummernkreis). Schema-introspektiv wie der Backup-Export,
 /// damit neue Tabellen automatisch mit-geleert werden.
-pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), String> {
-    // Setup/Konfiguration + Workspace-Identität, die NICHT geleert wird. (workspaces/
-    // workspace_members existieren lokal aktuell nicht — defensiv für Konsistenz mit
-    // dem Cloud-Reset, falls sie lokal je dazukommen.)
+pub fn reset_workspace_local(conn: &mut rusqlite::Connection, workspace_id: &str) -> Result<(), String> {
+    // WICHTIG: Reset ist STRIKT workspace-scoped. Lokale und geteilte (Cloud-)
+    // Workspaces dürfen sich nie schneiden — ein Reset löscht ausschließlich die
+    // Zeilen DIESER Workspace, niemals die einer anderen (lokal oder Cloud).
+    //
+    // Setup/Konfiguration + Workspace-Identität, die NICHT geleert wird.
     const KEEP: &[&str] = &[
         "company_settings", "invoice_sequences", "offer_sequences",
         "time_planning", "app_state", "workspaces", "workspace_members",
+    ];
+
+    // Kind-Tabellen OHNE eigene workspace_id: über ihre Eltern-Tabelle scopen,
+    // damit auch sie nur für diese Workspace geleert werden. (child, FK, parent)
+    // customer_*-Kinder hängen am Kunden = `accounts` (workspace-scoped).
+    const CHILD_VIA: &[(&str, &str, &str)] = &[
+        ("invoice_items",       "invoice_id",  "invoices"),
+        ("offer_items",         "offer_id",    "offers"),
+        ("campaign_recipients", "campaign_id", "campaigns"),
+        ("crm_follow_ups",      "customer_id", "accounts"),
+        ("deadlines",           "customer_id", "accounts"),
+        ("health_scores",       "customer_id", "accounts"),
+        ("notes",               "customer_id", "accounts"),
+        ("time_entries",        "customer_id", "accounts"),
+        ("todos",               "customer_id", "accounts"),
     ];
 
     let tables: Vec<String> = {
@@ -349,11 +366,34 @@ pub fn reset_workspace_local(conn: &mut rusqlite::Connection) -> Result<(), Stri
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     tx.execute_batch("PRAGMA defer_foreign_keys=ON;").map_err(|e| e.to_string())?;
+
+    // 1. Kind-Tabellen über ihre Eltern in DIESER Workspace löschen. Fehlende
+    //    Tabellen/Spalten (ältere Schemata) werden still übersprungen.
+    for (child, fk, parent) in CHILD_VIA {
+        let sql = format!(
+            "DELETE FROM \"{child}\" WHERE \"{fk}\" IN \
+             (SELECT id FROM \"{parent}\" WHERE workspace_id = ?1)"
+        );
+        let _ = tx.execute(&sql, [workspace_id]);
+    }
+
+    // 2. Tabellen MIT workspace_id direkt scopen. Tabellen ohne workspace_id, die
+    //    nicht in CHILD_VIA stehen (z. B. customers), werden bewusst NICHT geleert.
     for t in &tables {
         if KEEP.contains(&t.as_str()) { continue; }
-        tx.execute(&format!("DELETE FROM \"{t}\""), [])
-            .map_err(|e| format!("{t}: {e}"))?;
+        let has_ws: bool = {
+            let mut stmt = tx.prepare(&format!("PRAGMA table_info(\"{t}\")"))
+                .map_err(|e| e.to_string())?;
+            let cols = stmt.query_map([], |r| r.get::<_, String>(1)).map_err(|e| e.to_string())?;
+            let found = cols.filter_map(Result::ok).any(|c| c == "workspace_id");
+            found
+        };
+        if has_ws {
+            tx.execute(&format!("DELETE FROM \"{t}\" WHERE workspace_id = ?1"), [workspace_id])
+                .map_err(|e| format!("{t}: {e}"))?;
+        }
     }
+
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -424,9 +464,9 @@ pub fn cmd_delete_workspace(db: State<'_, DbPool>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn cmd_reset_workspace(db: State<'_, DbPool>) -> Result<(), String> {
+pub fn cmd_reset_workspace(db: State<'_, DbPool>, workspace_id: String) -> Result<(), String> {
     let mut conn = db.conn();
-    reset_workspace_local(&mut conn)
+    reset_workspace_local(&mut conn, &workspace_id)
 }
 
 /// Schreibt workspace_id (und created_by, falls Spalte existiert) aller
@@ -703,7 +743,7 @@ mod tests {
             "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, total, created_at, updated_at) \
              VALUES ('i1','ws1','u1','a1','2026-01-01','2026-01-15',119.0,'2026-01-01','2026-01-01')", []).unwrap();
 
-        reset_workspace_local(&mut conn).unwrap();
+        reset_workspace_local(&mut conn, "ws1").unwrap();
 
         let accounts: i64 = conn.query_row("SELECT count(*) FROM accounts", [], |r| r.get(0)).unwrap();
         let invoices: i64 = conn.query_row("SELECT count(*) FROM invoices", [], |r| r.get(0)).unwrap();
@@ -715,6 +755,41 @@ mod tests {
         assert_eq!(settings, 1);
         assert_eq!(seq, 5);
         assert_eq!(oseq, 3);
+    }
+
+    #[test]
+    fn reset_is_strictly_workspace_scoped() {
+        // Regression: Reset einer Workspace darf NIE Daten einer anderen treffen
+        // (lokal & Cloud duerfen sich nicht schneiden). Frueher loeschte der lokale
+        // Reset ALLE Zeilen — ein Reset der geteilten Workspace radierte die lokale.
+        let mut conn = sample_conn();
+        // ws-A und ws-B mit je Account + Rechnung + Rechnungsposition (Kind ohne ws_id)
+        for (ws, a, i, it) in [("ws-A","a-A","i-A","it-A"), ("ws-B","a-B","i-B","it-B")] {
+            conn.execute(
+                "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at) \
+                 VALUES (?1,?2,'u','K','2026-01-01','2026-01-01')", rusqlite::params![a, ws]).unwrap();
+            conn.execute(
+                "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, total, created_at, updated_at) \
+                 VALUES (?1,?2,'u',?3,'2026-01-01','2026-01-15',119.0,'2026-01-01','2026-01-01')",
+                rusqlite::params![i, ws, a]).unwrap();
+            conn.execute(
+                "INSERT INTO invoice_items (id, invoice_id, title, quantity, unit_price, tax_rate, total, sort_order) \
+                 VALUES (?1,?2,'Pos',1,100.0,19,119.0,0)", rusqlite::params![it, i]).unwrap();
+        }
+
+        reset_workspace_local(&mut conn, "ws-A").unwrap();
+
+        // ws-A komplett weg
+        let a_a: i64 = conn.query_row("SELECT count(*) FROM accounts WHERE workspace_id='ws-A'", [], |r| r.get(0)).unwrap();
+        let i_a: i64 = conn.query_row("SELECT count(*) FROM invoices WHERE workspace_id='ws-A'", [], |r| r.get(0)).unwrap();
+        let it_a: i64 = conn.query_row("SELECT count(*) FROM invoice_items WHERE id='it-A'", [], |r| r.get(0)).unwrap();
+        assert_eq!((a_a, i_a, it_a), (0, 0, 0), "ws-A muss vollstaendig geleert sein");
+
+        // ws-B UNANGETASTET — inkl. Kind-Tabelle
+        let a_b: i64 = conn.query_row("SELECT count(*) FROM accounts WHERE workspace_id='ws-B'", [], |r| r.get(0)).unwrap();
+        let i_b: i64 = conn.query_row("SELECT count(*) FROM invoices WHERE workspace_id='ws-B'", [], |r| r.get(0)).unwrap();
+        let it_b: i64 = conn.query_row("SELECT count(*) FROM invoice_items WHERE id='it-B'", [], |r| r.get(0)).unwrap();
+        assert_eq!((a_b, i_b, it_b), (1, 1, 1), "ws-B darf NICHT angefasst werden");
     }
 
     #[test]

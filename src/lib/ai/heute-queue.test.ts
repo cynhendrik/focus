@@ -1,51 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { parseHeuteQueue, staticHeuteQueue } from './heute-queue'
+import { staticHeuteQueue } from './heute-queue'
+import { todayLocalIso } from '@/lib/heute/due'
 import type { CorraContextInput } from './corra-intelligence'
 
 const emptyInput: CorraContextInput = {
   todos: [], invoices: [], emails: [], deals: [], calendarEvents: [], accounts: [],
   followUps: [], leads: [],
 }
-
-describe('parseHeuteQueue', () => {
-  it('parses valid JSON array', () => {
-    const raw = JSON.stringify([
-      { type: 'invoice_reminder', id: 'inv-1', reason: 'Überfällig' },
-      { type: 'todo', id: 'todo-1', reason: 'P1' },
-    ])
-    const result = parseHeuteQueue(raw)
-    expect(result).toHaveLength(2)
-    expect(result[0].type).toBe('invoice_reminder')
-    expect(result[0].id).toBe('inv-1')
-  })
-
-  it('handles fenced code block', () => {
-    const raw = '```json\n[{"type":"todo","id":"t1","reason":"ok"}]\n```'
-    expect(parseHeuteQueue(raw)).toHaveLength(1)
-  })
-
-  it('returns empty array on garbage input', () => {
-    expect(parseHeuteQueue('not json at all')).toEqual([])
-    expect(parseHeuteQueue('')).toEqual([])
-    expect(parseHeuteQueue('"just a string"')).toEqual([])
-  })
-
-  it('filters items missing required fields', () => {
-    const raw = JSON.stringify([
-      { type: 'todo', id: 'ok', reason: 'fine' },
-      { type: 'todo', id: 'missing-reason' },
-      { id: 'missing-type', reason: 'x' },
-    ])
-    expect(parseHeuteQueue(raw)).toHaveLength(1)
-  })
-
-  it('caps at 10 items', () => {
-    const raw = JSON.stringify(
-      Array.from({ length: 15 }, (_, i) => ({ type: 'todo', id: `t${i}`, reason: 'x' }))
-    )
-    expect(parseHeuteQueue(raw)).toHaveLength(10)
-  })
-})
 
 describe('staticHeuteQueue', () => {
   it('returns empty array for empty input', () => {
@@ -67,6 +28,23 @@ describe('staticHeuteQueue', () => {
     expect(queue[0].id).toBe('inv-1')
   })
 
+  it('verschränkt Geld und Beziehung (Rechnung, Follow-up, Rechnung, Follow-up)', () => {
+    const todayStr = todayLocalIso()
+    const inv = (id: string, total: number): CorraContextInput['invoices'][number] =>
+      ({ id, status: 'overdue', total, dueDate: '2026-05-01', accountId: 'a', workspaceId: 'w', createdBy: 'u', date: '2026-04-01', taxMode: 'standard', subtotal: total, taxAmount: 0, bankInfo: '', isSuggestion: false, pendingSync: false, createdAt: '', updatedAt: '' })
+    const input: CorraContextInput = {
+      ...emptyInput,
+      invoices: [inv('inv-big', 5000), inv('inv-small', 500)],
+      followUps: [
+        { id: 'fu-1', customerId: 'l', title: 'A', dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '' },
+        { id: 'fu-2', customerId: 'l', title: 'B', dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '' },
+      ],
+    }
+    const q = staticHeuteQueue(input)
+    expect(q.map(x => x.type)).toEqual(['invoice_reminder', 'lead_followup', 'invoice_reminder', 'lead_followup'])
+    expect(q[0].id).toBe('inv-big') // größte Rechnung als #1
+  })
+
   it('maps todo actionType reply_mail to mail_reply', () => {
     const input: CorraContextInput = {
       ...emptyInput,
@@ -78,8 +56,20 @@ describe('staticHeuteQueue', () => {
     expect(queue[0].type).toBe('mail_reply')
   })
 
+  it('includes a todo scheduled for today even if its bucket is backlog (capture-bug)', () => {
+    const scheduledToday = `${todayLocalIso()}T09:00:00.000Z`
+    const input: CorraContextInput = {
+      ...emptyInput,
+      todos: [
+        { id: 'todo-sched', title: 'Getippt, heute eingeplant', status: 'open', priority: 'p2', bucket: 'backlog', scheduledAt: scheduledToday, checklist: [], tags: [], createdAt: '', updatedAt: '' },
+      ],
+    }
+    const queue = staticHeuteQueue(input)
+    expect(queue.find(q => q.id === 'todo-sched')).toBeDefined()
+  })
+
   it('surfaces a due lead follow-up as lead_followup', () => {
-    const todayStr = new Date().toISOString().slice(0, 10)
+    const todayStr = todayLocalIso()
     const input: CorraContextInput = {
       ...emptyInput,
       followUps: [

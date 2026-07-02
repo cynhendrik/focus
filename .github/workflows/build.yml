@@ -84,6 +84,6 @@ jobs:
           args: ${{ matrix.args }}
           # Legt automatisch ein (Entwurfs-)Release mit den Installern als Assets an.
           tagName: app-v__VERSION__
-          releaseName: 'Cultera Focus v__VERSION__'
+          releaseName: 'Cultera OS v__VERSION__'
           releaseDraft: true
           prerelease: false
