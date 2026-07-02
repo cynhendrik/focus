@@ -62,4 +62,14 @@ describe('vertraege store', () => {
     const { vertraege } = useVertraege.getState()
     expect(vertraege[0].nextBillingDate > new Date().toLocaleDateString('sv')).toBe(true)
   })
+
+  it('faelliger Vertrag erzeugt einen Rechnungs-VORSCHLAG (isSuggestion), keinen stillen Draft', async () => {
+    const { useVertraege } = await import('./vertraege.store')
+    useVertraege.getState().createVertrag({ ...base, startDate: '2026-05-01' })
+    await useVertraege.getState().checkAndCreateDueInvoices('ws1', 'u1')
+    const { FinanceService } = await import('@/services/finance.service')
+    expect(vi.mocked(FinanceService.createInvoice)).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'draft', isSuggestion: true, suggestedBy: 'vertrag' }),
+    )
+  })
 })
