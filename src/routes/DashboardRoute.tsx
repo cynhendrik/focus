@@ -27,6 +27,7 @@ import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
 import { openExternal } from '@/lib/open-external'
 import { maskEvent } from '@/lib/calendar/owner'
+import { buildTodayLine } from '@/lib/notifications/briefing'
 import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { useLeadsStore } from '@/store/leads.store'
@@ -102,12 +103,6 @@ function relTime(iso: string): string {
 function eur0(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
-
-function joinDe(parts: string[]): string {
-  if (parts.length <= 1) return parts[0] ?? ''
-  return `${parts.slice(0, -1).join(', ')} und ${parts[parts.length - 1]}`
-}
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KPI Card (gemeinsam fuer alle Views)
@@ -323,14 +318,15 @@ function WorkspaceView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, snoozeTick])
   const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
-  const koraLine = useMemo(() => {
-    const parts: string[] = []
-    if (overdueInvoices.length) parts.push(`${overdueInvoices.length} ${overdueInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'} (${eur0(geldUnterwegs)})`)
-    if (dueToday.fus) parts.push(`${dueToday.fus} Follow-up${dueToday.fus === 1 ? '' : 's'}`)
-    if (dueToday.tasks) parts.push(`${dueToday.tasks} To-do${dueToday.tasks === 1 ? '' : 's'}`)
-    if (events.length) parts.push(`${events.length} Termin${events.length === 1 ? '' : 'e'}`)
-    return parts.length ? `Heute stehen an: ${joinDe(parts)}.` : 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.'
-  }, [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
+  const koraLine = useMemo(() =>
+    buildTodayLine({
+      overdueCount: overdueInvoices.length,
+      overdueSum: geldUnterwegs,
+      fusDue: dueToday.fus,
+      tasksDue: dueToday.tasks,
+      eventsToday: events.length,
+    }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
+  [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
 
