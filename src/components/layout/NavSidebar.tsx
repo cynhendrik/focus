@@ -11,6 +11,7 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCompanyStore } from '@/store/company.store'
 import { WorkspaceSwitcher } from '@/core/workspace/WorkspaceSwitcher'
+import { SyncStatusChip } from './SyncStatusChip'
 import {
   Home, Users, CreditCard,
   Target, TrendingUp,
@@ -155,6 +156,8 @@ export function NavSidebar() {
 
       <div className="nav-spacer" />
       <div className="nav-foot-divider" />
+
+      <SyncStatusChip />
 
       <NavItem icon={HelpCircle} label="Hilfe" active={false}
         onClick={() => setHelpOpen(true)} />

@@ -31,6 +31,7 @@ interface WorkspaceState {
   localWorkspaces: Workspace[]
   activeWorkspaceId: string | null
   pendingCount: number
+  failedCount: number
   isOnline: boolean
   loadWorkspaces: () => Promise<void>
   createWorkspace: (name: string) => Promise<void>
@@ -41,6 +42,7 @@ interface WorkspaceState {
   regenerateJoinCode: (workspaceId: string) => Promise<string>
   setActiveWorkspace: (id: string) => void
   setPendingCount: (count: number) => void
+  setFailedCount: (count: number) => void
   setOnline: (online: boolean) => void
   getActiveWorkspaceId: () => string | null
   isActiveWorkspaceShared: () => boolean
@@ -53,6 +55,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       localWorkspaces: [],
       activeWorkspaceId: null,
       pendingCount: 0,
+      failedCount: 0,
       isOnline: true,
 
       loadWorkspaces: async () => {
@@ -189,6 +192,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),
       setPendingCount: (count) => set({ pendingCount: count }),
+      setFailedCount: (count) => set({ failedCount: count }),
       setOnline: (online) => set({ isOnline: online }),
 
       getActiveWorkspaceId: () => get().activeWorkspaceId,
