@@ -144,8 +144,8 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
         <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
           {btn('Freigeben', onApprove, { primary: true, disabled: busy })}
           {hasDraft && btn('Anpassen', () => setEditing(true), { disabled: busy })}
-          {btn('Später', () => setSnoozeOpen(o => !o), { disabled: busy })}
-          {onDelegate && delegatable && delegatable.length > 0 && btn('Übergeben', () => setDelegateOpen(o => !o), { disabled: busy })}
+          {btn('Später', () => { setSnoozeOpen(o => !o); setDelegateOpen(false) }, { disabled: busy })}
+          {onDelegate && delegatable && delegatable.length > 0 && btn('Übergeben', () => { setDelegateOpen(o => !o); setSnoozeOpen(false) }, { disabled: busy })}
           {btn('Verwerfen', onDismiss, { disabled: busy })}
           {snoozeOpen && (
             <div style={{
