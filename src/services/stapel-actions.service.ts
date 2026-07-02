@@ -58,10 +58,15 @@ async function approveFollowup(item: PreparedItem): Promise<ApproveResult> {
     subject: item.payload.draftSubject ?? `Kurze Rückfrage: ${fu.title}`,
     bodyText: item.payload.draftBody ?? '',
   })
-  await useCrmStore.getState().upsert({
-    id: fu.id, customerId: fu.customerId, title: fu.title,
-    dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
-  })
+  // Mail ist raus = Erfolg. Scheitert nur die Nachbuchung, darf ein Retry NICHT erneut mailen.
+  try {
+    await useCrmStore.getState().upsert({
+      id: fu.id, customerId: fu.customerId, title: fu.title,
+      dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
+    })
+  } catch (upsertErr) {
+    log.error('followup sent but marking erledigt failed', { id: item.id, err: upsertErr })
+  }
   // Protokollbuch (Spec §10.4): nachlesbar am Kunden.
   try {
     await ActivitiesGateway.create({
@@ -80,7 +85,8 @@ async function approveFollowup(item: PreparedItem): Promise<ApproveResult> {
 
 async function approveRechnungsentwurf(item: PreparedItem): Promise<ApproveResult> {
   const inv = useFinanceStore.getState().invoices.find(i => i.id === item.sourceId)
-  if (!inv || !inv.isSuggestion) return { ok: false, error: 'Rechnungsvorschlag nicht mehr vorhanden.' }
+  if (!inv) return { ok: false, error: 'Rechnungsvorschlag nicht mehr vorhanden.' }
+  if (!inv.isSuggestion) return { ok: false, error: 'Rechnung wurde bereits freigegeben.' }
   await useFinanceStore.getState().approveInvoiceSuggestion(
     inv.id, useAuthStore.getState().user?.id ?? '', item.workspaceId,
   )
