@@ -25,7 +25,7 @@ export function StapelSection() {
   const visible = useMemo(() => {
     const now = new Date().toISOString()
     return items
-      .filter(i => i.status === 'pending' || (i.status === 'snoozed' && (i.snoozeUntil ?? '') <= now))
+      .filter(i => i.status === 'pending' || (i.status === 'snoozed' && i.snoozeUntil != null && i.snoozeUntil <= now))
       .filter(i => !i.assignee || i.assignee === myId)
       .sort((a, b) => b.score - a.score || a.createdAt.localeCompare(b.createdAt))
   }, [items, myId])
