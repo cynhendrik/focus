@@ -434,6 +434,12 @@ fn main() {
             commands::notes::create_note_folder,
             commands::notes::update_note_folder,
             commands::notes::delete_note_folder,
+            commands::prepared_item::cmd_get_active_prepared_items,
+            commands::prepared_item::cmd_insert_prepared_item_ignore,
+            commands::prepared_item::cmd_update_prepared_item_status,
+            commands::prepared_item::cmd_update_prepared_item_payload,
+            commands::prepared_item::cmd_set_prepared_item_assignee,
+            commands::prepared_item::cmd_get_approved_prepared_items_since,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

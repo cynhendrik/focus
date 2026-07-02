@@ -23,3 +23,4 @@ pub mod payment;
 pub mod campaign;
 pub mod note_entry;
 pub mod note_folder;
+pub mod prepared_item;
