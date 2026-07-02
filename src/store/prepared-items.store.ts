@@ -35,6 +35,7 @@ export const usePreparedItemsStore = create<PreparedItemsState>()((set, get) => 
       set({ items, loading: false })
     } catch (err) {
       log.error('prepared items load failed', { err })
+      toastError('Stapel konnte nicht geladen werden.')
       set({ loading: false })
     }
   },
