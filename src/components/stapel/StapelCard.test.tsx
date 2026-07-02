@@ -47,6 +47,16 @@ describe('StapelCard', () => {
     expect(onSaveDraft).toHaveBeenCalledWith(expect.objectContaining({ draftBody: 'Neuer Text' }))
   })
 
+  it('Kartenwechsel setzt den Editor auf die neue Karte zurueck', () => {
+    const { rerender } = render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Anpassen' }))
+    fireEvent.change(screen.getByLabelText('Entwurf'), { target: { value: 'ALT' } })
+    const next = { ...item, id: 'p2', payload: { ...item.payload, draftBody: 'Neuer Karten-Entwurf' } } as never
+    rerender(<StapelCard item={next} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Anpassen' }))
+    expect(screen.getByLabelText('Entwurf')).toHaveValue('Neuer Karten-Entwurf')
+  })
+
   it('Spaeter zeigt die drei Fristen und liefert die Tage', () => {
     const onSnooze = vi.fn()
     render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={onSnooze} onDismiss={vi.fn()} />)

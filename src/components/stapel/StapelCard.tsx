@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
 import { generateCorraDraft } from '@/lib/ai/corra'
 import type { PreparedItem, PreparedItemPayload } from '@/types/prepared-item.types'
@@ -24,19 +24,34 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
   const [draftSubject, setDraftSubject] = useState(item.payload.draftSubject ?? '')
   const [draftBody, setDraftBody] = useState(item.payload.draftBody ?? '')
   const [koraBusy, setKoraBusy] = useState(false)
+  const [koraError, setKoraError] = useState<string | null>(null)
+
+  // Kartenwechsel im selben Slot: Editor-Zustand auf die neue Karte zurücksetzen.
+  useEffect(() => {
+    setDraftSubject(item.payload.draftSubject ?? '')
+    setDraftBody(item.payload.draftBody ?? '')
+    setEditing(false)
+    setSnoozeOpen(false)
+    setKoraError(null)
+  }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasDraft = item.payload.draftBody != null
 
   const rephrase = async () => {
     setKoraBusy(true)
+    setKoraError(null)
     try {
       // Einziger KI-Einsatz im Stapel: bewusster Klick des Nutzers.
-      const text = await generateCorraDraft(
-        item.type === 'mahnung'
-          ? { kind: 'reminder', customerName: item.payload.customerName ?? '', invoiceNumber: item.payload.invoiceNumber ?? '', amount: item.payload.amount ?? 0, dueDate: '', daysOverdue: 0, dunningLevel: item.payload.level ?? 0 }
-          : { kind: 'followup', customerName: item.payload.customerName ?? '', topic: item.payload.title },
-      )
+      const ctx = item.type === 'mahnung'
+        ? { kind: 'reminder' as const, customerName: item.payload.customerName ?? '', invoiceNumber: item.payload.invoiceNumber ?? '', amount: item.payload.amount ?? 0, dueDate: '', daysOverdue: 0, dunningLevel: item.payload.level ?? 0 }
+        : item.type === 'rechnungsentwurf'
+          ? { kind: 'invoice' as const, customerName: item.payload.customerName ?? '', invoiceNumber: item.payload.invoiceNumber, amount: item.payload.amount ?? 0 }
+          : { kind: 'followup' as const, customerName: item.payload.customerName ?? '', topic: item.payload.title }
+      const text = await generateCorraDraft(ctx)
       if (text) setDraftBody(text)
+      else setKoraError('KORA hat keinen Text geliefert — bitte erneut versuchen.')
+    } catch {
+      setKoraError('KORA ist gerade nicht erreichbar — der Entwurf bleibt unverändert.')
     } finally {
       setKoraBusy(false)
     }
@@ -117,6 +132,7 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
               <Sparkles size={14} /> {koraBusy ? 'KORA schreibt …' : 'Mit KORA umformulieren'}
             </button>
           </div>
+          {koraError && <p style={{ fontSize: 12, color: 'var(--danger, #d33)', margin: 0 }}>{koraError}</p>}
         </div>
       )}
 
