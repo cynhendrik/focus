@@ -11,12 +11,14 @@ mod engine;
 
 pub use error::AppError;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 use email::db::EmailDb;
 use db::pool::DbPool;
 use core::auth::SyncState;
+use tauri_plugin_autostart::MacosLauncher;
 
 fn groq_key() -> &'static str {
     option_env!("GROQ_API_KEY").unwrap_or("")
@@ -26,6 +28,15 @@ fn groq_key() -> &'static str {
 struct Message {
     role: String,
     content: String,
+}
+
+/// Verhalten beim Fenster-Schließen: true = in den Tray minimieren (Default),
+/// false = App wirklich beenden. Wird von den Einstellungen per Command gesetzt.
+pub struct CloseToTray(pub AtomicBool);
+
+#[tauri::command]
+fn cmd_set_close_to_tray(state: tauri::State<'_, CloseToTray>, enabled: bool) {
+    state.0.store(enabled, Ordering::Relaxed);
 }
 
 #[tauri::command]
@@ -118,6 +129,8 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .setup(|app| {
             // Init SQLite email database
             let data_dir = app.path()
@@ -158,6 +171,7 @@ fn main() {
             let sync_state = SyncState::new();
             app.manage(sync_state.clone());
             app.manage(db_pool.clone());
+            app.manage(CloseToTray(AtomicBool::new(true)));
 
             // Legacy email DB — kept until Phase 4 email migration
             let email_db_path = data_dir.join("emails.db");
@@ -169,8 +183,53 @@ fn main() {
 
             let window = app.get_webview_window("main").unwrap();
             window.set_title("Cultera OS").unwrap();
-            // Im Fenster-Vollbild (maximiert) starten.
-            window.maximize().unwrap();
+            // Autostart übergibt --hidden: dann im Tray bleiben statt Fenster zeigen.
+            let start_hidden = std::env::args().any(|a| a == "--hidden");
+            if !start_hidden {
+                window.maximize().unwrap();
+                window.show().unwrap();
+            }
+
+            // ── Tray: Cultera OS lebt im Hintergrund weiter ─────────────────────
+            {
+                use tauri::menu::{Menu, MenuItem};
+                use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+                fn show_main(app: &tauri::AppHandle) {
+                    if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.unminimize();
+                        let _ = w.set_focus();
+                    }
+                }
+
+                let open_item = MenuItem::with_id(app, "open", "Cultera OS öffnen", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
+                let tray_menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+
+                TrayIconBuilder::with_id("main-tray")
+                    .icon(app.default_window_icon().cloned().expect("Fenster-Icon fehlt"))
+                    .tooltip("Cultera OS")
+                    .menu(&tray_menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "open" => show_main(app),
+                        "quit" => {
+                            commands::export::auto_export(app);
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up, ..
+                        } = event {
+                            show_main(tray.app_handle());
+                        }
+                    })
+                    .build(app)?;
+            }
 
             #[cfg(target_os = "macos")]
             {
@@ -188,6 +247,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             focus_ai_chat,
+            cmd_set_close_to_tray,
             commands::account::get_accounts,
             commands::account::upsert_account,
             commands::account::delete_account,
@@ -351,11 +411,16 @@ fn main() {
             commands::notes::delete_note_folder,
         ])
         .on_window_event(|window, event| {
-            // Sicherheitsnetz: beim Schließen automatisch ein frisches lokales
-            // Backup schreiben (rotierend), damit Datensicherheit nicht an der
-            // Disziplin des Nutzers hängt. Best-effort — blockiert das Schließen nicht.
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // Sicherheitsnetz-Backup wie bisher — best effort.
                 commands::export::auto_export(window.app_handle());
+                // Default: in den Tray statt beenden — die Präsenz-Schicht
+                // (Briefing, Geld-Events) lebt nur, solange der Prozess lebt.
+                let to_tray = window.app_handle().state::<CloseToTray>().0.load(Ordering::Relaxed);
+                if to_tray && window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .run(tauri::generate_context!())
