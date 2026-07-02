@@ -46,6 +46,7 @@ export function SyncStatusChip() {
       data-active="false"
       data-label="Sync-Fehler"
       onClick={retry}
+      disabled={busy}
       title={`${failedCount} Änderungen konnten nicht synchronisiert werden — klicken für erneuten Versuch`}
     >
       {busy ? <RefreshCw size={18} strokeWidth={1.75} /> : <CloudOff size={18} strokeWidth={1.75} />}

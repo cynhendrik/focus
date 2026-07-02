@@ -138,6 +138,14 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // Zweitstart: vorhandenes Fenster zeigen statt zweiten Prozess auf derselben DB.
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
@@ -219,28 +227,32 @@ fn main() {
                 let quit_item = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
                 let tray_menu = Menu::with_items(app, &[&open_item, &quit_item])?;
 
-                TrayIconBuilder::with_id("main-tray")
-                    .icon(app.default_window_icon().cloned().expect("Fenster-Icon fehlt"))
-                    .tooltip("Cultera OS")
-                    .menu(&tray_menu)
-                    .show_menu_on_left_click(false)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "open" => show_main(app),
-                        "quit" => {
-                            commands::export::auto_export(app);
-                            app.exit(0);
-                        }
-                        _ => {}
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up, ..
-                        } = event {
-                            show_main(tray.app_handle());
-                        }
-                    })
-                    .build(app)?;
+                if let Some(icon) = app.default_window_icon().cloned() {
+                    TrayIconBuilder::with_id("main-tray")
+                        .icon(icon)
+                        .tooltip("Cultera OS")
+                        .menu(&tray_menu)
+                        .show_menu_on_left_click(false)
+                        .on_menu_event(|app, event| match event.id.as_ref() {
+                            "open" => show_main(app),
+                            "quit" => {
+                                commands::export::auto_export(app);
+                                app.exit(0);
+                            }
+                            _ => {}
+                        })
+                        .on_tray_icon_event(|tray, event| {
+                            if let TrayIconEvent::Click {
+                                button: MouseButton::Left,
+                                button_state: MouseButtonState::Up, ..
+                            } = event {
+                                show_main(tray.app_handle());
+                            }
+                        })
+                        .build(app)?;
+                } else {
+                    eprintln!("[tray] Kein Fenster-Icon — Tray deaktiviert");
+                }
             }
 
             #[cfg(target_os = "macos")]

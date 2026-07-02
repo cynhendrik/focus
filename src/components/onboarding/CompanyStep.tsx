@@ -30,7 +30,7 @@ export function CompanyStep() {
       await saveProfile({ ...profile, ...form })
     } catch (err) {
       // Nicht mehr still: der Nutzer erfaehrt, dass seine Firmendaten NICHT gespeichert sind.
-      toastError('Unternehmensdaten konnten nicht gespeichert werden — bitte spaeter unter Einstellungen → Unternehmen pruefen.')
+      toastError('Unternehmensdaten konnten nicht gespeichert werden — bitte später unter Einstellungen → Unternehmen prüfen.')
       console.warn('CompanyStep saveProfile failed', err)
     }
     setSaving(false)

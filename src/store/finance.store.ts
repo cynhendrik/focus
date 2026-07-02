@@ -228,7 +228,7 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     if (inv && inv.status === 'paid' && prevStatus !== 'paid') {
       const { notify } = await import('@/services/notify.service')
       void notify('money', 'Zahlung eingegangen ✓',
-        `Rechnung ${inv.number ?? ''} ist vollständig bezahlt.`)
+        `Rechnung ${inv.number ?? inv.id.slice(0, 8)} ist vollständig bezahlt.`)
     }
   }),
 

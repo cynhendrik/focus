@@ -4,7 +4,7 @@ import { log } from '@/lib/logger'
 
 export type NotifyKind = 'briefing' | 'money' | 'team'
 
-type GateSettings = BriefingConfig & { moneyEventsEnabled: boolean; teamEventsEnabled: boolean }
+export type GateSettings = BriefingConfig & { moneyEventsEnabled: boolean; teamEventsEnabled: boolean }
 
 /**
  * Pure Gating-Regel: Kind-Schalter + Ruhezeiten. Das Briefing prüft die

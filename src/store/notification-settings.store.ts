@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface NotificationSettings {
+export interface NotificationSettings {
   briefingEnabled: boolean
   briefingTime: string
   moneyEventsEnabled: boolean
