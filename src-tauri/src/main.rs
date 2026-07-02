@@ -268,6 +268,7 @@ fn main() {
             core::auth::set_auth_token,
             core::sync::get_sync_status,
             core::sync::sync_now,
+            core::sync::get_failed_sync_entries,
             commands::lead::get_leads,
             commands::lead::upsert_lead,
             commands::lead::bulk_update_leads,

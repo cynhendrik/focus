@@ -545,6 +545,22 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             ON campaign_recipients(campaign_id);
         CREATE INDEX IF NOT EXISTS idx_campaign_recipients_email
             ON campaign_recipients(email);
+
+        CREATE TABLE IF NOT EXISTS sync_queue (
+            id          TEXT PRIMARY KEY,
+            table_name  TEXT NOT NULL,
+            record_id   TEXT NOT NULL,
+            operation   TEXT NOT NULL CHECK (operation IN ('INSERT','UPDATE','DELETE')),
+            payload     TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            attempts    INTEGER NOT NULL DEFAULT 0,
+            last_error  TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
     "#)?;
     Ok(())
 }

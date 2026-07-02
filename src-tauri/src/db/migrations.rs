@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 34;
+const CURRENT_VERSION: u32 = 35;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -804,6 +804,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
                 conn.execute_batch(
                     "ALTER TABLE calendar_events ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0;",
                 )?;
+            }
+            Ok(())
+        }
+        35 => {
+            // sync_queue: Fehler-Tracking — Server-Ablehnungen (4xx) wurden bisher
+            // still endlos wiederholt. attempts/last_error machen sie zähl- und anzeigbar.
+            if !column_exists(conn, "sync_queue", "attempts") {
+                conn.execute_batch("ALTER TABLE sync_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;")?;
+            }
+            if !column_exists(conn, "sync_queue", "last_error") {
+                conn.execute_batch("ALTER TABLE sync_queue ADD COLUMN last_error TEXT;")?;
             }
             Ok(())
         }
