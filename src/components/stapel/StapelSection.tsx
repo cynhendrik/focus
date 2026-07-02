@@ -4,8 +4,9 @@ import { usePreparedItemsStore } from '@/store/prepared-items.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
+import { useStapelSettingsStore } from '@/store/stapel-settings.store'
 import { approvePreparedItem } from '@/services/stapel-actions.service'
-import { recordDismissal } from '@/lib/stapel/dismiss-learning'
+import { recordDismissal, shouldOfferSuppression, RULE_LABEL } from '@/lib/stapel/dismiss-learning'
 import type { PreparedItem } from '@/types/prepared-item.types'
 
 const VISIBLE_CAP = 7
@@ -56,8 +57,15 @@ export function StapelSection() {
   }
 
   const handleDismiss = (item: PreparedItem) => {
-    recordDismissal(item.ruleId)
+    const count = recordDismissal(item.ruleId)
     void usePreparedItemsStore.getState().applyStatus(item.id, 'dismissed')
+    if (shouldOfferSuppression(count)) {
+      useToastStore.getState().show({
+        message: `Du hast ${RULE_LABEL[item.ruleId] ?? 'diese Karten'} dreimal verworfen — soll ich sie künftig nicht mehr vorbereiten?`,
+        variant: 'info', durationMs: 10_000,
+        action: { label: 'Nicht mehr vorbereiten', onClick: () => useStapelSettingsStore.getState().suppressRule(item.ruleId) },
+      })
+    }
   }
 
   if (!focusItem) {

@@ -6,6 +6,7 @@
 import { PreparedItemsGateway } from '@/data/prepared-items.gateway'
 import { generateCardDrafts, reconcileResolvedIds, type GenerateInput } from '@/lib/stapel/generate'
 import { usePreparedItemsStore } from '@/store/prepared-items.store'
+import { useStapelSettingsStore } from '@/store/stapel-settings.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
@@ -17,7 +18,7 @@ import { log } from '@/lib/logger'
 
 let running = false
 
-export async function runPreparation(workspaceId: string, suppressedRuleIds: string[] = []): Promise<void> {
+export async function runPreparation(workspaceId: string): Promise<void> {
   if (running) return
   running = true
   try {
@@ -30,7 +31,7 @@ export async function runPreparation(workspaceId: string, suppressedRuleIds: str
       leads: useLeadsStore.getState().leads.map(l => ({ id: l.id, name: l.name })),
       payments: useFinanceStore.getState().payments,
       fees: useCompanyStore.getState().profile.dunningFees ?? DEFAULT_DUNNING_FEES,
-      suppressedRuleIds,
+      suppressedRuleIds: useStapelSettingsStore.getState().suppressedRuleIds,
       todayIso: new Date().toLocaleDateString('sv'),
     }
 
