@@ -2,8 +2,7 @@
 // DashboardRoute "Mein Tag" — persönliche View (KPI-Kacheln + CORRA-Queue), auf assignee=ich gefiltert.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
 } from 'lucide-react'
@@ -19,26 +18,19 @@ import { useMailStore } from '@/store/mail.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useToastStore } from '@/store/toast.store'
-import { useHeuteQueue } from '@/hooks/useHeuteQueue'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
-import { snoozeInvoice, snoozedInvoiceIds } from '@/lib/heute/snooze'
+import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
 import { openExternal } from '@/lib/open-external'
 import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
-import { HeuteTile } from '@/components/heute/HeuteTile'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
-import { useLeadsStore } from '@/store/leads.store'
-import { useAccountsStore } from '@/store/accounts.store'
-import type { HeuteQueueItem } from '@/lib/ai/heute-queue'
+import { StapelSection } from '@/components/stapel/StapelSection'
 import '@/styles/heute.css'
 
-import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
 import type { Todo } from '@/types/todo.types'
-import type { UpsertTodoPayload } from '@/types/todo.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -190,76 +182,11 @@ function WorkspaceView() {
   const followUps = useCrmStore(s => s.allFollowUps)
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
-  const upsertTodo = useTodosStore(s => s.upsert)
-  const postponeTodo = useTodosStore(s => s.postpone)
-  const crmUpsert  = useCrmStore(s => s.upsert)
-  const showToast  = useToastStore(s => s.show)
   const emails     = useMailStore(s => s.emails)
-  const leads      = useLeadsStore(s => s.leads)
-  const accounts   = useAccountsStore(s => s.accounts)
 
   useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
-  const [snoozeTick, setSnoozeTick] = useState(0)   // erzwingt Neuberechnung nach „7 Tage ruhen"
-
-  // Heute-Cockpit queue
-  const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
-  const [queueIndex, setQueueIndex] = useState(0)
-  const [direction, setDirection]   = useState<1 | -1>(1)
-
-  const advance = useCallback(() => {
-    setDirection(1)
-    setQueueIndex(prev => prev + 1)
-  }, [])
-
-  const handleDone = useCallback(async () => {
-    const item = queueItems[queueIndex]
-    if (!item) return
-    try {
-      if (item.type === 'todo' || item.type === 'mail_reply' || item.type === 'followup') {
-        const todo = todos.find(t => t.id === item.id)
-        if (todo) {
-          const payload: UpsertTodoPayload = {
-            id: todo.id, title: todo.title, status: 'done', bucket: 'done',
-            priority: todo.priority, customerId: todo.customerId,
-            actionType: todo.actionType, sourceRef: todo.sourceRef,
-            notes: todo.notes, checklist: todo.checklist, tags: todo.tags,
-          }
-          await upsertTodo(payload)
-        }
-      } else if (item.type === 'lead_followup') {
-        // CRM-Follow-up als erledigt markieren (sonst kommt es wieder).
-        const fu = followUps.find(f => f.id === item.id)
-        if (fu) {
-          await crmUpsert({
-            id: fu.id, customerId: fu.customerId, title: fu.title,
-            dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
-          })
-        }
-      } else if (item.type === 'invoice_reminder') {
-        // Rechnung wird nicht „erledigt" (das entscheidet die Zahlung), aber nach
-        // dem Senden einer Erinnerung 7 Tage ruhen lassen — sonst steht sie morgen
-        // wieder auf #1 (Broken-Record). Mahn-Cooldown respektiert.
-        snoozeInvoice(item.id, 7)
-      }
-    } catch {
-      showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
-    }
-    advance()
-  }, [queueItems, queueIndex, todos, upsertTodo, followUps, crmUpsert, advance, showToast])
-
-  const handleSkip = useCallback(() => advance(), [advance])
-
-  // „Später erinnern" für eine Rechnung: 7 Tage ruhen lassen (persistiert), damit
-  // eine bewusst liegengelassene Rechnung kein Broken-Record wird.
-  const handleSnooze = useCallback(() => {
-    const item = queueItems[queueIndex]
-    if (item?.type === 'invoice_reminder') snoozeInvoice(item.id, 7)
-    advance()
-  }, [queueItems, queueIndex, advance])
-
-  const currentItem = queueItems[queueIndex]
 
   // Workspace leer?  (keine Kunden + keine Todos + keine Rechnungen)
   const isWorkspaceEmpty = customers.length === 0 && todos.length === 0 && invoices.length === 0
@@ -315,8 +242,7 @@ function WorkspaceView() {
     const snoozed = snoozedInvoiceIds()   // gesnoozte zählen nicht als „drängt heute"
     return invoices.filter(i => !snoozed.has(i.id) && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
       && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now()))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoices, snoozeTick])
+  }, [invoices])
   const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
   const koraLine = useMemo(() =>
     buildTodayLine({
@@ -329,68 +255,6 @@ function WorkspaceView() {
   [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
-
-  const invById  = useMemo(() => new Map(invoices.map(i => [i.id, i])), [invoices])
-  const fuById   = useMemo(() => new Map(followUps.map(f => [f.id, f])), [followUps])
-  const todoById = useMemo(() => new Map(todos.map(t => [t.id, t])), [todos])
-  const contactName = useCallback(
-    (id: string) => leads.find(l => l.id === id)?.name ?? accounts.find(a => a.id === id)?.name ?? 'Kontakt',
-    [leads, accounts],
-  )
-
-  const completeItem = useCallback(async (item: HeuteQueueItem) => {
-    try {
-      if (item.type === 'lead_followup') {
-        const fu = fuById.get(item.id)
-        if (fu) await crmUpsert({ id: fu.id, customerId: fu.customerId, title: fu.title, dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority })
-      } else {
-        const t = todoById.get(item.id)
-        if (t) await upsertTodo({ id: t.id, title: t.title, status: 'done', bucket: 'done', priority: t.priority, customerId: t.customerId, actionType: t.actionType, sourceRef: t.sourceRef, notes: t.notes, checklist: t.checklist, tags: t.tags })
-      }
-      reshuffle()   // Index erhalten — Hero springt nicht zurück auf #1
-    } catch {
-      showToast({ message: 'Konnte nicht als erledigt markieren.', variant: 'error' })
-    }
-  }, [fuById, todoById, crmUpsert, upsertTodo, reshuffle, showToast])
-
-  const snoozeItem = useCallback((item: HeuteQueueItem) => {
-    snoozeInvoice(item.id, 7); setSnoozeTick(t => t + 1); reshuffle()
-  }, [reshuffle])
-
-  // „Später" — To-do/Follow-up um einen Tag verschieben (kein Broken-Record).
-  const laterItem = useCallback(async (item: HeuteQueueItem) => {
-    try {
-      if (item.type === 'lead_followup') {
-        const fu = fuById.get(item.id)
-        if (fu) {
-          const d = new Date(); d.setDate(d.getDate() + 1)
-          await crmUpsert({ id: fu.id, customerId: fu.customerId, title: fu.title, dueDate: d.toLocaleDateString('sv'), status: 'offen', priority: fu.priority })
-        }
-      } else {
-        await postponeTodo(item.id)
-      }
-      reshuffle()
-    } catch {
-      showToast({ message: 'Konnte nicht verschieben.', variant: 'error' })
-    }
-  }, [fuById, crmUpsert, postponeTodo, reshuffle, showToast])
-
-  // Ein Listen-Item in den Fokus („Dein nächster Zug") holen — z.B. um eine
-  // Rechnung von dort aus zu senden.
-  const promoteToHero = useCallback((absIndex: number) => {
-    setDirection(1); setQueueIndex(absIndex)
-  }, [])
-
-  const listAll   = queueItems.slice(queueIndex + 1)
-  const listShown = listAll.slice(0, 6)
-  const hidden    = listAll.slice(6)
-  const hInv  = hidden.filter(x => x.type === 'invoice_reminder').length
-  const hFu   = hidden.filter(x => x.type === 'lead_followup').length
-  const hTodo = hidden.length - hInv - hFu
-  const hiddenBreak = [hTodo ? `${hTodo} To-dos` : '', hFu ? `${hFu} Follow-ups` : '', hInv ? `${hInv} Rechn.` : ''].filter(Boolean).join(', ')
-  const listFootTxt = hidden.length > 0
-    ? `Noch ${hidden.length} weitere${hiddenBreak ? ` — ${hiddenBreak}` : ''}. Nichts fällt still weg.`
-    : 'Alles Aktuelle im Blick — nichts fällt still weg.'
 
   return (
     <div className="hd">
@@ -429,81 +293,9 @@ function WorkspaceView() {
       {/* 2 gleich hohe Spalten */}
       <div className="hd-main">
 
-        {/* Links: Fokus-Karte + Interleave-Liste */}
+        {/* Links: Stapel — „Für dich vorbereitet" */}
         <div className="hd-col">
-          {!queueLoading && currentItem && (
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div key={`${currentItem.id}-${queueIndex}`} custom={direction}
-                initial={{ opacity: 0, x: direction * 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: direction * -24 }} transition={{ duration: 0.2, ease: 'easeOut' }}>
-                <HeuteTile item={currentItem} index={queueIndex} total={queueItems.length} onDone={handleDone} onSkip={handleSkip} onSnooze={handleSnooze} />
-              </motion.div>
-            </AnimatePresence>
-          )}
-          {!queueLoading && !currentItem && !isWorkspaceEmpty && (
-            <div className="card" style={{ flex: '1 1 auto', borderLeft: '3px solid var(--ok)', padding: '22px 24px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--ok)' }} />
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ok)' }}>HEUTE</span>
-              </div>
-              <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', margin: 0, color: 'var(--fg)' }}>
-                {queueItems.length === 0 ? 'Heute ist frei für Fokus.' : 'Alles Dringende erledigt.'}
-              </h2>
-              <p style={{ fontSize: 13, color: 'var(--fg-muted)', margin: '9px 0 0', lineHeight: 1.55 }}>
-                Kein dringender Zug. Ein guter Moment für Tiefarbeit — oder plane deinen Tag.
-              </p>
-              <button type="button" onClick={() => { setQueueIndex(0); reshuffle() }}
-                style={{ marginTop: 14, background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
-                Neu prüfen →
-              </button>
-            </div>
-          )}
-
-          {(currentItem || listShown.length > 0) && (
-            <div className="hd-fill">
-              <div className="hd-lhead"><span className="t">Als nächstes</span><span className="c">Geld &amp; Beziehung im Wechsel</span></div>
-              {listShown.map((item, i) => {
-                const absIndex = queueIndex + 1 + i
-                const isMoney = item.type === 'invoice_reminder'
-                const isFollow = item.type === 'lead_followup' || item.type === 'followup'
-                const kindLabel = isMoney ? 'Mahnung' : isFollow ? 'Follow-up' : item.type === 'mail_reply' ? 'Mail' : 'To-do'
-                const kindClass = isMoney ? 'mahnung' : isFollow ? 'followup' : 'todo'
-                let title = ''
-                let meta = item.reason
-                if (isMoney) {
-                  const inv = invById.get(item.id)
-                  const c = inv ? accounts.find(a => a.id === inv.accountId)?.name : undefined
-                  title = inv ? ([c, inv.number].filter(Boolean).join(' · ') || 'Rechnung') : 'Rechnung'
-                } else if (item.type === 'lead_followup') {
-                  const fu = fuById.get(item.id)
-                  title = contactName(fu?.customerId ?? '')
-                  meta = fu?.title ?? item.reason
-                } else {
-                  const t = todoById.get(item.id)
-                  title = t?.title ?? item.reason
-                }
-                return (
-                  <div key={item.id} className={`hd-row${isMoney ? ' mny' : ''}`}>
-                    {isMoney
-                      ? <span className="hd-mmark">€</span>
-                      : <button className="hd-check" title="Als erledigt markieren" onClick={() => completeItem(item)} />}
-                    <span className={`hd-kind ${kindClass}`}>{kindLabel}</span>
-                    <div className="hd-body" style={{ cursor: 'pointer' }} title="In den Fokus holen" onClick={() => promoteToHero(absIndex)}>
-                      <div className="hd-ti">{title}</div><div className="hd-mt">{meta}</div>
-                    </div>
-                    <div className="hd-quick">
-                      {isMoney
-                        ? <><button className="hd-qbtn" onClick={() => promoteToHero(absIndex)}>Erinnern</button><button className="hd-qbtn" onClick={() => snoozeItem(item)}>Ruhen</button></>
-                        : <button className="hd-qbtn" onClick={() => laterItem(item)}>Später</button>}
-                    </div>
-                  </div>
-                )
-              })}
-              <div className="hd-lfoot">
-                <span className="txt">{listFootTxt}</span>
-                <button type="button" onClick={() => setAppView('leverage_inbox')}>Alle anzeigen →</button>
-              </div>
-            </div>
-          )}
+          <StapelSection />
         </div>
 
         {/* Rechts: Tagesplan + Neueste Mails */}
