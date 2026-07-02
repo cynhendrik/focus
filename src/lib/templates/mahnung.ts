@@ -39,14 +39,14 @@ export function mahnungBody(i: MahnungInput): string {
   const gruss = `Mit freundlichen Grüßen`
 
   if (i.level === 0) {
-    return `${anrede}\n\nsicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${i.invoiceNumber} (${i.customerName}) ist seit ${i.daysOverdue} Tagen fällig. ${betrag}\n\n${frist} Sollte sich die Zahlung mit diesem Schreiben überschnitten haben, betrachten Sie es bitte als gegenstandslos.\n\n${gruss}`
+    return `${anrede}\n\nsicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${i.invoiceNumber} (${i.customerName}) ist seit ${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tagen'} fällig. ${betrag}\n\n${frist} Sollte sich die Zahlung mit diesem Schreiben überschnitten haben, betrachten Sie es bitte als gegenstandslos.\n\n${gruss}`
   }
   if (i.level === 1) {
-    return `${anrede}\n\ntrotz unserer Zahlungserinnerung ist die Rechnung ${i.invoiceNumber} weiterhin offen (${i.daysOverdue} Tage überfällig). ${betrag}\n\n${frist}\n\n${gruss}`
+    return `${anrede}\n\ntrotz unserer Zahlungserinnerung ist die Rechnung ${i.invoiceNumber} weiterhin offen (${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig). ${betrag}\n\n${frist}\n\n${gruss}`
   }
-  return `${anrede}\n\ndie Rechnung ${i.invoiceNumber} ist trotz Erinnerung und 1. Mahnung weiterhin offen (${i.daysOverdue} Tage überfällig). ${betrag}\n\n${frist} Sollte bis dahin kein Zahlungseingang erfolgen, behalten wir uns weitere Schritte vor.\n\n${gruss}`
+  return `${anrede}\n\ndie Rechnung ${i.invoiceNumber} ist trotz Erinnerung und 1. Mahnung weiterhin offen (${i.daysOverdue} ${i.daysOverdue === 1 ? 'Tag' : 'Tage'} überfällig). ${betrag}\n\n${frist} Sollte bis dahin kein Zahlungseingang erfolgen, behalten wir uns weitere Schritte vor.\n\n${gruss}`
 }
 
-export function begleitmailBody(i: { customerName: string; invoiceNumber: string; total: number; dueDate: string }): string {
+export function begleitmailBody(i: { invoiceNumber: string; total: number; dueDate: string }): string {
   return `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung ${i.invoiceNumber} über ${fmtEur(i.total)}. Zahlbar bis zum ${fmtDate(i.dueDate)}.\n\nBei Fragen melden Sie sich gern.\n\nMit freundlichen Grüßen`
 }

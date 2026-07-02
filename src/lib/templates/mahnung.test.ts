@@ -31,9 +31,16 @@ describe('mahnungBody', () => {
 
 describe('begleitmailBody', () => {
   it('nennt Rechnung, Betrag und Zahlungsziel', () => {
-    const b = begleitmailBody({ customerName: 'Meyer GmbH', invoiceNumber: 'R-100', total: 1190, dueDate: '2026-07-16' })
+    const b = begleitmailBody({ invoiceNumber: 'R-100', total: 1190, dueDate: '2026-07-16' })
     expect(b).toContain('R-100')
     expect(b).toContain('1.190,00 €')
     expect(b).toContain('16.07.2026')
+  })
+})
+
+describe('Tag/Tagen Singular/Plural', () => {
+  it('Singular: 1 Tag statt 1 Tagen', () => {
+    expect(mahnungBody({ ...BASE, daysOverdue: 1 })).toContain('seit 1 Tag')
+    expect(mahnungBody({ ...BASE, daysOverdue: 1 })).not.toContain('1 Tagen')
   })
 })
