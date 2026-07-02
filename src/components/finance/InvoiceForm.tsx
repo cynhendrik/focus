@@ -7,6 +7,7 @@ import { useCompanyStore } from '@/store/company.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useAuftraege } from '@/store/auftraege.store'
+import { humanizeError } from '@/lib/humanize-error'
 import type { CompanyProfile } from '@/types/company.types'
 import type { InvoiceWithItems, UpsertInvoicePayload } from '@/types/finance.types'
 import {
@@ -161,7 +162,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
       if (initial) await updateInvoice(initial.invoice.id, payload)
       else         await createInvoice(payload)
       onSaved()
-    } catch (e) { setError(String(e)) }
+    } catch (e) { setError(humanizeError(e, 'Rechnung konnte nicht gespeichert werden.')) }
     finally { setIsSaving(false) }
   }
 

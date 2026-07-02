@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Building2, ArrowRight } from 'lucide-react'
 import { useCompanyStore } from '@/store/company.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
+import { toastError } from '@/store/toast.store'
 import type { CompanyProfile } from '@/types/company.types'
 
 /**
@@ -27,8 +28,10 @@ export function CompanyStep() {
     setSaving(true)
     try {
       await saveProfile({ ...profile, ...form })
-    } catch {
-      /* kein Backend (z. B. Browser-Vorschau) — trotzdem weiter */
+    } catch (err) {
+      // Nicht mehr still: der Nutzer erfaehrt, dass seine Firmendaten NICHT gespeichert sind.
+      toastError('Unternehmensdaten konnten nicht gespeichert werden — bitte spaeter unter Einstellungen → Unternehmen pruefen.')
+      console.warn('CompanyStep saveProfile failed', err)
     }
     setSaving(false)
     markCompanyDone()
