@@ -86,7 +86,9 @@ const s = StyleSheet.create({
   grandValue:  { width: 80, textAlign: 'right', fontFamily: PDF_FONT, fontWeight: 'bold' },
   divider:     { height: 0.5, backgroundColor: '#d0d0d0', width: 220, alignSelf: 'flex-end', marginVertical: 4 },
   kleinBox:    { marginTop: 16, borderTopWidth: 0.5, borderColor: '#e4e4e4', paddingTop: 12, paddingLeft: 10, paddingRight: 10, paddingBottom: 10, backgroundColor: '#f9f9f9' },
-  kleinText:   { fontSize: 8.5, color: '#666', fontStyle: 'italic', lineHeight: 1.6 },
+  // Kein italic: InvoiceSans ist nur normal/bold registriert — react-pdf wirft sonst
+  // "Could not resolve font" und der komplette Download scheitert (Repro: §19-Rechnung).
+  kleinText:   { fontSize: 8.5, color: '#666', lineHeight: 1.6 },
   paySection:  { marginTop: 16, borderTopWidth: 0.5, borderColor: '#e4e4e4', paddingTop: 12 },
   payText:     { fontSize: 9, color: '#333', lineHeight: 1.7, marginBottom: 5 },
   payBank:     { fontSize: 9, color: '#555' },
