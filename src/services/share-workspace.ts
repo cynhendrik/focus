@@ -1,6 +1,7 @@
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { runMigration, bumpSequences } from '@/data/migration-runner'
+import { rescopeWorkspace } from '@/data/workspace-local'
 
 /**
  * Orchestriert das Teilen eines lokalen Workspaces:
@@ -25,6 +26,11 @@ export async function shareWorkspace(
   // Step 2+3: Migration + Sequences — bei Fehler wird hier geworfen, kein Flip
   await runMigration({ localWsId, cloudWsId, uid }, onProgress)
   await bumpSequences({ localWsId, cloudWsId, uid })
+
+  // Lokale Zeilen auf die Cloud-ID umziehen: verhindert, dass die Selbstheilung
+  // (loadWorkspaces-Orphan-Scan) den gerade geteilten Workspace als lokalen
+  // Geist wiederbelebt — die Reste gehören jetzt sichtbar dem Cloud-Workspace.
+  await rescopeWorkspace(localWsId, cloudWsId, uid)
 
   // Step 4: Erst NACH erfolgreicher Migration flippen
   await useWorkspaceStore.getState().loadWorkspaces()
