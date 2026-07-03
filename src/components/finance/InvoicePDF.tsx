@@ -10,6 +10,7 @@ import { computeTaxRateGroups } from '@/lib/invoice-tax'
 import { buildCiiXml } from '@/lib/erechnung/cii-invoice'
 import { embedFacturX } from '@/lib/erechnung/facturx-embed'
 import { checkErechnungReadiness } from '@/lib/erechnung/erechnung-readiness'
+import { log } from '@/lib/logger'
 import fontRegular from '@/assets/fonts/LiberationSans-Regular.ttf'
 import fontBold from '@/assets/fonts/LiberationSans-Bold.ttf'
 import iccUrl from '@/assets/icc/sRGB-v2-micro.icc?url'
@@ -351,8 +352,10 @@ export async function downloadInvoicePDF(data: InvoiceWithItems, profile: Compan
         durationMs: 9000,
       })
     }
-  } catch {
-    toast.setError('Fehler beim Speichern')
+  } catch (err) {
+    log.error('downloadInvoicePDF failed', { invoiceId: data.invoice.id, err })
+    const detail = err instanceof Error ? err.message : String(err)
+    toast.setError(detail ? `Fehler beim Speichern: ${detail.slice(0, 160)}` : 'Fehler beim Speichern')
   }
 }
 
@@ -381,7 +384,9 @@ export async function batchExportInvoicesPDF(
     const savedTo = await invoke<string>('save_zip', { files, suggestedName: suggestedZipName })
     toast.setDone(savedTo)
     onProgress?.(100)
-  } catch {
-    toast.setError('Fehler beim Exportieren')
+  } catch (err) {
+    log.error('batchExportInvoicesPDF failed', { count: invoices.length, err })
+    const detail = err instanceof Error ? err.message : String(err)
+    toast.setError(detail ? `Fehler beim Exportieren: ${detail.slice(0, 160)}` : 'Fehler beim Exportieren')
   }
 }
