@@ -15,15 +15,11 @@
 /* KPIs */
 .hd-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 
-/* 2 gleich hohe Spalten */
-.hd-main { display: grid; grid-template-columns: 1.62fr 1fr; gap: 16px; align-items: stretch; }
-.hd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: 100%; }
-@media (max-width: 940px) { .hd-main { grid-template-columns: 1fr; } .hd-kpis { grid-template-columns: 1fr; } }
-
-/* Leerer Stapel: Banner volle Breite, darunter Tagesplan + Mails nebeneinander */
-.hd-main--stacked { grid-template-columns: 1fr; }
-.hd-col--duo { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
-@media (max-width: 940px) { .hd-col--duo { grid-template-columns: 1fr; } }
+/* Hauptspalte einspaltig; rechte Rail bei mind. 2 Stapel-Karten */
+.hd-main { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.hd-main--rail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+.hd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 940px) { .hd-main--rail { grid-template-columns: 1fr; } .hd-kpis { grid-template-columns: 1fr; } }
 
 /* Karte, die die Resthöhe füllt (Liste / Mails) — Footer am Grund */
 .hd-fill { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden;

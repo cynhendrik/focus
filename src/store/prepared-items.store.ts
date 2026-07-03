@@ -9,11 +9,13 @@ interface PreparedItemsState {
   weekApproved: PreparedItem[]
   loading: boolean
   loadError: boolean
+  focusId: string | null
   load: (workspaceId: string) => Promise<void>
   loadWeekApproved: (workspaceId: string) => Promise<void>
   applyStatus: (id: string, status: PreparedItemStatus, opts?: { snoozeUntil?: string | null; approvedAt?: string | null }) => Promise<void>
   applyPayload: (id: string, payload: PreparedItemPayload) => Promise<void>
   applyAssignee: (id: string, assignee: string | null) => Promise<void>
+  setFocusId: (id: string | null) => void
 }
 
 function startOfWeekIso(): string {
@@ -29,6 +31,8 @@ export const usePreparedItemsStore = create<PreparedItemsState>()((set, get) => 
   weekApproved: [],
   loading: false,
   loadError: false,
+  focusId: null,
+  setFocusId: (id) => set({ focusId: id }),
 
   load: async (workspaceId) => {
     set({ loading: true })

@@ -47,12 +47,19 @@ describe('StapelSection', () => {
     expect(screen.getByText(/1.190/)).toBeInTheDocument()
   })
 
-  it('hoechster Score ist die Fokus-Karte; Deckel bei 7 sichtbaren + Rest-Hinweis', () => {
+  it('hoechster Score ist die Fokus-Karte; genau eine Karte sichtbar, kein Rest-Hinweis', () => {
     const items = Array.from({ length: 10 }, (_, i) => mk(`k${i}`, 100 - i))
     usePreparedItemsStore.setState({ items, loading: false, loadError: false } as never)
     render(<StapelSection />)
     expect(screen.getByRole('heading', { name: 'Karte k0' })).toBeInTheDocument()
-    expect(screen.getByText('+ 3 weitere')).toBeInTheDocument()
+    expect(screen.queryByText(/\+ \d+ weitere/)).not.toBeInTheDocument()
+  })
+
+  it('focusId im Store gesetzt → die entsprechende Karte wird als Fokus-Karte angezeigt', () => {
+    const items = [mk('k1', 100), mk('k2', 90)]
+    usePreparedItemsStore.setState({ items, loading: false, loadError: false, focusId: 'k2' } as never)
+    render(<StapelSection />)
+    expect(screen.getByRole('heading', { name: 'Karte k2' })).toBeInTheDocument()
   })
 
   it('gesnoozte Karten mit Frist in der Zukunft erscheinen nicht', () => {

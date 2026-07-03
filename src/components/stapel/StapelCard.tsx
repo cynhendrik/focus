@@ -15,7 +15,7 @@ interface StapelCardProps {
   busy?: boolean
 }
 
-const TYPE_LABEL: Record<PreparedItem['type'], string> = {
+export const TYPE_LABEL: Record<PreparedItem['type'], string> = {
   mahnung: 'MAHNWESEN', followup: 'FOLLOW-UP', rechnungsentwurf: 'RECHNUNG', aufgabe: 'AUFGABE',
 }
 

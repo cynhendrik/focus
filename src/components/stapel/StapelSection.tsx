@@ -8,10 +8,8 @@ import { useStapelSettingsStore } from '@/store/stapel-settings.store'
 import { useMembersStore } from '@/store/members.store'
 import { approvePreparedItem } from '@/services/stapel-actions.service'
 import { recordDismissal, shouldOfferSuppression, RULE_LABEL } from '@/lib/stapel/dismiss-learning'
-import { visiblePreparedItems } from '@/lib/stapel/visible'
+import { visiblePreparedItems, sortVisible } from '@/lib/stapel/visible'
 import type { PreparedItem } from '@/types/prepared-item.types'
-
-const VISIBLE_CAP = 7
 
 function eur0(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -25,6 +23,7 @@ export function StapelSection() {
   const weekApproved = usePreparedItemsStore(s => s.weekApproved)
   const loading = usePreparedItemsStore(s => s.loading)
   const loadError = usePreparedItemsStore(s => s.loadError)
+  const focusId = usePreparedItemsStore(s => s.focusId)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -38,15 +37,14 @@ export function StapelSection() {
     ? members.filter(m => m.id !== myId).map(m => ({ id: m.id, displayName: m.displayName }))
     : undefined
 
-  const visible = useMemo(() => {
+  const { visible, focusItem } = useMemo(() => {
     const now = new Date().toISOString()
-    return visiblePreparedItems(items, myId, now)
-      .sort((a, b) => b.score - a.score || a.createdAt.localeCompare(b.createdAt))
-  }, [items, myId])
-
-  const focusItem = visible[0]
-  const rest = visible.slice(1, VISIBLE_CAP)
-  const hidden = Math.max(0, visible.length - VISIBLE_CAP)
+    const vis = sortVisible(visiblePreparedItems(items, myId, now))
+    const focus = (focusId != null && vis.some(i => i.id === focusId))
+      ? vis.find(i => i.id === focusId)!
+      : vis[0]
+    return { visible: vis, focusItem: focus }
+  }, [items, myId, focusId])
 
   const handleApprove = async (item: PreparedItem) => {
     setBusyId(item.id)
@@ -57,6 +55,7 @@ export function StapelSection() {
         return
       }
       await usePreparedItemsStore.getState().applyStatus(item.id, 'approved', { approvedAt: new Date().toISOString() })
+      usePreparedItemsStore.getState().setFocusId(null)
       useToastStore.getState().show({ message: `Freigegeben ✓ — ${item.payload.title}`, variant: 'success' })
       void usePreparedItemsStore.getState().loadWeekApproved(workspaceId)
     } finally {
@@ -67,11 +66,13 @@ export function StapelSection() {
   const handleSnooze = (item: PreparedItem, days: number) => {
     const until = new Date(Date.now() + days * 86_400_000).toISOString()
     void usePreparedItemsStore.getState().applyStatus(item.id, 'snoozed', { snoozeUntil: until })
+    usePreparedItemsStore.getState().setFocusId(null)
   }
 
   const handleDismiss = (item: PreparedItem) => {
     const count = recordDismissal(item.ruleId)
     void usePreparedItemsStore.getState().applyStatus(item.id, 'dismissed')
+    usePreparedItemsStore.getState().setFocusId(null)
     if (shouldOfferSuppression(count)) {
       useToastStore.getState().show({
         message: `Du hast ${RULE_LABEL[item.ruleId] ?? 'diese Karten'} dreimal verworfen — soll ich sie künftig nicht mehr vorbereiten?`,
@@ -130,22 +131,6 @@ export function StapelSection() {
         onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(focusItem.id, a)}
         delegatable={delegatable}
       />
-
-      {rest.map(item => (
-        <StapelCard
-          key={item.id} item={item} focused={false} busy={busyId === item.id}
-          onApprove={() => void handleApprove(item)}
-          onSaveDraft={(p) => void usePreparedItemsStore.getState().applyPayload(item.id, p)}
-          onSnooze={(d) => handleSnooze(item, d)}
-          onDismiss={() => handleDismiss(item)}
-          onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(item.id, a)}
-          delegatable={delegatable}
-        />
-      ))}
-
-      {hidden > 0 && (
-        <div style={{ fontSize: 12, color: 'var(--fg-dim)', padding: '4px 2px' }}>+ {hidden} weitere</div>
-      )}
     </div>
   )
 }

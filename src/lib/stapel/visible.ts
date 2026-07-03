@@ -6,3 +6,8 @@ export function visiblePreparedItems(items: PreparedItem[], myId: string | undef
     (i.status === 'pending' || (i.status === 'snoozed' && i.snoozeUntil != null && i.snoozeUntil <= nowIso))
     && (!i.assignee || i.assignee === myId))
 }
+
+/** Sortierung: hoechster Score zuerst, bei Gleichstand aelteste Karte zuerst. */
+export function sortVisible(items: PreparedItem[]): PreparedItem[] {
+  return [...items].sort((a, b) => b.score - a.score || a.createdAt.localeCompare(b.createdAt))
+}

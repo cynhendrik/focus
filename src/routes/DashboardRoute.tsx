@@ -27,6 +27,7 @@ import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { StapelSection } from '@/components/stapel/StapelSection'
+import { StapelQueue } from '@/components/stapel/StapelQueue'
 import { usePreparedItemsStore } from '@/store/prepared-items.store'
 import { visiblePreparedItems } from '@/lib/stapel/visible'
 import '@/styles/heute.css'
@@ -186,10 +187,9 @@ function WorkspaceView() {
   const setAppView = useUiStore(s => s.setAppView)
   const emails     = useMailStore(s => s.emails)
   const stapelItems = usePreparedItemsStore(s => s.items)
-  // Leerer Stapel: Feier-Banner volle Breite, Tagesplan+Mails ruecken nebeneinander —
-  // sonst laesst die kurze Leer-Karte ein Loch in der linken Spalte.
-  const stapelHasCards = useMemo(
-    () => visiblePreparedItems(stapelItems, myUserId, new Date().toISOString()).length > 0,
+  // Rail-Klasse: 2-spaltig sobald mindestens 2 Karten sichtbar (1 Fokus + mind. 1 in Queue)
+  const queueCount = useMemo(
+    () => visiblePreparedItems(stapelItems, myUserId, new Date().toISOString()).length,
     [stapelItems, myUserId],
   )
 
@@ -299,16 +299,12 @@ function WorkspaceView() {
         />
       </div>
 
-      {/* 2 gleich hohe Spalten — bei leerem Stapel gestapelt (Banner + Duo) */}
-      <div className={stapelHasCards ? 'hd-main' : 'hd-main hd-main--stacked'}>
+      {/* Hauptspalte + optionale rechte Rail (ab 2 sichtbaren Stapel-Karten) */}
+      <div className={queueCount >= 2 ? 'hd-main hd-main--rail' : 'hd-main'}>
 
-        {/* Links: Stapel — „Für dich vorbereitet" */}
+        {/* Hauptspalte: Stapel → Tagesplan → Neueste Mails */}
         <div className="hd-col">
           <StapelSection />
-        </div>
-
-        {/* Rechts: Tagesplan + Neueste Mails */}
-        <div className={stapelHasCards ? 'hd-col' : 'hd-col hd-col--duo'}>
           <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} />
           <div className="hd-fill">
             <div className="hd-lhead"><span className="t">Neueste Mails</span><span className="c">{unreadCount} ungelesen</span></div>
@@ -336,6 +332,9 @@ function WorkspaceView() {
             </div>
           </div>
         </div>
+
+        {/* Rechte Rail — StapelQueue rendert selbst null wenn keine wartenden Karten */}
+        <StapelQueue />
       </div>
     </div>
   )
