@@ -295,17 +295,13 @@ pub fn invoice_number_exists(
 }
 
 pub fn set_invoice_start_number(conn: &Connection, workspace_id: &str, start: i64) -> rusqlite::Result<()> {
-    // Cannot go below already-issued numbers to prevent duplicates.
-    let current_next: i64 = conn.query_row(
-        "SELECT next_number FROM invoice_sequences WHERE workspace_id = ?1",
-        [workspace_id],
-        |r| r.get(0),
-    ).unwrap_or(0);
-    let effective_next = std::cmp::max(start - 1, current_next);
+    // Absenken ist erlaubt: Die Vergabe (next_invoice_number/peek) überspringt
+    // bereits vergebene Nummern, Duplikate sind damit ausgeschlossen. So lassen
+    // sich nach dem Löschen von Test-Rechnungen freigewordene Nummern wiederverwenden.
     conn.execute(
         "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) VALUES (?1, ?2, ?3)
          ON CONFLICT(workspace_id) DO UPDATE SET start_number = ?3, next_number = ?2",
-        rusqlite::params![workspace_id, effective_next, start],
+        rusqlite::params![workspace_id, start - 1, start],
     )?;
     Ok(())
 }
@@ -624,6 +620,32 @@ mod tests {
             [&now],
         ).unwrap();
         conn
+    }
+
+    #[test]
+    fn start_number_can_be_lowered_to_reuse_freed_numbers() {
+        let conn = setup();
+        // Zähler steht hoch (als hätte es Rechnungen bis 9 gegeben) …
+        set_invoice_start_number(&conn, "ws-1", 9).unwrap();
+        // … die Rechnungen wurden gelöscht → Absenken auf 7 muss greifen.
+        set_invoice_start_number(&conn, "ws-1", 7).unwrap();
+        let peeked = peek_invoice_number(&conn, "ws-1");
+        assert!(peeked.ends_with("00007"), "erwartet …00007, bekam {peeked}");
+    }
+
+    #[test]
+    fn lowered_start_still_skips_existing_numbers() {
+        let conn = setup();
+        let now = chrono::Utc::now().to_rfc3339();
+        // 00007 existiert noch → Absenken auf 7 darf KEIN Duplikat vorschlagen.
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, number, date, due_date, status, tax_mode, subtotal, tax_amount, total, bank_info, created_at, updated_at)
+             VALUES ('inv-7','ws-1','u-1','acc-1','2026-00007','2026-07-01','2026-07-15','open','standard',100,19,119,'{}',?1,?1)",
+            [&now],
+        ).unwrap();
+        set_invoice_start_number(&conn, "ws-1", 7).unwrap();
+        let peeked = peek_invoice_number(&conn, "ws-1");
+        assert!(peeked.ends_with("00008"), "erwartet Überspringen auf …00008, bekam {peeked}");
     }
 
     #[test]
