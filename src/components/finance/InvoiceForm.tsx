@@ -137,7 +137,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
     setItems(prev => prev.map((item, i) => {
       if (i !== idx) return item
       const next = { ...item, ...patch }
-      next.taxRate = kleinunternehmer ? 0 : (next.taxRate || 19)
+      next.taxRate = kleinunternehmer ? 0 : (next.taxRate ?? 19)
       next.total   = calcItemTotal(next, kleinunternehmer)
       return next
     }))
