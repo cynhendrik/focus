@@ -18,4 +18,17 @@ describe('vatCategory', () => {
     expect(r.code).toBe('E'); expect(r.rate).toBe(0)
     expect(r.exemptionReason).toMatch(/19/)
   })
+  it('standard + rate 0 → Z (zero-rated), nicht S', () => {
+    const r = vatCategory('standard', 0)
+    expect(r.code).toBe('Z')
+    expect(r.rate).toBe(0)
+  })
+  it('standard + rate 19 → S (unverändert)', () => {
+    expect(vatCategory('standard', 19)).toEqual({ code: 'S', rate: 19 })
+  })
+  it('reverse_charge bleibt AE unabhängig vom Satz', () => {
+    const r = vatCategory('reverse_charge', 19)
+    expect(r.code).toBe('AE')
+    expect(r.rate).toBe(0)
+  })
 })

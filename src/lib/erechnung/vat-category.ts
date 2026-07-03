@@ -1,8 +1,8 @@
 import type { TaxMode } from '@/types/finance.types'
 
 export interface VatCategory {
-  /** EN16931 BT-151/BT-95: S=Standard, AE=Reverse Charge, E=steuerbefreit. */
-  code: 'S' | 'AE' | 'E'
+  /** EN16931 BT-151/BT-95: S=Standard, Z=Zero-rated, AE=Reverse Charge, E=steuerbefreit. */
+  code: 'S' | 'Z' | 'AE' | 'E'
   rate: number
   exemptionReason?: string
 }
@@ -17,6 +17,9 @@ export function vatCategory(taxMode: TaxMode, itemRate: number): VatCategory {
     case 'standard':
     case 'reduced':
     default:
-      return { code: 'S', rate: itemRate }
+      // EN16931: Kategorie S erfordert rate > 0; ein 0%-Posten ist Z (Zero-rated).
+      return itemRate === 0
+        ? { code: 'Z', rate: 0 }
+        : { code: 'S', rate: itemRate }
   }
 }

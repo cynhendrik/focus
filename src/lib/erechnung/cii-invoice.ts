@@ -46,12 +46,13 @@ export function buildCiiXml(data: InvoiceWithItems, profile: CompanyProfile, acc
       </ram:ApplicableTradeTax>`)
   } else {
     for (const g of computeTaxRateGroups(items)) {
+      const groupCat = vatCategory(invoice.taxMode, g.rate)
       tradeTaxBlocks.push(`
       <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>${n2(g.tax)}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
         <ram:BasisAmount>${n2(g.net)}</ram:BasisAmount>
-        <ram:CategoryCode>S</ram:CategoryCode>
+        <ram:CategoryCode>${groupCat.code}</ram:CategoryCode>
         <ram:RateApplicablePercent>${n2(g.rate)}</ram:RateApplicablePercent>
       </ram:ApplicableTradeTax>`)
     }
