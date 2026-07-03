@@ -1,12 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DashboardRoute "Mein Tag" — persönliche View (KPI-Kacheln + CORRA-Queue), auf assignee=ich gefiltert.
+// DashboardRoute "Mein Tag" — Tagesanker-Design: eine Spalte, randlose Karten.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
 } from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
 
 import { filterMine } from '@/lib/todos/ownership'
 import { useCustomersStore } from '@/store/customers.store'
@@ -27,9 +26,6 @@ import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { StapelSection } from '@/components/stapel/StapelSection'
-import { StapelQueue } from '@/components/stapel/StapelQueue'
-import { usePreparedItemsStore } from '@/store/prepared-items.store'
-import { visiblePreparedItems } from '@/lib/stapel/visible'
 import '@/styles/heute.css'
 
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -100,7 +96,7 @@ function eur0(n: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI Card (gemeinsam fuer alle Views)
+// KPI Card (bleibt in der Datei; nicht mehr vom Dashboard genutzt)
 
 function KpiCard({
   label, value, hint, accentValue, action, children,
@@ -108,9 +104,9 @@ function KpiCard({
   label: string
   value: React.ReactNode
   hint?: React.ReactNode
-  accentValue?: boolean   // groesse Zahl in blau statt fg
+  accentValue?: boolean
   action?: { label?: string; onClick: () => void }
-  children?: React.ReactNode  // Header-Toolbar (z.B. Woche/Monat-Toggle)
+  children?: React.ReactNode
 }) {
   return (
     <div style={{
@@ -174,71 +170,51 @@ function KpiCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WorkspaceView — KPIs + Tagesplan + Inbox
+// WorkspaceView — Tagesanker + Puls-Leiste + Stapel + Tagesplan + Mails
 
 function WorkspaceView() {
   const customers = useCustomersStore(s => s.customers)
   const invoices  = useFinanceStore(s => s.invoices)
   const todos     = useTodosStore(s => s.allTodos)
-  const myUserId = useAuthStore(s => s.user?.id)
+  const user      = useAuthStore(s => s.user)
+  const myUserId  = user?.id
   const myTodos  = useMemo(() => filterMine(todos, myUserId), [todos, myUserId])
   const followUps = useCrmStore(s => s.allFollowUps)
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const emails     = useMailStore(s => s.emails)
-  const stapelItems = usePreparedItemsStore(s => s.items)
-  // Rail-Klasse: 2-spaltig sobald mindestens 2 Karten sichtbar (1 Fokus + mind. 1 in Queue)
-  const queueCount = useMemo(
-    () => visiblePreparedItems(stapelItems, myUserId, new Date().toISOString()).length,
-    [stapelItems, myUserId],
-  )
 
   useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
 
-  // Workspace leer?  (keine Kunden + keine Todos + keine Rechnungen)
+  // Vorname aus user_metadata
+  const firstName = (
+    ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
+    || user?.email?.split('@')[0]
+    || 'User'
+  ).replace(/^./, c => c.toUpperCase())
+
+  const now = new Date()
+  const dateText = `${WEEKDAYS[now.getDay()]} · ${now.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}`
+
+  // Workspace leer?
   const isWorkspaceEmpty = customers.length === 0 && todos.length === 0 && invoices.length === 0
 
   // Umsatz
-  const { paidNow, paidPrev, label, hintPrevLabel } = useMemo(() => {
+  const paidNow = useMemo(() => {
     const now = new Date()
-    let rangeStart: Date
-    let prevStart: Date
-    let prevEnd:   Date
-    let label:     string
-    let hintPrevLabel: string
-
-    if (revRange === 'week') {
-      rangeStart = startOfWeek(now)
-      const prevWeek = new Date(rangeStart); prevWeek.setDate(prevWeek.getDate() - 7)
-      prevStart = prevWeek
-      prevEnd   = new Date(rangeStart)
-      label = 'diese Woche'
-      hintPrevLabel = 'vs Vorwoche'
-    } else {
-      rangeStart = startOfMonth(now)
-      const prevMonth = new Date(rangeStart); prevMonth.setMonth(prevMonth.getMonth() - 1)
-      prevStart = prevMonth
-      prevEnd   = new Date(rangeStart)
-      label = 'diesen Monat'
-      hintPrevLabel = 'vs Vormonat'
-    }
-
-    let paidNow = 0
-    let paidPrev = 0
+    const rangeStart = revRange === 'week' ? startOfWeek(now) : startOfMonth(now)
+    let paid = 0
     for (const inv of invoices) {
       if (inv.status !== 'paid') continue
       const ts = new Date(inv.date)
-      if (ts >= rangeStart && ts <= now) paidNow += inv.total
-      else if (ts >= prevStart && ts < prevEnd) paidPrev += inv.total
+      if (ts >= rangeStart && ts <= now) paid += inv.total
     }
-    return { paidNow, paidPrev, label, hintPrevLabel }
+    return paid
   }, [invoices, revRange])
 
-  // Aktive Kunden — alle nicht-privaten, +Anzahl der diese Woche neu erstellten
-
-  // Heute faellig
+  // Heute fällig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
     const tasks = myTodos.filter(t => isTodoForToday(t, todayIso)).length
@@ -246,13 +222,15 @@ function WorkspaceView() {
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
 
-  // ── Fokus+ abgeleitete Werte ────────────────────────────────────────────────
+  // Geld unterwegs
   const overdueInvoices = useMemo(() => {
-    const snoozed = snoozedInvoiceIds()   // gesnoozte zählen nicht als „drängt heute"
+    const snoozed = snoozedInvoiceIds()
     return invoices.filter(i => !snoozed.has(i.id) && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
       && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now()))
   }, [invoices])
   const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
+
+  // KORA-Zeile
   const koraLine = useMemo(() =>
     buildTodayLine({
       overdueCount: overdueInvoices.length,
@@ -262,79 +240,93 @@ function WorkspaceView() {
       eventsToday: events.length,
     }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
   [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
+
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
+
+  // Tagesplan-Zähler für den Eyebrow-Header
+  const tagesplanCount = useMemo(() => buildTagesplan(events, myTodos).length, [events, myTodos])
 
   return (
     <div className="hd">
       {isWorkspaceEmpty && <DashboardEmptyState />}
 
-      {/* KORA-Zeile — Gruß + Datum liefert bereits der PageHeader oben */}
-      <p className="hd-kora" style={{ margin: 0 }}>{koraLine}</p>
+      {/* ── Tagesanker + Puls-Leiste ─────────────────────────────────────── */}
+      <div className="hd-anchor enter d1">
+        <div className="hd-anchor-date">{dateText}</div>
+        <h2>{greeting()}, <em>{firstName}.</em></h2>
+        <p className="hd-anchor-line">{koraLine}</p>
 
-      {/* KPIs */}
-      <div className="hd-kpis">
-        <KpiCard
-          label="Umsatz"
-          value={<span>{fmtKEur(paidNow)}<span style={{ fontSize: 15, color: 'var(--fg-dim)', marginLeft: 2, fontWeight: 600 }}>k€</span></span>}
-          hint={<><span style={{ color: paidNow >= paidPrev ? 'var(--ok)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>{paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{hintPrevLabel}</span><span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span></>}
-        >
-          <WeekMonthToggle range={revRange} onChange={setRevRange} />
-        </KpiCard>
-
-        <KpiCard
-          label="Geld unterwegs"
-          value={<span>{eur0(geldUnterwegs)}</span>}
-          accentValue={geldUnterwegs > 0}
-          hint={<><span style={{ color: overdueInvoices.length > 0 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>{overdueInvoices.length}</span><span>überfällige {overdueInvoices.length === 1 ? 'Rechnung' : 'Rechnungen'}</span></>}
-          action={{ label: 'Zu Rechnungen', onClick: () => setAppView('invoices') }}
-        />
-
-        <KpiCard
-          label="Offen heute"
-          value={String(dueToday.total)}
-          accentValue={dueToday.total > 0}
-          hint={<><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span style={{ color: 'var(--fg-2)', fontWeight: 600 }}>{dueToday.fus} FU</span><span style={{ color: 'var(--fg-dim)' }}>·</span><span>{events.length} Termine</span></>}
-          action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
-        />
-      </div>
-
-      {/* Hauptspalte + optionale rechte Rail (ab 2 sichtbaren Stapel-Karten) */}
-      <div className={queueCount >= 2 ? 'hd-main hd-main--rail' : 'hd-main'}>
-
-        {/* Hauptspalte: Stapel → Tagesplan → Neueste Mails */}
-        <div className="hd-col">
-          <StapelSection />
-          <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} />
-          <div className="hd-fill">
-            <div className="hd-lhead"><span className="t">Neueste Mails</span><span className="c">{unreadCount} ungelesen</span></div>
-            {recentMails.length === 0 && (
-              <div style={{ padding: 20, fontSize: 13, color: 'var(--fg-dim)' }}>Keine Mails.</div>
-            )}
-            {recentMails.map(m => {
-              const unread = !m.isRead
-              return (
-                <div key={m.id} className={`hd-mrow${unread ? ' unread' : ''}`} onClick={() => setAppView('mail')}>
-                  <span className="hd-av">{initials(m.fromName || m.fromAddr)}</span>
-                  <div className="hd-mbody">
-                    <div className="hd-from">{unread && <span className="dot" />}<span className="nm">{m.fromName || m.fromAddr}</span></div>
-                    <div className="hd-subj">{m.subject || '(Kein Betreff)'}</div>
-                  </div>
-                  {unread
-                    ? <button className="hd-reply" onClick={e => { e.stopPropagation(); setAppView('mail') }}>Antworten</button>
-                    : <span className="hd-mtime">{relTime(m.sentAt)}</span>}
-                </div>
-              )
-            })}
-            <div className="hd-lfoot">
-              <span className="txt">Postfach</span>
-              <button type="button" onClick={() => setAppView('mail')}>Öffnen →</button>
+        <div className="hd-pulse">
+          {/* Segment 1: Umsatz mit Woche/Monat-Toggle */}
+          <div className="hd-pulse-stat">
+            <div className="hd-pulse-k">
+              UMSATZ · {revRange === 'week' ? 'WOCHE' : 'MONAT'}
+              <WeekMonthToggle range={revRange} onChange={setRevRange} />
+            </div>
+            <div className="hd-pulse-v">
+              {fmtKEur(paidNow)}<small>k€</small>
             </div>
           </div>
-        </div>
 
-        {/* Rechte Rail — StapelQueue rendert selbst null wenn keine wartenden Karten */}
-        <StapelQueue />
+          {/* Segment 2: Geld unterwegs */}
+          <div className={`hd-pulse-stat${geldUnterwegs > 0 ? ' hot' : ''}`}>
+            <span className="hd-pulse-k">GELD UNTERWEGS</span>
+            <span className="hd-pulse-v">{eur0(geldUnterwegs)}</span>
+          </div>
+
+          {/* Segment 3: Offen heute */}
+          <div className="hd-pulse-stat">
+            <span className="hd-pulse-k">OFFEN HEUTE</span>
+            <span className="hd-pulse-v">{dueToday.total}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Stapel (inkl. eigenem Eyebrow in StapelSection) ──────────────── */}
+      <div className="enter d2">
+        <StapelSection />
+      </div>
+
+      {/* ── Tagesplan ────────────────────────────────────────────────────── */}
+      <div className="enter d3">
+        <div className="hd-eyebrow">
+          <span className="t">MEIN TAGESPLAN</span>
+          <span className="c">{tagesplanCount} {tagesplanCount === 1 ? 'Eintrag' : 'Einträge'}</span>
+        </div>
+        <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} hideHeader />
+      </div>
+
+      {/* ── Neueste Mails ─────────────────────────────────────────────────── */}
+      <div className="enter d4">
+        <div className="hd-eyebrow">
+          <span className="t">NEUESTE MAILS</span>
+          <span className="c">{unreadCount} ungelesen</span>
+        </div>
+        <div className="hd-fill">
+          {recentMails.length === 0 && (
+            <div style={{ padding: 20, fontSize: 13, color: 'var(--fg-dim)' }}>Keine Mails.</div>
+          )}
+          {recentMails.map(m => {
+            const unread = !m.isRead
+            return (
+              <div key={m.id} className={`hd-mrow${unread ? ' unread' : ''}`} onClick={() => setAppView('mail')}>
+                <span className="hd-av">{initials(m.fromName || m.fromAddr)}</span>
+                <div className="hd-mbody">
+                  <div className="hd-from">{unread && <span className="dot" />}<span className="nm">{m.fromName || m.fromAddr}</span></div>
+                  <div className="hd-subj">{m.subject || '(Kein Betreff)'}</div>
+                </div>
+                {unread
+                  ? <button className="hd-reply" onClick={e => { e.stopPropagation(); setAppView('mail') }}>Antworten</button>
+                  : <span className="hd-mtime">{relTime(m.sentAt)}</span>}
+              </div>
+            )
+          })}
+          <div className="hd-lfoot">
+            <span className="txt">Postfach</span>
+            <button type="button" onClick={() => setAppView('mail')}>Öffnen →</button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -410,12 +402,10 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
     })
   }
 
-  // Heute fällige Tasks (ohne Uhrzeit → ohne Zeit-Label)
+  // Heute fällige Tasks
   const todayIso = todayLocalIso()
   for (const t of todos) {
     if (t.status === 'done') continue
-    // Aufgabe zählt für heute, wenn fällig ODER für heute eingeplant (Composer
-    // setzt scheduledAt, nicht dueDate) — sonst verschwinden getippte Tasks.
     if (t.dueDate !== todayIso && !(t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso)) continue
     items.push({
       id: `t-${t.id}`,
@@ -426,7 +416,6 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
     })
   }
 
-  // Sortieren: Termine mit Zeit aufsteigend, Tasks ohne Zeit ans Ende
   return items.sort((a, b) => {
     if (!a.time && b.time) return 1
     if (a.time && !b.time) return -1
@@ -451,32 +440,34 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
 }
 
 function TagesplanCard({
-  events, todos, customers: _customers, onOpen,
-}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[]; onOpen?: () => void }) {
+  events, todos, customers: _customers, onOpen, hideHeader,
+}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[]; onOpen?: () => void; hideHeader?: boolean }) {
   const items = useMemo(() => buildTagesplan(events, todos), [events, todos])
 
   return (
     <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
       background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 22px',
     }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        marginBottom: 16,
-      }}>
-        <h2 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-          letterSpacing: '-0.01em',
+      {!hideHeader && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginBottom: 16,
         }}>
-          Mein Tagesplan
-        </h2>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          color: 'var(--fg-dim)', letterSpacing: '0.04em',
-        }}>
-          {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'} · heute
-        </span>
-      </div>
+          <h2 style={{
+            margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
+            letterSpacing: '-0.01em',
+          }}>
+            Mein Tagesplan
+          </h2>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10.5,
+            color: 'var(--fg-dim)', letterSpacing: '0.04em',
+          }}>
+            {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'} · heute
+          </span>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div style={{
@@ -568,14 +559,11 @@ function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void })
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main route
+// Main route — kein PageHeader; Anker liegt in WorkspaceView
 
 export function DashboardRoute() {
-  const user        = useAuthStore(s => s.user)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
-  // Data loads — sind in App.tsx schon in den beiden Init-Wellen,
-  // hier nur Finance ergaenzen, weil das nicht workspace-weit geladen wird.
   const loadFinance = useFinanceStore(s => s.loadAll)
   const loadToday   = useCalendarStore(s => s.loadToday)
   useEffect(() => {
@@ -584,24 +572,8 @@ export function DashboardRoute() {
     loadToday(workspaceId)
   }, [workspaceId, loadFinance, loadToday])
 
-  const firstName = (
-    ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
-    || user?.email?.split('@')[0]
-    || 'User'
-  ).replace(/^./, c => c.toUpperCase())
-  const now = new Date()
-  const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
-
   return (
     <div className="main-inner">
-      <PageHeader
-        title={<>{greeting()}, <span style={{ color: 'var(--accent-text)' }}>{firstName}</span></>}
-        right={
-          <div className="greeting-sub">
-            <span>{dateLine}</span>
-          </div>
-        }
-      />
       <WorkspaceView />
     </div>
   )

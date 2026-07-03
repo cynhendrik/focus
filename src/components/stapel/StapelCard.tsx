@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
 import { generateCorraDraft } from '@/lib/ai/corra'
-import type { PreparedItem, PreparedItemPayload } from '@/types/prepared-item.types'
+import type { PreparedItem, PreparedItemPayload, PreparedItemType } from '@/types/prepared-item.types'
+
+const QUEUE_CAP = 7
 
 interface StapelCardProps {
   item: PreparedItem
@@ -13,14 +15,16 @@ interface StapelCardProps {
   onDelegate?: (assignee: string | null) => void
   delegatable?: { id: string; displayName: string }[]
   busy?: boolean
+  queue?: { id: string; type: PreparedItemType; title: string }[]
+  onPickQueue?: (id: string) => void
 }
 
 export const TYPE_LABEL: Record<PreparedItem['type'], string> = {
   mahnung: 'MAHNWESEN', followup: 'FOLLOW-UP', rechnungsentwurf: 'RECHNUNG', aufgabe: 'AUFGABE',
 }
 
-/** Karte des Stapels: Was habe ich vorbereitet · Warum · das Ergebnis — plus 4 Aktionen. */
-export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, onDismiss, onDelegate, delegatable, busy }: StapelCardProps) {
+/** Karte des Stapels: Was habe ich vorbereitet · Warum · das Ergebnis — plus 4 Aktionen + Danach-Band. */
+export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, onDismiss, onDelegate, delegatable, busy, queue, onPickQueue }: StapelCardProps) {
   const [editing, setEditing] = useState(false)
   const [snoozeOpen, setSnoozeOpen] = useState(false)
   const [delegateOpen, setDelegateOpen] = useState(false)
@@ -67,46 +71,69 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
       onClick={onClick}
       disabled={opts?.disabled}
       style={{
-        padding: focused ? '9px 18px' : '5px 12px', borderRadius: 9, fontSize: 13, fontWeight: 600,
-        cursor: opts?.disabled ? 'default' : 'pointer', opacity: opts?.disabled ? 0.5 : 1,
-        border: opts?.primary ? 'none' : '1px solid var(--border)',
-        background: opts?.primary ? 'var(--accent)' : 'transparent',
-        color: opts?.primary ? '#fff' : 'var(--fg-muted)',
+        padding: focused ? '10px 20px' : '5px 12px',
+        borderRadius: 11, fontSize: 13, fontWeight: 650,
+        cursor: opts?.disabled ? 'default' : 'pointer',
+        opacity: opts?.disabled ? 0.5 : 1,
+        border: 'none',
+        background: opts?.primary ? 'var(--accent-gradient)' : 'var(--surface-2)',
+        color: opts?.primary ? '#fff' : 'var(--fg-2)',
+        boxShadow: opts?.primary ? '0 2px 8px rgb(242 117 79 / 0.38)' : 'none',
       }}
     >
       {label}
     </button>
   )
 
+  const showQueue = focused && queue && queue.length > 0
+
   return (
     <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderLeft: '3px solid var(--accent)', borderRadius: 'var(--radius)',
-      padding: focused ? '24px 28px' : '12px 16px',
+      background: 'var(--surface)',
+      borderRadius: 'var(--radius)',
+      padding: focused ? '28px 30px 24px' : '12px 16px',
       display: 'flex', flexDirection: 'column', gap: focused ? 14 : 8,
+      boxShadow: focused
+        ? 'var(--card-shadow), 0 18px 44px -20px rgb(35 35 60 / 0.32)'
+        : 'var(--card-shadow)',
+      position: 'relative', overflow: 'hidden',
     }}>
+      {/* Gradient-Topline nur auf der Fokus-Karte */}
+      {focused && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+          background: 'var(--accent-gradient)',
+        }} />
+      )}
+
+      {/* Kind-Pille */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+        <span style={{
+          display: 'inline-block',
+          fontFamily: 'var(--font-mono)', fontSize: 9.5, fontWeight: 700, letterSpacing: '0.13em',
+          color: 'var(--accent-text)', background: 'var(--accent-soft)',
+          padding: '4px 10px', borderRadius: 99,
+        }}>
           {TYPE_LABEL[item.type]}
         </span>
       </div>
 
       <div>
-        <h3 style={{ fontSize: focused ? 22 : 14, fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+        <h3 style={{ fontSize: focused ? 24 : 14, fontWeight: 800, margin: 0, letterSpacing: '-0.03em', lineHeight: 1.2 }}>
           {item.payload.title}
         </h3>
-        <p style={{ fontSize: 12, color: 'var(--fg-dim)', margin: '6px 0 0 0', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13.5, color: 'var(--fg-muted)', margin: '6px 0 0 0', lineHeight: 1.6 }}>
           {item.payload.why}
         </p>
       </div>
 
       {focused && hasDraft && !editing && (
         <details>
-          <summary style={{ fontSize: 12, color: 'var(--fg-muted)', cursor: 'pointer' }}>Entwurf ansehen</summary>
+          <summary style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-muted)', cursor: 'pointer' }}>Entwurf ansehen</summary>
           <pre style={{
-            whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.6, color: 'var(--fg-muted)',
-            background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8,
-            padding: 12, margin: '8px 0 0 0', fontFamily: 'inherit',
+            whiteSpace: 'pre-wrap', fontSize: 12.5, lineHeight: 1.65, color: 'var(--fg-2)',
+            background: 'var(--surface-2)', borderRadius: 11,
+            padding: '14px 16px', margin: '10px 0 0 0', fontFamily: 'inherit',
           }}>
             {item.payload.draftSubject ? `Betreff: ${item.payload.draftSubject}\n\n` : ''}{item.payload.draftBody}
           </pre>
@@ -141,7 +168,7 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
       )}
 
       {!editing && (
-        <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 8, position: 'relative', flexWrap: 'wrap' }}>
           {btn('Freigeben', onApprove, { primary: true, disabled: busy })}
           {hasDraft && btn('Anpassen', () => setEditing(true), { disabled: busy })}
           {btn('Später', () => { setSnoozeOpen(o => !o); setDelegateOpen(false) }, { disabled: busy })}
@@ -171,6 +198,57 @@ export function StapelCard({ item, focused, onApprove, onSaveDraft, onSnooze, on
                 </button>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Danach-Band — volles Kartenbreite als Fußzeile */}
+      {showQueue && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          margin: '22px -30px -24px',
+          padding: '13px 30px',
+          background: 'var(--surface-2)',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+        } as React.CSSProperties}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+            letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: 'var(--fg-dim)', flexShrink: 0, marginRight: 4,
+          }}>
+            DANACH
+          </span>
+          {queue!.slice(0, QUEUE_CAP).map(q => (
+            <button
+              key={q.id}
+              type="button"
+              onClick={() => onPickQueue?.(q.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 9,
+                height: 34, padding: '0 15px 0 6px',
+                background: 'var(--surface)', border: 'none', borderRadius: 99,
+                boxShadow: '0 1px 2px rgb(35 35 60 / 0.08)',
+                cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+              }}
+            >
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', height: 24,
+                fontFamily: 'var(--font-mono)', fontSize: 8, fontWeight: 700, letterSpacing: '0.10em',
+                color: 'var(--accent-text)', background: 'var(--accent-soft)',
+                padding: '0 9px', borderRadius: 99,
+              }}>
+                {TYPE_LABEL[q.type]}
+              </span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--fg-2)', whiteSpace: 'nowrap' }}>
+                {q.title}
+              </span>
+            </button>
+          ))}
+          {queue!.length > QUEUE_CAP && (
+            <span style={{ fontSize: 11.5, color: 'var(--fg-dim)', flexShrink: 0 }}>
+              + {queue!.length - QUEUE_CAP} weitere
+            </span>
           )}
         </div>
       )}

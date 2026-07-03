@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 import { useStapelSettingsStore } from '@/store/stapel-settings.store'
 import { useMembersStore } from '@/store/members.store'
+import { useCalendarStore } from '@/store/calendar.store'
 import { approvePreparedItem } from '@/services/stapel-actions.service'
 import { recordDismissal, shouldOfferSuppression, RULE_LABEL } from '@/lib/stapel/dismiss-learning'
 import { visiblePreparedItems, sortVisible } from '@/lib/stapel/visible'
@@ -15,7 +16,7 @@ function eur0(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
-/** Der Stapel — Herz von „Mein Tag": eine Fokus-Karte, kompakte Liste, Deckel bei 7. */
+/** Der Stapel — Herz von „Mein Tag": eine Fokus-Karte, Danach-Band, Abend-Karte. */
 export function StapelSection() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const myId = useAuthStore(s => s.user?.id)
@@ -25,6 +26,17 @@ export function StapelSection() {
   const loadError = usePreparedItemsStore(s => s.loadError)
   const focusId = usePreparedItemsStore(s => s.focusId)
   const [busyId, setBusyId] = useState<string | null>(null)
+
+  // Morgen-zuerst: erster Termin von morgen
+  const allEvents = useCalendarStore(s => s.events)
+  const tomorrowEvent = useMemo(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrowIso = tomorrow.toLocaleDateString('sv')
+    return allEvents
+      .filter(e => e.startAt.slice(0, 10) === tomorrowIso && !e.allDay)
+      .sort((a, b) => a.startAt.localeCompare(b.startAt))[0] ?? null
+  }, [allEvents])
 
   useEffect(() => {
     if (!workspaceId) return
@@ -37,13 +49,14 @@ export function StapelSection() {
     ? members.filter(m => m.id !== myId).map(m => ({ id: m.id, displayName: m.displayName }))
     : undefined
 
-  const { visible, focusItem } = useMemo(() => {
+  const { visible, focusItem, queued } = useMemo(() => {
     const now = new Date().toISOString()
     const vis = sortVisible(visiblePreparedItems(items, myId, now))
     const focus = (focusId != null && vis.some(i => i.id === focusId))
       ? vis.find(i => i.id === focusId)!
       : vis[0]
-    return { visible: vis, focusItem: focus }
+    const q = focus ? vis.filter(i => i.id !== focus.id) : []
+    return { visible: vis, focusItem: focus, queued: q }
   }, [items, myId, focusId])
 
   const handleApprove = async (item: PreparedItem) => {
@@ -84,7 +97,7 @@ export function StapelSection() {
 
   if (loading && visible.length === 0) {
     return (
-      <div style={{ padding: '28px 32px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+      <div style={{ padding: '28px 32px', background: 'var(--surface)', borderRadius: 'var(--radius)', boxShadow: 'var(--card-shadow)' }}>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-muted)' }}>Stapel wird geladen …</p>
       </div>
     )
@@ -92,45 +105,97 @@ export function StapelSection() {
 
   if (loadError && visible.length === 0) {
     return (
-      <div style={{ padding: '28px 32px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+      <div style={{ padding: '28px 32px', background: 'var(--surface)', borderRadius: 'var(--radius)', boxShadow: 'var(--card-shadow)' }}>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-muted)' }}>Stapel konnte nicht geladen werden — Verbindung prüfen und App neu öffnen.</p>
       </div>
     )
   }
 
+  // ── Abend-/Leer-Karte ──────────────────────────────────────────────────────
   if (!focusItem) {
     const moneyMoved = weekApproved.reduce((sum, i) => sum + (i.payload.amount ?? 0), 0)
+    const morgenText = tomorrowEvent
+      ? `${new Date(tomorrowEvent.startAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} — ${tomorrowEvent.title}`
+      : null
+
     return (
-      <div style={{ padding: '28px 32px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Alles erledigt. Heute ist frei für Fokusarbeit.</h2>
-        {weekApproved.length > 0 && (
-          <p style={{ margin: '10px 0 0 0', fontSize: 13, color: 'var(--fg-muted)' }}>
-            Diese Woche freigegeben: {weekApproved.length} {weekApproved.length === 1 ? 'Karte' : 'Karten'}
-            {moneyMoved > 0 ? ` — ${eur0(moneyMoved)} in Bewegung gebracht.` : '.'}
-          </p>
-        )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="hd-eyebrow">
+          <span className="t acc">FÜR DICH VORBEREITET</span>
+        </div>
+        <div style={{
+          background: 'var(--surface)',
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--card-shadow), 0 18px 44px -20px rgb(35 35 60 / 0.32)',
+          padding: '36px 38px',
+          display: 'flex', gap: 26, alignItems: 'flex-start',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* Grüne 3px-Topline */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+            background: 'linear-gradient(135deg,#3fa374,#7cc9a4)',
+          }} />
+          {/* ✓-Ring */}
+          <div style={{
+            width: 54, height: 54, borderRadius: '50%',
+            background: 'rgba(62,163,116,.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--ok)', fontSize: 22, fontWeight: 700, flexShrink: 0,
+          }}>
+            ✓
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontSize: 23, fontWeight: 800, letterSpacing: '-0.03em', margin: '4px 0 6px' }}>
+              Alles Vorbereitete ist erledigt.
+            </h3>
+            <p style={{ fontSize: 13.5, color: 'var(--fg-muted)', margin: 0, lineHeight: 1.65 }}>
+              Nichts liegt mehr auf dem Schreibtisch. Der Rest hat bis morgen Zeit.
+            </p>
+            {weekApproved.length > 0 && (
+              <p style={{ fontSize: 12.5, color: 'var(--fg-muted)', margin: '16px 0 0 0', lineHeight: 1.5 }}>
+                {moneyMoved > 0 ? `${eur0(moneyMoved)} — diese Woche in Bewegung gebracht · ` : ''}
+                {weekApproved.length} {weekApproved.length === 1 ? 'Karte' : 'Karten'} freigegeben
+              </p>
+            )}
+            {morgenText && (
+              <div style={{
+                marginTop: 20, paddingTop: 18,
+                borderTop: '1px solid var(--border)',
+                fontSize: 13, color: 'var(--fg-muted)',
+              }}>
+                Morgen zuerst: <b style={{ color: 'var(--fg-2)' }}>{morgenText}</b>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
 
+  // ── Fokus-Karte + Danach-Band ───────────────────────────────────────────────
+  const queueChips = queued.map(i => ({ id: i.id, type: i.type, title: i.payload.title }))
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
-          FÜR DICH VORBEREITET
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{visible.length} {visible.length === 1 ? 'Karte' : 'Karten'}</span>
+      <div className="hd-eyebrow">
+        <span className="t acc">FÜR DICH VORBEREITET</span>
+        <span className="c">{visible.length} {visible.length === 1 ? 'Karte' : 'Karten'}</span>
       </div>
 
-      <StapelCard
-        item={focusItem} focused busy={busyId === focusItem.id}
-        onApprove={() => void handleApprove(focusItem)}
-        onSaveDraft={(p) => void usePreparedItemsStore.getState().applyPayload(focusItem.id, p)}
-        onSnooze={(d) => handleSnooze(focusItem, d)}
-        onDismiss={() => handleDismiss(focusItem)}
-        onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(focusItem.id, a)}
-        delegatable={delegatable}
-      />
+      <div className="stage-fade" key={focusItem.id}>
+        <StapelCard
+          item={focusItem} focused busy={busyId === focusItem.id}
+          queue={queueChips}
+          onPickQueue={id => usePreparedItemsStore.getState().setFocusId(id)}
+          onApprove={() => void handleApprove(focusItem)}
+          onSaveDraft={(p) => void usePreparedItemsStore.getState().applyPayload(focusItem.id, p)}
+          onSnooze={(d) => handleSnooze(focusItem, d)}
+          onDismiss={() => handleDismiss(focusItem)}
+          onDelegate={(a) => void usePreparedItemsStore.getState().applyAssignee(focusItem.id, a)}
+          delegatable={delegatable}
+        />
+      </div>
     </div>
   )
 }

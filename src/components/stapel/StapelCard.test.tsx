@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { StapelCard } from './StapelCard'
+import type { PreparedItemType } from '@/types/prepared-item.types'
 
 vi.mock('@/lib/ai/corra', () => ({ generateCorraDraft: vi.fn().mockResolvedValue('KI-TEXT') }))
 
@@ -77,5 +78,24 @@ describe('StapelCard', () => {
   it('ohne delegatable gibt es keinen Uebergeben-Knopf', () => {
     render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Übergeben' })).toBeNull()
+  })
+
+  it('queue-Prop rendert Danach-Chips; onPickQueue feuert mit der Chip-ID', () => {
+    const onPickQueue = vi.fn()
+    const queue: { id: string; type: PreparedItemType; title: string }[] = [
+      { id: 'q1', type: 'followup', title: 'Bäckerei Lindner nachfassen' },
+      { id: 'q2', type: 'rechnungsentwurf', title: '890 € an Steuerbüro Voss' },
+    ]
+    render(<StapelCard item={item} focused queue={queue} onPickQueue={onPickQueue}
+      onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
+    const chip = screen.getByRole('button', { name: /Bäckerei Lindner nachfassen/ })
+    expect(chip).toBeInTheDocument()
+    fireEvent.click(chip)
+    expect(onPickQueue).toHaveBeenCalledWith('q1')
+  })
+
+  it('ohne queue kein Danach-Band', () => {
+    render(<StapelCard item={item} focused onApprove={vi.fn()} onSaveDraft={vi.fn()} onSnooze={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.queryByText('DANACH')).toBeNull()
   })
 })

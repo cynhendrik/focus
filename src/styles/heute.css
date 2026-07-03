@@ -1,60 +1,36 @@
-/* Fokus+ Dashboard („Heute") — Layout + Interleave-Liste + Neueste Mails.
+/* Fokus+ Dashboard „Mein Tag" — Tagesanker-Design.
    Scoped unter .hd, damit keine App-weiten Klassen kollidieren. Tokens aus globals.css. */
 
-.hd { display: flex; flex-direction: column; gap: 20px; }
+/* ── Haupt-Container: eine Spalte, 780px zentriert ── */
+.hd { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
 
-/* Kopf */
-.hd-greet { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
-.hd-greet h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-.hd-greet h1 em { font-style: normal; color: var(--accent); }
-.hd-kora { font-size: 13px; color: var(--fg-muted); margin: 8px 0 0; line-height: 1.55; max-width: 640px; }
-.hd-kora b { color: var(--fg-2); font-weight: 600; }
-.hd-kora .eur { color: var(--accent-text); font-weight: 600; }
-.hd-date { font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; }
+/* ── Tagesanker ── */
+.hd-anchor { display: flex; flex-direction: column; }
+.hd-anchor-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); }
+.hd-anchor h2 { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; margin: 8px 0 10px; line-height: 1.05; text-wrap: balance; }
+.hd-anchor h2 em { font-style: normal; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hd-anchor-line { font-size: 15px; color: var(--fg-muted); margin: 0; line-height: 1.6; }
 
-/* KPIs */
-.hd-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+/* ── Puls-Leiste ── */
+.hd-pulse { display: flex; margin-top: 24px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--card-shadow); }
+.hd-pulse-stat { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 18px 24px; position: relative; }
+.hd-pulse-stat + .hd-pulse-stat::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 1px; background: var(--border); }
+.hd-pulse-k { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hd-pulse-v { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; color: var(--fg); }
+.hd-pulse-v small { font-size: 13px; font-weight: 650; color: var(--fg-dim); margin-left: 4px; }
+.hd-pulse-stat.hot .hd-pulse-v { color: var(--accent-text); }
+.hd-pulse-stat.hot .hd-pulse-k::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 
-/* Hauptspalte einspaltig; rechte Rail bei mind. 2 Stapel-Karten */
-.hd-main { display: grid; grid-template-columns: 1fr; gap: 16px; }
-.hd-main--rail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
-.hd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-@media (max-width: 940px) { .hd-main--rail { grid-template-columns: 1fr; } .hd-kpis { grid-template-columns: 1fr; } }
+/* ── Eyebrow-Header (außerhalb der Karten) ── */
+.hd-eyebrow { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4px 12px; }
+.hd-eyebrow .t { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; color: var(--fg-dim); }
+.hd-eyebrow .t.acc { color: var(--accent-text); }
+.hd-eyebrow .c { font-family: var(--font-mono); font-size: 10.5px; color: var(--fg-dim); }
 
-/* Karte, die die Resthöhe füllt (Liste / Mails) — Footer am Grund */
-.hd-fill { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+/* ── Karte, die die Resthöhe füllt (Mails) ── */
+.hd-fill { display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border-radius: var(--radius);
   box-shadow: var(--card-shadow); }
-.hd-lhead { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px 11px; }
-.hd-lhead .t { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-dim); }
-.hd-lhead .c { font-family: var(--font-mono); font-size: 11px; color: var(--fg-dim); }
-
-/* Interleave-Zeile */
-.hd-row { display: grid; grid-template-columns: 20px 74px 1fr auto; align-items: center; gap: 12px;
-  padding: 8px 20px; min-height: 56px; border-top: 1px solid var(--border); transition: background 100ms; }
-.hd-row:hover { background: var(--surface-2); }
-.hd-row.mny { box-shadow: inset 3px 0 0 var(--accent); }
-.hd-check { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--border-strong);
-  background: transparent; cursor: pointer; padding: 0; transition: border-color 120ms, background 120ms; }
-.hd-check:hover { border-color: var(--ok); background: rgb(120 200 150 / 0.15); }
-.hd-mmark { width: 19px; height: 19px; display: flex; align-items: center; justify-content: center; color: var(--accent-text); font-size: 12px; font-weight: 800; }
-.hd-kind { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 0; text-align: center; border-radius: var(--radius-xs); }
-.hd-kind.mahnung { color: var(--accent-text); background: var(--accent-soft); }
-.hd-kind.followup { color: var(--info); background: rgb(120 180 210 / 0.12); }
-.hd-kind.todo { color: var(--fg-muted); background: var(--surface-2); border: 1px solid var(--border); }
-.hd-body { min-width: 0; }
-.hd-ti { font-size: 13px; font-weight: 600; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hd-mt { font-size: 11px; color: var(--fg-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hd-mt .eur { color: var(--accent-text); font-weight: 600; font-variant-numeric: tabular-nums; }
-.hd-quick { display: flex; gap: 6px; }
-.hd-qbtn { font-size: 11px; font-weight: 600; border-radius: 99px; padding: 5px 12px; border: 1px solid var(--border);
-  background: var(--surface-2); color: var(--fg-2); cursor: pointer; white-space: nowrap; transition: border-color 120ms; }
-.hd-qbtn:hover { border-color: var(--border-strong); }
-.hd-lfoot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-top: 1px solid var(--border); background: var(--surface-2); }
-.hd-lfoot .txt { font-size: 12px; color: var(--fg-muted); }
-.hd-lfoot .txt b { color: var(--fg-2); }
-.hd-lfoot button { font-size: 12px; font-weight: 700; color: var(--fg-2); background: none; border: none; cursor: pointer; }
-.hd-lfoot button:hover { color: var(--accent-text); }
 
 /* Neueste Mails */
 .hd-mrow { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 11px;
@@ -71,9 +47,30 @@
 .hd-mtime { font-family: var(--font-mono); font-size: 10px; color: var(--fg-dim); white-space: nowrap; }
 .hd-reply { font-size: 11px; font-weight: 600; border-radius: 99px; padding: 5px 11px; border: 1px solid var(--border); background: var(--surface-2); color: var(--fg-2); cursor: pointer; }
 .hd-reply:hover { border-color: var(--border-strong); }
+.hd-lfoot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-top: 1px solid var(--border); background: var(--surface-2); }
+.hd-lfoot .txt { font-size: 12px; color: var(--fg-muted); }
+.hd-lfoot .txt b { color: var(--fg-2); }
+.hd-lfoot button { font-size: 12px; font-weight: 700; color: var(--fg-2); background: none; border: none; cursor: pointer; }
+.hd-lfoot button:hover { color: var(--accent-text); }
 
-/* Ruhiger Tag — sanfter Hinweis */
-.hd-nudge { display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-top: 1px solid var(--border); }
-.hd-nudge .txt { font-size: 12px; color: var(--fg-muted); }
-.hd-nudge button { font-size: 12px; font-weight: 700; color: var(--fg-2); background: none; border: none; cursor: pointer; }
-.hd-nudge button:hover { color: var(--accent-text); }
+/* ── Animationen: gated by prefers-reduced-motion ── */
+@media (prefers-reduced-motion: no-preference) {
+  /* 1) Morgen-Entrée — einmalig gestaffelt, dann Ruhe */
+  .enter { opacity: 0; transform: translateY(10px); animation: hd-in .5s cubic-bezier(.2,.7,.3,1) forwards; }
+  .enter.d1 { animation-delay: .08s; }
+  .enter.d2 { animation-delay: .18s; }
+  .enter.d3 { animation-delay: .30s; }
+  .enter.d4 { animation-delay: .40s; }
+  @keyframes hd-in { to { opacity: 1; transform: none; } }
+
+  /* 2) Kartenwechsel — 0,22s Überblenden, nur Opacity, kein translate */
+  .stage-fade { animation: hd-stage-in .22s ease-out; }
+  @keyframes hd-stage-in { from { opacity: 0; } to { opacity: 1; } }
+}
+
+/* ── Responsive ── */
+@media (max-width: 720px) {
+  .hd { padding: 0 4px; }
+  .hd-pulse { flex-direction: column; }
+  .hd-pulse-stat + .hd-pulse-stat::before { left: 16px; right: 16px; top: 0; bottom: auto; width: auto; height: 1px; }
+}
