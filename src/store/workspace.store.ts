@@ -4,6 +4,17 @@ import { invoke } from '@tauri-apps/api/core'
 import { supabase } from '@/lib/supabase'
 import type { Role, Capability } from '@/lib/capabilities'
 import { makeLocalWorkspace, hasLocalOrphanData, rescopeWorkspace } from '@/data/workspace-local'
+import { log } from '@/lib/logger'
+
+/**
+ * Findet workspace_ids, für die lokale SQLite-Daten existieren, aber kein
+ * entsprechender Eintrag in `knownIds` (weder Cloud noch lokal registriert).
+ * Reine Helper-Funktion — testbar ohne Store-Kontext.
+ */
+export function findOrphanWorkspaceIds(dataIds: string[], knownIds: string[]): string[] {
+  const known = new Set(knownIds)
+  return dataIds.filter(id => id && !known.has(id))
+}
 
 export interface Workspace {
   id: string
@@ -93,6 +104,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
 
         set({ workspaces: cloud })
+
+        // Selbstheilung: lokale Workspaces wiederherstellen, die in der SQLite-DB
+        // Daten haben, aber nicht (mehr) in localWorkspaces registriert sind.
+        // Typischer Fall: Logout hat die Registrierung verloren, aber die Daten in
+        // SQLite sind vollständig erhalten.
+        const dataIds = (await invoke<string[]>('cmd_list_local_workspace_ids').catch(() => [])) ?? []
+        const knownIds = [...cloud, ...local].map(w => w.id)
+        const orphans = findOrphanWorkspaceIds(dataIds, knownIds)
+        if (orphans.length > 0) {
+          const recovered = orphans.map(id => makeLocalWorkspace(id, 'Mein Workspace'))
+          set(s => ({ localWorkspaces: [...s.localWorkspaces, ...recovered] }))
+          log.info('Lokale Workspaces wiederhergestellt', { orphans })
+          // local neu lesen, damit der activeWorkspaceId-Check unten stimmt.
+          local = get().localWorkspaces
+        }
 
         const all = [...cloud, ...local]
         const { activeWorkspaceId } = get()
