@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote } from 'lucide-react'
+import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote, Send } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
 import { useCompanyStore } from '@/store/company.store'
 import { useCapability } from '@/hooks/useCapability'
@@ -16,6 +16,7 @@ import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
 import { MahnwesenPanel } from '@/components/finance/MahnwesenPanel'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import { PaymentModal } from '@/components/finance/PaymentModal'
+import { InvoiceSendModal } from '@/components/finance/InvoiceSendModal'
 // PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
 // react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceGateway } from '@/data/finance.gateway'
@@ -370,6 +371,7 @@ export function FinanceRoute() {
   const [previewLoading,   setPreviewLoading]   = useState<string | null>(null)
   const [stornoInv,        setStornoInv]        = useState<Invoice | null>(null)
   const [paymentInvoice,   setPaymentInvoice]   = useState<Invoice | null>(null)
+  const [sendInvoice,      setSendInvoice]      = useState<Invoice | null>(null)
   const [showBatchExport,  setShowBatchExport]  = useState(false)
   const [editInvoice,      setEditInvoice]      = useState<InvoiceWithItems | null>(null)
 
@@ -898,6 +900,10 @@ export function FinanceRoute() {
                           useToastStore.getState().show({ message: `Download fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
                         }
                       }} />
+                      {!inv.isSuggestion && inv.status !== 'draft' && (
+                        <RowBtn icon={<Send size={12} />} label="Per E-Mail senden"
+                          onClick={() => setSendInvoice(inv)} />
+                      )}
                       {isAdmin && inv.isSuggestion && (
                         <RowBtn icon={<CheckCircle size={12} />} label="Freigeben" tone="ok"
                           onClick={() => approveInvoiceSuggestion(inv.id, user?.id ?? '', workspaceId)} />
@@ -954,6 +960,13 @@ export function FinanceRoute() {
       )}
       {paymentInvoice && (
         <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} />
+      )}
+      {sendInvoice && (
+        <InvoiceSendModal
+          invoice={sendInvoice}
+          onClose={() => setSendInvoice(null)}
+          onSent={() => {}}
+        />
       )}
       {previewData && profile && (
         <InvoicePreview
