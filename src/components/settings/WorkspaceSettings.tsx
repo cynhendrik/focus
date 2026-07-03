@@ -118,6 +118,16 @@ export function WorkspaceSettings({ workspaceId }: Props) {
             <Field label="USt-IdNr." value={val('taxId')} onChange={f('taxId')} placeholder="DE123456789" />
             <Field label="IBAN" value={val('iban')} onChange={f('iban')} placeholder="DE89 3704 0044 ..." />
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="BIC" value={val('bic')} onChange={f('bic')} placeholder="COBADEFFXXX" />
+            <Field label="Bankname" value={val('bankName')} onChange={f('bankName')} placeholder="Commerzbank AG" />
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)', letterSpacing: '0.05em', textTransform: 'uppercase', paddingTop: 4 }}>Rechtliches</div>
+          <Field label="Geschäftsführer" value={val('geschaeftsfuehrer')} onChange={f('geschaeftsfuehrer')} placeholder="Max Mustermann" />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Handelsregister" value={val('handelsregister')} onChange={f('handelsregister')} placeholder="HRB 12345" />
+            <Field label="Registergericht" value={val('registergericht')} onChange={f('registergericht')} placeholder="Amtsgericht Berlin-Charlottenburg" />
+          </div>
           <div
             onClick={() => setForm(p => ({ ...p, kleinunternehmer: !p.kleinunternehmer }))}
             style={{
