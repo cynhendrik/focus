@@ -61,35 +61,40 @@ export async function sendInvoiceMail(
   invoice: Invoice,
   mail: { to: string; subject: string; body: string; attachmentPath: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const mailAccount = useMailStore.getState().accounts[0]
-  if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert — unter Mail einrichten.' }
-
   try {
-    await MailService.sendEmail({
-      accountId: mailAccount.id,
-      to: [mail.to],
-      subject: mail.subject,
-      bodyText: mail.body,
-      attachmentPaths: [mail.attachmentPath],
-    })
+    const mailAccount = useMailStore.getState().accounts[0]
+    if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert — unter Mail einrichten.' }
+
+    try {
+      await MailService.sendEmail({
+        accountId: mailAccount.id,
+        to: [mail.to],
+        subject: mail.subject,
+        bodyText: mail.body,
+        attachmentPaths: [mail.attachmentPath],
+      })
+    } catch (err) {
+      log.warn('sendInvoiceMail failed', { invoiceId: invoice.id, err })
+      return { ok: false, error: `Versand fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }
+    }
+
+    const nr = invoice.number ?? invoice.id.slice(0, 8)
+    try {
+      await ActivitiesGateway.create({
+        workspaceId: useWorkspaceStore.getState().getActiveWorkspaceId() ?? '',
+        createdBy: useAuthStore.getState().user?.id ?? '',
+        accountId: invoice.accountId,
+        type: 'note',
+        title: `Rechnung ${nr} versendet`,
+        body: `Per E-Mail an ${mail.to} — mit Rechnungs-PDF.`,
+      })
+    } catch (protoErr) {
+      log.warn('invoice send protocol activity failed', { invoiceId: invoice.id, err: protoErr })
+    }
+
+    return { ok: true }
   } catch (err) {
     log.warn('sendInvoiceMail failed', { invoiceId: invoice.id, err })
-    return { ok: false, error: `Versand fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }
+    return { ok: false, error: 'Versand fehlgeschlagen — bitte erneut versuchen.' }
   }
-
-  const nr = invoice.number ?? invoice.id.slice(0, 8)
-  try {
-    await ActivitiesGateway.create({
-      workspaceId: useWorkspaceStore.getState().getActiveWorkspaceId() ?? '',
-      createdBy: useAuthStore.getState().user?.id ?? '',
-      accountId: invoice.accountId,
-      type: 'note',
-      title: `Rechnung ${nr} versendet`,
-      body: `Per E-Mail an ${mail.to} — mit Rechnungs-PDF.`,
-    })
-  } catch (protoErr) {
-    log.warn('invoice send protocol activity failed', { invoiceId: invoice.id, err: protoErr })
-  }
-
-  return { ok: true }
 }
