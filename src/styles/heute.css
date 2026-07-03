@@ -20,6 +20,11 @@
 .hd-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; height: 100%; }
 @media (max-width: 940px) { .hd-main { grid-template-columns: 1fr; } .hd-kpis { grid-template-columns: 1fr; } }
 
+/* Leerer Stapel: Banner volle Breite, darunter Tagesplan + Mails nebeneinander */
+.hd-main--stacked { grid-template-columns: 1fr; }
+.hd-col--duo { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; }
+@media (max-width: 940px) { .hd-col--duo { grid-template-columns: 1fr; } }
+
 /* Karte, die die Resthöhe füllt (Liste / Mails) — Footer am Grund */
 .hd-fill { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);

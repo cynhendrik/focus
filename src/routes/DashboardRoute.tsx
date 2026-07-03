@@ -27,6 +27,8 @@ import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { StapelSection } from '@/components/stapel/StapelSection'
+import { usePreparedItemsStore } from '@/store/prepared-items.store'
+import { visiblePreparedItems } from '@/lib/stapel/visible'
 import '@/styles/heute.css'
 
 import type { CalendarEvent } from '@/types/calendar.types'
@@ -183,6 +185,13 @@ function WorkspaceView() {
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const emails     = useMailStore(s => s.emails)
+  const stapelItems = usePreparedItemsStore(s => s.items)
+  // Leerer Stapel: Feier-Banner volle Breite, Tagesplan+Mails ruecken nebeneinander —
+  // sonst laesst die kurze Leer-Karte ein Loch in der linken Spalte.
+  const stapelHasCards = useMemo(
+    () => visiblePreparedItems(stapelItems, myUserId, new Date().toISOString()).length > 0,
+    [stapelItems, myUserId],
+  )
 
   useReminderTrailHydration()
 
@@ -290,8 +299,8 @@ function WorkspaceView() {
         />
       </div>
 
-      {/* 2 gleich hohe Spalten */}
-      <div className="hd-main">
+      {/* 2 gleich hohe Spalten — bei leerem Stapel gestapelt (Banner + Duo) */}
+      <div className={stapelHasCards ? 'hd-main' : 'hd-main hd-main--stacked'}>
 
         {/* Links: Stapel — „Für dich vorbereitet" */}
         <div className="hd-col">
@@ -299,7 +308,7 @@ function WorkspaceView() {
         </div>
 
         {/* Rechts: Tagesplan + Neueste Mails */}
-        <div className="hd-col">
+        <div className={stapelHasCards ? 'hd-col' : 'hd-col hd-col--duo'}>
           <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} />
           <div className="hd-fill">
             <div className="hd-lhead"><span className="t">Neueste Mails</span><span className="c">{unreadCount} ungelesen</span></div>
