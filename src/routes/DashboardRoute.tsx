@@ -3,9 +3,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react'
-import {
-  ArrowRight,
-} from 'lucide-react'
 
 import { filterMine } from '@/lib/todos/ownership'
 import { useCustomersStore } from '@/store/customers.store'
@@ -70,12 +67,6 @@ function fmtKEur(n: number): string {
   return n.toLocaleString('de-DE')
 }
 
-function pct(delta: number, base: number): string {
-  if (base === 0) return delta > 0 ? '+∞%' : '0%'
-  const v = Math.round((delta / base) * 100)
-  return `${v > 0 ? '+' : ''}${v}%`
-}
-
 function initials(name: string): string {
   return (name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()) || '?'
 }
@@ -93,80 +84,6 @@ function relTime(iso: string): string {
 
 function eur0(n: number): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// KPI Card (bleibt in der Datei; nicht mehr vom Dashboard genutzt)
-
-function KpiCard({
-  label, value, hint, accentValue, action, children,
-}: {
-  label: string
-  value: React.ReactNode
-  hint?: React.ReactNode
-  accentValue?: boolean
-  action?: { label?: string; onClick: () => void }
-  children?: React.ReactNode
-}) {
-  return (
-    <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-      background: 'var(--surface)', padding: '18px 20px',
-      boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', gap: 10,
-      position: 'relative', minHeight: 116,
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--fg-dim)', fontWeight: 600,
-        }}>
-          {label}
-        </span>
-        {children}
-        {action && (
-          <button
-            onClick={action.onClick}
-            title={action.label}
-            style={{
-              width: 26, height: 26, borderRadius: 99,
-              background: 'transparent', border: '1px solid var(--border)',
-              color: 'var(--fg-dim)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'color 140ms, border-color 140ms',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--fg)'
-              e.currentTarget.style.borderColor = 'var(--border-strong)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--fg-dim)'
-              e.currentTarget.style.borderColor = 'var(--border)'
-            }}
-          >
-            <ArrowRight size={12} />
-          </button>
-        )}
-      </div>
-
-      <div style={{
-        fontSize: 30, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em',
-        color: accentValue ? 'var(--accent-text)' : 'var(--fg)',
-        fontVariantNumeric: 'tabular-nums',
-      }}>
-        {value}
-      </div>
-
-      {hint && (
-        <div style={{ fontSize: 12, color: 'var(--fg-muted)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {hint}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
