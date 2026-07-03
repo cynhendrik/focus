@@ -7,6 +7,7 @@
 /* ── Tagesanker ── */
 /* Titel = .greeting-title aus globals.css (identisch mit Finanzen); darunter Datum + Satz. */
 .hd-anchor { display: flex; flex-direction: column; }
+.hd-name { background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hd-anchor-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); margin-top: 10px; }
 .hd-anchor-line { font-size: 15px; color: var(--fg-muted); margin: 8px 0 0; line-height: 1.6; }
 

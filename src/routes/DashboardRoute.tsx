@@ -170,7 +170,7 @@ function WorkspaceView() {
 
       {/* ── Tagesanker + Puls-Leiste ─────────────────────────────────────── */}
       <div className="hd-anchor enter d1">
-        <h1 className="greeting-title">{greeting()}, {firstName}<em>.</em></h1>
+        <h1 className="greeting-title">{greeting()}, <span className="hd-name">{firstName}</span><em>.</em></h1>
         <div className="hd-anchor-date">{dateText}</div>
         <p className="hd-anchor-line">{koraLine}</p>
 
