@@ -5,19 +5,18 @@
 .hd { display: flex; flex-direction: column; gap: 30px; }
 
 /* ── Tagesanker ── */
+/* Titel = .greeting-title aus globals.css (identisch mit Finanzen); darunter Datum + Satz. */
 .hd-anchor { display: flex; flex-direction: column; }
-.hd-anchor-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); }
-.hd-anchor h2 { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; margin: 8px 0 10px; line-height: 1.05; text-wrap: balance; }
-.hd-anchor h2 em { font-style: normal; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hd-anchor-line { font-size: 15px; color: var(--fg-muted); margin: 0; line-height: 1.6; }
+.hd-anchor-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); margin-top: 10px; }
+.hd-anchor-line { font-size: 15px; color: var(--fg-muted); margin: 8px 0 0; line-height: 1.6; }
 
 /* ── Puls-Leiste ── */
 .hd-pulse { display: flex; margin-top: 24px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--card-shadow); }
 .hd-pulse-stat { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 18px 24px; position: relative; }
 .hd-pulse-stat + .hd-pulse-stat::before { content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 1px; background: var(--border); }
 .hd-pulse-k { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--fg-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.hd-pulse-v { font-size: 24px; font-weight: 800; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; color: var(--fg); }
-.hd-pulse-v small { font-size: 13px; font-weight: 650; color: var(--fg-dim); margin-left: 4px; }
+.hd-pulse-v { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--fg); line-height: 1.1; }
+.hd-pulse-v small { font-size: 15px; font-weight: 650; color: var(--fg-dim); margin-left: 4px; }
 .hd-pulse-stat.hot .hd-pulse-v { color: var(--accent-text); }
 .hd-pulse-stat.hot .hd-pulse-k::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 
