@@ -353,8 +353,10 @@ export async function downloadInvoicePDF(data: InvoiceWithItems, profile: Compan
       })
     }
   } catch (err) {
-    log.error('downloadInvoicePDF failed', { invoiceId: data.invoice.id, err })
-    const detail = err instanceof Error ? err.message : String(err)
+    // Error-Objekte verlieren message/stack bei JSON-Serialisierung — als Klartext loggen.
+    const detail = err instanceof Error ? (err.message || err.name) : String(err)
+    const stack = err instanceof Error ? err.stack : undefined
+    log.error('downloadInvoicePDF failed', { invoiceId: data.invoice.id, detail, stack })
     toast.setError(detail ? `Fehler beim Speichern: ${detail.slice(0, 160)}` : 'Fehler beim Speichern')
   }
 }
