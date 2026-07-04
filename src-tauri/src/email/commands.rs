@@ -173,6 +173,11 @@ pub async fn email_sync(
                     // Only process inbound emails (skip own-account sent messages)
                     if !row.from_addr.is_empty() && row.from_addr != email {
                         let _ = crate::db::campaign::mark_replied(&pool.conn(), &row.from_addr);
+                        // Lead hat geantwortet → laufende Follow-up-Sequenz stoppen,
+                        // damit keine weiteren Sequenz-Karten im Stapel auflaufen.
+                        if let Err(e) = crate::db::follow_up_queue::cancel_pending_for_email(&pool.conn(), &row.from_addr) {
+                            eprintln!("[followup] cancel_pending_for_email failed for {}: {e}", row.from_addr);
+                        }
                     }
                 }
             }
