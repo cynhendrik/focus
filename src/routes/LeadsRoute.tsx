@@ -753,11 +753,11 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
     }
   }
 
-  const handleQualifyConfirm = async (appointmentDate?: string) => {
+  const handleQualifyConfirm = async (appointmentDate?: string, dealValue?: number) => {
     if (!pendingQualify) return
     try {
       const leadId = pendingQualify.id
-      await convertToDeal(leadId, workspaceId, userId)
+      await convertToDeal(leadId, workspaceId, userId, dealValue)
       // Termin aus dem Dialog wird ein Follow-up am Termin — Lead und Kunde
       // teilen dieselbe Account-ID, der Eintrag bleibt also am Kunden sichtbar.
       const followUp = appointmentFollowUp({
@@ -789,12 +789,12 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
 
   // „Zu Kunde machen" aus dem Kontextmenü — mit Wahl, ob zusätzlich ein Deal
   // entsteht (gleiche Wirkung wie Drag auf die Qualifiziert-Stage).
-  const handleConvertChoice = async (withDeal: boolean) => {
+  const handleConvertChoice = async (withDeal: boolean, dealValue?: number) => {
     if (!pendingConvert) return
     const lead = pendingConvert
     try {
       if (withDeal) {
-        await convertToDeal(lead.id, workspaceId, userId)
+        await convertToDeal(lead.id, workspaceId, userId, dealValue)
       } else {
         await convertToClient(lead.id)
       }

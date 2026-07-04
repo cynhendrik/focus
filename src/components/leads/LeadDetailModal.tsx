@@ -72,10 +72,10 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
     }
   }
 
-  async function handleConvertChoice(withDeal: boolean) {
+  async function handleConvertChoice(withDeal: boolean, dealValue?: number) {
     try {
       if (withDeal) {
-        await convertToDeal(lead.id, workspaceId, userId)
+        await convertToDeal(lead.id, workspaceId, userId, dealValue)
       } else {
         await convertToClient(lead.id)
       }

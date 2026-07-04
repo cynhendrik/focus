@@ -14,6 +14,9 @@ import { useMailStore } from '@/store/mail.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useDealsStore } from '@/store/deals.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { pipelinePotential } from '@/lib/finance/pipeline-potential'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
@@ -103,6 +106,13 @@ function WorkspaceView() {
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
   const emails     = useMailStore(s => s.emails)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+
+  const deals     = useDealsStore(s => s.deals)
+  const pipeStages = usePipelineStore(s => s.stages)
+  const loadDeals = useDealsStore(s => s.loadAll)
+  useEffect(() => { if (workspaceId) loadDeals(workspaceId) }, [workspaceId, loadDeals])
+  const pipelineSum = useMemo(() => pipelinePotential(deals, pipeStages), [deals, pipeStages])
 
   useReminderTrailHydration()
 
@@ -212,6 +222,12 @@ function WorkspaceView() {
           <div className="hd-pulse-stat">
             <span className="hd-pulse-k">OFFEN HEUTE</span>
             <span className="hd-pulse-v">{dueToday.total}</span>
+          </div>
+
+          {/* Segment 4: Pipeline-Potenzial — Summe offener Deal-Werte (ungewichtet) */}
+          <div className="hd-pulse-stat" onClick={() => setAppView('leverage_pipeline')} style={{ cursor: 'pointer' }} title="Zur Pipeline">
+            <span className="hd-pulse-k">PIPELINE</span>
+            <span className="hd-pulse-v">{eur0(pipelineSum)}</span>
           </div>
         </div>
       </div>

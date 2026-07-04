@@ -383,12 +383,12 @@ export function LeverageLeadsRoute() {
   const [pendingConvert, setPendingConvert] = useState<Lead | null>(null)
 
   // „Zu Kunde" mit Wahl: nur Kunde, oder Kunde + Deal in der Pipeline.
-  async function handleConvertChoice(withDeal: boolean) {
+  async function handleConvertChoice(withDeal: boolean, dealValue?: number) {
     if (!pendingConvert) return
     const lead = pendingConvert
     try {
       if (withDeal) {
-        await convertToDeal(lead.id, workspaceId, userId)
+        await convertToDeal(lead.id, workspaceId, userId, dealValue)
       } else {
         await convertToClient(lead.id)
       }

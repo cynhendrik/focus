@@ -4,7 +4,7 @@ import { useDialogFocus } from '@/components/ui/Sheet'
 interface Props {
   leadName: string
   /** withDeal=true legt zusätzlich einen Deal in der ersten Pipeline-Stage an. */
-  onChoose: (withDeal: boolean) => void | Promise<void>
+  onChoose: (withDeal: boolean, dealValue?: number) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -15,12 +15,17 @@ interface Props {
  */
 export function ConvertLeadChoice({ leadName, onChoose, onCancel }: Props) {
   const [saving, setSaving] = useState(false)
+  const [value, setValue] = useState('')
   const dialogRef = useDialogFocus(true, onCancel)
 
   const choose = async (withDeal: boolean) => {
     setSaving(true)
     try {
-      await onChoose(withDeal)
+      if (withDeal) {
+        await onChoose(true, value ? Number(value) : undefined)
+      } else {
+        await onChoose(false)
+      }
     } finally {
       setSaving(false)
     }
@@ -58,6 +63,14 @@ export function ConvertLeadChoice({ leadName, onChoose, onCancel }: Props) {
           Mit Deal taucht der Kunde direkt in der Pipeline auf — inklusive
           automatischem Rechnungsvorschlag beim Gewinn.
         </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+            Geschätzter Auftragswert (€) <span style={{ fontWeight: 400 }}>(optional, nur mit Deal)</span>
+          </label>
+          <input className="mock-input" type="number" min="0" step="100" value={value}
+            onChange={e => setValue(e.target.value)} placeholder="z. B. 2500" />
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button

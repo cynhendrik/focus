@@ -20,7 +20,7 @@ interface LeadsState {
   upsert: (payload: UpsertLeadPayload) => Promise<Lead>
   bulkUpdate: (payload: BulkUpdateLeadsPayload, workspaceId: string) => Promise<void>
   convertToClient: (id: string) => Promise<void>
-  convertToDeal: (id: string, workspaceId: string, userId: string) => Promise<void>
+  convertToDeal: (id: string, workspaceId: string, userId: string, value?: number) => Promise<void>
   deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
   updateStage: (id: string, stage: PipelineStage) => Promise<void>
@@ -100,7 +100,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     }
   },
 
-  convertToDeal: async (id, workspaceId, userId) => {
+  convertToDeal: async (id, workspaceId, userId, value) => {
     const lead = get().leads.find(l => l.id === id)
     if (!lead) throw new Error('Lead nicht gefunden')
 
@@ -144,7 +144,7 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
         customerId: id,
         title: lead.name,
         stage: firstStage.name,
-        value: 0,
+        value: value ?? 0,
         notes: sourceNote,
       })
       useDealsStore.setState(s => ({ deals: [...s.deals, deal] }))

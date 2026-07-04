@@ -10,11 +10,11 @@ describe('ConvertLeadChoice', () => {
     expect(screen.getByText(/Anna Beispiel/)).toBeTruthy()
   })
 
-  it('„Kunde + Deal" wählt withDeal=true', () => {
+  it('„Kunde + Deal" wählt withDeal=true, dealValue=undefined wenn kein Wert', () => {
     const onChoose = vi.fn()
     render(<ConvertLeadChoice leadName="Anna" onChoose={onChoose} onCancel={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: /kunde \+ deal/i }))
-    expect(onChoose).toHaveBeenCalledWith(true)
+    expect(onChoose).toHaveBeenCalledWith(true, undefined)
   })
 
   it('„Nur Kunde" wählt withDeal=false', () => {
@@ -31,5 +31,13 @@ describe('ConvertLeadChoice', () => {
     fireEvent.click(screen.getByRole('button', { name: /abbrechen/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onChoose).not.toHaveBeenCalled()
+  })
+
+  it('Wert „2500" eingeben und „Kunde + Deal" übergibt dealValue=2500', () => {
+    const onChoose = vi.fn()
+    render(<ConvertLeadChoice leadName="Anna" onChoose={onChoose} onCancel={() => {}} />)
+    fireEvent.change(screen.getByPlaceholderText(/2500/i), { target: { value: '2500' } })
+    fireEvent.click(screen.getByRole('button', { name: /kunde \+ deal/i }))
+    expect(onChoose).toHaveBeenCalledWith(true, 2500)
   })
 })
