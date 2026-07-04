@@ -1,6 +1,6 @@
-export type PreparedItemType = 'mahnung' | 'followup' | 'rechnungsentwurf' | 'aufgabe'
+export type PreparedItemType = 'mahnung' | 'followup' | 'sequenz' | 'rechnungsentwurf' | 'aufgabe'
 export type PreparedItemStatus = 'pending' | 'approved' | 'snoozed' | 'dismissed' | 'resolved'
-export type PreparedSourceKind = 'invoice_reminder' | 'crm_follow_up' | 'invoice_suggestion' | 'todo'
+export type PreparedSourceKind = 'invoice_reminder' | 'crm_follow_up' | 'follow_up_queue' | 'invoice_suggestion' | 'todo'
 export interface PreparedItemPayload {
   title: string; why: string
   customerName?: string; invoiceNumber?: string; amount?: number; level?: number

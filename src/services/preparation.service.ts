@@ -15,6 +15,7 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useCompanyStore } from '@/store/company.store'
 import { DEFAULT_DUNNING_FEES } from '@/services/dunning.service'
+import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import { log } from '@/lib/logger'
 
 let running = false
@@ -24,6 +25,12 @@ export async function runPreparation(workspaceId: string): Promise<void> {
   running = true
   try {
     if (useWorkspaceStore.getState().activeWorkspaceId !== workspaceId) return
+    // Fällige Sequenz-Schritte (lokale Queue) — Ausfall darf die übrige
+    // Vorbereitung nicht blockieren.
+    const queueItems = await FollowUpQueueService.getDue(workspaceId).catch(err => {
+      log.warn('getDue follow-up queue failed', { err })
+      return []
+    })
     const input: GenerateInput = {
       workspaceId,
       invoices: useFinanceStore.getState().invoices.filter(i => i.workspaceId === workspaceId),
@@ -34,6 +41,7 @@ export async function runPreparation(workspaceId: string): Promise<void> {
       payments: useFinanceStore.getState().payments,
       fees: useCompanyStore.getState().profile.dunningFees ?? DEFAULT_DUNNING_FEES,
       suppressedRuleIds: useStapelSettingsStore.getState().suppressedRuleIds,
+      queueItems,
       todayIso: new Date().toLocaleDateString('sv'),
     }
 

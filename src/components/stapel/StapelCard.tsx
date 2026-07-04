@@ -20,7 +20,7 @@ interface StapelCardProps {
 }
 
 export const TYPE_LABEL: Record<PreparedItem['type'], string> = {
-  mahnung: 'MAHNWESEN', followup: 'FOLLOW-UP', rechnungsentwurf: 'RECHNUNG', aufgabe: 'AUFGABE',
+  mahnung: 'MAHNWESEN', followup: 'FOLLOW-UP', sequenz: 'SEQUENZ', rechnungsentwurf: 'RECHNUNG', aufgabe: 'AUFGABE',
 }
 
 /** Karte des Stapels: Was habe ich vorbereitet · Warum · das Ergebnis — plus 4 Aktionen + Danach-Band. */

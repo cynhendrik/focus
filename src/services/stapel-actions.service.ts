@@ -14,6 +14,7 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
 import { useAuthStore } from '@/store/auth.store'
+import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import { log } from '@/lib/logger'
 
 export interface ApproveResult { ok: boolean; error?: string }
@@ -23,6 +24,7 @@ export async function approvePreparedItem(item: PreparedItem): Promise<ApproveRe
     switch (item.type) {
       case 'mahnung': return await approveMahnung(item)
       case 'followup': return await approveFollowup(item)
+      case 'sequenz': return await approveSequenz(item)
       case 'rechnungsentwurf': return await approveRechnungsentwurf(item)
       case 'aufgabe': return await approveAufgabe(item)
       default: return { ok: false, error: 'Unbekannter Kartentyp.' }
@@ -89,6 +91,48 @@ async function approveFollowup(item: PreparedItem): Promise<ApproveResult> {
     })
   } catch (protoErr) {
     log.warn('followup protocol activity failed', { id: item.id, protoErr })
+  }
+  return { ok: true }
+}
+
+async function approveSequenz(item: PreparedItem): Promise<ApproveResult> {
+  // Frischen Queue-Zustand prüfen — der Schritt kann inzwischen gesendet,
+  // übersprungen oder die Sequenz gestoppt worden sein.
+  const due = await FollowUpQueueService.getDue(item.workspaceId)
+  const q = due.find(x => x.id === item.sourceId)
+  if (!q) return { ok: false, error: 'Dieser Sequenz-Schritt ist nicht mehr fällig — Karte wird beim nächsten Abgleich geschlossen.' }
+  const mailAccount = useMailStore.getState().accounts[0]
+  if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert.' }
+  const lead = useLeadsStore.getState().leads.find(l => l.id === q.leadId)
+  const email = lead?.email
+  if (!email) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Lead — bitte anpassen oder verwerfen.' }
+
+  await MailService.sendEmail({
+    accountId: mailAccount.id,
+    to: [email],
+    subject: item.payload.draftSubject ?? q.draftSubject ?? 'Kurze Rückfrage',
+    bodyText: item.payload.draftBody ?? q.draftBody ?? '',
+  })
+  // Mail ist raus = Erfolg. Nachbuchungen fehlertolerant, damit ein Retry nicht doppelt mailt.
+  let sentActivityId = ''
+  try {
+    const act = await ActivitiesGateway.create({
+      workspaceId: item.workspaceId,
+      createdBy: useAuthStore.getState().user?.id ?? '',
+      accountId: q.leadId,
+      type: 'email',
+      title: `Sequenz-Mail ${q.sequenceIndex}/4 versendet`,
+      body: `Per E-Mail an ${email}.`,
+      status: 'done',
+    })
+    sentActivityId = act.id
+  } catch (protoErr) {
+    log.warn('sequenz protocol activity failed', { id: item.id, protoErr })
+  }
+  try {
+    await FollowUpQueueService.markSent(q.id, sentActivityId)
+  } catch (markErr) {
+    log.error('sequenz sent but markSent failed', { id: item.id, markErr })
   }
   return { ok: true }
 }

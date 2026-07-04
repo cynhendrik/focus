@@ -89,6 +89,8 @@ export interface CreateActivityPayload {
   status?: string
   dueAt?: string
   assignee?: string
+  /** Gesprächs-/Kontakt-Ergebnis — löst lokal die Scoring-Regeln aus. */
+  outcome?: import('./activity.types').ActivityOutcome
   direction?: 'in' | 'out'
 }
 

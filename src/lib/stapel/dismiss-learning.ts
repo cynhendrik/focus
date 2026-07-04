@@ -9,6 +9,7 @@ export const RULE_LABEL: Record<string, string> = {
   'mahnung-l1': '1. Mahnungen',
   'mahnung-l2': '2. Mahnungen',
   'followup-due': 'Follow-up-Vorschläge',
+  'sequenz-due': 'Sequenz-Mails',
   'rechnung-vorschlag': 'Rechnungsvorschläge',
   'aufgabe-heute': 'Heutige Aufgaben',
 }

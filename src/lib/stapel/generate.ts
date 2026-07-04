@@ -5,6 +5,7 @@
 import type { Invoice, Payment } from '@/types/finance.types'
 import type { Todo } from '@/types/todo.types'
 import type { FollowUp } from '@/types/crm.types'
+import type { FollowUpQueueItem } from '@/types/follow-up-queue.types'
 import type { CreatePreparedItem, PreparedItem } from '@/types/prepared-item.types'
 import { dueReminders, reminderBreakdown } from '@/services/dunning.service'
 import { mahnungBody, mahnungSubject, fmtEur, levelLabel, begleitmailBody } from '@/lib/templates/mahnung'
@@ -21,6 +22,8 @@ export interface GenerateInput {
   payments: Payment[]
   fees: number[]
   suppressedRuleIds: string[]
+  /** Fällige, offene Schritte der automatischen Follow-up-Sequenz (get_due). */
+  queueItems: FollowUpQueueItem[]
   todayIso: string
 }
 
@@ -87,6 +90,29 @@ export function generateCardDrafts(input: GenerateInput): CreatePreparedItem[] {
     }
   }
 
+  // 2b) SEQUENZ — fällige Schritte der automatischen Follow-up-Sequenz.
+  //     Kein Auto-Versand: Der vorgetextete Entwurf wartet hier auf Freigabe.
+  if (!suppressed.has('sequenz-due')) {
+    for (const q of input.queueItems) {
+      if (q.status !== 'pending' || q.sendAt.slice(0, 10) > input.todayIso) continue
+      const contact = nameOf(input, q.leadId)
+      const days = daysSince(q.sendAt, input.todayIso)
+      cards.push({
+        workspaceId: input.workspaceId, type: 'sequenz',
+        sourceKind: 'follow_up_queue', sourceId: q.id, ruleId: 'sequenz-due',
+        payload: {
+          title: `Sequenz-Mail ${q.sequenceIndex}/4 an ${contact}`,
+          why: `Schritt ${q.sequenceIndex} der Follow-up-Sequenz ist fällig — Freigeben sendet die Mail.`,
+          customerName: contact,
+          draftSubject: q.draftSubject ?? undefined,
+          draftBody: q.draftBody ?? undefined,
+        },
+        // Beziehungs-Band, knapp unter manuellen Follow-ups.
+        score: 780 + Math.min(days, 30),
+      })
+    }
+  }
+
   // 3) RECHNUNGSENTWÜRFE — Suggestions (Deals, Verträge ab Task 12). Normale Drafts NICHT.
   if (!suppressed.has('rechnung-vorschlag')) {
     for (const inv of input.invoices) {
@@ -146,6 +172,10 @@ export function reconcileResolvedIds(active: PreparedItem[], input: GenerateInpu
     } else if (item.sourceKind === 'crm_follow_up') {
       const fu = input.followUps.find(f => f.id === item.sourceId)
       if (!fu || fu.status === 'erledigt') resolved.push(item.id)
+    } else if (item.sourceKind === 'follow_up_queue') {
+      // queueItems enthält nur fällige pending-Schritte — fehlt der Schritt,
+      // wurde er gesendet, übersprungen oder die Sequenz gestoppt.
+      if (!input.queueItems.some(q => q.id === item.sourceId)) resolved.push(item.id)
     } else if (item.sourceKind === 'invoice_suggestion') {
       const inv = input.invoices.find(i => i.id === item.sourceId)
       if (!inv || !inv.isSuggestion) resolved.push(item.id)
