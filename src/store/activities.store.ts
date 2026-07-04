@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { ActivitiesGateway } from '@/data/activities.gateway'
 import { useCrmStore } from '@/store/crm.store'
+import { isFollowUpActivity } from '@/lib/activities/followups'
 import { log } from '@/lib/logger'
 import type { Activity, CreateActivityPayload, UpdateActivityPayload } from '@/types/pipeline.types'
 import type { AppError } from '@/types/error.types'
@@ -56,11 +57,15 @@ export const useActivitiesStore = create<ActivitiesState>()((set) => ({
       const activity = await ActivitiesGateway.create(payload)
       set(s => ({
         activities: [activity, ...s.activities],
-        followups: payload.type === 'followup' && (payload.status ?? 'open') === 'open'
+        followups: isFollowUpActivity(payload) && (payload.status ?? 'open') === 'open'
           ? [activity, ...s.followups]
           : s.followups,
       }))
       useCrmStore.getState().loadLastActivity(payload.workspaceId)
+      // Neues Follow-up sofort in Mein Tag/Stapel sichtbar machen.
+      if (isFollowUpActivity(payload)) {
+        void useCrmStore.getState().loadAll(payload.workspaceId)
+      }
     } catch (err) {
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error }); throw err

@@ -23,6 +23,7 @@ import { useCustomersStore } from '@/store/customers.store'
 
 import { MailService } from '@/services/mail.service'
 import { outcomeOptionsFor, autoFollowUpForOutcome } from '@/lib/activities/outcomes'
+import { isFollowUpActivity } from '@/lib/activities/followups'
 import type { ActivityOutcome } from '@/types/activity.types'
 import type { EmailBody } from '@/types/mail.types'
 import { FollowUpQueueService } from '@/services/follow-up-queue.service'
@@ -237,13 +238,15 @@ export function ActivityStream({
     const out: TimelineEvent[] = []
 
     for (const a of activities) {
-      const isFollowup = a.type === 'followup'
+      const isFollowup = isFollowUpActivity(a)
+      // Task-Follow-ups liefert die CRM-Quelle bereits — nicht doppelt zeigen.
+      if (isFollowup && a.type === 'task' && sources.crmFollowUps) continue
       const ts = isFollowup ? (a.dueAt ?? a.createdAt) : a.createdAt
       if (!ts) continue
       const kindMap: Record<string, EventKind> = {
         call: 'call', meeting: 'meeting', email: 'email', note: 'note', followup: 'followup',
       }
-      const kind = kindMap[a.type] ?? 'note'
+      const kind = isFollowup ? 'followup' : (kindMap[a.type] ?? 'note')
       const isFuture = isFollowup && a.status !== 'done' && new Date(ts).getTime() > nowMs
       out.push({
         id: `act-${a.id}`,
@@ -419,7 +422,11 @@ export function ActivityStream({
         createdBy: user?.email ?? 'user',
         accountId,
         customerId: accountId,
-        type: composerKind,
+        // Follow-ups als task + is_follow_up — die EINE Konvention, die alle
+        // Follow-up-Listen (Mein Tag, Stapel, Pipeline) lesen. type='followup'
+        // fiel aus sämtlichen Listen heraus.
+        type: isFollowup ? 'task' : composerKind,
+        payload: isFollowup ? JSON.stringify({ is_follow_up: true }) : undefined,
         title: composerText.trim(),
         status: isFollowup ? 'open' : 'done',
         dueAt: isFollowup && composerDate ? composerDate : undefined,
