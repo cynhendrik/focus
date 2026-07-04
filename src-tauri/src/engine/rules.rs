@@ -24,8 +24,15 @@ fn matches_trigger(filter_json: &str, event: &CrmEvent) -> bool {
         CrmEvent::ActivityOutcome { outcome, .. } => {
             filter.get("outcome").and_then(|v| v.as_str()) == Some(outcome.as_str())
         }
-        CrmEvent::DealStageChanged { to_stage, .. } => {
-            filter.get("to_stage").and_then(|v| v.as_str()) == Some(to_stage.as_str())
+        CrmEvent::DealStageChanged { to_stage, is_won, is_lost, .. } => {
+            // "won"/"lost" in Regel-Filtern meinen die Stage-Semantik, nicht
+            // den (umbenennbaren) Namen. Namensvergleich bleibt als Fallback.
+            match filter.get("to_stage").and_then(|v| v.as_str()) {
+                Some("won")  => *is_won  || to_stage == "won",
+                Some("lost") => *is_lost || to_stage == "lost",
+                Some(other)  => to_stage == other,
+                None         => false,
+            }
         }
     }
 }
@@ -173,6 +180,8 @@ mod tests {
             workspace_id: "ws-2".to_string(),
             deal_id: "deal-1".to_string(),
             to_stage: "won".to_string(),
+            is_won: true,
+            is_lost: false,
         }).unwrap();
         let (score, status): (f64, String) = conn.query_row(
             "SELECT lead_score, status FROM accounts WHERE id = 'acc-2'",
@@ -180,6 +189,67 @@ mod tests {
         ).unwrap();
         assert_eq!(score, 40.0);
         assert_eq!(status, "aktiv");
+    }
+
+    #[test]
+    fn renamed_won_stage_still_fires_won_rules() {
+        let conn = setup_with_rules("ws-6");
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-6', 'ws-6', '', 'Test6', 'company', 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-6', 'ws-6', 'acc-6', 'Deal', 'prospect', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        // Die Gewonnen-Stage heißt beim Nutzer „abschluss" — entscheidend ist
+        // das is_won-Flag, nicht der Name.
+        evaluate(&conn, CrmEvent::DealStageChanged {
+            account_id: "acc-6".to_string(),
+            workspace_id: "ws-6".to_string(),
+            deal_id: "deal-6".to_string(),
+            to_stage: "abschluss".to_string(),
+            is_won: true,
+            is_lost: false,
+        }).unwrap();
+        let (score, status): (f64, String) = conn.query_row(
+            "SELECT lead_score, status FROM accounts WHERE id = 'acc-6'",
+            [], |r| Ok((r.get(0)?, r.get(1)?)),
+        ).unwrap();
+        assert_eq!(score, 40.0);
+        assert_eq!(status, "aktiv");
+    }
+
+    #[test]
+    fn literal_won_stage_without_flag_still_fires_as_fallback() {
+        let conn = setup_with_rules("ws-7");
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, kind, is_private, created_at, updated_at)
+             VALUES ('acc-7', 'ws-7', '', 'Test7', 'company', 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, account_id, title, stage, created_at, updated_at)
+             VALUES ('deal-7', 'ws-7', 'acc-7', 'Deal', 'prospect', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        // Alt-Fall: Stage heißt wörtlich „won", Flags konnten nicht aufgelöst
+        // werden — der Namensvergleich greift weiterhin.
+        evaluate(&conn, CrmEvent::DealStageChanged {
+            account_id: "acc-7".to_string(),
+            workspace_id: "ws-7".to_string(),
+            deal_id: "deal-7".to_string(),
+            to_stage: "won".to_string(),
+            is_won: false,
+            is_lost: false,
+        }).unwrap();
+        let score: f64 = conn.query_row(
+            "SELECT lead_score FROM accounts WHERE id = 'acc-7'",
+            [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(score, 40.0);
     }
 
     #[test]

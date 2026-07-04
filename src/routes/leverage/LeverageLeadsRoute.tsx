@@ -3,10 +3,12 @@ import { Plus, Search, List, LayoutGrid, CalendarClock, UserCheck } from 'lucide
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useCrmStore } from '@/store/crm.store'
+import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { PhasenBoard, FollowUpModal } from '@/routes/LeadsRoute'
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal'
+import { ConvertLeadChoice } from '@/components/leads/ConvertLeadChoice'
 import type { Lead, LeadSource, LeadStage } from '@/types/lead.types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -364,20 +366,13 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
 export function LeverageLeadsRoute() {
   const leads        = useLeadsStore(s => s.leads)
   const convertToClient = useLeadsStore(s => s.convertToClient)
+  const convertToDeal   = useLeadsStore(s => s.convertToDeal)
   const stages       = useLeadStagesStore(s => s.stages)
   const allFollowUps = useCrmStore(s => s.allFollowUps)
   const loadAllFollowUps = useCrmStore(s => s.loadAll)
   const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const userId       = useAuthStore(s => s.user?.id ?? '')
   const showToast    = useToastStore(s => s.show)
-
-  async function handleConvert(lead: Lead) {
-    try {
-      await convertToClient(lead.id)
-      showToast({ message: `${lead.name} ist jetzt Kunde.`, variant: 'success' })
-    } catch {
-      showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
-    }
-  }
 
   const [viewMode,    setViewMode]    = useState<ViewMode>('list')
   const [query,       setQuery]       = useState('')
@@ -385,6 +380,31 @@ export function LeverageLeadsRoute() {
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [followUpLead, setFollowUpLead] = useState<Lead | null>(null)
   const [detailLead,  setDetailLead]  = useState<Lead | null>(null)
+  const [pendingConvert, setPendingConvert] = useState<Lead | null>(null)
+
+  // „Zu Kunde" mit Wahl: nur Kunde, oder Kunde + Deal in der Pipeline.
+  async function handleConvertChoice(withDeal: boolean) {
+    if (!pendingConvert) return
+    const lead = pendingConvert
+    try {
+      if (withDeal) {
+        await convertToDeal(lead.id, workspaceId, userId)
+      } else {
+        await convertToClient(lead.id)
+      }
+      showToast({
+        message: withDeal
+          ? `${lead.name} ist jetzt Kunde — Deal in der Pipeline.`
+          : `${lead.name} ist jetzt Kunde.`,
+        variant: 'success',
+      })
+    } catch {
+      // convertToDeal meldet seine Fehler selbst per Toast.
+      if (!withDeal) showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
+    } finally {
+      setPendingConvert(null)
+    }
+  }
 
   const followUpsByLead = useMemo(() => {
     const map = new Map<string, number>()
@@ -491,7 +511,7 @@ export function LeverageLeadsRoute() {
                 followUpCount={followUpsByLead.get(lead.id) ?? 0}
                 onClick={() => setDetailLead(lead)}
                 onFollowUp={() => setFollowUpLead(lead)}
-                onConvert={() => handleConvert(lead)}
+                onConvert={() => setPendingConvert(lead)}
               />
             ))
           )}
@@ -527,6 +547,14 @@ export function LeverageLeadsRoute() {
           lead={detailLead}
           workspaceId={workspaceId}
           onClose={() => setDetailLead(null)}
+        />
+      )}
+
+      {pendingConvert && (
+        <ConvertLeadChoice
+          leadName={pendingConvert.name}
+          onChoose={handleConvertChoice}
+          onCancel={() => setPendingConvert(null)}
         />
       )}
     </div>

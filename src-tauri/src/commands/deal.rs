@@ -43,13 +43,19 @@ pub fn update_deal_stage(
         direction: None,
         email_id: None,
     });
+    // Stage-Semantik über die Flags auflösen — Stages sind umbenennbar,
+    // „won"/„lost" als Name ist nicht verlässlich.
+    let (stage_is_won, stage_is_lost) =
+        db::pipeline_stage::stage_flags(&*conn, &updated.workspace_id, &stage)?;
     engine::evaluate(&*conn, engine::CrmEvent::DealStageChanged {
         account_id:   updated.account_id.clone(),
         workspace_id: updated.workspace_id.clone(),
         deal_id:      id,
         to_stage:     stage.clone(),
+        is_won:       stage_is_won,
+        is_lost:      stage_is_lost,
     })?;
-    if stage == "won" {
+    if stage_is_won {
         if let Err(e) = db::invoice::create_suggestion_from_deal(&*conn, &updated) {
             eprintln!("[invoice] create_suggestion_from_deal failed for deal {}: {e}", updated.id);
         }
