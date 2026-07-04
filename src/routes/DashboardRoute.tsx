@@ -21,6 +21,7 @@ import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
 import { receivables } from '@/lib/finance/receivables'
+import { remaining, paidAmount } from '@/lib/invoice-status'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
 import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { openExternal } from '@/lib/open-external'
@@ -160,8 +161,8 @@ function WorkspaceView() {
   const koraOverdue = useMemo(() => {
     const snoozed = snoozedInvoiceIds()
     const list = invoices.filter(i => !i.isSuggestion && !snoozed.has(i.id) && invoiceCategory(i) === 'overdue')
-    return { count: list.length, sum: list.reduce((s, i) => s + i.total, 0) }
-  }, [invoices])
+    return { count: list.length, sum: list.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0) }
+  }, [invoices, payments])
 
   // KORA-Zeile
   const koraLine = useMemo(() =>

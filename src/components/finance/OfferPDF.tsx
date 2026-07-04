@@ -121,9 +121,9 @@ function OfferPDFDoc({ data, profile, account }: Props) {
           <Text style={s.colDate}>Datum</Text>
           <Text style={s.colQty}>Menge</Text>
           <Text style={s.colUnit}>Einheit</Text>
-          <Text style={s.colPrice}>Einzel €</Text>
+          <Text style={s.colPrice}>Einzelpreis</Text>
           {!noTax && <Text style={s.colTax}>MwSt%</Text>}
-          <Text style={s.colTotal}>Gesamt €</Text>
+          <Text style={s.colTotal}>Gesamt</Text>
         </View>
         {items.map((item, i) => (
           <View key={i} style={s.row}>

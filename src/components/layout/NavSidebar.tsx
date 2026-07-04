@@ -8,6 +8,7 @@ import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
+import { invoiceCategory } from '@/lib/finance/invoice-filters'
 import { useTodosStore } from '@/store/todos.store'
 import { useCompanyStore } from '@/store/company.store'
 import { WorkspaceSwitcher } from '@/core/workspace/WorkspaceSwitcher'
@@ -65,10 +66,7 @@ export function NavSidebar() {
   const newLeadsCount = useLeadsStore(s => s.newLeads().length)
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
   const overdueCount  = useFinanceStore(s =>
-    s.invoices.filter(i => {
-      if (i.status === 'paid' || i.status === 'cancelled' || i.status === 'draft') return false
-      return i.status === 'overdue' || new Date(i.dueDate) < new Date()
-    }).length
+    s.invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length
   )
   const todayTodos = useTodosStore(s =>
     s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')).length

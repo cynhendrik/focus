@@ -9,6 +9,8 @@ import { shouldFireBriefing } from '@/lib/notifications/quiet-hours'
 import { buildTodayLine } from '@/lib/notifications/briefing'
 import { notify } from '@/services/notify.service'
 import { snoozedInvoiceIds } from '@/lib/heute/snooze'
+import { invoiceCategory } from '@/lib/finance/invoice-filters'
+import { remaining, paidAmount } from '@/lib/invoice-status'
 
 const TICK_MS = 60_000
 
@@ -51,11 +53,10 @@ export function useBriefingScheduler() {
       if (!shouldFireBriefing(now, s, s.lastBriefingDate, todayIso)) return
 
       const invoices = useFinanceStore.getState().invoices
+      const payments = useFinanceStore.getState().payments
       const snoozed = snoozedInvoiceIds()
       const overdue = invoices.filter(i =>
-        !snoozed.has(i.id)
-        && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
-        && (i.status === 'overdue' || i.dueDate.slice(0, 10) < todayIso))
+        !i.isSuggestion && !snoozed.has(i.id) && invoiceCategory(i) === 'overdue')
       const followUps = useCrmStore.getState().allFollowUps
       const fusDue = followUps.filter(f => f.status === 'offen' && f.dueDate.slice(0, 10) <= todayIso).length
       const tasksDue = useTodosStore.getState().allTodos
@@ -64,7 +65,7 @@ export function useBriefingScheduler() {
 
       const line = buildTodayLine({
         overdueCount: overdue.length,
-        overdueSum: overdue.reduce((sum, i) => sum + i.total, 0),
+        overdueSum: overdue.reduce((sum, i) => sum + remaining(i, paidAmount(payments, i.id)), 0),
         fusDue, tasksDue, eventsToday,
       })
 
