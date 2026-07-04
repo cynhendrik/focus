@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, pdf, Image } from '@react-pdf/renderer'
+import { fmtEurPdf, fmtQty } from '@/lib/finance/pdf-format'
 import type { OfferWithItems } from '@/types/finance.types'
 import type { CompanyProfile } from '@/types/company.types'
 import type { Account } from '@/types/account.types'
@@ -133,11 +134,11 @@ function OfferPDFDoc({ data, profile, account }: Props) {
               )}
             </View>
             <Text style={s.colDate}>{fmtDate(item.itemDate ?? offer.createdAt)}</Text>
-            <Text style={s.colQty}>{item.quantity}</Text>
+            <Text style={s.colQty}>{fmtQty(item.quantity)}</Text>
             <Text style={s.colUnit}>{item.unit ?? ''}</Text>
-            <Text style={s.colPrice}>{item.unitPrice.toFixed(2)}</Text>
+            <Text style={s.colPrice}>{fmtEurPdf(item.unitPrice)}</Text>
             {!noTax && <Text style={s.colTax}>{item.taxRate}%</Text>}
-            <Text style={s.colTotal}>{item.total.toFixed(2)}</Text>
+            <Text style={s.colTotal}>{fmtEurPdf(item.total)}</Text>
           </View>
         ))}
 

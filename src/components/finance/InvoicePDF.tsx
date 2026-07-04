@@ -10,6 +10,7 @@ import { computeTaxRateGroups } from '@/lib/invoice-tax'
 import { buildCiiXml } from '@/lib/erechnung/cii-invoice'
 import { embedFacturX } from '@/lib/erechnung/facturx-embed'
 import { checkErechnungReadiness } from '@/lib/erechnung/erechnung-readiness'
+import { fmtEurPdf, fmtQty } from '@/lib/finance/pdf-format'
 import { log } from '@/lib/logger'
 import fontRegular from '@/assets/fonts/LiberationSans-Regular.ttf'
 import fontBold from '@/assets/fonts/LiberationSans-Bold.ttf'
@@ -126,8 +127,6 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
     .filter(Boolean).join(', ')
 
   const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}` }
-  const daysBetween = (a: string, b: string) =>
-    Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000)
 
   const footerLine1 = [profile.name, profile.address, profile.email, profile.phone]
     .filter(Boolean).join('  ·  ')
@@ -179,11 +178,9 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
           </View>
           <View style={s.metaBlock}>
             {[
-              { label: 'Zahlungsziel',   value: `${daysBetween(invoice.date, invoice.dueDate)} Tage` },
               { label: 'Rechnungsdatum', value: fmtDate(invoice.date) },
               { label: 'Leistungsdatum', value: fmtDate(leistungsdatum) },
               { label: 'Fällig am',      value: fmtDate(invoice.dueDate) },
-              { label: 'Rechnungsnr.',   value: invoice.number ?? '—' },
             ].map(m => (
               <View key={m.label} style={s.metaItem}>
                 <Text style={s.label}>{m.label}</Text>
@@ -219,11 +216,11 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
               )}
             </View>
             <Text style={s.colDate}>{fmtDate(item.itemDate ?? invoice.date)}</Text>
-            <Text style={s.colQty}>{item.quantity}</Text>
+            <Text style={s.colQty}>{fmtQty(item.quantity)}</Text>
             <Text style={s.colUnit}>{item.unit ?? ''}</Text>
-            <Text style={s.colPrice}>{item.unitPrice.toFixed(2)} €</Text>
+            <Text style={s.colPrice}>{fmtEurPdf(item.unitPrice)}</Text>
             {!noTax && <Text style={s.colTax}>{item.taxRate}%</Text>}
-            <Text style={s.colTotal}>{item.total.toFixed(2)} €</Text>
+            <Text style={s.colTotal}>{fmtEurPdf(item.total)}</Text>
           </View>
         ))}
 
