@@ -561,6 +561,25 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError> {
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS prepared_items (
+            id           TEXT PRIMARY KEY,
+            workspace_id TEXT NOT NULL,
+            type         TEXT NOT NULL,
+            source_kind  TEXT NOT NULL,
+            source_id    TEXT NOT NULL,
+            assignee     TEXT,
+            payload      TEXT NOT NULL DEFAULT '{}',
+            score        REAL NOT NULL DEFAULT 0,
+            status       TEXT NOT NULL DEFAULT 'pending',
+            snooze_until TEXT,
+            rule_id      TEXT NOT NULL DEFAULT '',
+            created_at   TEXT NOT NULL,
+            updated_at   TEXT NOT NULL,
+            approved_at  TEXT,
+            UNIQUE(workspace_id, source_kind, source_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_prepared_items_ws_status ON prepared_items(workspace_id, status, score);
     "#)?;
     Ok(())
 }

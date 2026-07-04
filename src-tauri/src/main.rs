@@ -342,6 +342,9 @@ fn main() {
             email::commands::email_rematch_customers,
             email::commands::email_delete,
             email::commands::email_set_not_a_lead,
+            email::commands::email_list_ignored_senders,
+            email::commands::email_ignore_sender,
+            email::commands::email_unignore_sender,
             email::commands::email_test_smtp,
             email::commands::email_send,
             email::commands::email_get_attachments,
@@ -415,6 +418,7 @@ fn main() {
             commands::export::cmd_delete_workspace,
             commands::export::cmd_rescope_workspace,
             commands::export::cmd_has_local_orphan_data,
+            commands::export::cmd_list_local_workspace_ids,
             commands::export::cmd_dump_table,
             commands::calendar::get_calendar_events,
             commands::calendar::upsert_calendar_event,
@@ -434,6 +438,12 @@ fn main() {
             commands::notes::create_note_folder,
             commands::notes::update_note_folder,
             commands::notes::delete_note_folder,
+            commands::prepared_item::cmd_get_active_prepared_items,
+            commands::prepared_item::cmd_insert_prepared_item_ignore,
+            commands::prepared_item::cmd_update_prepared_item_status,
+            commands::prepared_item::cmd_update_prepared_item_payload,
+            commands::prepared_item::cmd_set_prepared_item_assignee,
+            commands::prepared_item::cmd_get_approved_prepared_items_since,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

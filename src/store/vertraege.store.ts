@@ -124,6 +124,8 @@ export const useVertraege = create<VertraegeState>()((set, get) => ({
           date: next,
           dueDate: addDays(next, 14),
           status: 'draft',
+          isSuggestion: true,
+          suggestedBy: 'vertrag', // Vertrags-Rechnungen laufen als Vorschlag in den Stapel — Freigeben vergibt die Nummer.
           taxMode: vertrag.taxMode,
           subtotal: totals.subtotal,
           taxAmount: totals.taxAmount,

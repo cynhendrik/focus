@@ -11,6 +11,8 @@ import { useUiStore } from '@/store/ui.store'
 import { useToastStore } from '@/store/toast.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { ActivitiesGateway } from '@/data/activities.gateway'
+import { appointmentFollowUp } from '@/lib/leads/qualify'
+import { ConvertLeadChoice } from '@/components/leads/ConvertLeadChoice'
 import { LeadStagesManager } from '@/components/leads/LeadStagesManager'
 import { QualifyModal } from '@/components/leads/QualifyModal'
 import { DisqualifyModal } from '@/components/leads/DisqualifyModal'
@@ -199,15 +201,15 @@ export function FollowUpModal({
 interface CtxMenu { lead: Lead; x: number; y: number }
 
 function ContextMenu({
-  menu, workspaceId, onClose, onFollowUp, warmStageName = 'warm',
+  menu, workspaceId, onClose, onFollowUp, onConvert, warmStageName = 'warm',
 }: {
   menu: CtxMenu
   workspaceId: string
   onClose: () => void
   onFollowUp: (leads: Lead[]) => void
+  onConvert: (lead: Lead) => void
   warmStageName?: string
 }) {
-  const convertToClient = useLeadsStore(s => s.convertToClient)
   const deleteLead = useLeadsStore(s => s.deleteLead)
   const bulkUpdate = useLeadsStore(s => s.bulkUpdate)
   const ref = useRef<HTMLDivElement>(null)
@@ -254,7 +256,7 @@ function ContextMenu({
       <CtxItem
         label="Zu Kunde machen ✓"
         color="var(--accent)"
-        onClick={() => act(() => convertToClient(menu.lead.id))}
+        onClick={() => act(() => onConvert(menu.lead))}
       />
 
       <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
@@ -643,9 +645,10 @@ function ReEngageSidebar({ leads, workspaceId }: { leads: Lead[]; workspaceId: s
 export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true }: { workspaceId: string; onShowCreate: () => void; showCreateButton?: boolean }) {
   const allLeads      = useLeadsStore(s => s.leads)
   const bulkUpdate    = useLeadsStore(s => s.bulkUpdate)
-  const moveLeadStage = useLeadsStore(s => s.moveLeadStage)
-  const deleteLead    = useLeadsStore(s => s.deleteLead)
-  const convertToDeal = useLeadsStore(s => s.convertToDeal)
+  const moveLeadStage   = useLeadsStore(s => s.moveLeadStage)
+  const deleteLead      = useLeadsStore(s => s.deleteLead)
+  const convertToDeal   = useLeadsStore(s => s.convertToDeal)
+  const convertToClient = useLeadsStore(s => s.convertToClient)
   const userId        = useAuthStore(s => s.user?.id ?? '')
   const openCustomerAt = useUiStore(s => s.openCustomerAt)
   const showToast     = useToastStore(s => s.show)
@@ -657,6 +660,7 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
   const [followUpLeads, setFollowUpLeads]         = useState<Lead[] | null>(null)
   const [pendingQualify, setPendingQualify]       = useState<Lead | null>(null)
   const [pendingDisqualify, setPendingDisqualify] = useState<Lead | null>(null)
+  const [pendingConvert, setPendingConvert]       = useState<Lead | null>(null)
   const [showStages, setShowStages]              = useState(false)
   const [detailLead, setDetailLead]              = useState<Lead | null>(null)
 
@@ -749,21 +753,62 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
     }
   }
 
-  const handleQualifyConfirm = async (_appointmentDate?: string) => {
+  const handleQualifyConfirm = async (appointmentDate?: string, dealValue?: number) => {
     if (!pendingQualify) return
     try {
       const leadId = pendingQualify.id
-      await convertToDeal(leadId, workspaceId, userId)
+      await convertToDeal(leadId, workspaceId, userId, dealValue)
+      // Termin aus dem Dialog wird ein Follow-up am Termin — Lead und Kunde
+      // teilen dieselbe Account-ID, der Eintrag bleibt also am Kunden sichtbar.
+      const followUp = appointmentFollowUp({
+        leadId, leadName: pendingQualify.name, workspaceId, userId, appointmentDate,
+      })
+      let followUpCreated = false
+      if (followUp) {
+        try {
+          await ActivitiesGateway.create(followUp)
+          followUpCreated = true
+        } catch {
+          showToast({ message: 'Termin konnte nicht als Follow-up gespeichert werden.', variant: 'error' })
+        }
+      }
       // Lead → Kunde: gleiche ID, History/Follow-Ups bleiben dran. Direkt zum
       // Kunden springen, damit die Kontinuität sofort sichtbar ist.
       showToast({
-        message: `${pendingQualify.name} ist jetzt Kunde — Deal in der Pipeline.`,
+        message: followUpCreated
+          ? `${pendingQualify.name} ist jetzt Kunde — Deal in der Pipeline, Termin als Follow-up notiert.`
+          : `${pendingQualify.name} ist jetzt Kunde — Deal in der Pipeline.`,
         action: { label: '→ Kunde öffnen', onClick: () => openCustomerAt(leadId, 'verlauf') },
       })
     } catch (err) {
       showToast({ message: err instanceof Error ? err.message : 'Konvertierung fehlgeschlagen', variant: 'error' })
     } finally {
       setPendingQualify(null)
+    }
+  }
+
+  // „Zu Kunde machen" aus dem Kontextmenü — mit Wahl, ob zusätzlich ein Deal
+  // entsteht (gleiche Wirkung wie Drag auf die Qualifiziert-Stage).
+  const handleConvertChoice = async (withDeal: boolean, dealValue?: number) => {
+    if (!pendingConvert) return
+    const lead = pendingConvert
+    try {
+      if (withDeal) {
+        await convertToDeal(lead.id, workspaceId, userId, dealValue)
+      } else {
+        await convertToClient(lead.id)
+      }
+      showToast({
+        message: withDeal
+          ? `${lead.name} ist jetzt Kunde — Deal in der Pipeline.`
+          : `${lead.name} ist jetzt Kunde.`,
+        action: { label: '→ Kunde öffnen', onClick: () => openCustomerAt(lead.id, 'verlauf') },
+      })
+    } catch {
+      // convertToDeal meldet seine Fehler selbst per Toast.
+      if (!withDeal) showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
+    } finally {
+      setPendingConvert(null)
     }
   }
 
@@ -965,11 +1010,19 @@ export function PhasenBoard({ workspaceId, onShowCreate, showCreateButton = true
           workspaceId={workspaceId}
           onClose={() => setCtxMenu(null)}
           onFollowUp={leads => { setCtxMenu(null); setFollowUpLeads(leads) }}
+          onConvert={lead => { setCtxMenu(null); setPendingConvert(lead) }}
           warmStageName={stages.find(s => s.name === 'warm')?.name ?? stages.find(s => !s.isQualified && !s.isDisqualified && s.orderIndex === 2)?.name ?? 'warm'}
         />
       )}
       {followUpLeads && (
         <FollowUpModal leads={followUpLeads} workspaceId={workspaceId} onClose={() => setFollowUpLeads(null)} />
+      )}
+      {pendingConvert && (
+        <ConvertLeadChoice
+          leadName={pendingConvert.name}
+          onChoose={handleConvertChoice}
+          onCancel={() => setPendingConvert(null)}
+        />
       )}
       {pendingQualify && (
         <QualifyModal

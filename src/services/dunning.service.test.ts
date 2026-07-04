@@ -135,6 +135,42 @@ describe('recordReminderSent', () => {
   })
 })
 
+describe('prepareReminder: Template statt KI', () => {
+  it('nutzt den deterministischen Mahntext und ruft KORA nicht auf', async () => {
+    const { prepareReminder } = await import('./dunning.service')
+    const { generateCorraDraft } = await import('@/lib/ai/corra')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+    const { FinanceGateway } = await import('@/data/finance.gateway')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    useAccountsStore.setState({ accounts: [{ id: 'acc1', name: 'Meyer GmbH', email: 'info@meyer.de' }] } as never)
+    vi.mocked(FinanceGateway.getInvoice).mockRejectedValueOnce(new Error('kein PDF im Test'))
+    vi.mocked(generateCorraDraft).mockClear()
+
+    const invoice = { id: 'inv1', accountId: 'acc1', number: 'R-100', dueDate: '2026-06-01', total: 1000, status: 'overdue' } as never
+    await prepareReminder(invoice, 0)
+    expect(vi.mocked(generateCorraDraft)).not.toHaveBeenCalled()
+  })
+
+  it('bodyOverride ersetzt den Template-Text', async () => {
+    const { prepareReminder } = await import('./dunning.service')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    // Kein account → PDF-Block wird übersprungen, Vorbereitung gelingt ohne Gateway.
+    useAccountsStore.setState({ accounts: [] } as never)
+    const { ContactsGateway } = await import('@/data/contacts.gateway')
+    vi.mocked(ContactsGateway.getByAccount).mockResolvedValueOnce([{ email: 'x@y.de' }] as never)
+
+    const invoice = { id: 'inv2', accountId: 'accX', number: 'R-200', dueDate: '2026-06-01', total: 500, status: 'overdue' } as never
+    const result = await prepareReminder(invoice, 0, { bodyOverride: 'MEIN EIGENER TEXT' })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.body).toBe('MEIN EIGENER TEXT')
+  })
+})
+
 describe('prepareReminder: PDF-Pflicht', () => {
   it('bricht ab, wenn das Rechnungs-PDF nicht erzeugt werden kann', async () => {
     const { prepareReminder } = await import('./dunning.service')

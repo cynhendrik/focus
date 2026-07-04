@@ -24,12 +24,20 @@ describe('tour fixtures', () => {
   // liegen → paidNow=0 / -100%. Darum muss die bezahlte Demo-Rechnung in die aktuelle Woche fallen.
   it('hat eine bezahlte Rechnung in der laufenden Woche (Dashboard-Umsatz > 0, nicht -100%)', () => {
     const now = new Date()
+    const day = now.getDay()
     const sow = new Date(now)
-    const day = sow.getDay()
     sow.setHours(0, 0, 0, 0)
     sow.setDate(now.getDate() + (day === 0 ? -6 : 1 - day))   // Montag dieser Woche (wie DashboardRoute)
+    // Zeitzonen-sicher: bare date-Strings (YYYY-MM-DD) werden von new Date() als UTC midnight
+    // geparst → bei CET/CEST-Offset (UTC+1/+2) liegt 00:00 UTC NACH lokalem Mitternacht,
+    // d. h. der Vergleich schlägt zwischen 00:00 und 02:00 fehl. Darum lexikografisch als
+    // YYYY-MM-DD-Strings vergleichen – das ist immer korrekt und zonenunabhängig.
+    const p = (n: number) => String(n).padStart(2, '0')
+    const toYmd = (d: Date) => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+    const sowDate = toYmd(sow)
+    const todayDate = toYmd(now)
     const paidThisWeek = tourInvoices.filter(
-      i => i.status === 'paid' && new Date(i.date) >= sow && new Date(i.date) <= now,
+      i => i.status === 'paid' && i.date.slice(0, 10) >= sowDate && i.date.slice(0, 10) <= todayDate,
     )
     expect(paidThisWeek.length).toBeGreaterThan(0)
   })

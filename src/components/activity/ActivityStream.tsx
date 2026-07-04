@@ -17,8 +17,14 @@ import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useMailStore } from '@/store/mail.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useToastStore } from '@/store/toast.store'
+import { useLeadsStore } from '@/store/leads.store'
+import { useCustomersStore } from '@/store/customers.store'
 
 import { MailService } from '@/services/mail.service'
+import { outcomeOptionsFor, autoFollowUpForOutcome } from '@/lib/activities/outcomes'
+import { isFollowUpActivity } from '@/lib/activities/followups'
+import type { ActivityOutcome } from '@/types/activity.types'
 import type { EmailBody } from '@/types/mail.types'
 import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import type { FollowUpQueueItem } from '@/types/follow-up-queue.types'
@@ -232,13 +238,15 @@ export function ActivityStream({
     const out: TimelineEvent[] = []
 
     for (const a of activities) {
-      const isFollowup = a.type === 'followup'
+      const isFollowup = isFollowUpActivity(a)
+      // Task-Follow-ups liefert die CRM-Quelle bereits — nicht doppelt zeigen.
+      if (isFollowup && a.type === 'task' && sources.crmFollowUps) continue
       const ts = isFollowup ? (a.dueAt ?? a.createdAt) : a.createdAt
       if (!ts) continue
       const kindMap: Record<string, EventKind> = {
         call: 'call', meeting: 'meeting', email: 'email', note: 'note', followup: 'followup',
       }
-      const kind = kindMap[a.type] ?? 'note'
+      const kind = isFollowup ? 'followup' : (kindMap[a.type] ?? 'note')
       const isFuture = isFollowup && a.status !== 'done' && new Date(ts).getTime() > nowMs
       out.push({
         id: `act-${a.id}`,
@@ -392,30 +400,58 @@ export function ActivityStream({
   const [composerKind, setComposerKind]   = useState<ComposerKind>('note')
   const [composerText, setComposerText]   = useState('')
   const [composerDate, setComposerDate]   = useState('')
+  const [composerOutcome, setComposerOutcome] = useState<ActivityOutcome | null>(null)
   const [kindMenuOpen, setKindMenuOpen]   = useState(false)
   const [saving, setSaving]               = useState(false)
+  const showToast = useToastStore(s => s.show)
+
+  // Beim Wechsel der Art passt das gewählte Ergebnis evtl. nicht mehr.
+  const handleKindChange = useCallback((k: ComposerKind) => {
+    setComposerKind(k)
+    setComposerOutcome(null)
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!composerText.trim() || !workspaceId) return
     setSaving(true)
     try {
       const isFollowup = composerKind === 'followup'
+      const outcome = composerOutcome ?? undefined
       await createActivity({
         workspaceId,
         createdBy: user?.email ?? 'user',
         accountId,
         customerId: accountId,
-        type: composerKind,
+        // Follow-ups als task + is_follow_up — die EINE Konvention, die alle
+        // Follow-up-Listen (Mein Tag, Stapel, Pipeline) lesen. type='followup'
+        // fiel aus sämtlichen Listen heraus.
+        type: isFollowup ? 'task' : composerKind,
+        payload: isFollowup ? JSON.stringify({ is_follow_up: true }) : undefined,
         title: composerText.trim(),
         status: isFollowup ? 'open' : 'done',
         dueAt: isFollowup && composerDate ? composerDate : undefined,
+        outcome,
       })
+      // „Nicht erreicht"/No-Show → automatisch in 3 Tagen dranbleiben.
+      const accountName =
+        useLeadsStore.getState().leads.find(l => l.id === accountId)?.name ??
+        useCustomersStore.getState().customers.find(c => c.id === accountId)?.name
+      const auto = autoFollowUpForOutcome({
+        outcome, accountId, workspaceId,
+        userId: user?.email ?? 'user',
+        leadName: accountName,
+      })
+      if (auto) {
+        await createActivity(auto)
+        showToast({ message: 'Nicht erreicht — Follow-up in 3 Tagen angelegt.', variant: 'success' })
+      }
       setComposerText('')
       setComposerDate('')
+      setComposerOutcome(null)
     } finally {
       setSaving(false)
     }
-  }, [composerKind, composerText, composerDate, workspaceId, user, accountId, createActivity])
+  }, [composerKind, composerText, composerDate, composerOutcome, workspaceId, user, accountId, createActivity, showToast])
 
   // ── Email expansion ──────────────────────────────────────────────────────
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null)
@@ -435,11 +471,13 @@ export function ActivityStream({
     <div style={{ minWidth: 0 }}>
       <Composer
         kind={composerKind}
-        onKindChange={setComposerKind}
+        onKindChange={handleKindChange}
         text={composerText}
         onTextChange={setComposerText}
         date={composerDate}
         onDateChange={setComposerDate}
+        outcome={composerOutcome}
+        onOutcomeChange={setComposerOutcome}
         menuOpen={kindMenuOpen}
         onMenuToggle={setKindMenuOpen}
         saving={saving}
@@ -548,6 +586,8 @@ interface ComposerProps {
   onTextChange: (s: string) => void
   date: string
   onDateChange: (s: string) => void
+  outcome: ActivityOutcome | null
+  onOutcomeChange: (o: ActivityOutcome | null) => void
   menuOpen: boolean
   onMenuToggle: (b: boolean) => void
   saving: boolean
@@ -556,11 +596,12 @@ interface ComposerProps {
 
 function Composer({
   kind, onKindChange, text, onTextChange, date, onDateChange,
-  menuOpen, onMenuToggle, saving, onSubmit,
+  outcome, onOutcomeChange, menuOpen, onMenuToggle, saving, onSubmit,
 }: ComposerProps) {
   const meta = metaFor(kind)
   const Icon = meta.Icon
   const isFollowup = kind === 'followup'
+  const outcomeOptions = outcomeOptionsFor(kind)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -691,6 +732,45 @@ function Composer({
           {saving ? '…' : (isFollowup ? 'Planen' : 'Erfassen')}
         </button>
       </div>
+
+      {/* Ergebnis-Auswahl — genau die Outcomes, auf die die Scoring-Regeln
+          hören. Ein Klick genügt; erneuter Klick wählt ab. */}
+      <AnimatePresence initial={false}>
+        {outcomeOptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 10 }}
+            exit   ={{ opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: 0.16, ease: [0.2, 0.7, 0.1, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontWeight: 600, marginRight: 2 }}>
+                Ergebnis:
+              </span>
+              {outcomeOptions.map(o => {
+                const active = outcome === o.value
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => onOutcomeChange(active ? null : o.value)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color: active ? 'var(--accent-text)' : 'var(--fg-muted)',
+                      transition: 'all 140ms ease',
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence initial={false}>
         {isFollowup && (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useWorkspaceStore, generateJoinCode } from './workspace.store'
+import { useWorkspaceStore, generateJoinCode, findOrphanWorkspaceIds } from './workspace.store'
 import { makeLocalWorkspace } from '@/data/workspace-local'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }))
@@ -265,5 +265,28 @@ describe('deleteWorkspace', () => {
     })
     await expect(useWorkspaceStore.getState().deleteWorkspace('c1')).rejects.toThrow('Nur der Inhaber')
     expect(useWorkspaceStore.getState().workspaces).toHaveLength(1)
+  })
+})
+
+describe('findOrphanWorkspaceIds', () => {
+  it('gibt IDs zurück, die in dataIds, aber nicht in knownIds sind', () => {
+    expect(findOrphanWorkspaceIds(['a', 'b', 'c'], ['b', 'c'])).toEqual(['a'])
+  })
+
+  it('gibt [] zurück, wenn alle dataIds bekannt sind', () => {
+    expect(findOrphanWorkspaceIds(['x', 'y'], ['x', 'y', 'z'])).toEqual([])
+  })
+
+  it('gibt [] zurück bei leeren dataIds', () => {
+    expect(findOrphanWorkspaceIds([], ['x'])).toEqual([])
+  })
+
+  it('gibt alle dataIds zurück, wenn knownIds leer ist', () => {
+    const result = findOrphanWorkspaceIds(['a', 'b'], [])
+    expect(result.sort()).toEqual(['a', 'b'])
+  })
+
+  it('filtert leere Strings heraus', () => {
+    expect(findOrphanWorkspaceIds(['', 'a'], ['x'])).toEqual(['a'])
   })
 })

@@ -11,7 +11,7 @@ import { useAccountsStore } from '@/store/accounts.store'
 import { useCompanyStore } from '@/store/company.store'
 import { MailService } from '@/services/mail.service'
 import { FinanceGateway } from '@/data/finance.gateway'
-import { generateCorraDraft } from '@/lib/ai/corra'
+import { mahnungBody, mahnungSubject } from '@/lib/templates/mahnung'
 import { log } from '@/lib/logger'
 import type { Contact } from '@/types/contact.types'
 import { ActivitiesGateway } from '@/data/activities.gateway'
@@ -133,9 +133,6 @@ export function escalatedInvoices(
 
 const LEVEL_LABEL = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung']
 function levelLabel(level: number): string { return LEVEL_LABEL[level] ?? '2. Mahnung' }
-function fmtEur(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 /** Protokolliert einen gesendeten Mahnschritt als abgeschlossenes To-do (treibt die Stufe). */
 export async function recordReminderSent(
@@ -168,11 +165,11 @@ export interface PreparedReminder {
 }
 
 /**
- * Bereitet eine Mahnung vor (Empfänger, Betreff, KORA-Text, PDF-Anhang) OHNE zu senden.
+ * Bereitet eine Mahnung vor (Empfänger, Betreff, Template-Text, PDF-Anhang) OHNE zu senden.
  * Für den Einzel-Versand, der die Mail im Editor öffnet. Wirft nie.
  */
 export async function prepareReminder(
-  invoice: Invoice, level: number,
+  invoice: Invoice, level: number, opts?: { bodyOverride?: string },
 ): Promise<{ ok: true; data: PreparedReminder } | { ok: false; error: string }> {
   try {
     const mailAccount = useMailStore.getState().accounts[0]
@@ -190,19 +187,13 @@ export async function prepareReminder(
     const todos = useTodosStore.getState().allTodos
     const bd = reminderBreakdown(invoice, payments, todos, level, fees)
 
-    const body = await generateCorraDraft({
-      kind: 'reminder', customerName,
-      invoiceNumber: invoice.number ?? invoice.id.slice(0, 8),
-      amount: bd.total, baseAmount: bd.base, feeAmount: bd.fee,
-      dueDate: invoice.dueDate, daysOverdue: days, dunningLevel: level,
-    }).catch(() =>
-      bd.fee > 0
-        ? `Guten Tag,\n\nwir möchten an die offene Rechnung ${invoice.number ?? ''} erinnern.\n`
-          + `Rechnungsbetrag ${fmtEur(bd.base)} € + Mahngebühr ${fmtEur(bd.fee)} € = zu zahlen ${fmtEur(bd.total)} €.\n\n`
-          + `Bitte gleichen Sie den Betrag zeitnah aus.\n\nMit freundlichen Grüßen`
-        : `Guten Tag,\n\nwir möchten an die offene Rechnung ${invoice.number ?? ''} über ${fmtEur(bd.total)} € erinnern.\n\n`
-          + `Bitte gleichen Sie den Betrag zeitnah aus.\n\nMit freundlichen Grüßen`,
-    )
+    const newDeadline = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+    const templateInput = {
+      customerName, invoiceNumber: invoice.number ?? invoice.id.slice(0, 8),
+      base: bd.base, fee: bd.fee, total: bd.total,
+      daysOverdue: days, level, newDeadline,
+    }
+    const body = opts?.bodyOverride ?? mahnungBody(templateInput)
 
     let attachmentPaths: string[] = []
     if (account) {
@@ -226,7 +217,7 @@ export async function prepareReminder(
       data: {
         invoiceId: invoice.id, level, mailAccountId: mailAccount.id,
         to: [recipient],
-        subject: `${levelLabel(level)} · Rechnung ${invoice.number ?? ''} · zu zahlen ${fmtEur(bd.total)} €`,
+        subject: mahnungSubject(templateInput),
         body, attachmentPaths,
       },
     }
@@ -237,12 +228,12 @@ export async function prepareReminder(
 }
 
 /**
- * Versendet eine Mahnung: Kontakt-Mail → KORA-Text → PDF (optional) → SMTP →
+ * Versendet eine Mahnung: Kontakt-Mail → Template-Text → PDF (optional) → SMTP →
  * bei Erfolg recordReminderSent (Stufe zählt hoch). Wirft nie — gibt ein Result zurück
  * (für isolierten Batch-Versand).
  */
-export async function sendReminder(invoice: Invoice, level: number): Promise<DunningSendResult> {
-  const prep = await prepareReminder(invoice, level)
+export async function sendReminder(invoice: Invoice, level: number, opts?: { bodyOverride?: string }): Promise<DunningSendResult> {
+  const prep = await prepareReminder(invoice, level, opts)
   if (!prep.ok) return { invoiceId: invoice.id, ok: false, error: prep.error }
   const fees = useCompanyStore.getState().profile.dunningFees ?? DEFAULT_DUNNING_FEES
   try {

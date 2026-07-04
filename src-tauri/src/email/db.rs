@@ -111,6 +111,22 @@ pub fn init_schema(conn: &Connection) -> rusqlite::Result<()> {
         conn.execute_batch("PRAGMA user_version = 5")?;
     }
 
+    if version < 6 {
+        // ignored_senders: dauerhaft ignorierte Absender (Adresse oder ganze
+        // Domain). Wirkt absenderweit — im Gegensatz zum Mail-einzelnen
+        // not_a_lead-Flag überlebt das neue Mails desselben Absenders.
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS ignored_senders (
+                id         TEXT PRIMARY KEY,
+                pattern    TEXT NOT NULL,
+                scope      TEXT NOT NULL CHECK(scope IN ('address','domain')),
+                created_at TEXT NOT NULL,
+                UNIQUE(pattern, scope)
+            );
+        ")?;
+        conn.execute_batch("PRAGMA user_version = 6")?;
+    }
+
     Ok(())
 }
 
@@ -300,6 +316,94 @@ pub fn list_emails(
         }
     )?;
     rows.collect()
+}
+
+// ── Ignorierte Absender ───────────────────────────────────────────────────────
+
+/// Kleinschreiben + trimmen; bei Domain-Scope auch ein führendes „@" entfernen,
+/// damit „@app.com" und „app.com" denselben Eintrag ergeben.
+fn normalize_ignore_pattern(pattern: &str, scope: &str) -> String {
+    let p = pattern.trim().to_lowercase();
+    if scope == "domain" { p.trim_start_matches('@').to_string() } else { p }
+}
+
+/// WHERE-Bedingung, die eine Mail einem einzelnen Ignorier-Eintrag zuordnet:
+/// Adresse exakt, Domain inklusive Subdomains.
+const MATCH_ADDRESS: &str = "lower(from_addr) = ?1";
+const MATCH_DOMAIN: &str =
+    "(lower(from_addr) LIKE '%@' || ?1 OR lower(from_addr) LIKE '%@%.' || ?1)";
+
+pub fn list_ignored_senders(
+    conn: &Connection,
+) -> rusqlite::Result<Vec<crate::email::types::IgnoredSender>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, pattern, scope, created_at FROM ignored_senders ORDER BY pattern",
+    )?;
+    let rows = stmt.query_map([], |row| Ok(crate::email::types::IgnoredSender {
+        id:         row.get(0)?,
+        pattern:    row.get(1)?,
+        scope:      row.get(2)?,
+        created_at: row.get(3)?,
+    }))?;
+    rows.collect()
+}
+
+/// Blendet alle Mails aus, deren Absender auf der Ignorierliste steht. Läuft
+/// nach jedem Mail-Sync — so bleiben auch neue Mails ignorierter Absender
+/// dauerhaft draußen. Gibt die Anzahl neu ausgeblendeter Mails zurück.
+pub fn apply_ignored_senders(conn: &Connection) -> rusqlite::Result<usize> {
+    conn.execute(
+        "UPDATE emails SET not_a_lead = 1
+         WHERE not_a_lead = 0
+           AND EXISTS (
+             SELECT 1 FROM ignored_senders s
+             WHERE (s.scope = 'address' AND lower(emails.from_addr) = s.pattern)
+                OR (s.scope = 'domain'  AND (lower(emails.from_addr) LIKE '%@' || s.pattern
+                                             OR lower(emails.from_addr) LIKE '%@%.' || s.pattern))
+           )",
+        [],
+    )
+}
+
+/// Nimmt einen Absender (scope „address") oder eine ganze Domain (scope
+/// „domain") dauerhaft auf die Ignorierliste und blendet alle vorhandenen
+/// Mails dieses Absenders sofort aus (Backfill).
+pub fn add_ignored_sender(conn: &Connection, pattern: &str, scope: &str) -> rusqlite::Result<()> {
+    let normalized = normalize_ignore_pattern(pattern, scope);
+    conn.execute(
+        "INSERT OR IGNORE INTO ignored_senders (id, pattern, scope, created_at)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![Uuid::new_v4().to_string(), normalized, scope, chrono::Utc::now().to_rfc3339()],
+    )?;
+    apply_ignored_senders(conn)?;
+    Ok(())
+}
+
+/// Entfernt einen Ignorier-Eintrag und blendet dessen Mails wieder ein —
+/// außer sie sind noch von einem anderen Eintrag abgedeckt (Re-Apply).
+pub fn remove_ignored_sender(conn: &Connection, id: &str) -> rusqlite::Result<()> {
+    let entry: Option<(String, String)> = conn
+        .query_row(
+            "SELECT pattern, scope FROM ignored_senders WHERE id = ?1",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(other),
+        })?;
+
+    let Some((pattern, scope)) = entry else { return Ok(()) };
+    conn.execute("DELETE FROM ignored_senders WHERE id = ?1", params![id])?;
+
+    let match_clause = if scope == "address" { MATCH_ADDRESS } else { MATCH_DOMAIN };
+    conn.execute(
+        &format!("UPDATE emails SET not_a_lead = 0 WHERE {}", match_clause),
+        params![pattern],
+    )?;
+    apply_ignored_senders(conn)?;
+    Ok(())
 }
 
 /// Markiert eine Mail als „kein Lead" (oder hebt es wieder auf). Damit fällt sie
@@ -747,6 +851,87 @@ mod tests {
         let conn = in_memory_db();
         let flags = get_folder_flags(&conn, "acc1", "INBOX.Unknown").unwrap();
         assert!(flags.is_empty());
+    }
+
+    /// Kürzel: Mail mit Absender anlegen.
+    fn insert_mail(conn: &Connection, id: &str, uid: u32, from_addr: &str) {
+        conn.execute(
+            "INSERT INTO emails (id, account_id, uid, folder, from_addr, sent_at)
+             VALUES (?1,'a1',?2,'INBOX',?3,'2026-01-01')",
+            params![id, uid, from_addr],
+        ).unwrap();
+    }
+
+    fn not_a_lead_of(conn: &Connection, id: &str) -> bool {
+        conn.query_row("SELECT not_a_lead FROM emails WHERE id=?1", params![id], |r| r.get::<_, i32>(0))
+            .unwrap() != 0
+    }
+
+    #[test]
+    fn ignore_sender_address_backfills_and_flags_new_mails_on_apply() {
+        let conn = in_memory_db();
+        insert_mail(&conn, "m1", 1, "privat@gmx.de");
+        insert_mail(&conn, "m2", 2, "Privat@GMX.de");
+        insert_mail(&conn, "m3", 3, "andere@web.de");
+
+        // Normalisierung: Groß-/Kleinschreibung + Leerzeichen egal.
+        add_ignored_sender(&conn, " Privat@GMX.de ", "address").unwrap();
+        assert!(not_a_lead_of(&conn, "m1"));
+        assert!(not_a_lead_of(&conn, "m2"));
+        assert!(!not_a_lead_of(&conn, "m3"));
+
+        // Neue Mail desselben Absenders kommt per Sync herein → der
+        // Sync-Hook (apply) blendet sie sofort wieder aus.
+        insert_mail(&conn, "m4", 4, "privat@gmx.de");
+        assert!(!not_a_lead_of(&conn, "m4"));
+        assert_eq!(apply_ignored_senders(&conn).unwrap(), 1);
+        assert!(not_a_lead_of(&conn, "m4"));
+    }
+
+    #[test]
+    fn ignore_sender_domain_matches_subdomains_but_not_lookalikes() {
+        let conn = in_memory_db();
+        insert_mail(&conn, "m1", 1, "x@app.com");
+        insert_mail(&conn, "m2", 2, "y@mail.app.com");
+        insert_mail(&conn, "m3", 3, "z@notapp.com");
+
+        // Führendes @ wird toleriert und entfernt.
+        add_ignored_sender(&conn, "@app.com", "domain").unwrap();
+        assert!(not_a_lead_of(&conn, "m1"));
+        assert!(not_a_lead_of(&conn, "m2"));
+        assert!(!not_a_lead_of(&conn, "m3"));
+    }
+
+    #[test]
+    fn remove_ignored_sender_unhides_unless_still_covered() {
+        let conn = in_memory_db();
+        insert_mail(&conn, "m1", 1, "a@doppelt.de");
+        add_ignored_sender(&conn, "a@doppelt.de", "address").unwrap();
+        add_ignored_sender(&conn, "doppelt.de", "domain").unwrap();
+        assert!(not_a_lead_of(&conn, "m1"));
+
+        let entries = list_ignored_senders(&conn).unwrap();
+        let addr_id = entries.iter().find(|e| e.scope == "address").unwrap().id.clone();
+        let dom_id  = entries.iter().find(|e| e.scope == "domain").unwrap().id.clone();
+
+        // Adress-Eintrag weg — Domain-Eintrag deckt die Mail weiterhin ab.
+        remove_ignored_sender(&conn, &addr_id).unwrap();
+        assert!(not_a_lead_of(&conn, "m1"));
+
+        // Letzter Eintrag weg — Mail wird wieder sichtbar.
+        remove_ignored_sender(&conn, &dom_id).unwrap();
+        assert!(!not_a_lead_of(&conn, "m1"));
+    }
+
+    #[test]
+    fn add_ignored_sender_is_idempotent_and_normalized_in_list() {
+        let conn = in_memory_db();
+        add_ignored_sender(&conn, "Noreply@App.com", "address").unwrap();
+        add_ignored_sender(&conn, "noreply@app.com", "address").unwrap();
+        let entries = list_ignored_senders(&conn).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].pattern, "noreply@app.com");
+        assert_eq!(entries[0].scope, "address");
     }
 
     #[test]

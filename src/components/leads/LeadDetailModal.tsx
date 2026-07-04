@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
-import { UserCheck, Trash2 } from 'lucide-react'
+import { UserCheck, Trash2, Repeat } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
+import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
 import { leadToUpsertPayload } from '@/lib/lead-payload'
 import { useDialogFocus } from '@/components/ui/Sheet'
 import { ActivityStream } from '@/components/activity/ActivityStream'
+import { ConvertLeadChoice } from '@/components/leads/ConvertLeadChoice'
+import { FollowUpQueueService } from '@/services/follow-up-queue.service'
+import { ActivitiesGateway } from '@/data/activities.gateway'
+import { log } from '@/lib/logger'
 import type { Lead } from '@/types/lead.types'
 
 interface Props {
@@ -16,21 +21,76 @@ interface Props {
 export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const upsertLead      = useLeadsStore(s => s.upsert)
   const convertToClient = useLeadsStore(s => s.convertToClient)
+  const convertToDeal   = useLeadsStore(s => s.convertToDeal)
   const deleteLead      = useLeadsStore(s => s.deleteLead)
+  const userId          = useAuthStore(s => s.user?.id ?? '')
   const showToast       = useToastStore(s => s.show)
   const dialogRef       = useDialogFocus(true)
-  const [converting, setConverting] = useState(false)
+  const [showConvertChoice, setShowConvertChoice] = useState(false)
   const [deleting, setDeleting]     = useState(false)
 
-  async function handleConvert() {
-    setConverting(true)
+  // Follow-up-Sequenz: 4 vorgetextete Mails (Tag 2/5/10/21), die als
+  // Stapel-Karten zur Freigabe erscheinen — kein Auto-Versand.
+  const [sequenceActive, setSequenceActive] = useState<boolean | null>(null)
+  const [sequenceBusy, setSequenceBusy]     = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    FollowUpQueueService.getForLead(lead.id)
+      .then(items => { if (!cancelled) setSequenceActive(items.some(i => i.status === 'pending')) })
+      .catch(() => { if (!cancelled) setSequenceActive(false) })
+    return () => { cancelled = true }
+  }, [lead.id])
+
+  async function handleSequenceToggle() {
+    setSequenceBusy(true)
     try {
-      await convertToClient(lead.id)
-      showToast({ message: `${lead.name} ist jetzt Kunde.`, variant: 'success' })
+      if (sequenceActive) {
+        await FollowUpQueueService.cancelForLead(lead.id)
+        setSequenceActive(false)
+        showToast({ message: 'Sequenz gestoppt — es landen keine weiteren Mails im Stapel.', variant: 'success' })
+      } else {
+        // Protokoll-Aktivität als Auslöser, damit der Start im Verlauf steht.
+        const trigger = await ActivitiesGateway.create({
+          workspaceId, createdBy: userId, accountId: lead.id,
+          type: 'note', title: 'Follow-up-Sequenz gestartet',
+          body: '4 vorgetextete Mails (Tag 2/5/10/21) — jede wartet im Stapel auf Freigabe.',
+          status: 'done',
+        })
+        await FollowUpQueueService.createSequence({
+          workspaceId, leadId: lead.id, triggerActivityId: trigger.id,
+          leadName: lead.name, companyName: lead.companyName ?? undefined,
+        })
+        setSequenceActive(true)
+        showToast({ message: 'Sequenz geplant — die erste Mail liegt in 2 Tagen im Stapel.', variant: 'success' })
+      }
+    } catch (err) {
+      log.error('sequence toggle failed', { err })
+      showToast({ message: 'Sequenz konnte nicht geändert werden.', variant: 'error' })
+    } finally {
+      setSequenceBusy(false)
+    }
+  }
+
+  async function handleConvertChoice(withDeal: boolean, dealValue?: number) {
+    try {
+      if (withDeal) {
+        await convertToDeal(lead.id, workspaceId, userId, dealValue)
+      } else {
+        await convertToClient(lead.id)
+      }
+      showToast({
+        message: withDeal
+          ? `${lead.name} ist jetzt Kunde — Deal in der Pipeline.`
+          : `${lead.name} ist jetzt Kunde.`,
+        variant: 'success',
+      })
+      setShowConvertChoice(false)
       onClose()
     } catch {
-      showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
-      setConverting(false)
+      // convertToDeal meldet seine Fehler selbst per Toast.
+      if (!withDeal) showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
+      setShowConvertChoice(false)
     }
   }
 
@@ -117,18 +177,36 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
-                onClick={handleConvert}
-                disabled={converting}
-                title="Lead direkt zum Kunden machen"
+                onClick={handleSequenceToggle}
+                disabled={sequenceBusy || sequenceActive === null || (!sequenceActive && !lead.email)}
+                title={!lead.email && !sequenceActive
+                  ? 'Ohne E-Mail-Adresse keine Sequenz möglich'
+                  : sequenceActive
+                    ? 'Follow-up-Sequenz stoppen'
+                    : '4 vorgetextete Follow-up-Mails planen — jede wartet im Stapel auf Freigabe'}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 12px', borderRadius: 8, cursor: converting ? 'default' : 'pointer',
-                  border: '1px solid var(--ok)', background: 'transparent',
-                  color: 'var(--ok)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  opacity: converting ? 0.6 : 1,
+                  padding: '6px 12px', borderRadius: 8,
+                  cursor: sequenceBusy ? 'default' : 'pointer',
+                  border: '1px solid var(--accent)', background: sequenceActive ? 'var(--accent-soft)' : 'transparent',
+                  color: 'var(--accent-text)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  opacity: sequenceBusy || (!sequenceActive && !lead.email) ? 0.55 : 1,
                 }}
               >
-                <UserCheck size={14} /> {converting ? 'Wird umgewandelt…' : 'Zu Kunde machen'}
+                <Repeat size={14} />
+                {sequenceBusy ? 'Moment…' : sequenceActive ? 'Sequenz stoppen' : 'Sequenz starten'}
+              </button>
+              <button
+                onClick={() => setShowConvertChoice(true)}
+                title="Lead zum Kunden machen — wahlweise mit Deal in der Pipeline"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                  border: '1px solid var(--ok)', background: 'transparent',
+                  color: 'var(--ok)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                }}
+              >
+                <UserCheck size={14} /> Zu Kunde machen
               </button>
               <button
                 onClick={handleDelete}
@@ -265,6 +343,14 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
           />
         </div>
       </div>
+
+      {showConvertChoice && (
+        <ConvertLeadChoice
+          leadName={lead.name}
+          onChoose={handleConvertChoice}
+          onCancel={() => setShowConvertChoice(false)}
+        />
+      )}
     </div>
   )
 }

@@ -4,18 +4,19 @@ import type { Lead } from '@/types/lead.types'
 
 interface Props {
   lead: Lead
-  onConfirm: (appointmentDate?: string) => Promise<void>
+  onConfirm: (appointmentDate?: string, dealValue?: number) => Promise<void>
   onCancel: () => void
 }
 
 export function QualifyModal({ lead, onConfirm, onCancel }: Props) {
   const [date, setDate] = useState('')
+  const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
 
   const handleConfirm = async () => {
     setSaving(true)
     try {
-      await onConfirm(date || undefined)
+      await onConfirm(date || undefined, value ? Number(value) : undefined)
     } finally {
       setSaving(false)
     }
@@ -61,6 +62,14 @@ export function QualifyModal({ lead, onConfirm, onCancel }: Props) {
             onChange={e => setDate(e.target.value)}
             autoFocus
           />
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-dim)', display: 'block', marginBottom: 5 }}>
+            Geschätzter Auftragswert (€) <span style={{ fontWeight: 400 }}>(optional)</span>
+          </label>
+          <input className="mock-input" type="number" min="0" step="100" value={value}
+            onChange={e => setValue(e.target.value)} placeholder="z. B. 2500" />
         </div>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>

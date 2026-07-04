@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Inbox, UserPlus, ChevronRight, ChevronDown, EyeOff, Eye } from 'lucide-react'
+import { Inbox, UserPlus, ChevronRight, ChevronDown, EyeOff, Eye, AtSign, Ban } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
+import { useCustomersStore } from '@/store/customers.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { MailService } from '@/services/mail.service'
-import type { EmailHeader } from '@/types/mail.types'
+import { classifyMails, matchesIgnoredSender } from '@/lib/mail/newcomer'
+import { log } from '@/lib/logger'
+import type { EmailHeader, IgnoredSender } from '@/types/mail.types'
 
 function fmtDate(iso: string): string {
   const d = new Date(iso)
@@ -31,6 +34,11 @@ function stripHtml(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+function senderDomain(addr: string): string {
+  const at = addr.indexOf('@')
+  return at >= 0 ? addr.slice(at + 1).toLowerCase() : ''
 }
 
 // ── Read-only Lead-Zeile (bekannte Absender) ──────────────────────────────────
@@ -82,12 +90,12 @@ function LeadMailRow({ mail }: { mail: EmailHeader }) {
 
 // ── Unbekannte Absender — ausklappbar mit Inhalt + Lead-Formular ───────────────
 
-function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onNotALead }: {
+function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore }: {
   mail: EmailHeader
   expanded: boolean
   onToggle: () => void
   onCreateLead: (payload: { name: string; email: string; phone?: string }) => Promise<void>
-  onNotALead: () => void
+  onIgnore: (pattern: string, scope: IgnoredSender['scope']) => void
 }) {
   const [body, setBody]             = useState<string | null>(null)
   const [bodyLoading, setBodyLoading] = useState(false)
@@ -96,6 +104,9 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onNotALead }: 
   const [phone, setPhone]           = useState('')
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState<string | null>(null)
+  const [ignoreMenuOpen, setIgnoreMenuOpen] = useState(false)
+
+  const domain = senderDomain(mail.fromAddr)
 
   // Mailtext erst beim Aufklappen nachladen (mit IMAP-Fallback bei leerem Cache).
   useEffect(() => {
@@ -172,18 +183,73 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onNotALead }: 
           {fmtDate(mail.sentAt)}
         </span>
 
-        <button
-          onClick={e => { e.stopPropagation(); onNotALead() }}
-          title="Kein Lead — aus dieser Liste ausblenden"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-            border: '1px solid var(--border)', cursor: 'pointer',
-            background: 'transparent', color: 'var(--fg-dim)', fontFamily: 'inherit',
-          }}
-        >
-          <EyeOff size={11} /> Kein Lead
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={e => { e.stopPropagation(); setIgnoreMenuOpen(v => !v) }}
+            title="Kein Lead — Absender dauerhaft ignorieren"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+              border: '1px solid var(--border)', cursor: 'pointer',
+              background: ignoreMenuOpen ? 'var(--surface-2)' : 'transparent',
+              color: 'var(--fg-dim)', fontFamily: 'inherit',
+            }}
+          >
+            <EyeOff size={11} /> Kein Lead
+          </button>
+
+          {ignoreMenuOpen && (
+            <>
+              {/* Unsichtbarer Backdrop zum Schließen */}
+              <div
+                onClick={e => { e.stopPropagation(); setIgnoreMenuOpen(false) }}
+                style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+              />
+              <div style={{
+                position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 11,
+                minWidth: 230, borderRadius: 9, overflow: 'hidden',
+                background: 'var(--surface)', border: '1px solid var(--border-strong)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+              }}>
+                <button
+                  onClick={e => { e.stopPropagation(); setIgnoreMenuOpen(false); onIgnore(mail.fromAddr, 'address') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '9px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                    background: 'transparent', color: 'var(--fg)', fontFamily: 'inherit',
+                  }}
+                >
+                  <AtSign size={12} style={{ flexShrink: 0, color: 'var(--fg-dim)' }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>Absender ignorieren</span>
+                    <span style={{ display: 'block', fontSize: 10.5, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {mail.fromAddr}
+                    </span>
+                  </span>
+                </button>
+                {domain && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setIgnoreMenuOpen(false); onIgnore(domain, 'domain') }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                      padding: '9px 12px', border: 'none', borderTop: '1px solid var(--border)',
+                      cursor: 'pointer', textAlign: 'left',
+                      background: 'transparent', color: 'var(--fg)', fontFamily: 'inherit',
+                    }}
+                  >
+                    <Ban size={12} style={{ flexShrink: 0, color: 'var(--fg-dim)' }} />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 12, fontWeight: 600 }}>Ganze Domain ignorieren</span>
+                      <span style={{ display: 'block', fontSize: 10.5, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>
+                        @{domain}
+                      </span>
+                    </span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         <button
           onClick={e => { e.stopPropagation(); if (!expanded) onToggle(); setShowForm(true) }}
@@ -281,35 +347,50 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 export function LeverageMailRoute() {
-  const emails       = useMailStore(s => s.emails)
-  const setNotALead  = useMailStore(s => s.setNotALead)
-  const leads        = useLeadsStore(s => s.leads)
-  const upsert       = useLeadsStore(s => s.upsert)
-  const stages       = useLeadStagesStore(s => s.stages)
-  const workspaceId  = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const emails             = useMailStore(s => s.emails)
+  const setNotALead        = useMailStore(s => s.setNotALead)
+  const ignoredSenders     = useMailStore(s => s.ignoredSenders)
+  const loadIgnoredSenders = useMailStore(s => s.loadIgnoredSenders)
+  const ignoreSender       = useMailStore(s => s.ignoreSender)
+  const unignoreSender     = useMailStore(s => s.unignoreSender)
+  const leads       = useLeadsStore(s => s.leads)
+  const upsert      = useLeadsStore(s => s.upsert)
+  const stages      = useLeadStagesStore(s => s.stages)
+  const customers   = useCustomersStore(s => s.customers)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [showAutoSorted, setShowAutoSorted] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+
+  useEffect(() => { loadIgnoredSenders() }, [loadIgnoredSenders])
 
   const openStages = useMemo(
     () => stages.filter(s => !s.isQualified && !s.isDisqualified),
     [stages],
   )
 
-  const leadEmailHeaderSet = useMemo(
+  const leadEmailSet = useMemo(
     () => new Set(leads.flatMap(l => l.email ? [l.email.toLowerCase()] : [])),
     [leads],
   )
+  // Mails bestehender Kunden sind keine Newcomer — sie gehören ins CRM.
+  const customerEmailSet = useMemo(
+    () => new Set(customers.flatMap(c => c.email ? [c.email.toLowerCase()] : [])),
+    [customers],
+  )
 
-  const { leadMails, unmatchedMails, hiddenMails } = useMemo(() => {
-    const sorted = [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-    const isLead = (e: EmailHeader) => e.fromAddr && leadEmailHeaderSet.has(e.fromAddr.toLowerCase())
-    return {
-      leadMails:      sorted.filter(e => isLead(e)),
-      unmatchedMails: sorted.filter(e => !isLead(e) && !e.notALead),
-      hiddenMails:    sorted.filter(e => !isLead(e) && e.notALead),
-    }
-  }, [emails, leadEmailHeaderSet])
+  const { leadMails, candidates, autoSorted, hidden } = useMemo(
+    () => classifyMails(emails, leadEmailSet, customerEmailSet),
+    [emails, leadEmailSet, customerEmailSet],
+  )
+
+  // Einzeln ausgeblendete Mails (Alt-Flags ohne Ignorier-Eintrag) — Mails
+  // ignorierter Absender werden über die Einträge selbst verwaltet.
+  const hiddenSingles = useMemo(
+    () => hidden.filter(m => !matchesIgnoredSender(m.fromAddr, ignoredSenders)),
+    [hidden, ignoredSenders],
+  )
 
   const handleCreateLead = async (payload: { name: string; email: string; phone?: string }) => {
     await upsert({
@@ -322,7 +403,11 @@ export function LeverageMailRoute() {
     })
   }
 
-  const totalCount = leadMails.length + unmatchedMails.length
+  const handleIgnore = (pattern: string, scope: IgnoredSender['scope']) => {
+    ignoreSender(pattern, scope).catch(err => log.error('Failed to ignore sender', { err }))
+  }
+
+  const totalCount = leadMails.length + candidates.length
 
   return (
     <div className="main-inner" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', padding: 0 }}>
@@ -330,23 +415,26 @@ export function LeverageMailRoute() {
       <div className="greeting" style={{ padding: '24px 24px 16px', flexShrink: 0 }}>
         <h1 className="greeting-title">Newcomer<em>.</em></h1>
         <div className="greeting-sub">
-          <span>{totalCount} Mails · {unmatchedMails.length} unbekannte Absender</span>
+          <span>
+            {candidates.length} mögliche Leads
+            {autoSorted.length > 0 && ` · ${autoSorted.length} automatisch aussortiert`}
+          </span>
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, borderTop: '1px solid var(--border)' }}>
 
-        {unmatchedMails.length > 0 && (
+        {candidates.length > 0 && (
           <>
-            <SectionHeader label="Unbekannte Absender — mögliche Leads" count={unmatchedMails.length} />
-            {unmatchedMails.map(m => (
+            <SectionHeader label="Unbekannte Absender — mögliche Leads" count={candidates.length} />
+            {candidates.map(m => (
               <UnknownMailRow
                 key={m.id}
                 mail={m}
                 expanded={expandedId === m.id}
                 onToggle={() => setExpandedId(id => id === m.id ? null : m.id)}
                 onCreateLead={handleCreateLead}
-                onNotALead={() => setNotALead(m.id, true)}
+                onIgnore={handleIgnore}
               />
             ))}
           </>
@@ -361,7 +449,37 @@ export function LeverageMailRoute() {
           </>
         )}
 
-        {hiddenMails.length > 0 && (
+        {/* Automatisch aussortiert: noreply-, Newsletter- und System-Absender.
+            Falls die Heuristik danebenliegt, geht „Lead anlegen" auch hier. */}
+        {autoSorted.length > 0 && (
+          <div style={{ borderTop: '1px solid var(--border)' }}>
+            <button
+              onClick={() => setShowAutoSorted(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 16px', background: 'transparent', border: 'none',
+                cursor: 'pointer', color: 'var(--fg-dim)', fontSize: 11, fontWeight: 600,
+                fontFamily: 'inherit',
+              }}
+            >
+              {showAutoSorted ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              <Ban size={12} />
+              {autoSorted.length} automatisch aussortiert (Newsletter & System-Mails)
+            </button>
+            {showAutoSorted && autoSorted.map(m => (
+              <UnknownMailRow
+                key={m.id}
+                mail={m}
+                expanded={expandedId === m.id}
+                onToggle={() => setExpandedId(id => id === m.id ? null : m.id)}
+                onCreateLead={handleCreateLead}
+                onIgnore={handleIgnore}
+              />
+            ))}
+          </div>
+        )}
+
+        {(ignoredSenders.length > 0 || hiddenSingles.length > 0) && (
           <div style={{ borderTop: '1px solid var(--border)' }}>
             <button
               onClick={() => setShowHidden(v => !v)}
@@ -374,41 +492,84 @@ export function LeverageMailRoute() {
             >
               {showHidden ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               <EyeOff size={12} />
-              {hiddenMails.length} ausgeblendet (kein Lead)
+              Ignoriert & ausgeblendet
+              {' '}({ignoredSenders.length > 0 ? `${ignoredSenders.length} Absender` : ''}
+              {ignoredSenders.length > 0 && hiddenSingles.length > 0 ? ' · ' : ''}
+              {hiddenSingles.length > 0 ? `${hiddenSingles.length} Mails` : ''})
             </button>
-            {showHidden && hiddenMails.map(m => (
-              <div key={m.id} style={{
-                display: 'grid', gridTemplateColumns: '1fr auto auto',
-                alignItems: 'center', gap: 12, padding: '9px 16px 9px 36px',
-                borderTop: '1px solid var(--border)', opacity: 0.7,
-              }}>
-                <div style={{ minWidth: 0 }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {mailLabel(m)}
-                  </span>
-                  <div style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>{m.fromAddr}</div>
-                </div>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
-                  {fmtDate(m.sentAt)}
-                </span>
-                <button
-                  onClick={() => setNotALead(m.id, false)}
-                  title="Wieder als möglichen Lead einblenden"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
-                    border: '1px solid var(--border)', cursor: 'pointer',
-                    background: 'transparent', color: 'var(--fg-muted)', fontFamily: 'inherit',
-                  }}
-                >
-                  <Eye size={11} /> Einblenden
-                </button>
-              </div>
-            ))}
+
+            {showHidden && (
+              <>
+                {/* Ignorierte Absender — Verwaltung */}
+                {ignoredSenders.map(entry => (
+                  <div key={entry.id} style={{
+                    display: 'grid', gridTemplateColumns: '1fr auto',
+                    alignItems: 'center', gap: 12, padding: '9px 16px 9px 36px',
+                    borderTop: '1px solid var(--border)', opacity: 0.8,
+                  }}>
+                    <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {entry.scope === 'domain' ? `@${entry.pattern}` : entry.pattern}
+                      </span>
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                        background: 'var(--surface-2)', border: '1px solid var(--border)',
+                        color: 'var(--fg-dim)', textTransform: 'uppercase', letterSpacing: '0.05em',
+                      }}>
+                        {entry.scope === 'domain' ? 'Domain' : 'Absender'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => { unignoreSender(entry.id).catch(err => log.error('Failed to unignore sender', { err })) }}
+                      title="Ignorieren aufheben — Mails erscheinen wieder als Newcomer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                        border: '1px solid var(--border)', cursor: 'pointer',
+                        background: 'transparent', color: 'var(--fg-muted)', fontFamily: 'inherit',
+                      }}
+                    >
+                      <Eye size={11} /> Aufheben
+                    </button>
+                  </div>
+                ))}
+
+                {/* Einzeln ausgeblendete Mails (alte „kein Lead"-Klicks) */}
+                {hiddenSingles.map(m => (
+                  <div key={m.id} style={{
+                    display: 'grid', gridTemplateColumns: '1fr auto auto',
+                    alignItems: 'center', gap: 12, padding: '9px 16px 9px 36px',
+                    borderTop: '1px solid var(--border)', opacity: 0.7,
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 12.5, color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {mailLabel(m)}
+                      </span>
+                      <div style={{ fontSize: 11, color: 'var(--fg-dim)', fontFamily: 'var(--font-mono)' }}>{m.fromAddr}</div>
+                    </div>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)', whiteSpace: 'nowrap' }}>
+                      {fmtDate(m.sentAt)}
+                    </span>
+                    <button
+                      onClick={() => setNotALead(m.id, false)}
+                      title="Wieder als möglichen Lead einblenden"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 9px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                        border: '1px solid var(--border)', cursor: 'pointer',
+                        background: 'transparent', color: 'var(--fg-muted)', fontFamily: 'inherit',
+                      }}
+                    >
+                      <Eye size={11} /> Einblenden
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
-        {totalCount === 0 && hiddenMails.length === 0 && (
+        {totalCount === 0 && autoSorted.length === 0 && ignoredSenders.length === 0 && hiddenSingles.length === 0 && (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', height: '50%', gap: 12, color: 'var(--fg-dim)',

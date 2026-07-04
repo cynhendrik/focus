@@ -73,4 +73,13 @@ describe('buildCiiXml', () => {
     const xml = buildCiiXml(inv({}, stdItems), profile, { ...account, name: 'Müller & Co <GmbH>' })
     expect(xml).toContain('Müller &amp; Co &lt;GmbH&gt;')
   })
+
+  it('standard + 0%-Posten: Kategorie Z (zero-rated), kein S mit rate 0', () => {
+    const zeroItems = [{ id: 'z1', invoiceId: 'i1', title: 'Export-Leistung', quantity: 1, unitPrice: 100, taxRate: 0, total: 100, sortOrder: 0, unit: 'Stk' }]
+    const xml = buildCiiXml(inv({ taxMode: 'standard', subtotal: 100, taxAmount: 0, total: 100 }, zeroItems), profile, account)
+    expect(xml).toContain('<ram:CategoryCode>Z</ram:CategoryCode>')
+    expect(xml).not.toMatch(/<ram:CategoryCode>S<\/ram:CategoryCode>/)
+    expect(xml).toContain('<ram:RateApplicablePercent>0.00</ram:RateApplicablePercent>')
+    expect(xml).toContain('<ram:GrandTotalAmount>100.00</ram:GrandTotalAmount>')
+  })
 })
