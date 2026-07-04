@@ -19,6 +19,7 @@ import { isTodoForToday } from '@/lib/heute/due'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
 import { receivables } from '@/lib/finance/receivables'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
+import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { openExternal } from '@/lib/open-external'
 import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
@@ -143,21 +144,25 @@ function WorkspaceView() {
 
   // Offene Forderungen (Restbeträge) — dieselbe Ableitung wie das Finanzen-Cockpit.
   const recv = useMemo(() => receivables(invoices, payments), [invoices, payments])
-  const overdueCount = useMemo(
-    () => invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length,
-    [invoices],
-  )
+
+  // KORA-Briefing: gesnoozte Rechnungen bleiben draußen — Snooze vertagt genau
+  // diese Erinnerung. (Die Kachel darüber zeigt bewusst ALLE Forderungen.)
+  const koraOverdue = useMemo(() => {
+    const snoozed = snoozedInvoiceIds()
+    const list = invoices.filter(i => !i.isSuggestion && !snoozed.has(i.id) && invoiceCategory(i) === 'overdue')
+    return { count: list.length, sum: list.reduce((s, i) => s + i.total, 0) }
+  }, [invoices])
 
   // KORA-Zeile
   const koraLine = useMemo(() =>
     buildTodayLine({
-      overdueCount,
-      overdueSum: recv.overdue,
+      overdueCount: koraOverdue.count,
+      overdueSum: koraOverdue.sum,
       fusDue: dueToday.fus,
       tasksDue: dueToday.tasks,
       eventsToday: events.length,
     }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
-  [overdueCount, recv.overdue, dueToday.fus, dueToday.tasks, events.length])
+  [koraOverdue, dueToday.fus, dueToday.tasks, events.length])
 
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
