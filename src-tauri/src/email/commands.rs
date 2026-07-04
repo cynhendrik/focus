@@ -162,6 +162,9 @@ pub async fn email_sync(
                 let conn = db.0.lock().map_err(|e| e.to_string())?;
                 let n = db::insert_emails(&conn, &out.rows).map_err(|e| e.to_string())?;
                 db::insert_attachments(&conn, &out.attachments).map_err(|e| e.to_string())?;
+                // Ignorierliste anwenden: neue Mails ignorierter Absender
+                // bleiben dauerhaft aus der Newcomer-Ansicht draußen.
+                db::apply_ignored_senders(&conn).map_err(|e| e.to_string())?;
                 n
             };
             // Reply-Detection: newly synced incoming emails may be campaign replies
@@ -453,6 +456,48 @@ pub fn email_set_not_a_lead(
 ) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     db::set_not_a_lead(&conn, &email_id, value).map_err(|e| e.to_string())
+}
+
+// ── Ignorierte Absender ───────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn email_list_ignored_senders(
+    db: tauri::State<'_, EmailDb>,
+) -> Result<Vec<crate::email::types::IgnoredSender>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::list_ignored_senders(&conn).map_err(|e| e.to_string())
+}
+
+/// Setzt einen Absender (scope „address") oder eine Domain (scope „domain")
+/// dauerhaft auf die Ignorierliste und blendet vorhandene Mails aus.
+/// Gibt die aktualisierte Liste zurück.
+#[tauri::command]
+pub fn email_ignore_sender(
+    pattern: String,
+    scope: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<Vec<crate::email::types::IgnoredSender>, String> {
+    if scope != "address" && scope != "domain" {
+        return Err("Ungültiger Scope — erlaubt sind 'address' und 'domain'.".to_string());
+    }
+    if pattern.trim().is_empty() {
+        return Err("Leeres Muster kann nicht ignoriert werden.".to_string());
+    }
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::add_ignored_sender(&conn, &pattern, &scope).map_err(|e| e.to_string())?;
+    db::list_ignored_senders(&conn).map_err(|e| e.to_string())
+}
+
+/// Entfernt einen Ignorier-Eintrag und blendet dessen Mails wieder ein.
+/// Gibt die aktualisierte Liste zurück.
+#[tauri::command]
+pub fn email_unignore_sender(
+    id: String,
+    db: tauri::State<'_, EmailDb>,
+) -> Result<Vec<crate::email::types::IgnoredSender>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    db::remove_ignored_sender(&conn, &id).map_err(|e| e.to_string())?;
+    db::list_ignored_senders(&conn).map_err(|e| e.to_string())
 }
 
 // ── SMTP ──────────────────────────────────────────────────────────────────────

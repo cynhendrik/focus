@@ -32,6 +32,16 @@ pub struct EmailHeader {
     pub not_a_lead: bool,
 }
 
+/// Dauerhaft ignorierter Absender — Mails davon erscheinen nie als Newcomer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IgnoredSender {
+    pub id: String,
+    pub pattern: String,
+    pub scope: String, // "address" | "domain"
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EmailBody {

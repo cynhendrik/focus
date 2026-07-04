@@ -3,7 +3,7 @@ import { MailService } from '@/services/mail.service'
 import { log } from '@/lib/logger'
 import type {
   EmailAccount, EmailHeader, EmailBody, EmailAttachment,
-  SyncProgress, AddAccountPayload, SendEmailPayload, MailFolder,
+  SyncProgress, AddAccountPayload, SendEmailPayload, MailFolder, IgnoredSender,
 } from '@/types/mail.types'
 import type { AppError } from '@/types/error.types'
 import { formatError } from '@/types/error.types'
@@ -22,6 +22,7 @@ interface MailState {
   error: AppError | null
   attachments: EmailAttachment[]
   isSending: boolean
+  ignoredSenders: IgnoredSender[]
 
   // Folder-Tree
   folders: MailFolder[]
@@ -47,6 +48,9 @@ interface MailState {
   markRead: (emailId: string, isRead: boolean) => void
   assignCustomer: (emailId: string, customerId: string | null) => Promise<void>
   setNotALead: (emailId: string, value: boolean) => Promise<void>
+  loadIgnoredSenders: () => Promise<void>
+  ignoreSender: (pattern: string, scope: IgnoredSender['scope']) => Promise<void>
+  unignoreSender: (id: string) => Promise<void>
   deleteEmail: (emailId: string) => Promise<void>
   sendEmail: (payload: SendEmailPayload) => Promise<void>
   getAttachments: (emailId: string) => Promise<void>
@@ -92,6 +96,7 @@ export const useMailStore = create<MailState>()((set, get) => ({
   error: null,
   attachments: [],
   isSending: false,
+  ignoredSenders: [],
   folders: [],
   expandedFolders: new Set<string>(),
   foldersLastFetched: 0,
@@ -242,6 +247,29 @@ export const useMailStore = create<MailState>()((set, get) => ({
       log.error('Failed to set not_a_lead', { err })
       throw err
     }
+  },
+
+  loadIgnoredSenders: async () => {
+    try {
+      const ignoredSenders = await MailService.listIgnoredSenders()
+      set({ ignoredSenders })
+    } catch (err) {
+      log.error('Failed to load ignored senders', { err })
+    }
+  },
+
+  ignoreSender: async (pattern, scope) => {
+    // Backend blendet alle Mails des Absenders aus (Backfill) —
+    // danach die sichtbare Liste neu laden.
+    const ignoredSenders = await MailService.ignoreSender(pattern, scope)
+    set({ ignoredSenders })
+    await get().loadEmails()
+  },
+
+  unignoreSender: async (id) => {
+    const ignoredSenders = await MailService.unignoreSender(id)
+    set({ ignoredSenders })
+    await get().loadEmails()
   },
 
   deleteEmail: async (emailId) => {
