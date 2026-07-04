@@ -16,8 +16,9 @@ import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
 import { isTodoForToday } from '@/lib/heute/due'
-import { snoozedInvoiceIds } from '@/lib/heute/snooze'
 import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
+import { receivables } from '@/lib/finance/receivables'
+import { invoiceCategory } from '@/lib/finance/invoice-filters'
 import { openExternal } from '@/lib/open-external'
 import { maskEvent } from '@/lib/calendar/owner'
 import { buildTodayLine } from '@/lib/notifications/briefing'
@@ -92,6 +93,7 @@ function eur0(n: number): string {
 function WorkspaceView() {
   const customers = useCustomersStore(s => s.customers)
   const invoices  = useFinanceStore(s => s.invoices)
+  const payments  = useFinanceStore(s => s.payments)
   const todos     = useTodosStore(s => s.allTodos)
   const user      = useAuthStore(s => s.user)
   const myUserId  = user?.id
@@ -139,24 +141,23 @@ function WorkspaceView() {
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
 
-  // Geld unterwegs
-  const overdueInvoices = useMemo(() => {
-    const snoozed = snoozedInvoiceIds()
-    return invoices.filter(i => !snoozed.has(i.id) && i.status !== 'paid' && i.status !== 'cancelled' && i.status !== 'draft'
-      && (i.status === 'overdue' || new Date(i.dueDate).getTime() < Date.now()))
-  }, [invoices])
-  const geldUnterwegs = useMemo(() => overdueInvoices.reduce((s, i) => s + i.total, 0), [overdueInvoices])
+  // Offene Forderungen (Restbeträge) — dieselbe Ableitung wie das Finanzen-Cockpit.
+  const recv = useMemo(() => receivables(invoices, payments), [invoices, payments])
+  const overdueCount = useMemo(
+    () => invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length,
+    [invoices],
+  )
 
   // KORA-Zeile
   const koraLine = useMemo(() =>
     buildTodayLine({
-      overdueCount: overdueInvoices.length,
-      overdueSum: geldUnterwegs,
+      overdueCount,
+      overdueSum: recv.overdue,
       fusDue: dueToday.fus,
       tasksDue: dueToday.tasks,
       eventsToday: events.length,
     }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
-  [overdueInvoices, geldUnterwegs, dueToday.fus, dueToday.tasks, events.length])
+  [overdueCount, recv.overdue, dueToday.fus, dueToday.tasks, events.length])
 
   const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
   const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
@@ -186,10 +187,20 @@ function WorkspaceView() {
             </div>
           </div>
 
-          {/* Segment 2: Geld unterwegs */}
-          <div className={`hd-pulse-stat${geldUnterwegs > 0 ? ' hot' : ''}`}>
+          {/* Segment 2: Geld unterwegs — ALLE offenen Forderungen, Überfälliges als Unterzeile */}
+          <div
+            className={`hd-pulse-stat${recv.overdue > 0 ? ' hot' : ''}`}
+            onClick={() => setAppView('invoices')}
+            style={{ cursor: 'pointer' }}
+            title="Zu Finanzen"
+          >
             <span className="hd-pulse-k">GELD UNTERWEGS</span>
-            <span className="hd-pulse-v">{eur0(geldUnterwegs)}</span>
+            <span className="hd-pulse-v">{eur0(recv.open + recv.overdue)}</span>
+            {recv.overdue > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
+                davon {eur0(recv.overdue)} überfällig
+              </span>
+            )}
           </div>
 
           {/* Segment 3: Offen heute */}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote, Send } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
+import { receivables } from '@/lib/finance/receivables'
 import { useCompanyStore } from '@/store/company.store'
 import { useCapability } from '@/hooks/useCapability'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
@@ -453,8 +454,9 @@ export function FinanceRoute() {
   const openInvoices    = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'open'), [realInvoices])
   const overdueInvoices = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'overdue'), [realInvoices])
   // Cockpit: offene/überfällige Beträge = Restbeträge (minus erfasste Zahlungen).
-  const openTotal    = useMemo(() => openInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [openInvoices, payments])
-  const overdueTotal = useMemo(() => overdueInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [overdueInvoices, payments])
+  const recvTotals   = useMemo(() => receivables(realInvoices, payments), [realInvoices, payments])
+  const openTotal    = recvTotals.open
+  const overdueTotal = recvTotals.overdue
   const cashInMonth  = useMemo(() => {
     const m = todayLocalISO().slice(0, 7) // YYYY-MM
     return payments.reduce((s, p) => p.paidAt.slice(0, 7) === m ? s + p.amount : s, 0)
