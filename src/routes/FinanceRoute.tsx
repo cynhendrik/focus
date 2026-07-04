@@ -21,12 +21,13 @@ import { InvoiceSendModal } from '@/components/finance/InvoiceSendModal'
 // react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceGateway } from '@/data/finance.gateway'
 import { isOverdue, paidAmount, displayInvoiceStatus, remaining, todayLocalISO } from '@/lib/invoice-status'
+import { invoiceCategory, invoiceFilterCounts } from '@/lib/finance/invoice-filters'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 type Period = 'monat' | 'quartal' | 'jahr' | 'eigener'
-type InvoiceFilter = InvoiceStatus | 'all'
+type InvoiceFilter = 'all' | 'open' | 'overdue' | 'paid' | 'cancelled'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
@@ -449,8 +450,8 @@ export function FinanceRoute() {
   )
   // "Offen" = unbezahlt & noch nicht fällig; "Überfällig" = unbezahlt & über Fälligkeit.
   // Überfälligkeit wird aus dueDate abgeleitet (Status wird nie auf 'overdue' gesetzt).
-  const openInvoices    = useMemo(() => realInvoices.filter(i => i.status === 'open' && !isOverdue(i)), [realInvoices])
-  const overdueInvoices = useMemo(() => realInvoices.filter(i => isOverdue(i)), [realInvoices])
+  const openInvoices    = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'open'), [realInvoices])
+  const overdueInvoices = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'overdue'), [realInvoices])
   // Cockpit: offene/überfällige Beträge = Restbeträge (minus erfasste Zahlungen).
   const openTotal    = useMemo(() => openInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [openInvoices, payments])
   const overdueTotal = useMemo(() => overdueInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [overdueInvoices, payments])
@@ -495,12 +496,19 @@ export function FinanceRoute() {
     return () => clearTimeout(t)
   }, [gaugePct])
 
-  // Filtered invoices (exclude cancelled and draft from 'all' unless explicitly selected)
+  // Filter über die geteilte Kategorie-Ableitung — 'overdue' funktioniert damit
+  // endlich (Status wird nie auf overdue gesetzt), 'open' zeigt nur nicht-fällige.
   const filteredInvoices = useMemo(() => {
-    const base = realInvoices.filter(i => i.status !== 'cancelled' && i.status !== 'draft')
-    if (invoiceFilter === 'all') return base
-    return realInvoices.filter(i => i.status === invoiceFilter && i.status !== 'draft')
+    if (invoiceFilter === 'all') {
+      return realInvoices.filter(i => {
+        const c = invoiceCategory(i)
+        return c !== 'cancelled' && c !== 'draft'
+      })
+    }
+    return realInvoices.filter(i => invoiceCategory(i) === invoiceFilter)
   }, [realInvoices, invoiceFilter])
+
+  const filterCounts = useMemo(() => invoiceFilterCounts(realInvoices), [realInvoices])
 
   // Active offers (pipeline) — includes accepted so user can convert to invoice
   const activeOffers = useMemo(() =>
@@ -800,6 +808,7 @@ export function FinanceRoute() {
             <div style={{ display: 'flex', gap: 5 }}>
               {INVOICE_FILTERS.map(f => {
                 const isActive = invoiceFilter === f.value
+                const count = filterCounts[f.value]
                 return (
                   <button key={f.value} onClick={() => setInvoiceFilter(f.value)}
                     className="chip"
@@ -810,7 +819,7 @@ export function FinanceRoute() {
                       border: isActive ? '1px solid oklch(91% 0.03 264 / 0.3)' : undefined,
                       transition: 'background 150ms, color 150ms',
                     }}>
-                    {f.label}
+                    {f.label}{count > 0 ? ` ${count}` : ''}
                   </button>
                 )
               })}
