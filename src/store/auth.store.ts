@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useWorkspaceStore } from '@/store/workspace.store'
 
 interface AuthState {
   user: User | null
@@ -41,7 +42,23 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   signOut: async () => {
+    // Lokale Workspaces VOR dem Logout sichern — sie sind geräte-scoped,
+    // nicht account-scoped, und dürfen keinen Logout nicht überleben.
+    const { localWorkspaces, activeWorkspaceId, workspaces } =
+      useWorkspaceStore.getState()
     await supabase.auth.signOut()
     set({ user: null, session: null })
+    // Cloud-Workspace-Liste leeren; lokale Workspaces explizit beibehalten.
+    // War der aktive Workspace ein Cloud-Workspace, auf den ersten lokalen
+    // Workspace wechseln (oder null, wenn kein lokaler existiert), damit
+    // nach dem Re-Login kein ungültiger activeWorkspaceId im Store bleibt.
+    const wasCloudActive = workspaces.some(w => w.id === activeWorkspaceId)
+    useWorkspaceStore.setState({
+      workspaces: [],
+      localWorkspaces, // ← explizit beibehalten (verhindert persist-Überschreibung)
+      ...(wasCloudActive
+        ? { activeWorkspaceId: localWorkspaces[0]?.id ?? null }
+        : {}),
+    })
   },
 }))

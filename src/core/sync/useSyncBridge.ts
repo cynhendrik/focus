@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 export function useSyncBridge() {
   const setOnline = useWorkspaceStore(s => s.setOnline)
   const setPendingCount = useWorkspaceStore(s => s.setPendingCount)
+  const setFailedCount = useWorkspaceStore(s => s.setFailedCount)
 
   useEffect(() => {
     // 1. Auth-Token bei Änderung an Rust übergeben
@@ -30,10 +31,17 @@ export function useSyncBridge() {
       (event) => setPendingCount(event.payload)
     )
 
+    // 4. Fehlgeschlagene Sync-Einträge (Server-Ablehnungen) empfangen
+    const unlistenFailed = listen<number>(
+      'cultera://sync-failed-count',
+      (event) => setFailedCount(event.payload)
+    )
+
     return () => {
       subscription.unsubscribe()
       unlistenConnectivity.then(fn => fn())
       unlistenPending.then(fn => fn())
+      unlistenFailed.then(fn => fn())
     }
-  }, [setOnline, setPendingCount])
+  }, [setOnline, setPendingCount, setFailedCount])
 }

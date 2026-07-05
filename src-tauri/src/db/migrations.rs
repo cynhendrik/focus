@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 32;
+const CURRENT_VERSION: u32 = 36;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -780,6 +780,63 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             "#)?;
             Ok(())
         }
+        33 => {
+            // pipeline_stages: gleichnamige Duplikate entfernen (durch rescope/
+            // Share-Migration konnten sich Stages stapeln → "3× im Board") und
+            // UNIQUE(workspace_id, name) erzwingen — analog lead_stages (Migration 19).
+            // Deals referenzieren die Stage per NAME; der Keeper behält den Namen,
+            // also bleiben Deals konsistent.
+            conn.execute_batch(r#"
+                DELETE FROM pipeline_stages
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM pipeline_stages GROUP BY workspace_id, name
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_ws_name
+                    ON pipeline_stages(workspace_id, name);
+            "#)?;
+            Ok(())
+        }
+        34 => {
+            // calendar_events.is_private — Termin-Privatsphäre (im geteilten
+            // Workspace sehen andere nur „Gebucht"). Guard: create_tables legt die
+            // Spalte bei frischen Installs bereits an, dann darf ALTER nicht erneut laufen.
+            if !column_exists(conn, "calendar_events", "is_private") {
+                conn.execute_batch(
+                    "ALTER TABLE calendar_events ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0;",
+                )?;
+            }
+            Ok(())
+        }
+        35 => {
+            // sync_queue: Fehler-Tracking — Server-Ablehnungen (4xx) wurden bisher
+            // still endlos wiederholt. attempts/last_error machen sie zähl- und anzeigbar.
+            if !column_exists(conn, "sync_queue", "attempts") {
+                conn.execute_batch("ALTER TABLE sync_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;")?;
+            }
+            if !column_exists(conn, "sync_queue", "last_error") {
+                conn.execute_batch("ALTER TABLE sync_queue ADD COLUMN last_error TEXT;")?;
+            }
+            Ok(())
+        }
+        36 => {
+            // prepared_items — der EINE Vorbereitungs-Kanal des Stapels (Spec §6).
+            // create_tables legt die Tabelle bei Frischinstalls an; hier für Bestandsinstallationen.
+            if !table_exists(conn, "prepared_items") {
+                conn.execute_batch(r#"
+                    CREATE TABLE prepared_items (
+                        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, type TEXT NOT NULL,
+                        source_kind TEXT NOT NULL, source_id TEXT NOT NULL, assignee TEXT,
+                        payload TEXT NOT NULL DEFAULT '{}', score REAL NOT NULL DEFAULT 0,
+                        status TEXT NOT NULL DEFAULT 'pending', snooze_until TEXT,
+                        rule_id TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL, approved_at TEXT,
+                        UNIQUE(workspace_id, source_kind, source_id)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_prepared_items_ws_status ON prepared_items(workspace_id, status, score);
+                "#)?;
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -1056,6 +1113,38 @@ mod tests {
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
             [name], |r| r.get::<_, i64>(0),
         ).unwrap_or(0) > 0
+    }
+
+    #[test]
+    fn migration_33_dedupes_pipeline_stages_and_enforces_unique() {
+        // pipeline_stages OHNE Unique-Index (Zustand vor Migration 33), mit Duplikaten
+        // wie sie durch rescope/Share-Migration entstehen konnten.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(r#"
+            CREATE TABLE pipeline_stages (
+                id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, name TEXT NOT NULL,
+                label TEXT NOT NULL, order_index INTEGER, color TEXT,
+                is_won INTEGER, is_lost INTEGER, created_at TEXT, updated_at TEXT
+            );
+            INSERT INTO pipeline_stages VALUES ('a','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('b','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('c','ws','won','Won',0,'#fff',1,0,'t','t');
+            INSERT INTO pipeline_stages VALUES ('d','ws','lost','Lost',1,'#fff',0,1,'t','t');
+            INSERT INTO pipeline_stages VALUES ('e','ws2','won','Won',0,'#fff',1,0,'t','t');
+        "#).unwrap();
+
+        apply(&conn, 33).unwrap();
+
+        let won_ws: i64 = conn.query_row(
+            "SELECT count(*) FROM pipeline_stages WHERE workspace_id='ws' AND name='won'", [], |r| r.get(0)).unwrap();
+        let total: i64 = conn.query_row("SELECT count(*) FROM pipeline_stages", [], |r| r.get(0)).unwrap();
+        assert_eq!(won_ws, 1, "Duplikate in ws entfernt");
+        assert_eq!(total, 3, "ws: won+lost, ws2: won = 3 (andere Workspace unberührt)");
+
+        // UNIQUE-Index verhindert ein neues Duplikat.
+        let dup = conn.execute(
+            "INSERT INTO pipeline_stages VALUES ('f','ws','won','Won',0,'#fff',1,0,'t','t')", []);
+        assert!(dup.is_err(), "UNIQUE(workspace_id,name) muss greifen");
     }
 
     #[test]

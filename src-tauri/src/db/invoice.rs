@@ -229,7 +229,16 @@ fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, 
     let now = chrono::Local::now();
     let cur_year: i64 = now.format("%Y").to_string().parse().unwrap_or(0);
     let (last, start, format, seq_year) = read_sequence(conn, workspace_id);
-    let to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    let mut to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    // Skip numbers already assigned (e.g. cloud-mirrored invoices that share the local DB).
+    // Only auto-allocation skips; manual entry is validated separately and still errors.
+    loop {
+        let candidate = apply_invoice_format(&format, &now, to_use);
+        if !invoice_number_exists(conn, workspace_id, &candidate, None)? {
+            break;
+        }
+        to_use += 1;
+    }
     let number = apply_invoice_format(&format, &now, to_use);
     conn.execute(
         "INSERT INTO invoice_sequences (workspace_id, next_number, start_number, format, seq_year) \
@@ -241,11 +250,20 @@ fn next_invoice_number(conn: &Connection, workspace_id: &str) -> Result<String, 
 }
 
 /// Liest die nächste Nummer, ohne den Zähler zu erhöhen (Formular-Vorschlag).
+/// Überspringt bereits vergebene Nummern genau wie next_invoice_number, aber ohne den Zähler zu persistieren.
 pub fn peek_invoice_number(conn: &Connection, workspace_id: &str) -> String {
     let now = chrono::Local::now();
     let cur_year: i64 = now.format("%Y").to_string().parse().unwrap_or(0);
     let (last, start, format, seq_year) = read_sequence(conn, workspace_id);
-    let to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    let mut to_use = compute_next_counter(last, start, &format, seq_year, cur_year);
+    // Skip numbers already assigned — same logic as next_invoice_number.
+    loop {
+        let candidate = apply_invoice_format(&format, &now, to_use);
+        if !invoice_number_exists(conn, workspace_id, &candidate, None).unwrap_or(false) {
+            break;
+        }
+        to_use += 1;
+    }
     apply_invoice_format(&format, &now, to_use)
 }
 
@@ -277,17 +295,13 @@ pub fn invoice_number_exists(
 }
 
 pub fn set_invoice_start_number(conn: &Connection, workspace_id: &str, start: i64) -> rusqlite::Result<()> {
-    // Cannot go below already-issued numbers to prevent duplicates.
-    let current_next: i64 = conn.query_row(
-        "SELECT next_number FROM invoice_sequences WHERE workspace_id = ?1",
-        [workspace_id],
-        |r| r.get(0),
-    ).unwrap_or(0);
-    let effective_next = std::cmp::max(start - 1, current_next);
+    // Absenken ist erlaubt: Die Vergabe (next_invoice_number/peek) überspringt
+    // bereits vergebene Nummern, Duplikate sind damit ausgeschlossen. So lassen
+    // sich nach dem Löschen von Test-Rechnungen freigewordene Nummern wiederverwenden.
     conn.execute(
         "INSERT INTO invoice_sequences (workspace_id, next_number, start_number) VALUES (?1, ?2, ?3)
          ON CONFLICT(workspace_id) DO UPDATE SET start_number = ?3, next_number = ?2",
-        rusqlite::params![workspace_id, effective_next, start],
+        rusqlite::params![workspace_id, start - 1, start],
     )?;
     Ok(())
 }
@@ -606,6 +620,32 @@ mod tests {
             [&now],
         ).unwrap();
         conn
+    }
+
+    #[test]
+    fn start_number_can_be_lowered_to_reuse_freed_numbers() {
+        let conn = setup();
+        // Zähler steht hoch (als hätte es Rechnungen bis 9 gegeben) …
+        set_invoice_start_number(&conn, "ws-1", 9).unwrap();
+        // … die Rechnungen wurden gelöscht → Absenken auf 7 muss greifen.
+        set_invoice_start_number(&conn, "ws-1", 7).unwrap();
+        let peeked = peek_invoice_number(&conn, "ws-1");
+        assert!(peeked.ends_with("00007"), "erwartet …00007, bekam {peeked}");
+    }
+
+    #[test]
+    fn lowered_start_still_skips_existing_numbers() {
+        let conn = setup();
+        let now = chrono::Utc::now().to_rfc3339();
+        // 00007 existiert noch → Absenken auf 7 darf KEIN Duplikat vorschlagen.
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, number, date, due_date, status, tax_mode, subtotal, tax_amount, total, bank_info, created_at, updated_at)
+             VALUES ('inv-7','ws-1','u-1','acc-1','2026-00007','2026-07-01','2026-07-15','open','standard',100,19,119,'{}',?1,?1)",
+            [&now],
+        ).unwrap();
+        set_invoice_start_number(&conn, "ws-1", 7).unwrap();
+        let peeked = peek_invoice_number(&conn, "ws-1");
+        assert!(peeked.ends_with("00008"), "erwartet Überspringen auf …00008, bekam {peeked}");
     }
 
     #[test]
@@ -936,11 +976,16 @@ mod tests {
     #[test]
     fn get_finance_kpis_returns_correct_counts() {
         let conn = setup();
-        // paid invoice
-        let inv1 = create(&conn, sample_payload(vec![])).unwrap();
+        let today = chrono::Utc::now();
+        // paid invoice — Datum in DIESEM Monat (month_revenue), robust gegen Datums-Drift
+        let mut p1 = sample_payload(vec![]);
+        p1.date = today.format("%Y-%m-05").to_string();
+        let inv1 = create(&conn, p1).unwrap();
         update_status(&conn, &inv1.invoice.id, "paid").unwrap();
-        // open invoice
-        let inv2 = create(&conn, sample_payload(vec![])).unwrap();
+        // open invoice — Fälligkeit in der Zukunft (zählt als offen)
+        let mut p2 = sample_payload(vec![]);
+        p2.due_date = (today + chrono::Duration::days(20)).format("%Y-%m-%d").to_string();
+        let inv2 = create(&conn, p2).unwrap();
         update_status(&conn, &inv2.invoice.id, "open").unwrap();
         // suggestion
         let mut p = sample_payload(vec![]);
@@ -956,8 +1001,10 @@ mod tests {
     #[test]
     fn get_finance_kpis_open_total_subtracts_partial_payments() {
         let conn = setup();
-        // Offene Rechnung über 119,00 (due_date in der Zukunft → zählt als "offen")
-        let inv = create(&conn, sample_payload(vec![])).unwrap();
+        // Offene Rechnung über 119,00 — Fälligkeit in der Zukunft (robust gegen Datums-Drift)
+        let mut p = sample_payload(vec![]);
+        p.due_date = (chrono::Utc::now() + chrono::Duration::days(20)).format("%Y-%m-%d").to_string();
+        let inv = create(&conn, p).unwrap();
         update_status(&conn, &inv.invoice.id, "open").unwrap();
 
         // Teilzahlung über 19,00 → Restbetrag 100,00
@@ -970,5 +1017,88 @@ mod tests {
         let kpis = get_finance_kpis(&conn, "ws-1").unwrap();
         assert_eq!(kpis.open_count, 1);          // Rechnung zählt weiterhin als offen
         assert_eq!(kpis.open_total, 100.0);      // aber nur der Restbetrag
+    }
+
+    // ── Nummernkreis-Skip-Tests (Bug: Vergabe blockierte statt zu überspringen) ──
+
+    fn seed_taken_invoice(conn: &Connection, number: &str) {
+        let ts = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO invoices \
+             (id, workspace_id, created_by, account_id, deal_id, number, date, due_date, \
+              status, tax_mode, subtotal, tax_amount, total, bank_info, notes, pdf_path, \
+              is_suggestion, suggested_by, approved_by, pending_sync, created_at, updated_at) \
+             VALUES ('inv-taken','ws-1','u-1','acc-1',NULL,?1,'2026-01-01','2026-01-31', \
+                     'open','standard',100,19,119,'{}',NULL,NULL,0,NULL,NULL,0,?2,?2)",
+            rusqlite::params![number, ts],
+        ).unwrap();
+    }
+
+    fn seed_sequence(conn: &Connection, next_number: i64) {
+        let cur_year: i64 = chrono::Local::now().format("%Y").to_string().parse().unwrap();
+        conn.execute(
+            "INSERT INTO invoice_sequences (workspace_id, next_number, start_number, format, seq_year) \
+             VALUES ('ws-1', ?1, 1, '{YYYY}-{NNNNN}', ?2) \
+             ON CONFLICT(workspace_id) DO UPDATE SET next_number=?1, seq_year=?2",
+            rusqlite::params![next_number, cur_year],
+        ).unwrap();
+    }
+
+    /// (1) Zähler bei 7, Rechnung 2026-00007 bereits vorhanden →
+    ///     Vergabe liefert 2026-00008, Zähler ≥ 8.
+    #[test]
+    fn auto_allocate_skips_taken_number() {
+        let conn = setup();
+        let now = chrono::Local::now();
+        let taken = apply_invoice_format("{YYYY}-{NNNNN}", &now, 7);
+        seed_sequence(&conn, 7);
+        seed_taken_invoice(&conn, &taken);
+
+        let allocated = next_invoice_number(&conn, "ws-1").unwrap();
+        let expected = apply_invoice_format("{YYYY}-{NNNNN}", &now, 8);
+        assert_eq!(allocated, expected, "allocator must skip to 8 when 7 is taken");
+
+        let (counter, _, _) = get_invoice_sequence(&conn, "ws-1").unwrap();
+        assert!(counter >= 8, "sequence counter must be persisted ≥ 8, got {counter}");
+    }
+
+    /// (2) Manuell eingegebene Duplikatnummer muss weiterhin den deutschen Fehlertext liefern.
+    #[test]
+    fn manual_duplicate_still_errors_with_german_message() {
+        let conn = setup();
+        let mut p1 = sample_payload(vec![]);
+        p1.status = Some("open".into());
+        p1.number = Some("RE-2026-001".into());
+        create(&conn, p1).unwrap();
+
+        let mut p2 = sample_payload(vec![]);
+        p2.status = Some("open".into());
+        p2.number = Some("RE-2026-001".into());
+        let err = create(&conn, p2).expect_err("duplicate manual number must error");
+        match err {
+            AppError::Validation(msg) => assert!(
+                msg.contains("bereits vergeben"),
+                "error must contain 'bereits vergeben', got: {msg}"
+            ),
+            other => panic!("expected Validation error, got: {other:?}"),
+        }
+    }
+
+    /// (3) peek zeigt die übersprungene Nummer, ohne den Zähler zu konsumieren.
+    #[test]
+    fn peek_skips_taken_number_without_consuming_counter() {
+        let conn = setup();
+        let now = chrono::Local::now();
+        let taken = apply_invoice_format("{YYYY}-{NNNNN}", &now, 7);
+        seed_sequence(&conn, 7);
+        seed_taken_invoice(&conn, &taken);
+
+        let peeked = peek_invoice_number(&conn, "ws-1");
+        let expected = apply_invoice_format("{YYYY}-{NNNNN}", &now, 8);
+        assert_eq!(peeked, expected, "peek must return first free number (8)");
+
+        // Counter must not have advanced
+        let (counter, _, _) = get_invoice_sequence(&conn, "ws-1").unwrap();
+        assert_eq!(counter, 7, "peek must not advance the persisted counter");
     }
 }

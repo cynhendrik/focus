@@ -1,6 +1,6 @@
 import type { SettingsTab } from '@/store/ui.store'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, LayoutGrid, Plug, Code2, AlertTriangle, Clock, Palette, ShieldCheck, ReceiptText } from 'lucide-react'
+import { Building2, LayoutGrid, Plug, Code2, AlertTriangle, Clock, Palette, ShieldCheck, ReceiptText, BellRing } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { Badge } from './ui'
 
@@ -15,8 +15,9 @@ const GROUPS: Group[] = [
   ]},
   { label: 'Konto', items: [
     { key: 'lizenzen',      label: 'Lizenzen & Upgrades', icon: ReceiptText, badge: 'Pro' },
-    { key: 'aussehen',      label: 'Aussehen',       icon: Palette },
-    { key: 'datenschutz',   label: 'Datenschutz',    icon: ShieldCheck },
+    { key: 'aussehen',          label: 'Aussehen',            icon: Palette },
+    { key: 'benachrichtigungen', label: 'Benachrichtigungen', icon: BellRing },
+    { key: 'datenschutz',       label: 'Datenschutz',         icon: ShieldCheck },
   ]},
   { label: 'System', items: [
     { key: 'auftraege',     label: 'Aufträge',       icon: Clock },

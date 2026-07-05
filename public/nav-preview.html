@@ -19,8 +19,8 @@
     --fg:oklch(98% 0 0);
     --fg-muted:oklch(66% 0.008 270);
     --fg-dim:oklch(48% 0.008 270);
-    --accent:#3B6DF4;
-    --accent-soft:rgb(59 109 244 / 0.16);
+    --accent:#F2754F;
+    --accent-soft:rgb(242 117 79 / 0.16);
     --accent-text:#7AA0FF;
     --shadow:0 24px 60px -16px rgb(0 0 0 / 0.6), 0 6px 18px -8px rgb(0 0 0 / 0.45);
   }
@@ -64,14 +64,14 @@
   .kora{
     position:relative; display:flex; align-items:center; gap:12px; margin:6px 4px 10px; padding:13px 14px;
     border-radius:15px; cursor:pointer; overflow:hidden;
-    background:linear-gradient(135deg, rgb(59 109 244 / 0.26), rgb(59 109 244 / 0.05) 70%);
-    border:1px solid rgb(59 109 244 / 0.34);
+    background:linear-gradient(135deg, rgb(242 117 79 / 0.26), rgb(242 117 79 / 0.05) 70%);
+    border:1px solid rgb(242 117 79 / 0.34);
     transition:transform .15s, box-shadow .15s, border-color .15s;
   }
   .kora::after{ content:""; position:absolute; inset:0; background:radial-gradient(120px 60px at 18% 0%, rgb(122 160 255 / 0.22), transparent 70%); pointer-events:none; }
-  .kora:hover{ transform:translateY(-1px); border-color:rgb(59 109 244 / 0.6); box-shadow:0 10px 28px -12px rgb(59 109 244 / 0.65); }
+  .kora:hover{ transform:translateY(-1px); border-color:rgb(242 117 79 / 0.6); box-shadow:0 10px 28px -12px rgb(242 117 79 / 0.65); }
   .kora__icon{ width:36px;height:36px;border-radius:11px;flex-shrink:0; display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(150deg,#5b86ff,#3B6DF4); color:#fff; box-shadow:0 6px 18px rgb(59 109 244 / 0.6), inset 0 1px 0 rgb(255 255 255 /.25); }
+    background:linear-gradient(150deg,#FF9576,#F2754F); color:#fff; box-shadow:0 6px 18px rgb(242 117 79 / 0.6), inset 0 1px 0 rgb(255 255 255 /.25); }
   .kora__icon svg{ width:19px;height:19px;stroke-width:2; }
   .kora__b{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
   .kora__t{ font-size:14px; font-weight:700; letter-spacing:-0.01em; line-height:1; }
@@ -80,7 +80,7 @@
 
   /* collapsed KORA icon */
   .kora-ic{ width:44px;height:44px;border-radius:13px; margin:6px 0 12px; display:flex;align-items:center;justify-content:center; position:relative;
-    background:linear-gradient(150deg,#5b86ff,#3B6DF4); color:#fff; box-shadow:0 6px 20px rgb(59 109 244 / 0.6); cursor:pointer; }
+    background:linear-gradient(150deg,#FF9576,#F2754F); color:#fff; box-shadow:0 6px 20px rgb(242 117 79 / 0.6); cursor:pointer; }
   .kora-ic svg{ width:20px;height:20px;stroke-width:2; }
   .kora-ic .dot{ position:absolute; top:-3px; right:-3px; min-width:17px;height:17px;padding:0 5px;border-radius:99px; background:#fff;color:var(--accent); font-family:var(--mono);font-size:9px;font-weight:800; display:flex;align-items:center;justify-content:center; box-shadow:0 2px 6px rgb(0 0 0 /.3); }
 
@@ -150,7 +150,7 @@ const ICON={
   spark:'<path d="M12 3.2l1.7 4.6 4.6 1.7-4.6 1.7L12 15.8l-1.7-4.6L5.7 9.5l4.6-1.7z"/><path d="M18.4 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/>',
 };
 const I=n=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+ICON[n]+'</svg>';
-const LOGO='<svg class="logo" viewBox="0 0 160 160"><rect width="160" height="160" rx="42" fill="#3B6DF4"/><g fill="#fff" transform="translate(1 0) skewX(-14)"><rect x="78" y="36" width="56" height="23" rx="11"/><rect x="56" y="69" width="56" height="23" rx="11"/><rect x="68" y="102" width="33" height="23" rx="11"/></g></svg>';
+const LOGO='<svg class="logo" viewBox="0 0 160 160"><rect width="160" height="160" rx="42" fill="#F2754F"/><g fill="#fff" transform="translate(1 0) skewX(-14)"><rect x="78" y="36" width="56" height="23" rx="11"/><rect x="56" y="69" width="56" height="23" rx="11"/><rect x="68" y="102" width="33" height="23" rx="11"/></g></svg>';
 const MODEL=[
   {label:'Menü',items:[{i:'home',n:'Heute',k:'H',active:1},{i:'users',n:'Kunden',k:'C'},{i:'card',n:'Finanzen',k:'F'}]},
   {label:'Akquise',items:[{i:'inbox',n:'Follow-Ups'},{i:'target',n:'Leads',b:4},{i:'trend',n:'Pipeline',b:2},{i:'userplus',n:'Newcomer'}]},

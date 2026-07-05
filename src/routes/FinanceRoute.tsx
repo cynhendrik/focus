@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote } from 'lucide-react'
+import { Plus, FileText, Tag, Trash2, CheckCircle, ChevronRight, Download, Lightbulb, TrendingUp, Eye, XCircle, Package, Banknote, Send } from 'lucide-react'
 import { useFinanceStore } from '@/store/finance.store'
+import { receivables } from '@/lib/finance/receivables'
 import { useCompanyStore } from '@/store/company.store'
 import { useCapability } from '@/hooks/useCapability'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
@@ -16,16 +17,18 @@ import { InvoiceSuggestions } from '@/components/finance/InvoiceSuggestions'
 import { MahnwesenPanel } from '@/components/finance/MahnwesenPanel'
 import { InvoicePreview } from '@/components/finance/InvoicePreview'
 import { PaymentModal } from '@/components/finance/PaymentModal'
+import { InvoiceSendModal } from '@/components/finance/InvoiceSendModal'
 // PDF helpers (react-pdf) are imported lazily at call time so the ~heavy
 // react-pdf lib stays out of the main bundle and loads only on export.
 import { FinanceGateway } from '@/data/finance.gateway'
 import { isOverdue, paidAmount, displayInvoiceStatus, remaining, todayLocalISO } from '@/lib/invoice-status'
+import { invoiceCategory, invoiceFilterCounts } from '@/lib/finance/invoice-filters'
 import type { Invoice, InvoiceStatus, InvoiceWithItems, Offer } from '@/types/finance.types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 type Period = 'monat' | 'quartal' | 'jahr' | 'eigener'
-type InvoiceFilter = InvoiceStatus | 'all'
+type InvoiceFilter = 'all' | 'open' | 'overdue' | 'paid' | 'cancelled'
 
 function fmt(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
@@ -169,7 +172,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
         <path
           d={GAUGE_PATH}
           fill="none"
-          stroke="oklch(56% 0.19 264)"
+          stroke="oklch(68% 0.16 41)"
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${filled} ${GAUGE_LEN}`}
@@ -183,7 +186,7 @@ function GaugeArc({ animPct, revenue, periodLabel: label }: { animPct: number; r
               style={{ filter: 'url(#dot-glow)' }} />
             <circle cx={tipX} cy={tipY} r={5} fill="var(--accent)"
               style={{ filter: 'url(#dot-glow)' }} />
-            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(56% 0.19 264)" />
+            <circle cx={tipX} cy={tipY} r={2.5} fill="oklch(68% 0.16 41)" />
           </>
         )}
 
@@ -258,10 +261,10 @@ function RevenueBarChart({ bars, maxRevenue }: { bars: BarEntry[]; maxRevenue: n
                 background: bar.isCurrent
                   ? 'var(--accent)'
                   : 'var(--surface-2)',
-                border: `1px solid ${bar.isCurrent ? 'oklch(56% 0.19 264 / 0.5)' : 'var(--border)'}`,
+                border: `1px solid ${bar.isCurrent ? 'oklch(68% 0.16 41 / 0.5)' : 'var(--border)'}`,
                 borderRadius: '4px 4px 0 0',
                 transition: 'height 700ms cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: bar.isCurrent ? '0 0 12px oklch(56% 0.19 264 / 0.35)' : 'none',
+                boxShadow: bar.isCurrent ? '0 0 12px oklch(68% 0.16 41 / 0.35)' : 'none',
               }} />
             </div>
           )
@@ -370,6 +373,7 @@ export function FinanceRoute() {
   const [previewLoading,   setPreviewLoading]   = useState<string | null>(null)
   const [stornoInv,        setStornoInv]        = useState<Invoice | null>(null)
   const [paymentInvoice,   setPaymentInvoice]   = useState<Invoice | null>(null)
+  const [sendInvoice,      setSendInvoice]      = useState<Invoice | null>(null)
   const [showBatchExport,  setShowBatchExport]  = useState(false)
   const [editInvoice,      setEditInvoice]      = useState<InvoiceWithItems | null>(null)
 
@@ -447,11 +451,12 @@ export function FinanceRoute() {
   )
   // "Offen" = unbezahlt & noch nicht fällig; "Überfällig" = unbezahlt & über Fälligkeit.
   // Überfälligkeit wird aus dueDate abgeleitet (Status wird nie auf 'overdue' gesetzt).
-  const openInvoices    = useMemo(() => realInvoices.filter(i => i.status === 'open' && !isOverdue(i)), [realInvoices])
-  const overdueInvoices = useMemo(() => realInvoices.filter(i => isOverdue(i)), [realInvoices])
+  const openInvoices    = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'open'), [realInvoices])
+  const overdueInvoices = useMemo(() => realInvoices.filter(i => invoiceCategory(i) === 'overdue'), [realInvoices])
   // Cockpit: offene/überfällige Beträge = Restbeträge (minus erfasste Zahlungen).
-  const openTotal    = useMemo(() => openInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [openInvoices, payments])
-  const overdueTotal = useMemo(() => overdueInvoices.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0), [overdueInvoices, payments])
+  const recvTotals   = useMemo(() => receivables(realInvoices, payments), [realInvoices, payments])
+  const openTotal    = recvTotals.open
+  const overdueTotal = recvTotals.overdue
   const cashInMonth  = useMemo(() => {
     const m = todayLocalISO().slice(0, 7) // YYYY-MM
     return payments.reduce((s, p) => p.paidAt.slice(0, 7) === m ? s + p.amount : s, 0)
@@ -493,12 +498,19 @@ export function FinanceRoute() {
     return () => clearTimeout(t)
   }, [gaugePct])
 
-  // Filtered invoices (exclude cancelled and draft from 'all' unless explicitly selected)
+  // Filter über die geteilte Kategorie-Ableitung — 'overdue' funktioniert damit
+  // endlich (Status wird nie auf overdue gesetzt), 'open' zeigt nur nicht-fällige.
   const filteredInvoices = useMemo(() => {
-    const base = realInvoices.filter(i => i.status !== 'cancelled' && i.status !== 'draft')
-    if (invoiceFilter === 'all') return base
-    return realInvoices.filter(i => i.status === invoiceFilter && i.status !== 'draft')
+    if (invoiceFilter === 'all') {
+      return realInvoices.filter(i => {
+        const c = invoiceCategory(i)
+        return c !== 'cancelled' && c !== 'draft'
+      })
+    }
+    return realInvoices.filter(i => invoiceCategory(i) === invoiceFilter)
   }, [realInvoices, invoiceFilter])
+
+  const filterCounts = useMemo(() => invoiceFilterCounts(realInvoices), [realInvoices])
 
   // Active offers (pipeline) — includes accepted so user can convert to invoice
   const activeOffers = useMemo(() =>
@@ -582,7 +594,7 @@ export function FinanceRoute() {
         {/* Subtle background glow blob */}
         <div style={{
           position: 'absolute', top: -60, right: -40, width: 280, height: 280,
-          background: 'radial-gradient(circle, oklch(56% 0.19 264 / 0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, oklch(68% 0.16 41 / 0.06) 0%, transparent 70%)',
           pointerEvents: 'none',
         }} />
 
@@ -798,6 +810,7 @@ export function FinanceRoute() {
             <div style={{ display: 'flex', gap: 5 }}>
               {INVOICE_FILTERS.map(f => {
                 const isActive = invoiceFilter === f.value
+                const count = filterCounts[f.value]
                 return (
                   <button key={f.value} onClick={() => setInvoiceFilter(f.value)}
                     className="chip"
@@ -808,7 +821,7 @@ export function FinanceRoute() {
                       border: isActive ? '1px solid oklch(91% 0.03 264 / 0.3)' : undefined,
                       transition: 'background 150ms, color 150ms',
                     }}>
-                    {f.label}
+                    {f.label}{count > 0 ? ` ${count}` : ''}
                   </button>
                 )
               })}
@@ -898,6 +911,10 @@ export function FinanceRoute() {
                           useToastStore.getState().show({ message: `Download fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`, variant: 'error' })
                         }
                       }} />
+                      {!inv.isSuggestion && inv.status !== 'draft' && (
+                        <RowBtn icon={<Send size={12} />} label="Per E-Mail senden"
+                          onClick={() => setSendInvoice(inv)} />
+                      )}
                       {isAdmin && inv.isSuggestion && (
                         <RowBtn icon={<CheckCircle size={12} />} label="Freigeben" tone="ok"
                           onClick={() => approveInvoiceSuggestion(inv.id, user?.id ?? '', workspaceId)} />
@@ -954,6 +971,13 @@ export function FinanceRoute() {
       )}
       {paymentInvoice && (
         <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} />
+      )}
+      {sendInvoice && (
+        <InvoiceSendModal
+          invoice={sendInvoice}
+          onClose={() => setSendInvoice(null)}
+          onSent={() => {}}
+        />
       )}
       {previewData && profile && (
         <InvoicePreview

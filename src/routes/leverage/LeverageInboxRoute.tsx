@@ -56,12 +56,13 @@ function SectionDivider({ label, count }: { label: string; count: number }) {
   )
 }
 
-function InboxRow({ followUp, lead, stages, isOverdue, openLead }: {
+function InboxRow({ followUp, lead, stages, isOverdue, openLead, onComplete }: {
   followUp: FollowUp
   lead: Lead | undefined
   stages: LeadStage[]
   isOverdue: boolean
   openLead: (id: string) => void
+  onComplete: (f: FollowUp) => void
 }) {
   const stage = lead ? resolveStage(lead.leadStatus, stages) : { label: '', color: FALLBACK_STAGE_COLOR }
   const stageColor = stage.color
@@ -71,7 +72,7 @@ function InboxRow({ followUp, lead, stages, isOverdue, openLead }: {
       onClick={() => lead && openLead(lead.id)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '36px 1fr auto',
+        gridTemplateColumns: '26px 36px 1fr auto',
         alignItems: 'center', gap: 12,
         padding: '10px 14px',
         borderRadius: 10,
@@ -92,6 +93,21 @@ function InboxRow({ followUp, lead, stages, isOverdue, openLead }: {
         e.currentTarget.style.borderColor = 'var(--border)'
       }}
     >
+      {/* Abhaken — erledigt den Follow-up (der Kern-Loop) */}
+      <button
+        onClick={e => { e.stopPropagation(); onComplete(followUp) }}
+        title="Als erledigt markieren"
+        aria-label="Follow-up erledigen"
+        style={{
+          width: 20, height: 20, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
+          border: '1.5px solid var(--border-strong)', background: 'transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+          transition: 'border-color 120ms, background 120ms',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ok)'; e.currentTarget.style.background = 'var(--ok)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'transparent' }}
+      />
+
       {/* Avatar */}
       <div style={{
         width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -149,83 +165,11 @@ function InboxRow({ followUp, lead, stages, isOverdue, openLead }: {
   )
 }
 
-function NoFollowUpRow({ lead, stages, daysSince, openLead }: {
-  lead: Lead
-  stages: LeadStage[]
-  daysSince: number
-  openLead: (id: string) => void
-}) {
-  const stage = resolveStage(lead.leadStatus, stages)
-  const stageColor = stage.color
-
-  return (
-    <div
-      onClick={() => openLead(lead.id)}
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '36px 1fr auto',
-        alignItems: 'center', gap: 12,
-        padding: '10px 14px',
-        borderRadius: 10,
-        border: '1px solid var(--border)',
-        background: 'var(--surface)',
-        cursor: 'pointer',
-        transition: 'background 100ms',
-        marginBottom: 6,
-        opacity: 0.7,
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.background = 'var(--surface-2)'
-        e.currentTarget.style.opacity = '1'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.background = 'var(--surface)'
-        e.currentTarget.style.opacity = '0.7'
-      }}
-    >
-      <div style={{
-        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)',
-        fontFamily: 'var(--font-mono)',
-      }}>
-        {initials(lead.name)}
-      </div>
-
-      <div style={{ minWidth: 0 }}>
-        <div style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--fg)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          marginBottom: 3,
-        }}>
-          {lead.name}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {lead.companyName && (
-            <span style={{ fontSize: 11, color: 'var(--fg-dim)' }}>{lead.companyName}</span>
-          )}
-          <span style={{
-            fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
-            background: `${stageColor}18`, color: stageColor, border: `1px solid ${stageColor}30`,
-            textTransform: 'uppercase', letterSpacing: '0.06em',
-          }}>
-            {stage.label}
-          </span>
-        </div>
-      </div>
-
-      <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--fg-dim)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-        {daysSince === 0 ? 'Heute' : `vor ${daysSince}d`}
-      </div>
-    </div>
-  )
-}
-
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export function LeverageInboxRoute() {
-  const allFollowUps = useCrmStore(s => s.allFollowUps)
+  const allFollowUps   = useCrmStore(s => s.allFollowUps)
+  const upsertFollowUp = useCrmStore(s => s.upsert)
   const allLeads     = useLeadsStore(s => s.leads)
   const stages       = useLeadStagesStore(s => s.stages)
   const setAppView   = useUiStore(s => s.setAppView)
@@ -235,10 +179,19 @@ export function LeverageInboxRoute() {
 
   const today = new Date().toLocaleDateString('sv')
 
+  // Nur offene Follow-ups AN LEADS — Kunden-Follow-ups gehören nicht in den
+  // Akquise-Inbox (früher tauchten sie als Geisterzeilen mit "?" auf).
   const openFollowUps = useMemo(() =>
-    allFollowUps.filter(f => f.status === 'offen'),
-    [allFollowUps],
+    allFollowUps.filter(f => f.status === 'offen' && leadMap.has(f.customerId)),
+    [allFollowUps, leadMap],
   )
+
+  const completeFollowUp = (f: FollowUp) => {
+    void upsertFollowUp({
+      id: f.id, customerId: f.customerId, title: f.title,
+      dueDate: f.dueDate, status: 'erledigt', priority: f.priority,
+    })
+  }
 
   const { overdue, dueToday, upcoming, noDue } = useMemo(() => {
     const overdue:   FollowUp[] = []
@@ -257,28 +210,10 @@ export function LeverageInboxRoute() {
     return { overdue, dueToday, upcoming, noDue }
   }, [openFollowUps, today])
 
-  // Leads with no open follow-up and either no lastActivity or >14d ago
-  const leadsWithoutFollowUp = useMemo(() => {
-    const leadIdsWithFollowUp = new Set(openFollowUps.map(f => f.customerId))
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 14)
-    const cutoffStr = cutoff.toISOString()
-    return allLeads
-      .filter(l =>
-        !leadIdsWithFollowUp.has(l.id) &&
-        l.reEngageDate == null &&   // geparkte / disqualifizierte Leads ausnehmen
-        (!l.lastActivityAt || l.lastActivityAt < cutoffStr),
-      )
-      .sort((a, b) => (a.lastActivityAt ?? '0').localeCompare(b.lastActivityAt ?? '0'))
-  }, [allLeads, openFollowUps])
-
   const openLead = (id: string) => {
     setLeadId(id)
     setAppView('leverage_lead_detail')
   }
-
-  const daysSince = (iso: string | null) =>
-    iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : 0
 
   const total = overdue.length + dueToday.length + upcoming.length + noDue.length
 
@@ -297,12 +232,12 @@ export function LeverageInboxRoute() {
         </div>
       </div>
 
-      {total === 0 && leadsWithoutFollowUp.length === 0 && (
+      {total === 0 && (
         <div style={{
           textAlign: 'center', padding: '60px 0',
           fontSize: 13, color: 'var(--fg-dim)',
         }}>
-          Alle Leads haben offene Follow-Ups oder waren kürzlich aktiv.
+          Keine offenen Follow-Ups — alles erledigt. 🎉
         </div>
       )}
 
@@ -311,7 +246,7 @@ export function LeverageInboxRoute() {
           <SectionDivider label="Überfällig" count={overdue.length} />
           {overdue.map(f => (
             <InboxRow key={f.id} followUp={f} lead={leadMap.get(f.customerId)}
-              stages={stages} isOverdue openLead={openLead} />
+              stages={stages} isOverdue openLead={openLead} onComplete={completeFollowUp} />
           ))}
         </>
       )}
@@ -321,7 +256,7 @@ export function LeverageInboxRoute() {
           <SectionDivider label="Heute" count={dueToday.length} />
           {dueToday.map(f => (
             <InboxRow key={f.id} followUp={f} lead={leadMap.get(f.customerId)}
-              stages={stages} isOverdue={false} openLead={openLead} />
+              stages={stages} isOverdue={false} openLead={openLead} onComplete={completeFollowUp} />
           ))}
         </>
       )}
@@ -331,7 +266,7 @@ export function LeverageInboxRoute() {
           <SectionDivider label="Demnächst" count={upcoming.length} />
           {upcoming.map(f => (
             <InboxRow key={f.id} followUp={f} lead={leadMap.get(f.customerId)}
-              stages={stages} isOverdue={false} openLead={openLead} />
+              stages={stages} isOverdue={false} openLead={openLead} onComplete={completeFollowUp} />
           ))}
         </>
       )}
@@ -341,17 +276,7 @@ export function LeverageInboxRoute() {
           <SectionDivider label="Ohne Datum" count={noDue.length} />
           {noDue.map(f => (
             <InboxRow key={f.id} followUp={f} lead={leadMap.get(f.customerId)}
-              stages={stages} isOverdue={false} openLead={openLead} />
-          ))}
-        </>
-      )}
-
-      {leadsWithoutFollowUp.length > 0 && (
-        <>
-          <SectionDivider label="Kein Follow-Up" count={leadsWithoutFollowUp.length} />
-          {leadsWithoutFollowUp.map(l => (
-            <NoFollowUpRow key={l.id} lead={l} stages={stages}
-              daysSince={daysSince(l.lastActivityAt)} openLead={openLead} />
+              stages={stages} isOverdue={false} openLead={openLead} onComplete={completeFollowUp} />
           ))}
         </>
       )}

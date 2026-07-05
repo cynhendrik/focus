@@ -14,6 +14,10 @@ pub enum CrmEvent {
         workspace_id: String,
         deal_id:      String,
         to_stage:     String,
+        // Semantik der Ziel-Stage (Stages sind umbenennbar, die Filter
+        // "won"/"lost" der Regeln matchen über diese Flags).
+        is_won:       bool,
+        is_lost:      bool,
     },
 }
 

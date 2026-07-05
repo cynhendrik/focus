@@ -21,3 +21,4 @@ pub mod payment;
 pub mod campaign;
 pub mod ai;
 pub mod notes;
+pub mod prepared_item;

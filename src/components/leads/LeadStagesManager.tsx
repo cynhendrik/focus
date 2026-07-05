@@ -114,12 +114,17 @@ export function LeadStagesManager({ workspaceId, onClose }: Props) {
   const handleAdd = async () => {
     if (!newLabel.trim()) return
     const name = newLabel.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
-    await upsertStage({
-      workspaceId, name, label: newLabel.trim(),
-      color: PRESET_COLORS[stages.length % PRESET_COLORS.length],
-      orderIndex: stages.length,
-    })
-    setNewLabel('')
+    setError(null)
+    try {
+      await upsertStage({
+        workspaceId, name, label: newLabel.trim(),
+        color: PRESET_COLORS[stages.length % PRESET_COLORS.length],
+        orderIndex: stages.length,
+      })
+      setNewLabel('')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Stage konnte nicht angelegt werden')
+    }
   }
 
   return (

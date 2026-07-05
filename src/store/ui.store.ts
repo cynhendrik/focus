@@ -71,16 +71,15 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
       return 'verlauf'
   }
 }
-export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'lizenzen' | 'datenschutz' | 'developer' | 'gefahrenzone' | 'auftraege'
+export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'lizenzen' | 'datenschutz' | 'developer' | 'gefahrenzone' | 'auftraege' | 'benachrichtigungen'
 
 export type AppView =
   | 'dashboard' | 'profile'
-  | 'clients'   | 'akquise'        | 'invoices'
+  | 'clients'   | 'invoices'
   | 'settings'  | 'integrations'
   | 'posteingang' | 'zeitmanagement'
-  | 'pipeline'  | 'calendar'  | 'mail' | 'followups' | 'leads'
+  | 'calendar'  | 'mail'
   | 'corra'
-  | 'sales'
   // Akquise / Sales views (vormals LEVERAGE — jetzt Teil der einen Nav)
   | 'leverage_inbox'
   | 'leverage_leads'

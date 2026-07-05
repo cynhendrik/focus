@@ -233,7 +233,7 @@ type KindVisual = { icon: LucideIcon; bg: string; color: string }
 
 const KIND_VISUAL: Record<Exclude<EntryKind, 'now' | 'gap'>, KindVisual> = {
   event: { icon: CalIcon,        bg: 'var(--accent-soft)',                color: 'var(--accent)' },
-  task:  { icon: CheckCircle2,   bg: 'oklch(78% 0.13 235 / 0.18)',         color: 'var(--info)'   },
+  task:  { icon: CheckCircle2,   bg: 'oklch(72% 0.10 195 / 0.18)',         color: 'var(--info)'   },
 }
 
 const FALLBACK_VISUAL: KindVisual = {

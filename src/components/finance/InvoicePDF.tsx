@@ -10,6 +10,8 @@ import { computeTaxRateGroups } from '@/lib/invoice-tax'
 import { buildCiiXml } from '@/lib/erechnung/cii-invoice'
 import { embedFacturX } from '@/lib/erechnung/facturx-embed'
 import { checkErechnungReadiness } from '@/lib/erechnung/erechnung-readiness'
+import { fmtEurPdf, fmtQty } from '@/lib/finance/pdf-format'
+import { log } from '@/lib/logger'
 import fontRegular from '@/assets/fonts/LiberationSans-Regular.ttf'
 import fontBold from '@/assets/fonts/LiberationSans-Bold.ttf'
 import iccUrl from '@/assets/icc/sRGB-v2-micro.icc?url'
@@ -85,7 +87,9 @@ const s = StyleSheet.create({
   grandValue:  { width: 80, textAlign: 'right', fontFamily: PDF_FONT, fontWeight: 'bold' },
   divider:     { height: 0.5, backgroundColor: '#d0d0d0', width: 220, alignSelf: 'flex-end', marginVertical: 4 },
   kleinBox:    { marginTop: 16, borderTopWidth: 0.5, borderColor: '#e4e4e4', paddingTop: 12, paddingLeft: 10, paddingRight: 10, paddingBottom: 10, backgroundColor: '#f9f9f9' },
-  kleinText:   { fontSize: 8.5, color: '#666', fontStyle: 'italic', lineHeight: 1.6 },
+  // Kein italic: InvoiceSans ist nur normal/bold registriert — react-pdf wirft sonst
+  // "Could not resolve font" und der komplette Download scheitert (Repro: §19-Rechnung).
+  kleinText:   { fontSize: 8.5, color: '#666', lineHeight: 1.6 },
   paySection:  { marginTop: 16, borderTopWidth: 0.5, borderColor: '#e4e4e4', paddingTop: 12 },
   payText:     { fontSize: 9, color: '#333', lineHeight: 1.7, marginBottom: 5 },
   payBank:     { fontSize: 9, color: '#555' },
@@ -123,8 +127,6 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
     .filter(Boolean).join(', ')
 
   const fmtDate = (iso: string) => { const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}` }
-  const daysBetween = (a: string, b: string) =>
-    Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000)
 
   const footerLine1 = [profile.name, profile.address, profile.email, profile.phone]
     .filter(Boolean).join('  ·  ')
@@ -176,11 +178,9 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
           </View>
           <View style={s.metaBlock}>
             {[
-              { label: 'Zahlungsziel',   value: `${daysBetween(invoice.date, invoice.dueDate)} Tage` },
               { label: 'Rechnungsdatum', value: fmtDate(invoice.date) },
               { label: 'Leistungsdatum', value: fmtDate(leistungsdatum) },
               { label: 'Fällig am',      value: fmtDate(invoice.dueDate) },
-              { label: 'Rechnungsnr.',   value: invoice.number ?? '—' },
             ].map(m => (
               <View key={m.label} style={s.metaItem}>
                 <Text style={s.label}>{m.label}</Text>
@@ -216,11 +216,11 @@ function InvoicePDFDoc({ data, profile, account }: Props) {
               )}
             </View>
             <Text style={s.colDate}>{fmtDate(item.itemDate ?? invoice.date)}</Text>
-            <Text style={s.colQty}>{item.quantity}</Text>
+            <Text style={s.colQty}>{fmtQty(item.quantity)}</Text>
             <Text style={s.colUnit}>{item.unit ?? ''}</Text>
-            <Text style={s.colPrice}>{item.unitPrice.toFixed(2)} €</Text>
+            <Text style={s.colPrice}>{fmtEurPdf(item.unitPrice)}</Text>
             {!noTax && <Text style={s.colTax}>{item.taxRate}%</Text>}
-            <Text style={s.colTotal}>{item.total.toFixed(2)} €</Text>
+            <Text style={s.colTotal}>{fmtEurPdf(item.total)}</Text>
           </View>
         ))}
 
@@ -351,8 +351,12 @@ export async function downloadInvoicePDF(data: InvoiceWithItems, profile: Compan
         durationMs: 9000,
       })
     }
-  } catch {
-    toast.setError('Fehler beim Speichern')
+  } catch (err) {
+    // Error-Objekte verlieren message/stack bei JSON-Serialisierung — als Klartext loggen.
+    const detail = err instanceof Error ? (err.message || err.name) : String(err)
+    const stack = err instanceof Error ? err.stack : undefined
+    log.error('downloadInvoicePDF failed', { invoiceId: data.invoice.id, detail, stack })
+    toast.setError(detail ? `Fehler beim Speichern: ${detail.slice(0, 160)}` : 'Fehler beim Speichern')
   }
 }
 
@@ -381,7 +385,9 @@ export async function batchExportInvoicesPDF(
     const savedTo = await invoke<string>('save_zip', { files, suggestedName: suggestedZipName })
     toast.setDone(savedTo)
     onProgress?.(100)
-  } catch {
-    toast.setError('Fehler beim Exportieren')
+  } catch (err) {
+    log.error('batchExportInvoicesPDF failed', { count: invoices.length, err })
+    const detail = err instanceof Error ? err.message : String(err)
+    toast.setError(detail ? `Fehler beim Exportieren: ${detail.slice(0, 160)}` : 'Fehler beim Exportieren')
   }
 }

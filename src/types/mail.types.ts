@@ -28,6 +28,14 @@ export interface EmailHeader {
   notALead: boolean
 }
 
+/** Dauerhaft ignorierter Absender — Mails davon erscheinen nie als Newcomer. */
+export interface IgnoredSender {
+  id: string
+  pattern: string            // kleingeschriebene Adresse oder Domain
+  scope: 'address' | 'domain'
+  createdAt: string
+}
+
 export interface EmailBody {
   id: string
   bodyText: string

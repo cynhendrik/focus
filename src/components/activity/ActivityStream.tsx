@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Phone, Users, Mail, FileText, Bell, AlarmClock,
+  Phone, Users, Mail, FileText, Bell, AlarmClock, NotebookPen,
   Paperclip, CheckCircle2, Trash2, ChevronDown, Calendar as CalIcon,
   Search, X, Inbox, CheckSquare,
 } from 'lucide-react'
@@ -10,24 +10,32 @@ import type { LucideIcon } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useNotesStore } from '@/store/notes.store'
+import { useNotesModuleStore } from '@/store/notes-module.store'
 import { useFilesStore } from '@/store/files.store'
 import { useCrmStore } from '@/store/crm.store'
 import { useDeadlinesStore } from '@/store/deadlines.store'
 import { useMailStore } from '@/store/mail.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
+import { useToastStore } from '@/store/toast.store'
+import { useLeadsStore } from '@/store/leads.store'
+import { useCustomersStore } from '@/store/customers.store'
 
 import { MailService } from '@/services/mail.service'
+import { outcomeOptionsFor, autoFollowUpForOutcome } from '@/lib/activities/outcomes'
+import { isFollowUpActivity } from '@/lib/activities/followups'
+import type { ActivityOutcome } from '@/types/activity.types'
 import type { EmailBody } from '@/types/mail.types'
 import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import type { FollowUpQueueItem } from '@/types/follow-up-queue.types'
+import { htmlToExcerpt } from '@/lib/text/htmlExcerpt'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event model — every source collapses into one shape.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type EventKind =
-  | 'call' | 'meeting' | 'email' | 'note' | 'note_text'
+  | 'call' | 'meeting' | 'email' | 'note' | 'note_text' | 'note_doc'
   | 'followup' | 'todo' | 'file' | 'deadline' | 'mail_in'
 
 export interface TimelineEvent {
@@ -51,6 +59,7 @@ const KIND_META: Record<EventKind, KindMeta> = {
   mail_in:   { Icon: Mail,         label: 'Mail',       color: 'oklch(78% 0.13 210)', tint: 'oklch(78% 0.13 210 / 0.14)' },
   note:      { Icon: FileText,     label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
   note_text: { Icon: FileText,     label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
+  note_doc:  { Icon: NotebookPen,  label: 'Notiz',      color: 'oklch(76% 0.04 270)', tint: 'oklch(76% 0.04 270 / 0.14)' },
   followup:  { Icon: Bell,         label: 'Follow-up',  color: 'oklch(86% 0.18 95)',  tint: 'oklch(86% 0.18 95 / 0.16)'  },
   todo:      { Icon: CheckCircle2, label: 'Aufgabe',    color: 'oklch(80% 0.18 150)', tint: 'oklch(80% 0.18 150 / 0.16)' },
   file:      { Icon: Paperclip,    label: 'Datei',      color: 'oklch(72% 0.04 240)', tint: 'oklch(72% 0.04 240 / 0.14)' },
@@ -154,6 +163,8 @@ export interface ActivityStreamSources {
   deadlines?: boolean
   mails?: boolean
   followUpQueue?: boolean
+  /** Dokument-Notizen (note_entries / Notizen-Tab) in den Verlauf mischen. */
+  noteDocs?: boolean
 }
 
 interface ActivityStreamProps {
@@ -176,6 +187,8 @@ export function ActivityStream({
   const activities = useActivitiesStore(s => s.activities)
   const todos      = useTodosStore(s => s.todos)
   const notes      = useNotesStore(s => s.notes)
+  const noteDocs   = useNotesModuleStore(s => s.entries)
+  const loadNoteDocs = useNotesModuleStore(s => s.loadForAccount)
   const files      = useFilesStore(s => s.files)
   const followUps  = useCrmStore(s => s.followUps)
   const deadlines  = useDeadlinesStore(s => s.deadlines)
@@ -195,6 +208,12 @@ export function ActivityStream({
   useEffect(() => {
     if (sources.mails) loadEmails()
   }, [accountId, sources.mails, loadEmails])
+
+  // Dokument-Notizen (note_entries) für diesen Kunden laden, falls der Verlauf
+  // sie mitmischt. Derselbe Store, den der Notizen-Tab nutzt — idempotent.
+  useEffect(() => {
+    if (sources.noteDocs) loadNoteDocs(accountId)
+  }, [accountId, sources.noteDocs, loadNoteDocs])
 
   // Auto follow-up sequence (lead) — fetched locally so we don't disturb the
   // global follow-up-queue store that the Follow-Ups dashboard relies on.
@@ -219,13 +238,15 @@ export function ActivityStream({
     const out: TimelineEvent[] = []
 
     for (const a of activities) {
-      const isFollowup = a.type === 'followup'
+      const isFollowup = isFollowUpActivity(a)
+      // Task-Follow-ups liefert die CRM-Quelle bereits — nicht doppelt zeigen.
+      if (isFollowup && a.type === 'task' && sources.crmFollowUps) continue
       const ts = isFollowup ? (a.dueAt ?? a.createdAt) : a.createdAt
       if (!ts) continue
       const kindMap: Record<string, EventKind> = {
         call: 'call', meeting: 'meeting', email: 'email', note: 'note', followup: 'followup',
       }
-      const kind = kindMap[a.type] ?? 'note'
+      const kind = isFollowup ? 'followup' : (kindMap[a.type] ?? 'note')
       const isFuture = isFollowup && a.status !== 'done' && new Date(ts).getTime() > nowMs
       out.push({
         id: `act-${a.id}`,
@@ -260,6 +281,20 @@ export function ActivityStream({
         timestamp: n.createdAt,
         title: n.title,
         body: n.content,
+        isFuture: false,
+      })
+    }
+
+    // Dokument-Notizen (Notizen-Tab) als gelabelte "Notiz" in den Verlauf — so
+    // taucht eine Quick-Capture-Notiz nicht mehr nur im Tab, sondern auch hier auf.
+    if (sources.noteDocs) for (const e of noteDocs) {
+      if (e.accountId !== accountId) continue
+      out.push({
+        id: `notedoc-${e.id}`,
+        kind: 'note_doc',
+        timestamp: e.createdAt,
+        title: e.title || 'Notiz',
+        body: htmlToExcerpt(e.content),
         isFuture: false,
       })
     }
@@ -323,9 +358,9 @@ export function ActivityStream({
 
     return out
   }, [
-    activities, todos, notes, files, followUps, deadlines, allEmails, queueItems,
+    activities, todos, notes, noteDocs, files, followUps, deadlines, allEmails, queueItems,
     accountId, nowMs, removeActivity,
-    sources.todos, sources.notes, sources.files, sources.crmFollowUps,
+    sources.todos, sources.notes, sources.noteDocs, sources.files, sources.crmFollowUps,
     sources.deadlines, sources.mails, sources.followUpQueue,
   ])
 
@@ -337,7 +372,7 @@ export function ActivityStream({
   const STREAM_FILTER_KINDS: Record<StreamFilter, ReadonlySet<EventKind> | null> = {
     all:    null,
     calls:  new Set<EventKind>(['call', 'meeting']),
-    notes:  new Set<EventKind>(['note', 'note_text']),
+    notes:  new Set<EventKind>(['note', 'note_text', 'note_doc']),
     mails:  new Set<EventKind>(['email', 'mail_in']),
     tasks:  new Set<EventKind>(['todo', 'followup', 'deadline', 'file']),
   }
@@ -365,30 +400,58 @@ export function ActivityStream({
   const [composerKind, setComposerKind]   = useState<ComposerKind>('note')
   const [composerText, setComposerText]   = useState('')
   const [composerDate, setComposerDate]   = useState('')
+  const [composerOutcome, setComposerOutcome] = useState<ActivityOutcome | null>(null)
   const [kindMenuOpen, setKindMenuOpen]   = useState(false)
   const [saving, setSaving]               = useState(false)
+  const showToast = useToastStore(s => s.show)
+
+  // Beim Wechsel der Art passt das gewählte Ergebnis evtl. nicht mehr.
+  const handleKindChange = useCallback((k: ComposerKind) => {
+    setComposerKind(k)
+    setComposerOutcome(null)
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!composerText.trim() || !workspaceId) return
     setSaving(true)
     try {
       const isFollowup = composerKind === 'followup'
+      const outcome = composerOutcome ?? undefined
       await createActivity({
         workspaceId,
         createdBy: user?.email ?? 'user',
         accountId,
         customerId: accountId,
-        type: composerKind,
+        // Follow-ups als task + is_follow_up — die EINE Konvention, die alle
+        // Follow-up-Listen (Mein Tag, Stapel, Pipeline) lesen. type='followup'
+        // fiel aus sämtlichen Listen heraus.
+        type: isFollowup ? 'task' : composerKind,
+        payload: isFollowup ? JSON.stringify({ is_follow_up: true }) : undefined,
         title: composerText.trim(),
         status: isFollowup ? 'open' : 'done',
         dueAt: isFollowup && composerDate ? composerDate : undefined,
+        outcome,
       })
+      // „Nicht erreicht"/No-Show → automatisch in 3 Tagen dranbleiben.
+      const accountName =
+        useLeadsStore.getState().leads.find(l => l.id === accountId)?.name ??
+        useCustomersStore.getState().customers.find(c => c.id === accountId)?.name
+      const auto = autoFollowUpForOutcome({
+        outcome, accountId, workspaceId,
+        userId: user?.email ?? 'user',
+        leadName: accountName,
+      })
+      if (auto) {
+        await createActivity(auto)
+        showToast({ message: 'Nicht erreicht — Follow-up in 3 Tagen angelegt.', variant: 'success' })
+      }
       setComposerText('')
       setComposerDate('')
+      setComposerOutcome(null)
     } finally {
       setSaving(false)
     }
-  }, [composerKind, composerText, composerDate, workspaceId, user, accountId, createActivity])
+  }, [composerKind, composerText, composerDate, composerOutcome, workspaceId, user, accountId, createActivity, showToast])
 
   // ── Email expansion ──────────────────────────────────────────────────────
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null)
@@ -408,11 +471,13 @@ export function ActivityStream({
     <div style={{ minWidth: 0 }}>
       <Composer
         kind={composerKind}
-        onKindChange={setComposerKind}
+        onKindChange={handleKindChange}
         text={composerText}
         onTextChange={setComposerText}
         date={composerDate}
         onDateChange={setComposerDate}
+        outcome={composerOutcome}
+        onOutcomeChange={setComposerOutcome}
         menuOpen={kindMenuOpen}
         onMenuToggle={setKindMenuOpen}
         saving={saving}
@@ -521,6 +586,8 @@ interface ComposerProps {
   onTextChange: (s: string) => void
   date: string
   onDateChange: (s: string) => void
+  outcome: ActivityOutcome | null
+  onOutcomeChange: (o: ActivityOutcome | null) => void
   menuOpen: boolean
   onMenuToggle: (b: boolean) => void
   saving: boolean
@@ -529,11 +596,12 @@ interface ComposerProps {
 
 function Composer({
   kind, onKindChange, text, onTextChange, date, onDateChange,
-  menuOpen, onMenuToggle, saving, onSubmit,
+  outcome, onOutcomeChange, menuOpen, onMenuToggle, saving, onSubmit,
 }: ComposerProps) {
   const meta = metaFor(kind)
   const Icon = meta.Icon
   const isFollowup = kind === 'followup'
+  const outcomeOptions = outcomeOptionsFor(kind)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -664,6 +732,45 @@ function Composer({
           {saving ? '…' : (isFollowup ? 'Planen' : 'Erfassen')}
         </button>
       </div>
+
+      {/* Ergebnis-Auswahl — genau die Outcomes, auf die die Scoring-Regeln
+          hören. Ein Klick genügt; erneuter Klick wählt ab. */}
+      <AnimatePresence initial={false}>
+        {outcomeOptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 10 }}
+            exit   ={{ opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: 0.16, ease: [0.2, 0.7, 0.1, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--fg-dim)', fontWeight: 600, marginRight: 2 }}>
+                Ergebnis:
+              </span>
+              {outcomeOptions.map(o => {
+                const active = outcome === o.value
+                return (
+                  <button
+                    key={o.value}
+                    onClick={() => onOutcomeChange(active ? null : o.value)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      background: active ? 'var(--accent-soft)' : 'transparent',
+                      color: active ? 'var(--accent-text)' : 'var(--fg-muted)',
+                      transition: 'all 140ms ease',
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence initial={false}>
         {isFollowup && (

@@ -18,6 +18,7 @@ pub struct SyncEntry {
 #[derive(Debug, Serialize)]
 pub struct SyncStatus {
     pub pending_count: u32,
+    pub failed_count: u32,
     pub last_synced_at: String,
     pub is_online: bool,
 }
@@ -46,6 +47,21 @@ pub fn get_pending_count(conn: &rusqlite::Connection) -> Result<u32, AppError> {
     Ok(count as u32)
 }
 
+pub fn get_failed_count(conn: &rusqlite::Connection) -> Result<u32, AppError> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sync_queue WHERE last_error IS NOT NULL", [], |r| r.get(0)
+    )?;
+    Ok(count as u32)
+}
+
+pub fn mark_entry_failed(conn: &rusqlite::Connection, id: &str, error: &str) -> Result<(), AppError> {
+    conn.execute(
+        "UPDATE sync_queue SET attempts = attempts + 1, last_error = ?2 WHERE id = ?1",
+        rusqlite::params![id, error],
+    )?;
+    Ok(())
+}
+
 pub fn get_last_synced_at(conn: &rusqlite::Connection) -> String {
     conn.query_row(
         "SELECT value FROM sync_meta WHERE key = 'last_sync_at'",
@@ -70,9 +86,10 @@ pub async fn get_sync_status(
 ) -> Result<SyncStatus, AppError> {
     let conn = db.conn();
     let pending_count = get_pending_count(&conn)?;
+    let failed_count = get_failed_count(&conn)?;
     let last_synced_at = get_last_synced_at(&conn);
     let is_online = !sync.supabase_url.is_empty();
-    Ok(SyncStatus { pending_count, last_synced_at, is_online })
+    Ok(SyncStatus { pending_count, failed_count, last_synced_at, is_online })
 }
 
 #[tauri::command]
@@ -84,8 +101,33 @@ pub async fn sync_now(
     push::flush_pending(&client, &sync, &db).await?;
     let conn = db.conn();
     let pending_count = get_pending_count(&conn)?;
+    let failed_count = get_failed_count(&conn)?;
     let last_synced_at = get_last_synced_at(&conn);
-    Ok(SyncStatus { pending_count, last_synced_at, is_online: true })
+    Ok(SyncStatus { pending_count, failed_count, last_synced_at, is_online: true })
+}
+
+#[derive(Debug, Serialize)]
+pub struct FailedSyncEntry {
+    pub table_name: String,
+    pub record_id: String,
+    pub operation: String,
+    pub attempts: i64,
+    pub last_error: String,
+    pub created_at: String,
+}
+
+#[tauri::command]
+pub async fn get_failed_sync_entries(db: tauri::State<'_, DbPool>) -> Result<Vec<FailedSyncEntry>, AppError> {
+    let conn = db.conn();
+    let mut stmt = conn.prepare(
+        "SELECT table_name, record_id, operation, attempts, last_error, created_at
+         FROM sync_queue WHERE last_error IS NOT NULL ORDER BY created_at ASC LIMIT 50",
+    )?;
+    let rows = stmt.query_map([], |row| Ok(FailedSyncEntry {
+        table_name: row.get(0)?, record_id: row.get(1)?, operation: row.get(2)?,
+        attempts: row.get(3)?, last_error: row.get(4)?, created_at: row.get(5)?,
+    }))?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
 }
 
 #[cfg(test)]
@@ -115,5 +157,24 @@ mod tests {
         let conn = setup();
         set_last_synced_at(&conn, "2026-05-14T10:00:00Z").unwrap();
         assert_eq!(get_last_synced_at(&conn), "2026-05-14T10:00:00Z");
+    }
+
+    #[test]
+    fn mark_entry_failed_sets_error_and_counts() {
+        let conn = setup();
+        enqueue(&conn, "customers", "c1", "INSERT", serde_json::json!({"id": "c1"})).unwrap();
+        let id: String = conn.query_row("SELECT id FROM sync_queue LIMIT 1", [], |r| r.get(0)).unwrap();
+        mark_entry_failed(&conn, &id, "HTTP 403: RLS verweigert").unwrap();
+        mark_entry_failed(&conn, &id, "HTTP 403: RLS verweigert").unwrap();
+        assert_eq!(get_failed_count(&conn).unwrap(), 1);
+        let attempts: i64 = conn.query_row("SELECT attempts FROM sync_queue WHERE id = ?1", [&id], |r| r.get(0)).unwrap();
+        assert_eq!(attempts, 2);
+    }
+
+    #[test]
+    fn failed_count_zero_without_errors() {
+        let conn = setup();
+        enqueue(&conn, "customers", "c1", "INSERT", serde_json::json!({"id": "c1"})).unwrap();
+        assert_eq!(get_failed_count(&conn).unwrap(), 0);
     }
 }

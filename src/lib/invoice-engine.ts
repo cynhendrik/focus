@@ -99,7 +99,7 @@ export function applyKleinunternehmerLogic(
 ): InvoiceItemDraft[] {
   return items.map(item => ({
     ...item,
-    taxRate: kleinunternehmer ? 0 : item.taxRate || 19,
+    taxRate: kleinunternehmer ? 0 : (item.taxRate ?? 19),
     total: calcItemTotal(item, kleinunternehmer),
   }))
 }

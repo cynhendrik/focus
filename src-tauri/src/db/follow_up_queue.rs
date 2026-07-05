@@ -86,6 +86,22 @@ pub fn cancel_for_lead(conn: &Connection, lead_id: &str) -> Result<usize, AppErr
     Ok(n)
 }
 
+/// Antwort eines Leads → laufende Sequenz sofort stoppen. Matcht die
+/// Absenderadresse case-insensitiv gegen die Lead-E-Mail. Läuft beim
+/// Mail-Sync für jede eingehende Mail; gibt die Anzahl gestoppter Schritte
+/// zurück (0, wenn der Absender kein Lead mit offener Sequenz ist).
+pub fn cancel_pending_for_email(conn: &Connection, from_addr: &str) -> Result<usize, AppError> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let n = conn.execute(
+        "UPDATE follow_up_queue SET status='cancelled', updated_at=?1
+         WHERE status='pending' AND lead_id IN (
+           SELECT id FROM accounts WHERE email IS NOT NULL AND lower(email) = lower(?2)
+         )",
+        rusqlite::params![now, from_addr],
+    )?;
+    Ok(n)
+}
+
 pub fn get_due(conn: &Connection, workspace_id: &str) -> Result<Vec<FollowUpQueueItem>, AppError> {
     let now = chrono::Utc::now().to_rfc3339();
     let mut stmt = conn.prepare(
@@ -279,6 +295,29 @@ mod tests {
         assert_eq!(cancelled, 4);
         let items = get_for_lead(&conn, "lead-1").unwrap();
         assert!(items.iter().all(|i| i.status == "cancelled"));
+    }
+
+    #[test]
+    fn reply_from_lead_cancels_pending_sequence() {
+        let conn = setup();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, account_type, email, created_at, updated_at)
+             VALUES ('lead-1','ws-1','','Anna','lead','anna@firma.de',?1,?1)",
+            rusqlite::params![now],
+        ).unwrap();
+        create_sequence(&conn, "ws-1", "lead-1", "act-1", "Anna", None).unwrap();
+
+        // Fremde Absender stoppen nichts.
+        assert_eq!(cancel_pending_for_email(&conn, "fremd@web.de").unwrap(), 0);
+
+        // Antwort des Leads (Groß-/Kleinschreibung egal) stoppt alle offenen Schritte.
+        assert_eq!(cancel_pending_for_email(&conn, "Anna@Firma.de").unwrap(), 4);
+        let items = get_for_lead(&conn, "lead-1").unwrap();
+        assert!(items.iter().all(|i| i.status == "cancelled"));
+
+        // Idempotent: nichts mehr pending → nichts mehr zu stoppen.
+        assert_eq!(cancel_pending_for_email(&conn, "anna@firma.de").unwrap(), 0);
     }
 
     #[test]

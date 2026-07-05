@@ -1,13 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DashboardRoute "Mein Tag" — persönliche View (KPI-Kacheln + CORRA-Queue), auf assignee=ich gefiltert.
+// DashboardRoute "Mein Tag" — Tagesanker-Design: eine Spalte, randlose Karten.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import {
-  ArrowRight,
-} from 'lucide-react'
-import { PageHeader } from '@/components/layout/PageHeader'
+import { useEffect, useMemo, useState } from 'react'
 
 import { filterMine } from '@/lib/todos/ownership'
 import { useCustomersStore } from '@/store/customers.store'
@@ -19,17 +14,25 @@ import { useMailStore } from '@/store/mail.store'
 import { useCalendarStore } from '@/store/calendar.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useCrmStore } from '@/store/crm.store'
-import { useToastStore } from '@/store/toast.store'
-import { useHeuteQueue } from '@/hooks/useHeuteQueue'
+import { useDealsStore } from '@/store/deals.store'
+import { usePipelineStore } from '@/store/pipeline.store'
+import { pipelinePotential } from '@/lib/finance/pipeline-potential'
 import { useReminderTrailHydration } from '@/hooks/useReminderTrailHydration'
-import { HeuteTile } from '@/components/heute/HeuteTile'
-import { DunningNudgeCard } from '@/components/finance/DunningNudgeCard'
+import { isTodoForToday } from '@/lib/heute/due'
+import { extractMeetingLink, type MeetingLink } from '@/lib/calendar/meeting-link'
+import { receivables } from '@/lib/finance/receivables'
+import { remaining, paidAmount } from '@/lib/invoice-status'
+import { invoiceCategory } from '@/lib/finance/invoice-filters'
+import { snoozedInvoiceIds } from '@/lib/heute/snooze'
+import { openExternal } from '@/lib/open-external'
+import { maskEvent } from '@/lib/calendar/owner'
+import { buildTodayLine } from '@/lib/notifications/briefing'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { StapelSection } from '@/components/stapel/StapelSection'
+import '@/styles/heute.css'
 
-import type { EmailHeader } from '@/types/mail.types'
 import type { CalendarEvent } from '@/types/calendar.types'
 import type { Todo } from '@/types/todo.types'
-import type { UpsertTodoPayload } from '@/types/todo.types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -70,384 +73,211 @@ function fmtKEur(n: number): string {
   return n.toLocaleString('de-DE')
 }
 
-function pct(delta: number, base: number): string {
-  if (base === 0) return delta > 0 ? '+∞%' : '0%'
-  const v = Math.round((delta / base) * 100)
-  return `${v > 0 ? '+' : ''}${v}%`
+function initials(name: string): string {
+  return (name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()) || '?'
 }
 
+function relTime(iso: string): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '–'
+  const hrs = Math.floor((Date.now() - d.getTime()) / 3_600_000)
+  if (hrs < 1) return 'gerade'
+  if (hrs < 24) return `${hrs} Std`
+  const y = new Date(); y.setDate(y.getDate() - 1)
+  if (d.toDateString() === y.toDateString()) return 'gestern'
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KPI Card (gemeinsam fuer alle Views)
-
-function KpiCard({
-  label, value, hint, accentValue, action, children,
-}: {
-  label: string
-  value: React.ReactNode
-  hint?: React.ReactNode
-  accentValue?: boolean   // groesse Zahl in blau statt fg
-  action?: { label?: string; onClick: () => void }
-  children?: React.ReactNode  // Header-Toolbar (z.B. Woche/Monat-Toggle)
-}) {
-  return (
-    <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-      background: 'var(--surface)', padding: '18px 20px',
-      boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', gap: 12,
-      position: 'relative', minHeight: 152,
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-      }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--fg-dim)', fontWeight: 600,
-        }}>
-          {label}
-        </span>
-        {children}
-        {action && (
-          <button
-            onClick={action.onClick}
-            title={action.label}
-            style={{
-              width: 26, height: 26, borderRadius: 99,
-              background: 'transparent', border: '1px solid var(--border)',
-              color: 'var(--fg-dim)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'color 140ms, border-color 140ms',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.color = 'var(--fg)'
-              e.currentTarget.style.borderColor = 'var(--border-strong)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.color = 'var(--fg-dim)'
-              e.currentTarget.style.borderColor = 'var(--border)'
-            }}
-          >
-            <ArrowRight size={12} />
-          </button>
-        )}
-      </div>
-
-      <div style={{
-        fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.04em',
-        color: accentValue ? 'var(--accent)' : 'var(--fg)',
-        fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
-      }}>
-        {value}
-      </div>
-
-      {hint && (
-        <div style={{ fontSize: 12, color: 'var(--fg-muted)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {hint}
-        </div>
-      )}
-    </div>
-  )
+function eur0(n: number): string {
+  return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WorkspaceView — KPIs + Tagesplan + Inbox
+// WorkspaceView — Tagesanker + Puls-Leiste + Stapel + Tagesplan + Mails
 
 function WorkspaceView() {
   const customers = useCustomersStore(s => s.customers)
   const invoices  = useFinanceStore(s => s.invoices)
+  const payments  = useFinanceStore(s => s.payments)
   const todos     = useTodosStore(s => s.allTodos)
-  const myUserId = useAuthStore(s => s.user?.id)
+  const user      = useAuthStore(s => s.user)
+  const myUserId  = user?.id
   const myTodos  = useMemo(() => filterMine(todos, myUserId), [todos, myUserId])
   const followUps = useCrmStore(s => s.allFollowUps)
   const events    = useCalendarStore(s => s.todayEvents)
   const setAppView = useUiStore(s => s.setAppView)
-  const upsertTodo = useTodosStore(s => s.upsert)
-  const crmUpsert  = useCrmStore(s => s.upsert)
-  const showToast  = useToastStore(s => s.show)
+  const emails     = useMailStore(s => s.emails)
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+
+  const deals     = useDealsStore(s => s.deals)
+  const pipeStages = usePipelineStore(s => s.stages)
+  const loadDeals = useDealsStore(s => s.loadAll)
+  useEffect(() => { if (workspaceId) loadDeals(workspaceId) }, [workspaceId, loadDeals])
+  const pipelineSum = useMemo(() => pipelinePotential(deals, pipeStages), [deals, pipeStages])
 
   useReminderTrailHydration()
 
   const [revRange, setRevRange] = useState<'week' | 'month'>('week')
 
-  // Heute-Cockpit queue
-  const { items: queueItems, loading: queueLoading, reshuffle } = useHeuteQueue()
-  const [queueIndex, setQueueIndex] = useState(0)
-  const [direction, setDirection]   = useState<1 | -1>(1)
+  // Vorname aus user_metadata
+  const firstName = (
+    ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
+    || user?.email?.split('@')[0]
+    || 'User'
+  ).replace(/^./, c => c.toUpperCase())
 
-  const advance = useCallback(() => {
-    setDirection(1)
-    setQueueIndex(prev => prev + 1)
-  }, [])
+  const now = new Date()
+  const dateText = `${WEEKDAYS[now.getDay()]} · ${now.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}`
 
-  const handleDone = useCallback(async () => {
-    const item = queueItems[queueIndex]
-    if (!item) return
-    try {
-      if (item.type === 'todo' || item.type === 'mail_reply' || item.type === 'followup') {
-        const todo = todos.find(t => t.id === item.id)
-        if (todo) {
-          const payload: UpsertTodoPayload = {
-            id: todo.id, title: todo.title, status: 'done', bucket: 'done',
-            priority: todo.priority, customerId: todo.customerId,
-            actionType: todo.actionType, sourceRef: todo.sourceRef,
-            notes: todo.notes, checklist: todo.checklist, tags: todo.tags,
-          }
-          await upsertTodo(payload)
-        }
-      } else if (item.type === 'lead_followup') {
-        // CRM-Follow-up als erledigt markieren (sonst kommt es wieder).
-        const fu = followUps.find(f => f.id === item.id)
-        if (fu) {
-          await crmUpsert({
-            id: fu.id, customerId: fu.customerId, title: fu.title,
-            dueDate: fu.dueDate, status: 'erledigt', priority: fu.priority,
-          })
-        }
-      }
-    } catch {
-      showToast({ message: 'Konnte Aufgabe nicht als erledigt markieren.', variant: 'error' })
-    }
-    advance()
-  }, [queueItems, queueIndex, todos, upsertTodo, followUps, crmUpsert, advance, showToast])
-
-  const handleSkip = useCallback(() => advance(), [advance])
-
-  const currentItem = queueItems[queueIndex]
-
-  // Workspace leer?  (keine Kunden + keine Todos + keine Rechnungen)
+  // Workspace leer?
   const isWorkspaceEmpty = customers.length === 0 && todos.length === 0 && invoices.length === 0
 
   // Umsatz
-  const { paidNow, paidPrev, label, hintPrevLabel } = useMemo(() => {
+  const paidNow = useMemo(() => {
     const now = new Date()
-    let rangeStart: Date
-    let prevStart: Date
-    let prevEnd:   Date
-    let label:     string
-    let hintPrevLabel: string
-
-    if (revRange === 'week') {
-      rangeStart = startOfWeek(now)
-      const prevWeek = new Date(rangeStart); prevWeek.setDate(prevWeek.getDate() - 7)
-      prevStart = prevWeek
-      prevEnd   = new Date(rangeStart)
-      label = 'diese Woche'
-      hintPrevLabel = 'vs Vorwoche'
-    } else {
-      rangeStart = startOfMonth(now)
-      const prevMonth = new Date(rangeStart); prevMonth.setMonth(prevMonth.getMonth() - 1)
-      prevStart = prevMonth
-      prevEnd   = new Date(rangeStart)
-      label = 'diesen Monat'
-      hintPrevLabel = 'vs Vormonat'
-    }
-
-    let paidNow = 0
-    let paidPrev = 0
+    const rangeStart = revRange === 'week' ? startOfWeek(now) : startOfMonth(now)
+    let paid = 0
     for (const inv of invoices) {
       if (inv.status !== 'paid') continue
       const ts = new Date(inv.date)
-      if (ts >= rangeStart && ts <= now) paidNow += inv.total
-      else if (ts >= prevStart && ts < prevEnd) paidPrev += inv.total
+      if (ts >= rangeStart && ts <= now) paid += inv.total
     }
-    return { paidNow, paidPrev, label, hintPrevLabel }
+    return paid
   }, [invoices, revRange])
 
-  // Aktive Kunden — alle nicht-privaten, +Anzahl der diese Woche neu erstellten
-  const activeCount = useMemo(
-    () => customers.filter(c => !c.isPrivate).length,
-    [customers],
-  )
-  const newThisWeek = useMemo(() => {
-    const sow = startOfWeek(new Date()).toISOString()
-    return customers.filter(c => !c.isPrivate && c.createdAt && c.createdAt >= sow).length
-  }, [customers])
-
-  // Heute faellig
+  // Heute fällig
   const todayIso = todayLocalIso()
   const dueToday = useMemo(() => {
-    const tasks = myTodos.filter(t => t.status !== 'done' && (t.dueDate === todayIso || (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso))).length
-    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate <= todayIso).length
+    const tasks = myTodos.filter(t => isTodoForToday(t, todayIso)).length
+    const fus = followUps.filter(f => f.status === 'offen' && f.dueDate.slice(0, 10) <= todayIso).length
     return { tasks, fus, total: tasks + fus + events.length }
   }, [myTodos, followUps, events, todayIso])
 
+  // Offene Forderungen (Restbeträge) — dieselbe Ableitung wie das Finanzen-Cockpit.
+  const recv = useMemo(() => receivables(invoices, payments), [invoices, payments])
+
+  // KORA-Briefing: gesnoozte Rechnungen bleiben draußen — Snooze vertagt genau
+  // diese Erinnerung. (Die Kachel darüber zeigt bewusst ALLE Forderungen.)
+  const koraOverdue = useMemo(() => {
+    const snoozed = snoozedInvoiceIds()
+    const list = invoices.filter(i => !i.isSuggestion && !snoozed.has(i.id) && invoiceCategory(i) === 'overdue')
+    return { count: list.length, sum: list.reduce((s, i) => s + remaining(i, paidAmount(payments, i.id)), 0) }
+  }, [invoices, payments])
+
+  // KORA-Zeile
+  const koraLine = useMemo(() =>
+    buildTodayLine({
+      overdueCount: koraOverdue.count,
+      overdueSum: koraOverdue.sum,
+      fusDue: dueToday.fus,
+      tasksDue: dueToday.tasks,
+      eventsToday: events.length,
+    }) || 'Heute steht nichts Dringendes an — ein guter Tag für Fokusarbeit.',
+  [koraOverdue, dueToday.fus, dueToday.tasks, events.length])
+
+  const recentMails = useMemo(() => [...emails].sort((a, b) => b.sentAt.localeCompare(a.sentAt)).slice(0, 4), [emails])
+  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
+
+  // Tagesplan-Zähler für den Eyebrow-Header
+  const tagesplanCount = useMemo(() => buildTagesplan(events, myTodos).length, [events, myTodos])
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="hd">
       {isWorkspaceEmpty && <DashboardEmptyState />}
-      <DunningNudgeCard />
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18,
-      }}>
-        <KpiCard
-          label="Umsatz"
-          value={
-            <span>
-              {fmtKEur(paidNow)}
-              <span style={{
-                fontSize: 22, color: 'var(--fg-dim)', marginLeft: 2,
-                fontFamily: 'var(--font-mono)', fontWeight: 600,
-              }}>
-                k€
-              </span>
-            </span>
-          }
-          hint={
-            <>
-              <span style={{ color: paidNow >= paidPrev ? 'var(--accent)' : 'oklch(72% 0.18 25)', fontWeight: 600 }}>
-                {paidPrev === 0 ? (paidNow > 0 ? '+100%' : '—') : pct(paidNow - paidPrev, paidPrev)}
-              </span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>{hintPrevLabel}</span>
-              <span style={{ color: 'var(--fg-dim)', marginLeft: 'auto' }}>{label}</span>
-            </>
-          }
-        >
-          <WeekMonthToggle range={revRange} onChange={setRevRange} />
-        </KpiCard>
 
-        <KpiCard
-          label="Aktive Kunden"
-          value={String(activeCount)}
-          hint={
-            <>
-              <span style={{ color: newThisWeek > 0 ? 'var(--accent)' : 'var(--fg-dim)', fontWeight: 600 }}>
-                {newThisWeek > 0 ? `+${newThisWeek}` : '0'}
-              </span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>diese Woche</span>
-            </>
-          }
-          action={{ label: 'Zu Kunden', onClick: () => setAppView('clients') }}
-        />
+      {/* ── Tagesanker + Puls-Leiste ─────────────────────────────────────── */}
+      <div className="hd-anchor enter d1">
+        <h1 className="greeting-title">{greeting()}, <span className="hd-name">{firstName}</span><em>.</em></h1>
+        <div className="hd-anchor-date">{dateText}</div>
+        <p className="hd-anchor-line">{koraLine}</p>
 
-        <KpiCard
-          label="Heute fällig"
-          value={String(dueToday.total)}
-          accentValue={dueToday.total > 0}
-          hint={
-            <>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.tasks} Tasks</span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{dueToday.fus} FU</span>
-              <span style={{ color: 'var(--fg-dim)' }}>·</span>
-              <span>{events.length} Termine</span>
-            </>
-          }
-          action={{ label: 'Zum Kalender', onClick: () => setAppView('calendar') }}
-        />
+        <div className="hd-pulse">
+          {/* Segment 1: Umsatz mit Woche/Monat-Toggle */}
+          <div className="hd-pulse-stat">
+            <div className="hd-pulse-k">
+              UMSATZ · {revRange === 'week' ? 'WOCHE' : 'MONAT'}
+              <WeekMonthToggle range={revRange} onChange={setRevRange} />
+            </div>
+            <div className="hd-pulse-v">
+              {fmtKEur(paidNow)}<small>k€</small>
+            </div>
+          </div>
+
+          {/* Segment 2: Geld unterwegs — ALLE offenen Forderungen, Überfälliges als Unterzeile */}
+          <div
+            className={`hd-pulse-stat${recv.overdue > 0 ? ' hot' : ''}`}
+            onClick={() => setAppView('invoices')}
+            style={{ cursor: 'pointer' }}
+            title="Zu Finanzen"
+          >
+            <span className="hd-pulse-k">GELD UNTERWEGS</span>
+            <span className="hd-pulse-v">{eur0(recv.open + recv.overdue)}</span>
+            {recv.overdue > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--danger)', fontFamily: 'var(--font-mono)' }}>
+                davon {eur0(recv.overdue)} überfällig
+              </span>
+            )}
+          </div>
+
+          {/* Segment 3: Offen heute */}
+          <div className="hd-pulse-stat">
+            <span className="hd-pulse-k">OFFEN HEUTE</span>
+            <span className="hd-pulse-v">{dueToday.total}</span>
+          </div>
+
+          {/* Segment 4: Pipeline-Potenzial — Summe offener Deal-Werte (ungewichtet) */}
+          <div className="hd-pulse-stat" onClick={() => setAppView('leverage_pipeline')} style={{ cursor: 'pointer' }} title="Zur Pipeline">
+            <span className="hd-pulse-k">PIPELINE</span>
+            <span className="hd-pulse-v">{eur0(pipelineSum)}</span>
+          </div>
+        </div>
       </div>
 
-      {/* Heute-Cockpit — DEIN NÄCHSTER ZUG */}
-      {!queueLoading && !currentItem && queueItems.length === 0 && !isWorkspaceEmpty && (
-        <div style={{
-          borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 24px',
-          color: 'var(--fg-muted)', fontSize: 13,
-        }}>
-          Noch nichts in deiner Queue — du bist auf dem neuesten Stand.
-        </div>
-      )}
-      {!queueLoading && currentItem && (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          {/* Aktuelle Kachel */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={`${currentItem.id}-${queueIndex}`}
-                custom={direction}
-                initial={{ opacity: 0, x: direction * 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: direction * -30 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-              >
-                <HeuteTile
-                  item={currentItem}
-                  index={queueIndex}
-                  total={queueItems.length}
-                  onDone={handleDone}
-                  onSkip={handleSkip}
-                />
-              </motion.div>
-            </AnimatePresence>
-          </div>
+      {/* ── Stapel (inkl. eigenem Eyebrow in StapelSection) ──────────────── */}
+      <div className="enter d2">
+        <StapelSection />
+      </div>
 
-          {/* Als nächstes */}
-          {queueItems.slice(queueIndex + 1, queueIndex + 4).length > 0 && (
-            <div style={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{
-                fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.14em',
-                textTransform: 'uppercase', color: 'var(--fg-dim)', fontWeight: 600,
-                padding: '0 2px',
-              }}>
-                Als nächstes
-              </span>
-              {queueItems.slice(queueIndex + 1, queueIndex + 4).map((next, i) => {
-                const typeLabel =
-                  next.type === 'invoice_reminder' ? 'Mahnung' :
-                  next.type === 'mail_reply'        ? 'Mail' :
-                  next.type === 'followup'          ? 'Follow-up' : 'Todo'
-                return (
-                  <div key={next.id} style={{
-                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)',
-                    background: 'var(--surface)', padding: '12px 14px',
-                    boxShadow: 'var(--card-shadow)',
-                    opacity: 1 - i * 0.2,
-                    display: 'flex', flexDirection: 'column', gap: 5,
-                  }}>
-                    <span style={{
-                      fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em',
-                      textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 700,
-                    }}>
-                      {typeLabel}
-                    </span>
-                    <span style={{
-                      fontSize: 12, color: 'var(--fg-dim)', lineHeight: 1.4,
-                      display: '-webkit-box', WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                    }}>
-                      {next.reason}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+      {/* ── Tagesplan ────────────────────────────────────────────────────── */}
+      <div className="enter d3">
+        <div className="hd-eyebrow">
+          <span className="t">MEIN TAGESPLAN</span>
+          <span className="c">{tagesplanCount} {tagesplanCount === 1 ? 'Eintrag' : 'Einträge'}</span>
+        </div>
+        <TagesplanCard events={events} todos={myTodos} customers={customers} onOpen={() => setAppView('calendar')} hideHeader />
+      </div>
+
+      {/* ── Neueste Mails ─────────────────────────────────────────────────── */}
+      <div className="enter d4">
+        <div className="hd-eyebrow">
+          <span className="t">NEUESTE MAILS</span>
+          <span className="c">{unreadCount} ungelesen</span>
+        </div>
+        <div className="hd-fill">
+          {recentMails.length === 0 && (
+            <div style={{ padding: 20, fontSize: 13, color: 'var(--fg-dim)' }}>Keine Mails.</div>
           )}
-        </div>
-      )}
-      {!queueLoading && queueIndex >= queueItems.length && queueItems.length > 0 && (
-        <div style={{
-          borderRadius: 'var(--radius)', border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)',
-          background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '24px 32px',
-          display: 'flex', alignItems: 'center', gap: 16,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-gradient)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 30px -8px var(--accent-glow)', flexShrink: 0,
-          }}>
-            <span style={{ color: '#fff', fontSize: 16 }}>✓</span>
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--fg)' }}>Alles erledigt für heute.</div>
-            <button
-              type="button"
-              onClick={() => { setQueueIndex(0); reshuffle() }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--accent)',
-                fontSize: 12, cursor: 'pointer', padding: 0, marginTop: 4,
-              }}
-            >
-              Neu prüfen →
-            </button>
+          {recentMails.map(m => {
+            const unread = !m.isRead
+            return (
+              <div key={m.id} className={`hd-mrow${unread ? ' unread' : ''}`} onClick={() => setAppView('mail')}>
+                <span className="hd-av">{initials(m.fromName || m.fromAddr)}</span>
+                <div className="hd-mbody">
+                  <div className="hd-from">{unread && <span className="dot" />}<span className="nm">{m.fromName || m.fromAddr}</span></div>
+                  <div className="hd-subj">{m.subject || '(Kein Betreff)'}</div>
+                </div>
+                {unread
+                  ? <button className="hd-reply" onClick={e => { e.stopPropagation(); setAppView('mail') }}>Antworten</button>
+                  : <span className="hd-mtime">{relTime(m.sentAt)}</span>}
+              </div>
+            )
+          })}
+          <div className="hd-lfoot">
+            <span className="txt">Postfach</span>
+            <button type="button" onClick={() => setAppView('mail')}>Öffnen →</button>
           </div>
         </div>
-      )}
-
-      <TagesplanCard events={events} todos={myTodos} customers={customers} />
-
-      <InboxCard />
+      </div>
     </div>
   )
 }
@@ -493,14 +323,16 @@ interface PlanItem {
   title:    string
   subtitle: string
   status:   { kind: 'now' | 'block' | 'pause' | 'live' | 'fokus' | 'short'; label: string }
+  meetingLink?: MeetingLink
 }
 
 function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
   const now = new Date()
   const items: PlanItem[] = []
 
-  // Termine heute → mit Zeit
-  for (const ev of events) {
+  // Termine heute → mit Zeit (fremde Privat-Termine als „Gebucht" maskiert)
+  for (const raw of events) {
+    const ev = maskEvent(raw)
     const start = new Date(ev.startAt)
     const end = ev.endAt ? new Date(ev.endAt) : new Date(start.getTime() + 60 * 60_000)
     const isNow = start <= now && end >= now
@@ -516,15 +348,14 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
       title: ev.title || '(Termin)',
       subtitle: ev.location || ev.description || '',
       status,
+      meetingLink: extractMeetingLink(ev) ?? undefined,
     })
   }
 
-  // Heute fällige Tasks (ohne Uhrzeit → ohne Zeit-Label)
+  // Heute fällige Tasks
   const todayIso = todayLocalIso()
   for (const t of todos) {
     if (t.status === 'done') continue
-    // Aufgabe zählt für heute, wenn fällig ODER für heute eingeplant (Composer
-    // setzt scheduledAt, nicht dueDate) — sonst verschwinden getippte Tasks.
     if (t.dueDate !== todayIso && !(t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso)) continue
     items.push({
       id: `t-${t.id}`,
@@ -535,7 +366,6 @@ function buildTagesplan(events: CalendarEvent[], todos: Todo[]): PlanItem[] {
     })
   }
 
-  // Sortieren: Termine mit Zeit aufsteigend, Tasks ohne Zeit ans Ende
   return items.sort((a, b) => {
     if (!a.time && b.time) return 1
     if (a.time && !b.time) return -1
@@ -551,7 +381,7 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
   }
   switch (kind) {
     case 'now':   return { ...base, background: 'var(--accent)',                  color: 'var(--accent-ink)' }
-    case 'block': return { ...base, background: 'oklch(78% 0.13 235 / 0.18)',     color: 'oklch(78% 0.13 235)' }
+    case 'block': return { ...base, background: 'oklch(72% 0.10 195 / 0.18)',     color: 'oklch(72% 0.10 195)' }
     case 'pause': return { ...base, background: 'var(--surface-2)',               color: 'var(--fg-muted)' }
     case 'live':  return { ...base, background: 'oklch(72% 0.18 25 / 0.15)',      color: 'oklch(72% 0.18 25)' }
     case 'fokus': return { ...base, background: 'oklch(82% 0.16 70 / 0.15)',      color: 'oklch(82% 0.16 70)' }
@@ -560,32 +390,34 @@ function statusPillStyle(kind: PlanItem['status']['kind']): React.CSSProperties 
 }
 
 function TagesplanCard({
-  events, todos, customers: _customers,
-}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[] }) {
+  events, todos, customers: _customers, onOpen, hideHeader,
+}: { events: CalendarEvent[]; todos: Todo[]; customers: unknown[]; onOpen?: () => void; hideHeader?: boolean }) {
   const items = useMemo(() => buildTagesplan(events, todos), [events, todos])
 
   return (
     <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
       background: 'var(--surface)', boxShadow: 'var(--card-shadow)', padding: '20px 22px',
     }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        marginBottom: 16,
-      }}>
-        <h2 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-          letterSpacing: '-0.01em',
+      {!hideHeader && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginBottom: 16,
         }}>
-          Mein Tagesplan
-        </h2>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          color: 'var(--fg-dim)', letterSpacing: '0.04em',
-        }}>
-          {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'} · heute
-        </span>
-      </div>
+          <h2 style={{
+            margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
+            letterSpacing: '-0.01em',
+          }}>
+            Mein Tagesplan
+          </h2>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10.5,
+            color: 'var(--fg-dim)', letterSpacing: '0.04em',
+          }}>
+            {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'} · heute
+          </span>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div style={{
@@ -601,7 +433,12 @@ function TagesplanCard({
             background: 'var(--border)',
           }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {items.map(item => <TagesplanRow key={item.id} item={item} />)}
+            {items.slice(0, 6).map(item => <TagesplanRow key={item.id} item={item} onOpen={onOpen} />)}
+            {items.length > 6 && (
+              <button type="button" onClick={onOpen} style={{ marginTop: 6, background: 'none', border: 'none', color: 'var(--fg-2)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'left', padding: '6px 0' }}>
+                + {items.length - 6} weitere im Kalender →
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -609,13 +446,16 @@ function TagesplanCard({
   )
 }
 
-function TagesplanRow({ item }: { item: PlanItem }) {
+function TagesplanRow({ item, onOpen }: { item: PlanItem; onOpen?: () => void }) {
   const isNow = item.status.kind === 'now'
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
-      alignItems: 'center', gap: 12, padding: '12px 0',
-    }}>
+    <div
+      onClick={onOpen}
+      style={{
+        display: 'grid', gridTemplateColumns: '60px 30px 1fr auto',
+        alignItems: 'center', gap: 12, padding: '12px 0',
+        cursor: onOpen ? 'pointer' : 'default',
+      }}>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 11,
         color: isNow ? 'var(--accent)' : 'var(--fg-dim)',
@@ -628,7 +468,7 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           width: 10, height: 10, borderRadius: 99,
           background: isNow ? 'var(--accent)' : 'transparent',
           border: `1.5px solid ${isNow ? 'var(--accent)' : 'var(--border-strong)'}`,
-          boxShadow: isNow ? '0 0 0 4px oklch(56% 0.19 264 / 0.16)' : 'none',
+          boxShadow: isNow ? '0 0 0 4px oklch(68% 0.16 41 / 0.16)' : 'none',
         }} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
@@ -647,166 +487,33 @@ function TagesplanRow({ item }: { item: PlanItem }) {
           </span>
         )}
       </div>
-      <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
-    </div>
-  )
-}
-
-// ── Inbox-Card ──────────────────────────────────────────────────────────────
-
-function InboxCard() {
-  const emails            = useMailStore(s => s.emails)
-  const loadEmails        = useMailStore(s => s.loadEmails)
-  const selectEmail       = useMailStore(s => s.selectEmail)
-  const selectedAccountId = useMailStore(s => s.selectedAccountId)
-  const setAppView        = useUiStore(s => s.setAppView)
-  const customers         = useCustomersStore(s => s.customers)
-
-  useEffect(() => {
-    if (selectedAccountId && emails.length === 0) loadEmails()
-  }, [selectedAccountId, emails.length, loadEmails])
-
-  const customerByEmail = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const c of customers) if (c.email) m.set(c.email.toLowerCase(), c.name)
-    return m
-  }, [customers])
-
-  const sorted = useMemo(
-    () => [...emails].sort((a, b) =>
-      (Number(!!a.isRead) - Number(!!b.isRead)) ||   // ungelesene zuerst
-      (b.sentAt || '').localeCompare(a.sentAt || ''),
-    ),
-    [emails],
-  )
-  const unreadCount = useMemo(() => emails.filter(e => !e.isRead).length, [emails])
-
-  return (
-    <div style={{
-      borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-      background: 'var(--surface)', boxShadow: 'var(--card-shadow)',
-      display: 'flex', flexDirection: 'column', minHeight: 0,
-      maxHeight: 480, overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        padding: '20px 22px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0,
-      }}>
-        <h2 style={{
-          margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--fg)',
-          letterSpacing: '-0.01em',
-        }}>
-          Inbox
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.04em',
-            color: unreadCount > 0 ? 'var(--accent)' : 'var(--fg-dim)',
-            fontWeight: unreadCount > 0 ? 700 : 400,
-          }}>
-            {unreadCount > 0 ? `${unreadCount} ungelesen` : `${sorted.length} ${sorted.length === 1 ? 'Mail' : 'Mails'}`}
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
+        {item.meetingLink && (
           <button
-            onClick={() => setAppView('mail')}
+            type="button"
+            title={`${item.meetingLink.label}-Meeting öffnen`}
+            onClick={e => { e.stopPropagation(); void openExternal(item.meetingLink!.url) }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 10px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              color: 'var(--fg)', cursor: 'pointer',
-              fontFamily: 'inherit', fontSize: 11.5,
-            }}
-          >
-            Alle <ArrowRight size={11} />
+              fontSize: 11, fontWeight: 700, borderRadius: 99, padding: '4px 12px',
+              border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}>
+            Beitreten →
           </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto', padding: '6px 14px 12px' }}>
-        {sorted.length === 0 ? (
-          <div style={{ padding: '28px 12px', textAlign: 'center', color: 'var(--fg-dim)', fontSize: 12.5 }}>
-            {selectedAccountId ? 'Inbox leer' : 'Kein Mail-Konto verbunden'}
-          </div>
-        ) : (
-          sorted.map(e => (
-            <InboxRow
-              key={e.id}
-              email={e}
-              customerName={customerByEmail.get(e.fromAddr?.toLowerCase() ?? '') ?? null}
-              onClick={() => { selectEmail(e); setAppView('mail') }}
-            />
-          ))
         )}
+        <span style={statusPillStyle(item.status.kind)}>{item.status.label}</span>
       </div>
     </div>
   )
 }
 
-function InboxRow({
-  email, customerName, onClick,
-}: {
-  email: EmailHeader
-  customerName: string | null
-  onClick: () => void
-}) {
-  const time = new Date(email.sentAt)
-  const today = new Date()
-  const isToday = time.toDateString() === today.toDateString()
-  const timeLabel = isToday
-    ? `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`
-    : time.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })
-
-  const unread = !email.isRead
-
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        display: 'grid', gridTemplateColumns: '8px 1fr auto', gap: 10,
-        alignItems: 'center', padding: '10px 8px', borderRadius: 10,
-        cursor: 'pointer', transition: 'background 140ms',
-        opacity: unread ? 1 : 0.6,
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-    >
-      <span style={{
-        width: 7, height: 7, borderRadius: '50%',
-        background: unread ? 'var(--accent)' : 'transparent',
-      }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{
-          fontSize: 13, fontWeight: unread ? 700 : 500,
-          color: unread ? 'var(--fg)' : 'var(--fg-muted)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {customerName ?? email.fromName ?? email.fromAddr}
-        </span>
-        <span style={{
-          fontSize: 11.5, color: unread ? 'var(--fg-muted)' : 'var(--fg-dim)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {email.subject || '(ohne Betreff)'}
-        </span>
-      </div>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-        color: 'var(--fg-dim)', letterSpacing: '0.04em', flexShrink: 0,
-      }}>
-        {timeLabel}
-      </span>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Main route
+// Main route — kein PageHeader; Anker liegt in WorkspaceView
 
 export function DashboardRoute() {
-  const user        = useAuthStore(s => s.user)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
-  // Data loads — sind in App.tsx schon in den beiden Init-Wellen,
-  // hier nur Finance ergaenzen, weil das nicht workspace-weit geladen wird.
   const loadFinance = useFinanceStore(s => s.loadAll)
   const loadToday   = useCalendarStore(s => s.loadToday)
   useEffect(() => {
@@ -815,24 +522,8 @@ export function DashboardRoute() {
     loadToday(workspaceId)
   }, [workspaceId, loadFinance, loadToday])
 
-  const firstName = (
-    ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
-    || user?.email?.split('@')[0]
-    || 'User'
-  ).replace(/^./, c => c.toUpperCase())
-  const now = new Date()
-  const dateLine = `${WEEKDAYS[now.getDay()]} · ${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`
-
   return (
     <div className="main-inner">
-      <PageHeader
-        title={<>{greeting()}, <span style={{ color: 'var(--accent-text)' }}>{firstName}</span></>}
-        right={
-          <div className="greeting-sub">
-            <span>{dateLine}</span>
-          </div>
-        }
-      />
       <WorkspaceView />
     </div>
   )

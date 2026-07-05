@@ -22,14 +22,14 @@ export function DatenschutzSettings() {
   return (
     <SettingsPage
       title="Datenschutz"
-      subtitle="Wie Cultera Focus mit KI-Funktionen und deinen Daten umgeht"
+      subtitle="Wie Cultera OS mit KI-Funktionen und deinen Daten umgeht"
       maxWidth={640}
     >
       <SettingCard>
         <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px' }}>KI-Funktionen &amp; Datenschutz</h3>
 
         <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--fg-muted)', margin: '0 0 12px' }}>
-          Cultera Focus bietet KI-gestützte Funktionen — den KORA-Assistenten, Textentwürfe,
+          Cultera OS bietet KI-gestützte Funktionen — den KORA-Assistenten, Textentwürfe,
           Kunden-Briefings und Mahntext-Vorschläge. Dafür übermitteln wir die jeweils nötigen
           Inhalte an unseren Dienstleister <strong>Anthropic PBC (USA)</strong> und lassen sie
           dort verarbeiten.

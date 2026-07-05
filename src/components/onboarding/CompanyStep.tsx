@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Building2, ArrowRight } from 'lucide-react'
 import { useCompanyStore } from '@/store/company.store'
 import { useOnboardingStore } from '@/store/onboarding.store'
+import { toastError } from '@/store/toast.store'
 import type { CompanyProfile } from '@/types/company.types'
+import { bankNameFromIban } from '@/lib/banking/iban'
 
 /**
  * Erster Schritt nach dem Willkommen: die eigenen Unternehmensdaten erfassen.
@@ -21,14 +23,23 @@ export function CompanyStep() {
   const [saving, setSaving] = useState(false)
   const set = (patch: Partial<CompanyProfile>) => setForm(f => ({ ...f, ...patch }))
 
+  const handleIbanChange = (iban: string) => {
+    set({ iban })
+    bankNameFromIban(iban).then(name => {
+      if (name) setForm(f => ({ ...f, bankName: f.bankName?.trim() ? f.bankName : name }))
+    }).catch(() => {/* ignore */})
+  }
+
   if (!welcomeSeen || companyDone) return null
 
   const handleSave = async () => {
     setSaving(true)
     try {
       await saveProfile({ ...profile, ...form })
-    } catch {
-      /* kein Backend (z. B. Browser-Vorschau) — trotzdem weiter */
+    } catch (err) {
+      // Nicht mehr still: der Nutzer erfaehrt, dass seine Firmendaten NICHT gespeichert sind.
+      toastError('Unternehmensdaten konnten nicht gespeichert werden — bitte später unter Einstellungen → Unternehmen prüfen.')
+      console.warn('CompanyStep saveProfile failed', err)
     }
     setSaving(false)
     markCompanyDone()
@@ -91,7 +102,7 @@ export function CompanyStep() {
           <div className="company-step__section-label">Bankverbindung</div>
           <label className="company-field">
             <span>IBAN</span>
-            <input value={form.iban ?? ''} onChange={(e) => set({ iban: e.target.value })} placeholder="DE12 3456 7890 1234 5678 90" />
+            <input value={form.iban ?? ''} onChange={(e) => handleIbanChange(e.target.value)} placeholder="DE12 3456 7890 1234 5678 90" />
           </label>
           <div className="company-step__row">
             <label className="company-field">

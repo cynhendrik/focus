@@ -127,6 +127,23 @@ pub fn delete(conn: &Connection, id: &str, workspace_id: &str) -> Result<(), App
     Ok(())
 }
 
+/// Semantik einer Stage auflösen: (is_won, is_lost). Stages sind vom Nutzer
+/// umbenennbar — die Bedeutung „gewonnen/verloren" hängt an den Flags, nicht
+/// am Namen. Fällt auf den Namensvergleich zurück, wenn die Stage nicht in
+/// pipeline_stages liegt (Alt-Daten).
+pub fn stage_flags(conn: &Connection, workspace_id: &str, name: &str) -> Result<(bool, bool), AppError> {
+    let row = conn.query_row(
+        "SELECT is_won, is_lost FROM pipeline_stages WHERE workspace_id = ?1 AND name = ?2",
+        rusqlite::params![workspace_id, name],
+        |r| Ok((r.get::<_, i32>(0)? != 0, r.get::<_, i32>(1)? != 0)),
+    );
+    match row {
+        Ok(flags) => Ok(flags),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok((name == "won", name == "lost")),
+        Err(e) => Err(AppError::Db(e.to_string())),
+    }
+}
+
 pub fn reorder(conn: &Connection, workspace_id: &str, ordered_ids: &[String]) -> Result<(), AppError> {
     let tx = conn.unchecked_transaction().map_err(|e| AppError::Db(e.to_string()))?;
     for (index, id) in ordered_ids.iter().enumerate() {
@@ -190,6 +207,29 @@ mod tests {
         schema::create_tables(&conn).unwrap();
         migrations::run(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn stage_flags_resolves_renamed_won_stage() {
+        let conn = setup();
+        seed_defaults(&conn, "ws-1").unwrap();
+        // Nutzer benennt die Won-Stage um — das Flag bleibt, der Name nicht.
+        conn.execute(
+            "UPDATE pipeline_stages SET name = 'abschluss' WHERE workspace_id = 'ws-1' AND name = 'won'",
+            [],
+        ).unwrap();
+        assert_eq!(stage_flags(&conn, "ws-1", "abschluss").unwrap(), (true, false));
+        assert_eq!(stage_flags(&conn, "ws-1", "lost").unwrap(), (false, true));
+        assert_eq!(stage_flags(&conn, "ws-1", "lead").unwrap(), (false, false));
+    }
+
+    #[test]
+    fn stage_flags_falls_back_to_name_when_stage_unknown() {
+        let conn = setup();
+        // Keine Stages im Workspace — Namensvergleich als Fallback.
+        assert_eq!(stage_flags(&conn, "ws-x", "won").unwrap(), (true, false));
+        assert_eq!(stage_flags(&conn, "ws-x", "lost").unwrap(), (false, true));
+        assert_eq!(stage_flags(&conn, "ws-x", "sonstwas").unwrap(), (false, false));
     }
 
     #[test]

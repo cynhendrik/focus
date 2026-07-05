@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   EmailAccount, EmailHeader, EmailBody, EmailAttachment,
-  AddAccountPayload, SendEmailPayload, MailFolder,
+  AddAccountPayload, SendEmailPayload, MailFolder, IgnoredSender,
 } from '@/types/mail.types'
 
 export const MailService = {
@@ -61,6 +61,16 @@ export const MailService = {
   },
   setNotALead(emailId: string, value: boolean): Promise<void> {
     return invoke<void>('email_set_not_a_lead', { emailId, value })
+  },
+  listIgnoredSenders(): Promise<IgnoredSender[]> {
+    return invoke<IgnoredSender[]>('email_list_ignored_senders')
+  },
+  /** Absender (scope 'address') oder Domain (scope 'domain') dauerhaft ignorieren. Gibt die aktualisierte Liste zurück. */
+  ignoreSender(pattern: string, scope: IgnoredSender['scope']): Promise<IgnoredSender[]> {
+    return invoke<IgnoredSender[]>('email_ignore_sender', { pattern, scope })
+  },
+  unignoreSender(id: string): Promise<IgnoredSender[]> {
+    return invoke<IgnoredSender[]>('email_unignore_sender', { id })
   },
   testSmtp(email: string, password: string, smtpHost: string, smtpPort: number, starttls: boolean): Promise<void> {
     return invoke<void>('email_test_smtp', { email, password, smtpHost, smtpPort, starttls })

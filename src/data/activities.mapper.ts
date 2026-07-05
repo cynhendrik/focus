@@ -22,11 +22,16 @@ export function activityRowToActivity(r: any): Activity {
 export function activityPayloadToRow(
   p: CreateActivityPayload, ctx: { id: string; now: string },
 ): Record<string, unknown> {
+  // Cloud-Schema hat keine outcome-Spalte — das Ergebnis wandert ins
+  // payload-JSONB, damit es nicht verloren geht. (Die Scoring-Engine läuft
+  // ohnehin nur lokal.)
+  const payload = parseObj(p.payload)
+  if (p.outcome) payload.outcome = p.outcome
   return {
     id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy,
     account_id: p.accountId || null, customer_id: p.customerId ?? null,
     type: p.type, title: p.title ?? null, body: p.body ?? null,
-    payload: parseObj(p.payload), status: p.status ?? 'open', due_at: p.dueAt ?? null,
+    payload, status: p.status ?? 'open', due_at: p.dueAt ?? null,
     assignee: p.assignee ?? null,
     created_at: ctx.now, updated_at: ctx.now,
   }
