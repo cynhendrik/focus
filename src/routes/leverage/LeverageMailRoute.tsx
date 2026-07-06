@@ -5,6 +5,7 @@ import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useToastStore } from '@/store/toast.store'
 import { MailService } from '@/services/mail.service'
 import { classifyMails, matchesIgnoredSender } from '@/lib/mail/newcomer'
 import { log } from '@/lib/logger'
@@ -90,12 +91,14 @@ function LeadMailRow({ mail }: { mail: EmailHeader }) {
 
 // ── Unbekannte Absender — ausklappbar mit Inhalt + Lead-Formular ───────────────
 
-function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore }: {
+function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore, selected, onToggleSelect }: {
   mail: EmailHeader
   expanded: boolean
   onToggle: () => void
   onCreateLead: (payload: { name: string; email: string; phone?: string }) => Promise<void>
   onIgnore: (pattern: string, scope: IgnoredSender['scope']) => void
+  selected?: boolean
+  onToggleSelect?: () => void
 }) {
   const [body, setBody]             = useState<string | null>(null)
   const [bodyLoading, setBodyLoading] = useState(false)
@@ -149,11 +152,21 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore }: {
       <div
         onClick={onToggle}
         style={{
-          display: 'grid', gridTemplateColumns: '16px 1fr auto auto auto',
+          display: 'grid', gridTemplateColumns: '20px 16px 1fr auto auto auto',
           alignItems: 'center', gap: 12, padding: '11px 16px', cursor: 'pointer',
           background: expanded ? 'var(--surface-2)' : 'transparent',
         }}
       >
+        {onToggleSelect
+          ? (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect()}
+              onClick={e => e.stopPropagation()}
+            />
+          )
+          : <span />}
         <span style={{ color: 'var(--fg-dim)', display: 'flex' }}>
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </span>
@@ -362,6 +375,9 @@ export function LeverageMailRoute() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showAutoSorted, setShowAutoSorted] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkCreating, setBulkCreating] = useState(false)
+  const showToast = useToastStore(s => s.show)
 
   useEffect(() => { loadIgnoredSenders() }, [loadIgnoredSenders])
 
@@ -407,6 +423,50 @@ export function LeverageMailRoute() {
     ignoreSender(pattern, scope).catch(err => log.error('Failed to ignore sender', { err }))
   }
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(s => {
+      const n = new Set(s)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  const toggleAll = () => {
+    const ids = candidates.map(m => m.id)
+    const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      if (allSelected) { ids.forEach(id => n.delete(id)) }
+      else { ids.forEach(id => n.add(id)) }
+      return n
+    })
+  }
+
+  async function handleBulkCreateLeads() {
+    const targets = candidates.filter(m => selectedIds.has(m.id))
+    if (targets.length === 0) return
+    setBulkCreating(true)
+    const results = await Promise.allSettled(
+      targets.map(m => handleCreateLead({ name: m.fromName || m.fromAddr, email: m.fromAddr })),
+    )
+    const succeededIds = targets
+      .filter((_, i) => results[i].status === 'fulfilled')
+      .map(m => m.id)
+    const failedCount = results.length - succeededIds.length
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      succeededIds.forEach(id => next.delete(id))
+      return next
+    })
+    setBulkCreating(false)
+    showToast({
+      message: failedCount === 0
+        ? `${succeededIds.length} Lead${succeededIds.length === 1 ? '' : 's'} angelegt.`
+        : `${succeededIds.length} von ${targets.length} Leads angelegt, ${failedCount} fehlgeschlagen.`,
+      variant: failedCount === 0 ? 'success' : 'error',
+    })
+  }
+
   const totalCount = leadMails.length + candidates.length
 
   return (
@@ -427,6 +487,37 @@ export function LeverageMailRoute() {
         {candidates.length > 0 && (
           <>
             <SectionHeader label="Unbekannte Absender — mögliche Leads" count={candidates.length} />
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              padding: '6px 16px', borderBottom: '1px solid var(--border)',
+            }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                fontSize: 11, fontWeight: 700, color: 'var(--fg-dim)',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={candidates.length > 0 && candidates.every(m => selectedIds.has(m.id))}
+                  onChange={toggleAll}
+                />
+                Alle auswählen ({candidates.length})
+              </label>
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkCreateLeads}
+                  disabled={bulkCreating}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '5px 12px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                    border: '1px solid var(--accent)', cursor: bulkCreating ? 'default' : 'pointer',
+                    background: 'var(--accent-soft)', color: 'var(--accent-text)',
+                    fontFamily: 'inherit', opacity: bulkCreating ? 0.6 : 1,
+                  }}
+                >
+                  {bulkCreating ? 'Wird angelegt…' : `${selectedIds.size} Lead${selectedIds.size === 1 ? '' : 's'} anlegen`}
+                </button>
+              )}
+            </div>
             {candidates.map(m => (
               <UnknownMailRow
                 key={m.id}
@@ -435,6 +526,8 @@ export function LeverageMailRoute() {
                 onToggle={() => setExpandedId(id => id === m.id ? null : m.id)}
                 onCreateLead={handleCreateLead}
                 onIgnore={handleIgnore}
+                selected={selectedIds.has(m.id)}
+                onToggleSelect={() => toggleSelect(m.id)}
               />
             ))}
           </>
