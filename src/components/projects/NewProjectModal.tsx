@@ -24,6 +24,7 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
   const [firstPhaseName, setFirstPhaseName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
 
   const lockedCustomer = presetCustomerId ? customers.find(c => c.id === presetCustomerId) : null
   const canSave = title.trim() !== '' && customerId !== '' && !saving
@@ -33,16 +34,21 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
     setSaving(true)
     setSaveError(null)
     try {
-      const project = await upsert({
-        workspaceId,
-        accountId: customerId,
-        title: title.trim(),
-        description: description.trim() || undefined,
-      })
-      if (firstPhaseName.trim()) {
-        await createPhase({ projectId: project.id, name: firstPhaseName.trim() })
+      let projectId = createdProjectId
+      if (!projectId) {
+        const project = await upsert({
+          workspaceId,
+          accountId: customerId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+        })
+        projectId = project.id
+        setCreatedProjectId(projectId)
       }
-      setSelectedProjectId(project.id)
+      if (firstPhaseName.trim()) {
+        await createPhase({ projectId, name: firstPhaseName.trim() })
+      }
+      setSelectedProjectId(projectId)
       setAppView('project_detail')
       onClose()
     } catch (err) {
@@ -126,7 +132,9 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
             background: 'oklch(72% 0.18 25 / 0.12)', border: '1px solid oklch(72% 0.18 25 / 0.4)',
             color: 'oklch(72% 0.18 25)', fontSize: 12, lineHeight: 1.4,
           }}>
-            Speichern fehlgeschlagen: {saveError}
+            {createdProjectId
+              ? `Projekt wurde angelegt, aber die erste Phase konnte nicht erstellt werden: ${saveError}`
+              : `Speichern fehlgeschlagen: ${saveError}`}
           </div>
         )}
 
