@@ -100,8 +100,13 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     .slice(0, 10)
 
   // Kalte Leads: kein offenes Follow-Up und seit >14 Tagen keine Aktivität —
-  // genau die, die man sonst vergisst. Gewonnene/verlorene Leads tauchen hier
-  // gar nicht erst auf (werden beim Konvertieren aus der leads-Liste entfernt).
+  // genau die, die man sonst vergisst. Gewonnene Leads tauchen hier nicht auf,
+  // weil convertToClient/convertToDeal sie beim Konvertieren aus der
+  // leads-Liste entfernen. Verlorene/disqualifizierte Leads werden dagegen
+  // NICHT ausgeschlossen: moveLeadStage aktualisiert bei ihnen nur leadStatus
+  // und lässt den Eintrag in der leads-Liste stehen, d.h. ein seit >14 Tagen
+  // inaktiver verlorener Lead ohne offenes Follow-Up kann hier trotzdem als
+  // "kalt" auftauchen (vorbestehendes Verhalten, siehe leads.store.ts).
   const leadIdsWithOpenFu = new Set(openFollowUps.map(f => f.customerId))
   const coldCutoff = new Date(today)
   coldCutoff.setDate(coldCutoff.getDate() - 14)
