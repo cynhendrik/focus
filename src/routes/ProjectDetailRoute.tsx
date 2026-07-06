@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useProjectsStore } from '@/store/projects.store'
 import { useUiStore } from '@/store/ui.store'
 import { useCustomersStore } from '@/store/customers.store'
@@ -77,14 +77,20 @@ export function ProjectDetailRoute() {
 
   const [activities, setActivities] = useState<Activity[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
+  const activeProjectIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!selectedProjectId) return
+    activeProjectIdRef.current = selectedProjectId
     loadPhases(selectedProjectId)
     setLoadingActivities(true)
     ActivitiesGateway.getByProject(selectedProjectId)
-      .then(setActivities)
-      .finally(() => setLoadingActivities(false))
+      .then(fetched => {
+        if (activeProjectIdRef.current === selectedProjectId) setActivities(fetched)
+      })
+      .finally(() => {
+        if (activeProjectIdRef.current === selectedProjectId) setLoadingActivities(false)
+      })
   }, [selectedProjectId, loadPhases])
 
   const customerName = project ? (customers.find(c => c.id === project.accountId)?.name ?? 'Unbekannter Kunde') : ''
