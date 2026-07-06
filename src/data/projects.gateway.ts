@@ -33,8 +33,9 @@ export const ProjectsGateway = {
   async upsert(payload: UpsertProjectPayload): Promise<Project> {
     if (!shared()) return ProjectsService.upsert(payload)
     const id = payload.id ?? crypto.randomUUID()
+    const now = new Date().toISOString()
     const { data, error } = await supabase.from('projects')
-      .upsert(projectToRow({ ...payload, id }), { onConflict: 'id' }).select('*').single()
+      .upsert(projectToRow(payload, { id, now }), { onConflict: 'id' }).select('*').single()
     if (error) fail(error)
     return projectRowToProject(data)
   },
@@ -52,6 +53,9 @@ export const ProjectsGateway = {
     if (pErr) fail(pErr)
     const { data: proj, error: gErr } = await supabase.from('projects').select('*').eq('id', projectId).single()
     if (gErr) fail(gErr)
+    if (proj.status === 'completed') {
+      throw new Error('Projekt ist bereits abgeschlossen')
+    }
     const currentIndex = (phases ?? []).findIndex(p => p.id === proj.current_phase_id)
     const next = currentIndex >= 0 ? (phases ?? [])[currentIndex + 1] : (phases ?? [])[0]
     const now = new Date().toISOString()
@@ -65,6 +69,11 @@ export const ProjectsGateway = {
 
   async setStatus(projectId: string, status: 'active' | 'paused'): Promise<Project> {
     if (!shared()) return ProjectsService.setStatus(projectId, status)
+    const { data: proj, error: gErr } = await supabase.from('projects').select('*').eq('id', projectId).single()
+    if (gErr) fail(gErr)
+    if (proj.status === 'completed') {
+      throw new Error('Abgeschlossenes Projekt kann nicht pausiert werden')
+    }
     const now = new Date().toISOString()
     const { data, error } = await supabase.from('projects')
       .update({ status, updated_at: now }).eq('id', projectId).select('*').single()
@@ -102,6 +111,12 @@ export const ProjectsGateway = {
 
   async deletePhase(id: string, projectId: string): Promise<void> {
     if (!shared()) return ProjectsService.deletePhase(id, projectId)
+    const { data: proj, error: pErr } = await supabase.from('projects')
+      .select('current_phase_id').eq('id', projectId).single()
+    if (pErr) fail(pErr)
+    if (proj.current_phase_id === id) {
+      throw new Error('Aktuelle Phase kann nicht geloescht werden -- zuerst eine andere Phase aktivieren')
+    }
     const { error } = await supabase.from('project_phases').delete().eq('id', id)
     if (error) fail(error)
   },

@@ -15,15 +15,17 @@ export function projectRowToProject(r: any): Project {
   }
 }
 
-export function projectToRow(p: {
-  id: string; workspaceId: string; accountId: string; title: string; description?: string
-}): Record<string, unknown> {
+export function projectToRow(
+  p: { workspaceId: string; accountId: string; title: string; description?: string },
+  ctx: { id: string; now: string },
+): Record<string, unknown> {
   return {
-    id: p.id,
+    id: ctx.id,
     workspace_id: p.workspaceId,
     account_id: p.accountId,
     title: p.title,
     description: p.description ?? null,
+    updated_at: ctx.now,
   }
 }
 

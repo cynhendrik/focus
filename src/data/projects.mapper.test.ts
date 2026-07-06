@@ -29,10 +29,14 @@ describe('projectRowToProject', () => {
 })
 
 describe('projectToRow', () => {
-  it('maps camelCase to snake_case, description optional', () => {
-    const row = projectToRow({ id: 'p1', workspaceId: 'ws1', accountId: 'a1', title: 'Relaunch' })
+  it('maps camelCase to snake_case, description optional, writes updated_at from ctx.now', () => {
+    const row = projectToRow(
+      { workspaceId: 'ws1', accountId: 'a1', title: 'Relaunch' },
+      { id: 'p1', now: '2026-01-03T00:00:00Z' },
+    )
     expect(row).toEqual({
       id: 'p1', workspace_id: 'ws1', account_id: 'a1', title: 'Relaunch', description: null,
+      updated_at: '2026-01-03T00:00:00Z',
     })
   })
 })
