@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 36;
+const CURRENT_VERSION: u32 = 37;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -837,6 +837,41 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             }
             Ok(())
         }
+        37 => {
+            // Projektplaner-Kern: Projekte + freie Phasenliste pro Projekt.
+            // create_tables() deckt nur Frischinstalls ab; hier fuer Bestandsinstallationen.
+            if !table_exists(conn, "projects") {
+                conn.execute_batch(r#"
+                    CREATE TABLE projects (
+                        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+                        account_id TEXT NOT NULL REFERENCES accounts(id),
+                        title TEXT NOT NULL, description TEXT,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        current_phase_id TEXT,
+                        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                        completed_at TEXT
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(workspace_id, status);
+                    CREATE INDEX IF NOT EXISTS idx_projects_account ON projects(account_id);
+                "#)?;
+            }
+            if !table_exists(conn, "project_phases") {
+                conn.execute_batch(r#"
+                    CREATE TABLE project_phases (
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                        name TEXT NOT NULL, order_index INTEGER NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_project_phases_project ON project_phases(project_id, order_index);
+                "#)?;
+            }
+            if !column_exists(conn, "activities", "project_id") {
+                conn.execute_batch("ALTER TABLE activities ADD COLUMN project_id TEXT REFERENCES projects(id);")?;
+                conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_activities_project ON activities(project_id, created_at DESC);")?;
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -1627,5 +1662,51 @@ mod tests {
         run(&conn).unwrap();
         run(&conn).unwrap();
         assert_eq!(get_version(&conn).unwrap(), CURRENT_VERSION);
+    }
+
+    #[test]
+    fn migration_37_creates_project_tables_and_column() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+        run(&conn).unwrap();
+
+        assert!(table_exists(&conn, "projects"), "projects table missing");
+        assert!(table_exists(&conn, "project_phases"), "project_phases table missing");
+        assert!(column_exists(&conn, "activities", "project_id"), "activities.project_id missing");
+
+        // Idempotent: running again must not error (table_exists/column_exists guards).
+        run(&conn).unwrap();
+    }
+
+    #[test]
+    fn migration_37_project_phases_cascade_delete_with_project() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+        run(&conn).unwrap();
+
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at)
+             VALUES ('p1','ws-1','a1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO project_phases (id, project_id, name, order_index, created_at)
+             VALUES ('ph1','p1','Konzept',0,'2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        conn.execute("DELETE FROM projects WHERE id = 'p1'", []).unwrap();
+
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM project_phases WHERE project_id = 'p1'", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(count, 0, "project_phases should cascade-delete with its project");
     }
 }
