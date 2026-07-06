@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { UserCheck, Trash2, Repeat } from 'lucide-react'
+import { UserCheck, Trash2, Repeat, Mail } from 'lucide-react'
 import { useLeadsStore } from '@/store/leads.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useToastStore } from '@/store/toast.store'
+import { useMailStore } from '@/store/mail.store'
 import { leadToUpsertPayload } from '@/lib/lead-payload'
 import { useDialogFocus } from '@/components/ui/Sheet'
 import { ActivityStream } from '@/components/activity/ActivityStream'
 import { ConvertLeadChoice } from '@/components/leads/ConvertLeadChoice'
+import { ComposeModal } from '@/components/mail/ComposeModal'
 import { FollowUpQueueService } from '@/services/follow-up-queue.service'
 import { ActivitiesGateway } from '@/data/activities.gateway'
 import { log } from '@/lib/logger'
@@ -26,7 +28,9 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const userId          = useAuthStore(s => s.user?.id ?? '')
   const showToast       = useToastStore(s => s.show)
   const dialogRef       = useDialogFocus(true)
+  const mailAccounts    = useMailStore(s => s.accounts)
   const [showConvertChoice, setShowConvertChoice] = useState(false)
+  const [showCompose, setShowCompose]     = useState(false)
   const [deleting, setDeleting]     = useState(false)
 
   // Follow-up-Sequenz: 4 vorgetextete Mails (Tag 2/5/10/21), die als
@@ -92,6 +96,20 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
       if (!withDeal) showToast({ message: `${lead.name} konnte nicht umgewandelt werden.`, variant: 'error' })
       setShowConvertChoice(false)
     }
+  }
+
+  async function handleMailSent() {
+    setShowCompose(false)
+    try {
+      await ActivitiesGateway.create({
+        workspaceId, createdBy: userId, accountId: lead.id,
+        type: 'email', title: `Mail an ${lead.name}`,
+        body: `Per E-Mail an ${lead.email}.`, status: 'done',
+      })
+    } catch (err) {
+      log.warn('lead mail activity logging failed', { err })
+    }
+    showToast({ message: 'Mail gesendet.', variant: 'success' })
   }
 
   async function handleDelete() {
@@ -177,6 +195,25 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
+                onClick={() => setShowCompose(true)}
+                disabled={!lead.email || mailAccounts.length === 0}
+                title={!lead.email
+                  ? 'Ohne E-Mail-Adresse nicht möglich'
+                  : mailAccounts.length === 0
+                    ? 'Kein E-Mail-Konto konfiguriert'
+                    : 'Mail an diesen Lead schreiben'}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 8,
+                  cursor: (!lead.email || mailAccounts.length === 0) ? 'default' : 'pointer',
+                  border: '1px solid var(--accent)', background: 'transparent',
+                  color: 'var(--accent-text)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  opacity: (!lead.email || mailAccounts.length === 0) ? 0.55 : 1,
+                }}
+              >
+                <Mail size={14} /> Mail schreiben
+              </button>
+              <button
                 onClick={handleSequenceToggle}
                 disabled={sequenceBusy || sequenceActive === null || (!sequenceActive && !lead.email)}
                 title={!lead.email && !sequenceActive
@@ -238,17 +275,16 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
           {/* Contact info */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 14 }}>
             {lead.email && (
-              <a
-                href={`mailto:${lead.email}`}
+              <span
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  fontSize: 12, color: 'var(--accent)', textDecoration: 'none',
+                  fontSize: 12, color: 'var(--accent)',
                   background: 'var(--accent-soft)', padding: '5px 10px',
                   borderRadius: 99, fontWeight: 500,
                 }}
               >
                 ✉️ {lead.email}
-              </a>
+              </span>
             )}
 
             {/* Phone — editable inline */}
@@ -349,6 +385,16 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
           leadName={lead.name}
           onChoose={handleConvertChoice}
           onCancel={() => setShowConvertChoice(false)}
+        />
+      )}
+
+      {showCompose && (
+        <ComposeModal
+          mode="new"
+          accountId={mailAccounts[0].id}
+          initialTo={[lead.email!]}
+          onClose={() => setShowCompose(false)}
+          onSent={handleMailSent}
         />
       )}
     </div>
