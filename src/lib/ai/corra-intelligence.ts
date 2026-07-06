@@ -100,15 +100,14 @@ export function buildCorraIntelligenceContext(input: CorraContextInput): string 
     .slice(0, 10)
 
   // Kalte Leads: kein offenes Follow-Up und seit >14 Tagen keine Aktivität —
-  // genau die, die man sonst vergisst. Won/Lost ausgenommen.
+  // genau die, die man sonst vergisst. Gewonnene/verlorene Leads tauchen hier
+  // gar nicht erst auf (werden beim Konvertieren aus der leads-Liste entfernt).
   const leadIdsWithOpenFu = new Set(openFollowUps.map(f => f.customerId))
   const coldCutoff = new Date(today)
   coldCutoff.setDate(coldCutoff.getDate() - 14)
   const coldCutoffStr = coldCutoff.toISOString()
   const coldLeads = input.leads
     .filter(l =>
-      l.pipelineStage !== 'won' &&
-      l.pipelineStage !== 'lost' &&
       !leadIdsWithOpenFu.has(l.id) &&
       (!l.lastActivityAt || l.lastActivityAt < coldCutoffStr),
     )

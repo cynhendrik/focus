@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useAuthStore } from '@/store/auth.store'
 import { invoke } from '@tauri-apps/api/core'
 import { accountRowToLead, leadPayloadToAccountRow, accountRowToAccount, accountPayloadToRow } from './accounts.mapper'
-import type { Lead, UpsertLeadPayload, PipelineStage, BulkUpdateLeadsPayload } from '@/types/lead.types'
+import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload } from '@/types/lead.types'
 import type { Account, UpsertAccountPayload } from '@/types/account.types'
 
 function shared(): boolean {
@@ -55,19 +55,6 @@ export const AccountsGateway = {
     if (!shared()) { await LeadsService.deleteLead(id, workspaceId); return }
     const { error } = await supabase.from('accounts').delete().eq('id', id)
     if (error) throw error
-  },
-
-  async updateStage(id: string, stage: PipelineStage): Promise<Lead> {
-    if (!shared()) return LeadsService.updateStage(id, stage)
-    const now = new Date().toISOString()
-    const { data, error } = await supabase
-      .from('accounts')
-      .update({ pipeline_stage: stage, updated_at: now })
-      .eq('id', id)
-      .select('*')
-      .single()
-    if (error) throw error
-    return accountRowToLead(data)
   },
 
   async bulkUpdate(payload: BulkUpdateLeadsPayload): Promise<void> {

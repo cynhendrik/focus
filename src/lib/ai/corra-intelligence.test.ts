@@ -82,7 +82,7 @@ describe('buildCorraIntelligenceContext', () => {
   })
 
   it('surfaces a due lead follow-up with lead name and ID', () => {
-    const lead = { id: 'lead-1', name: 'Sven Klar', pipelineStage: 'replied' } as Lead
+    const lead = { id: 'lead-1', name: 'Sven Klar' } as Lead
     const fu = {
       id: 'fu-1', customerId: 'lead-1', title: 'Angebot nachfassen',
       dueDate: todayStr, status: 'offen', priority: 'normal', createdAt: '',
@@ -100,7 +100,7 @@ describe('buildCorraIntelligenceContext', () => {
 
   it('flags a cold lead with no open follow-up', () => {
     const lead = {
-      id: 'lead-cold', name: 'Alte Spur', pipelineStage: 'waiting_reply',
+      id: 'lead-cold', name: 'Alte Spur',
       lastActivityAt: '2026-01-01T00:00:00.000Z',
     } as Lead
     const ctx = buildCorraIntelligenceContext({
@@ -111,16 +111,6 @@ describe('buildCorraIntelligenceContext', () => {
     expect(ctx).toContain('LEADS OHNE FOLLOW-UP')
     expect(ctx).toContain('Alte Spur')
     expect(ctx).toContain('ID:lead-cold')
-  })
-
-  it('does not flag won/lost leads as cold', () => {
-    const won = { id: 'l-won', name: 'Gewonnen', pipelineStage: 'won', lastActivityAt: '2026-01-01T00:00:00.000Z' } as Lead
-    const ctx = buildCorraIntelligenceContext({
-      todos: [], invoices: [], emails: [],
-      deals: [], calendarEvents: [], accounts: [],
-      followUps: [], leads: [won],
-    })
-    expect(ctx).not.toContain('LEADS OHNE FOLLOW-UP')
   })
 })
 

@@ -7,7 +7,7 @@ const row = {
   email: 'max@x.de', phone: null, account_type: 'lead',
   lead_status: 'neu', lead_source: 'manual', lead_source_detail: null,
   engagement_score: 0, re_engage_date: null, converted_at: null,
-  pipeline_stage: 'inbox', company_name: null, linkedin_url: null,
+  company_name: null, linkedin_url: null,
   last_activity_at: null, next_follow_up_at: null,
   created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z',
 }
@@ -17,13 +17,12 @@ describe('accounts.mapper', () => {
     const lead = accountRowToLead(row)
     expect(lead.workspaceId).toBe('ws1')
     expect(lead.accountType).toBe('lead')
-    expect(lead.pipelineStage).toBe('inbox')
     expect(lead.leadSourceDetail).toBeNull()
     expect(lead.engagementScore).toBe(0)
     expect(lead.updatedAt).toBe('2026-01-02T00:00:00Z')
   })
 
-  it('accountRowToLead mappt ALLE 19 Felder vollständig', () => {
+  it('accountRowToLead mappt ALLE 18 Felder vollständig', () => {
     expect(accountRowToLead(row)).toEqual({
       id: 'l1',
       workspaceId: 'ws1',
@@ -31,7 +30,6 @@ describe('accounts.mapper', () => {
       email: 'max@x.de',
       phone: null,
       accountType: 'lead',
-      pipelineStage: 'inbox',
       leadStatus: 'neu',
       leadSource: 'manual',
       leadSourceDetail: null,
@@ -57,7 +55,6 @@ describe('accounts.mapper', () => {
     expect(r.created_by).toBe('u1')
     expect(r.workspace_id).toBe('ws1')
     expect(r.lead_status).toBe('neu')        // default
-    expect(r.pipeline_stage).toBe('inbox')   // default
     expect(r.updated_at).toBe('2026-01-03T00:00:00Z')
   })
 
@@ -67,7 +64,6 @@ describe('accounts.mapper', () => {
         workspaceId: 'ws1',
         name: 'Max',
         leadSource: 'manual',
-        pipelineStage: 'won',
         leadStatus: 'qualifiziert',
         email: 'x@y.de',
         phone: '123',
@@ -78,7 +74,6 @@ describe('accounts.mapper', () => {
       },
       { id: 'l1', createdBy: 'u1', now: '2026-01-03T00:00:00Z' },
     )
-    expect(r.pipeline_stage).toBe('won')
     expect(r.lead_status).toBe('qualifiziert')
     expect(r.email).toBe('x@y.de')
     expect(r.phone).toBe('123')

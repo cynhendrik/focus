@@ -94,12 +94,12 @@ export const tourKpis: FinanceKpis = {
 
 export const tourLeads: Lead[] = [
   { id: 'tour-lead-1', workspaceId: TOUR_WS, name: 'Studio Voss', accountType: 'lead',
-    pipelineStage: 'inbox', leadStatus: 'neu', leadSource: 'website', engagementScore: 20,
+    leadStatus: 'neu', leadSource: 'website', engagementScore: 20,
     createdAt: TS, updatedAt: TS, email: 'voss@example.com', phone: null, leadSourceDetail: null,
     companyName: 'Studio Voss', linkedinUrl: null, lastActivityAt: null, nextFollowUpAt: null,
     reEngageDate: null, convertedAt: null },
   { id: 'tour-lead-2', workspaceId: TOUR_WS, name: 'Café Mira', accountType: 'lead',
-    pipelineStage: 'replied', leadStatus: 'warm', leadSource: 'event', engagementScore: 55,
+    leadStatus: 'warm', leadSource: 'event', engagementScore: 55,
     createdAt: TS, updatedAt: TS, email: 'mira@example.com', phone: null, leadSourceDetail: null,
     companyName: 'Café Mira', linkedinUrl: null, lastActivityAt: null, nextFollowUpAt: null,
     reEngageDate: null, convertedAt: null },

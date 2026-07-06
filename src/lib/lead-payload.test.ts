@@ -10,7 +10,6 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
     email: 'max@example.com',
     phone: null,
     accountType: 'lead',
-    pipelineStage: 'replied',
     leadStatus: 'warm',
     leadSource: 'zoom',
     leadSourceDetail: 'Marketing Webinar',
@@ -33,7 +32,6 @@ describe('leadToUpsertPayload', () => {
     // Without these, the Rust upsert would reset them to defaults / NULL.
     expect(payload.id).toBe('lead-1')
     expect(payload.leadStatus).toBe('warm')
-    expect(payload.pipelineStage).toBe('replied')
     expect(payload.reEngageDate).toBe('2026-09-01')
     expect(payload.leadSource).toBe('zoom')
     expect(payload.leadSourceDetail).toBe('Marketing Webinar')

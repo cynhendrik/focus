@@ -8,7 +8,7 @@ import { DealsService } from '@/services/deals.service'
 import { useToastStore } from '@/store/toast.store'
 import { useTourStore } from '@/store/tour.store'
 import { log } from '@/lib/logger'
-import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload, PipelineStage } from '@/types/lead.types'
+import type { Lead, UpsertLeadPayload, BulkUpdateLeadsPayload } from '@/types/lead.types'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
 
@@ -23,14 +23,9 @@ interface LeadsState {
   convertToDeal: (id: string, workspaceId: string, userId: string, value?: number) => Promise<void>
   deleteLead: (id: string, workspaceId: string) => Promise<void>
   syncPending: (workspaceId: string) => Promise<void>
-  updateStage: (id: string, stage: PipelineStage) => Promise<void>
   /** Board-Drag: Karte SOFORT lokal in die Zielspalte (leadStatus) setzen, dann im
    *  Hintergrund persistieren; bei Fehler zurückrollen. Kein await/Reload → kein Ruckeln. */
   moveLeadStage: (id: string, status: string) => void
-  newLeads: () => Lead[]
-  attemptedLeads: () => Lead[]
-  warmLeads: () => Lead[]
-  lostLeads: () => Lead[]
   reEngageLeads: () => Lead[]
 }
 
@@ -184,16 +179,6 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     }
   },
 
-  updateStage: async (id, stage) => {
-    try {
-      const lead = await AccountsGateway.updateStage(id, stage)
-      set(s => ({ leads: s.leads.map(l => l.id === id ? lead : l) }))
-    } catch (err) {
-      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
-      set({ error }); throw err
-    }
-  },
-
   moveLeadStage: (id, status) => {
     const prev = get().leads
     // Optimistisch: Karte sofort verschieben (Board gruppiert nach leadStatus).
@@ -206,9 +191,5 @@ export const useLeadsStore = create<LeadsState>()((set, get) => ({
     })
   },
 
-  newLeads: () => get().leads.filter(l => l.pipelineStage === 'inbox'),
-  attemptedLeads: () => get().leads.filter(l => l.pipelineStage === 'waiting_reply'),
-  warmLeads: () => get().leads.filter(l => l.pipelineStage === 'replied'),
-  lostLeads: () => get().leads.filter(l => l.pipelineStage === 'lost'),
   reEngageLeads: () => get().leads.filter(l => l.reEngageDate != null),
 }))

@@ -16,7 +16,6 @@ vi.mock('@/services/leads.service', () => ({
     convertToClient: vi.fn(),
     deleteLead: vi.fn(),
     syncPending: vi.fn().mockResolvedValue(0),
-    updateStage: vi.fn(),
   },
 }))
 
@@ -47,7 +46,7 @@ vi.mock('./customers.store', () => ({
 
 const mockLead: Lead = {
   id: 'lead-1', workspaceId: 'ws1', name: 'Acme GmbH', email: null,
-  accountType: 'lead', pipelineStage: 'replied', leadStatus: 'warm',
+  accountType: 'lead', leadStatus: 'warm',
   leadSource: 'manual', leadSourceDetail: null, companyName: null,
   linkedinUrl: null, lastActivityAt: null, nextFollowUpAt: null,
   engagementScore: 0, reEngageDate: null, convertedAt: null,

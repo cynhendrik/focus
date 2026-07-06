@@ -21,9 +21,6 @@ export interface UpsertLeadStagePayload {
   isDisqualified?: boolean
 }
 
-export type PipelineStage =
-  | 'inbox' | 'waiting_reply' | 'replied' | 'call_booked' | 'won' | 'lost'
-
 // Stage names stored in DB (migrated to German in v19; accepts any string for custom stages)
 export type LeadStatus = 'new' | 'attempted' | 'warm' | 'lost_reengage'
   | 'neu' | 'kontaktiert' | 'qualifiziert' | 'disqualifiziert'
@@ -38,9 +35,6 @@ export interface Lead {
   email: string | null
   phone: string | null
   accountType: 'lead'
-  // Canonical pipeline stage
-  pipelineStage: PipelineStage
-  // Legacy (still on DB, preserved for compat)
   leadStatus: LeadStatus
   leadSource: LeadSource
   leadSourceDetail: string | null
@@ -61,7 +55,6 @@ export interface UpsertLeadPayload {
   name: string
   email?: string
   phone?: string
-  pipelineStage?: PipelineStage
   leadStatus?: LeadStatus
   leadSource: LeadSource
   leadSourceDetail?: string

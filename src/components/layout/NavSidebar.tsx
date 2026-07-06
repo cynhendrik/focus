@@ -63,7 +63,11 @@ export function NavSidebar() {
   const openDealCount = useDealsStore(s =>
     s.deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
   )
-  const newLeadsCount = useLeadsStore(s => s.newLeads().length)
+  // newLeads() filterte bisher auf pipelineStage==='inbox', das aber für jeden
+  // echten Lead für immer auf 'inbox' eingefroren war — die Filterung war also
+  // ein No-Op und zählte de facto alle Leads. Gleiches Verhalten hier direkt
+  // über s.leads.length, ohne den toten pipelineStage-Selektor.
+  const newLeadsCount = useLeadsStore(s => s.leads.length)
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
   const overdueCount  = useFinanceStore(s =>
     s.invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length
