@@ -61,11 +61,15 @@ created_at    TEXT NOT NULL
 ```
 Freie Liste pro Projekt (Nutzer benennt/ordnet eigene Phasen beim Anlegen), analog zu den bestehenden konfigurierbaren `pipeline_stages`/`lead_stages` — nur pro Projekt statt pro Workspace.
 
-**`todos`-Tabelle:** zwei neue nullable Spalten `project_id` (FK `projects`) und `project_phase_id` (FK `project_phases`) — additive Migration, analog zum bestehenden `ALTER TABLE todos ADD COLUMN ...`-Muster (`migrations.rs:94-96`). Bestehende Todos bleiben unberührt.
+**Korrektur nach Code-Verifikation (wichtig):** Die eigenständige `todos`-SQLite-Tabelle (`schema.rs:162-171`) ist toter Code — kein Rust-Command liest/schreibt sie (`create_activity`/`update_activity`, die einzigen Schreibpfade für Todos, schreiben ausschließlich in `activities`). **Todos sind vollständig `activities`-Zeilen mit `type='task'`**, sowohl lokal als auch in der Cloud; Todo-spezifische Felder wie `bucket`, `checklist`, `notes`, `scheduledAt` leben nicht in eigenen Spalten, sondern im JSON-`payload`-Feld (`src/data/todos.mapper.ts`, `buildTaskPayloadJson`/`activityToTodo`). Die `todos`-Tabelle bleibt unangetastet (kein Teil dieser Spec — eigener, späterer Cleanup-Kandidat, analog `deal.types.ts`).
 
-**Notizen-Panel — bewusste Entscheidung gegen ein 4. Notiz-System:** Diese App hat laut Recherche bereits mindestens 3 getrennte Notiz-Ablagen (`note_entries`, `activities` Typ `note`, plus verstreute `notes`-Freitextfelder auf Todo/Deal/Contact/etc.). Eine neue eigene `project_notes`-Tabelle würde diese Fragmentierung verschärfen. Stattdessen: `activities`-Tabelle bekommt eine neue nullable Spalte `project_id` (FK `projects`, analog zu ihren bestehenden `account_id?`/`contact_id?`/`deal_id?`-Spalten, `src/types/activity.types.ts:20-22`). Das Notizen-Panel im Projekt-Detail ist eine gefilterte Ansicht: `activities WHERE project_id = ? AND type = 'note'`. Neue Notizen werden ganz normal als `type: 'note'`-Activity mit gesetztem `project_id` angelegt — kein neuer Code-Pfad, nur ein zusätzlicher Filter auf dem bestehenden Notiz-Aktivitäts-Typ.
+**Aufgaben-Verknüpfung folgt daher demselben Muster:**
+- `activities` bekommt eine neue nullable Spalte `project_id` (FK `projects`, analog zu den bestehenden `account_id?`/`contact_id?`/`deal_id?`-Spalten, `src-tauri/src/db/activity.rs:11-13`) — genutzt von BEIDEN Aktivitäts-Typen: `type='task'` (projektverknüpfte Aufgaben) UND `type='note'` (siehe Notizen-Panel unten). Eine Query lädt beides pro Projekt: `activities WHERE project_id = ?`.
+- `project_phase_id` (welche Phase eine Aufgabe gerade zugeordnet ist) ist KEINE eigene Spalte, sondern ein neues Feld im `payload`-JSON — exakt wie `bucket`/`notes`/`scheduledAt` heute schon gehandhabt werden. Das „Aufgaben"-Panel lädt alle projektverknüpften `type='task'`-Aktivitäten über `project_id` und filtert clientseitig auf die aktuelle Phase (gleiches Muster wie das bestehende `deriveBucket`).
 
-**Cloud-Pendant:** entsprechende Supabase-Tabellen `projects`/`project_phases` + Spalten auf `todos`/`activities`, mit RLS analog zu bestehenden workspace-gescopten Tabellen (Muster aus `accounts`/`deals` übernehmen).
+**Notizen-Panel — bewusste Entscheidung gegen ein 4. Notiz-System:** Diese App hat laut Recherche bereits mindestens 3 getrennte Notiz-Ablagen (`note_entries`, `activities` Typ `note`, plus verstreute `notes`-Freitextfelder auf Todo/Deal/Contact/etc.). Eine neue eigene `project_notes`-Tabelle würde diese Fragmentierung verschärfen. Stattdessen nutzt das Notizen-Panel dieselbe neue `activities.project_id`-Spalte: `activities WHERE project_id = ? AND type = 'note'`. Neue Notizen werden ganz normal als `type: 'note'`-Activity mit gesetztem `project_id` angelegt — kein neuer Code-Pfad, nur ein zusätzlicher Filter auf dem bestehenden Notiz-Aktivitäts-Typ.
+
+**Cloud-Pendant:** entsprechende Supabase-Tabellen `projects`/`project_phases` + eine `project_id`-Spalte auf `activities` (keine `todos`-Tabelle in der Cloud — siehe oben), mit RLS analog zu bestehenden workspace-gescopten Tabellen (Muster aus `accounts`/`deals` übernehmen).
 
 ## Lifecycle
 
@@ -79,7 +83,7 @@ Freie Liste pro Projekt (Nutzer benennt/ordnet eigene Phasen beim Anlegen), anal
 - Mail-/Rechnungs-/Notiz-Verknüpfung zu Projekten (`Invoice.projectId`, `EmailHeader.projectId` etc.) — eigene, spätere Specs nach demselben `dealId`-Muster.
 - Kunden-Freigabe + Kommentare + Benachrichtigungen — eigene, spätere Spec (externe Zugriffsrechte, Security-Architektur).
 - Konsolidierung der Notiz-/Follow-up-Fragmentierung als Ganzes — unabhängiges Thema. Diese Spec verschärft es bewusst nicht weiter (siehe Datenmodell: Notizen-Panel nutzt die bestehende `activities`/`note`-Ablage, keine neue Tabelle).
-- Aufräumen des toten `deal.types.ts` — separater Cleanup-Kandidat.
+- Aufräumen des toten `deal.types.ts` sowie der toten `todos`-SQLite-Tabelle — separate Cleanup-Kandidaten.
 
 ## Akzeptanzkriterien
 
