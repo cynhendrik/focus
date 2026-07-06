@@ -137,6 +137,15 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore, sele
     return () => { cancelled = true }
   }, [expanded, mail.id, body, bodyLoading])
 
+  // KI-Verdict darf nicht über Zuklappen/Wiederaufklappen hinweg stehen bleiben —
+  // Komponente bleibt beim Toggle gemountet, daher hier explizit zurücksetzen.
+  useEffect(() => {
+    if (!expanded) {
+      setClassification(null)
+      setClassifying(false)
+    }
+  }, [expanded])
+
   async function handleSubmit() {
     if (!name.trim()) return
     setSaving(true)
