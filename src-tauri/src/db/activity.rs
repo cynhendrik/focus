@@ -11,6 +11,7 @@ pub struct Activity {
     pub account_id: Option<String>,
     pub contact_id: Option<String>,
     pub deal_id: Option<String>,
+    pub project_id: Option<String>,
     #[serde(rename = "type")]
     pub activity_type: String,
     pub title: Option<String>,
@@ -34,6 +35,7 @@ pub struct CreateActivityPayload {
     pub account_id: Option<String>,
     pub contact_id: Option<String>,
     pub deal_id: Option<String>,
+    pub project_id: Option<String>,
     pub customer_id: Option<String>,
     #[serde(rename = "type")]
     pub activity_type: String,
@@ -65,13 +67,13 @@ pub fn insert(conn: &Connection, payload: CreateActivityPayload) -> Result<Activ
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT INTO activities
-         (id, workspace_id, created_by, account_id, contact_id, deal_id, customer_id, type,
+         (id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, customer_id, type,
           title, body, payload, status, due_at, assignee, outcome, direction, email_id,
           pending_sync, created_at, updated_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,1,?18,?18)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,1,?19,?19)",
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.account_id,
-            payload.contact_id, payload.deal_id, payload.customer_id, payload.activity_type,
+            payload.contact_id, payload.deal_id, payload.project_id, payload.customer_id, payload.activity_type,
             payload.title, payload.body,
             payload.payload.unwrap_or_else(|| "{}".into()),
             payload.status.unwrap_or_else(|| "open".into()),
@@ -80,7 +82,7 @@ pub fn insert(conn: &Connection, payload: CreateActivityPayload) -> Result<Activ
         ],
     )?;
     conn.query_row(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE id = ?1", [&id], map_row,
@@ -107,7 +109,7 @@ pub fn update(conn: &Connection, id: &str, payload: UpdateActivityPayload) -> Re
     )?;
     if n == 0 { return Err(AppError::NotFound(format!("Activity {id} not found"))); }
     conn.query_row(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE id = ?1", [id], map_row,
@@ -122,7 +124,7 @@ pub fn delete(conn: &Connection, id: &str) -> Result<(), AppError> {
 
 pub fn get_by_account(conn: &Connection, account_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE account_id = ?1 ORDER BY created_at DESC"
@@ -133,7 +135,7 @@ pub fn get_by_account(conn: &Connection, account_id: &str) -> Result<Vec<Activit
 
 pub fn get_by_deal(conn: &Connection, deal_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE deal_id = ?1 ORDER BY created_at DESC"
@@ -144,7 +146,7 @@ pub fn get_by_deal(conn: &Connection, deal_id: &str) -> Result<Vec<Activity>, Ap
 
 pub fn get_open_tasks(conn: &Connection, workspace_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities
@@ -157,7 +159,7 @@ pub fn get_open_tasks(conn: &Connection, workspace_id: &str) -> Result<Vec<Activ
 
 pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE customer_id = ?1 ORDER BY created_at DESC"
@@ -168,7 +170,7 @@ pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Activ
 
 pub fn get_by_project(conn: &Connection, project_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities WHERE project_id = ?1 ORDER BY created_at DESC"
@@ -179,7 +181,7 @@ pub fn get_by_project(conn: &Connection, project_id: &str) -> Result<Vec<Activit
 
 pub fn get_open_followups(conn: &Connection, workspace_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
-        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, project_id, type,
                 title, body, payload, status, due_at, assignee, outcome, direction, email_id,
                 created_at, updated_at
          FROM activities
@@ -221,13 +223,14 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Activity> {
     Ok(Activity {
         id: r.get(0)?, workspace_id: r.get(1)?, created_by: r.get(2)?,
         account_id: r.get(3)?, contact_id: r.get(4)?, deal_id: r.get(5)?,
-        activity_type: r.get(6)?, title: r.get(7)?, body: r.get(8)?,
-        payload: r.get::<_, Option<String>>(9)?.unwrap_or_else(|| "{}".into()),
-        status: r.get(10)?, due_at: r.get(11)?, assignee: r.get(12)?,
-        outcome: r.get(13)?,
-        direction: r.get(14)?,
-        email_id: r.get(15)?,
-        created_at: r.get(16)?, updated_at: r.get(17)?,
+        project_id: r.get(6)?,
+        activity_type: r.get(7)?, title: r.get(8)?, body: r.get(9)?,
+        payload: r.get::<_, Option<String>>(10)?.unwrap_or_else(|| "{}".into()),
+        status: r.get(11)?, due_at: r.get(12)?, assignee: r.get(13)?,
+        outcome: r.get(14)?,
+        direction: r.get(15)?,
+        email_id: r.get(16)?,
+        created_at: r.get(17)?, updated_at: r.get(18)?,
     })
 }
 
@@ -256,6 +259,7 @@ mod tests {
         CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
             account_id: Some(account_id.into()), contact_id: None, deal_id: None,
+            project_id: None,
             customer_id: None,
             activity_type: activity_type.into(), title: Some("Test".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -289,7 +293,7 @@ mod tests {
         // open task
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, project_id: None, customer_id: None,
             activity_type: "task".into(), title: Some("Open Task".into()),
             body: None, payload: None, status: Some("open".into()),
             due_at: Some("2026-06-01".into()), assignee: None, outcome: None,
@@ -330,7 +334,7 @@ mod tests {
         seed_account(&conn, "a1");
         let a = insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, project_id: None, customer_id: None,
             activity_type: "call".into(), title: Some("Call".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: Some("strong_interest".into()), direction: None, email_id: None,
@@ -354,7 +358,7 @@ mod tests {
         // Insert one activity with customer_id "cust-1"
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: Some("a1".into()), contact_id: None, deal_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, project_id: None,
             customer_id: Some("cust-1".into()),
             activity_type: "note".into(), title: Some("Notiz Kunde 1".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -363,7 +367,7 @@ mod tests {
         // Insert one activity with customer_id "cust-2"
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: Some("a2".into()), contact_id: None, deal_id: None,
+            account_id: Some("a2".into()), contact_id: None, deal_id: None, project_id: None,
             customer_id: Some("cust-2".into()),
             activity_type: "task".into(), title: Some("Task Kunde 2".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
@@ -401,16 +405,13 @@ mod tests {
         ).unwrap();
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(), account_id: Some("a1".into()),
-            contact_id: None, deal_id: None, customer_id: None, activity_type: "note".into(),
+            contact_id: None, deal_id: None, project_id: Some("p1".into()), customer_id: None, activity_type: "note".into(),
             title: Some("Projekt-Notiz".into()), body: None, payload: None, status: None,
             due_at: None, assignee: None, outcome: None, direction: None, email_id: None,
         }).unwrap();
-        conn.execute(
-            "UPDATE activities SET project_id = 'p1' WHERE title = 'Projekt-Notiz'", [],
-        ).unwrap();
         insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(), account_id: Some("a1".into()),
-            contact_id: None, deal_id: None, customer_id: None, activity_type: "note".into(),
+            contact_id: None, deal_id: None, project_id: None, customer_id: None, activity_type: "note".into(),
             title: Some("Andere Notiz".into()), body: None, payload: None, status: None,
             due_at: None, assignee: None, outcome: None, direction: None, email_id: None,
         }).unwrap();
@@ -426,7 +427,7 @@ mod tests {
         seed_account(&conn, "a1");
         let a = insert(&conn, CreateActivityPayload {
             workspace_id: "ws-1".into(), created_by: "u-1".into(),
-            account_id: Some("a1".into()), contact_id: None, deal_id: None, customer_id: None,
+            account_id: Some("a1".into()), contact_id: None, deal_id: None, project_id: None, customer_id: None,
             activity_type: "email".into(), title: Some("Email".into()),
             body: None, payload: None, status: None, due_at: None, assignee: None,
             outcome: None,
