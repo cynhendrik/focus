@@ -6,6 +6,8 @@ import { totalUnread } from '@/lib/chat/total-unread'
 import { useCapability } from '@/hooks/useCapability'
 import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
+import { useLeadStagesStore } from '@/store/lead-stages.store'
+import { countLeadsInFirstOpenStage } from '@/lib/leads/nav-badge'
 import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
@@ -63,11 +65,9 @@ export function NavSidebar() {
   const openDealCount = useDealsStore(s =>
     s.deals.filter(d => d.stage !== 'won' && d.stage !== 'lost').length
   )
-  // newLeads() filterte bisher auf pipelineStage==='inbox', das aber für jeden
-  // echten Lead für immer auf 'inbox' eingefroren war — die Filterung war also
-  // ein No-Op und zählte de facto alle Leads. Gleiches Verhalten hier direkt
-  // über s.leads.length, ohne den toten pipelineStage-Selektor.
-  const newLeadsCount = useLeadsStore(s => s.leads.length)
+  const leads          = useLeadsStore(s => s.leads)
+  const leadStages      = useLeadStagesStore(s => s.stages)
+  const newLeadsCount   = countLeadsInFirstOpenStage(leads, leadStages)
   const unreadMails   = useMailStore(s => s.emails.filter(e => !e.isRead).length)
   const overdueCount  = useFinanceStore(s =>
     s.invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length
