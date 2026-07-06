@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Inbox, UserPlus, ChevronRight, ChevronDown, EyeOff, Eye, AtSign, Ban } from 'lucide-react'
+import { Inbox, UserPlus, ChevronRight, ChevronDown, EyeOff, Eye, AtSign, Ban, Sparkles } from 'lucide-react'
 import { useMailStore } from '@/store/mail.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
@@ -8,6 +8,8 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useToastStore } from '@/store/toast.store'
 import { MailService } from '@/services/mail.service'
 import { classifyMails, matchesIgnoredSender } from '@/lib/mail/newcomer'
+import { classifyNewcomerCandidate } from '@/lib/ai/newcomer-classify'
+import type { NewcomerClassification } from '@/lib/ai/newcomer-classify'
 import { log } from '@/lib/logger'
 import type { EmailHeader, IgnoredSender } from '@/types/mail.types'
 
@@ -108,6 +110,8 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore, sele
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState<string | null>(null)
   const [ignoreMenuOpen, setIgnoreMenuOpen] = useState(false)
+  const [classifying, setClassifying]     = useState(false)
+  const [classification, setClassification] = useState<NewcomerClassification | null>(null)
 
   const domain = senderDomain(mail.fromAddr)
 
@@ -143,6 +147,25 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore, sele
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Fehler beim Anlegen')
       setSaving(false)
+    }
+  }
+
+  async function handleClassify() {
+    if (!body) return
+    setClassifying(true)
+    try {
+      const result = await classifyNewcomerCandidate({
+        fromName: mail.fromName || mail.fromAddr,
+        fromAddr: mail.fromAddr,
+        subject: mail.subject || '',
+        body,
+      })
+      setClassification(result)
+    } catch (err) {
+      log.error('newcomer classification failed', { err })
+      setClassification({ verdict: 'lead', reason: 'KI-Prüfung fehlgeschlagen — bitte manuell einschätzen.' })
+    } finally {
+      setClassifying(false)
     }
   }
 
@@ -290,6 +313,30 @@ function UnknownMailRow({ mail, expanded, onToggle, onCreateLead, onIgnore, sele
             fontFamily: 'var(--font-mono)', lineHeight: 1.5,
           }}>
             {bodyLoading ? 'Lade Inhalt…' : body}
+          </div>
+
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={handleClassify}
+              disabled={classifying || !body}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 600,
+                border: '1px solid var(--border)', cursor: classifying ? 'default' : 'pointer',
+                background: 'transparent', color: 'var(--fg-dim)', fontFamily: 'inherit',
+                opacity: classifying || !body ? 0.6 : 1,
+              }}
+            >
+              <Sparkles size={12} /> {classifying ? 'Prüft…' : 'Mit KI prüfen'}
+            </button>
+            {classification && (
+              <span style={{
+                fontSize: 11, color: classification.verdict === 'lead' ? 'var(--ok)' : 'var(--fg-dim)',
+              }}>
+                {classification.verdict === 'lead' ? '✓ wahrscheinlich Lead' : '— wahrscheinlich kein Lead'}
+                {classification.reason && ` — ${classification.reason}`}
+              </span>
+            )}
           </div>
 
           {/* Lead-Formular */}
