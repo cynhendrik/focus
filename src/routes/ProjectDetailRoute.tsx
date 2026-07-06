@@ -2,10 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useProjectsStore } from '@/store/projects.store'
 import { useUiStore } from '@/store/ui.store'
 import { useCustomersStore } from '@/store/customers.store'
+import { useTodosStore } from '@/store/todos.store'
+import { useMembersStore } from '@/store/members.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { ActivitiesGateway } from '@/data/activities.gateway'
 import { activityToTodo } from '@/data/todos.mapper'
 import type { Activity } from '@/types/pipeline.types'
 import type { Todo } from '@/types/todo.types'
+import type { MemberProfile } from '@/types/profile.types'
 
 function Stepper({ phases, currentPhaseId }: {
   phases: { id: string; name: string; orderIndex: number }[]
@@ -64,6 +68,52 @@ function NewPhaseForm({ onCreate }: { onCreate: (name: string) => void }) {
   )
 }
 
+function NewTaskForm({ members, onCreate }: {
+  members: MemberProfile[]
+  onCreate: (title: string, assigneeId: string | undefined) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
+
+  const submit = () => {
+    if (!title.trim()) return
+    onCreate(title.trim(), assigneeId || undefined)
+    setTitle('')
+    setAssigneeId('')
+  }
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 6,
+      marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)',
+    }}>
+      <input
+        className="mock-input" value={title} onChange={e => setTitle(e.target.value)}
+        placeholder="Neue Aufgabe" style={{ fontSize: 13 }}
+        onKeyDown={e => { if (e.key === 'Enter') submit() }}
+      />
+      {members.length > 0 && (
+        <select
+          className="mock-input" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
+          style={{ fontSize: 12 }}
+        >
+          <option value="">— Niemand —</option>
+          {members.map(m => (
+            <option key={m.id} value={m.id}>{m.displayName}</option>
+          ))}
+        </select>
+      )}
+      <button
+        className="btn-primary" style={{ fontSize: 12, padding: '6px 12px', alignSelf: 'flex-start' }}
+        disabled={!title.trim()}
+        onClick={submit}
+      >
+        + Aufgabe
+      </button>
+    </div>
+  )
+}
+
 export function ProjectDetailRoute() {
   const selectedProjectId = useUiStore(s => s.selectedProjectId)
   const setAppView = useUiStore(s => s.setAppView)
@@ -74,24 +124,36 @@ export function ProjectDetailRoute() {
   const setStatus = useProjectsStore(s => s.setStatus)
   const createPhase = useProjectsStore(s => s.createPhase)
   const customers = useCustomersStore(s => s.customers)
+  const upsertTodo = useTodosStore(s => s.upsert)
+  const setTodoAssignee = useTodosStore(s => s.setAssignee)
+  const members = useMembersStore(s => s.members())
+  const loadMembers = useMembersStore(s => s.load)
+  const nameOf = useMembersStore(s => s.nameOf)
+  const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
+  const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
   const [activities, setActivities] = useState<Activity[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
   const activeProjectIdRef = useRef<string | null>(null)
+
+  const refreshActivities = (projectId: string) =>
+    ActivitiesGateway.getByProject(projectId).then(fetched => {
+      if (activeProjectIdRef.current === projectId) setActivities(fetched)
+    })
 
   useEffect(() => {
     if (!selectedProjectId) return
     activeProjectIdRef.current = selectedProjectId
     loadPhases(selectedProjectId)
     setLoadingActivities(true)
-    ActivitiesGateway.getByProject(selectedProjectId)
-      .then(fetched => {
-        if (activeProjectIdRef.current === selectedProjectId) setActivities(fetched)
-      })
-      .finally(() => {
-        if (activeProjectIdRef.current === selectedProjectId) setLoadingActivities(false)
-      })
+    refreshActivities(selectedProjectId).finally(() => {
+      if (activeProjectIdRef.current === selectedProjectId) setLoadingActivities(false)
+    })
   }, [selectedProjectId, loadPhases])
+
+  useEffect(() => {
+    if (workspaceId && isShared) loadMembers(workspaceId)
+  }, [workspaceId, isShared, loadMembers])
 
   const customerName = project ? (customers.find(c => c.id === project.accountId)?.name ?? 'Unbekannter Kunde') : ''
 
@@ -113,6 +175,17 @@ export function ProjectDetailRoute() {
         <p style={{ color: 'var(--fg-dim)' }}>Projekt nicht gefunden.</p>
       </div>
     )
+  }
+
+  const handleCreateTask = async (title: string, assigneeId: string | undefined) => {
+    const created = await upsertTodo({
+      title,
+      customerId: project.accountId,
+      projectId: project.id,
+      projectPhaseId: project.currentPhaseId ?? undefined,
+    })
+    if (assigneeId) await setTodoAssignee(created.id, assigneeId)
+    await refreshActivities(project.id)
   }
 
   const isLastPhase = phases.length > 0 && phases[phases.length - 1]?.id === project.currentPhaseId
@@ -196,10 +269,14 @@ export function ProjectDetailRoute() {
               <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 13, color: t.status === 'done' ? 'var(--fg-dim)' : 'var(--fg)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
                   {t.title}
+                  {t.assignee && (
+                    <span style={{ color: 'var(--fg-dim)', fontWeight: 400 }}> · {nameOf(t.assignee)}</span>
+                  )}
                 </span>
               </div>
             ))
           )}
+          <NewTaskForm members={members} onCreate={handleCreateTask} />
         </div>
       </div>
     </div>
