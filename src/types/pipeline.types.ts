@@ -65,6 +65,7 @@ export interface Activity {
   createdBy: string
   accountId: string
   customerId?: string
+  projectId?: string
   type: string
   title?: string
   body?: string
@@ -81,6 +82,7 @@ export interface CreateActivityPayload {
   createdBy: string
   accountId: string
   customerId?: string
+  projectId?: string
   type: ActivityType
   title?: string
   body?: string

@@ -60,6 +60,14 @@ pub fn get_activities_by_account(
 }
 
 #[tauri::command]
+pub fn get_activities_by_project(
+    db: State<'_, DbPool>,
+    project_id: String,
+) -> Result<Vec<Activity>, AppError> {
+    db::activity::get_by_project(&db.conn(), &project_id)
+}
+
+#[tauri::command]
 pub fn get_activities_by_deal(
     db: State<'_, DbPool>,
     deal_id: String,

@@ -10,6 +10,7 @@ export function activityRowToActivity(r: any): Activity {
   return {
     id: r.id, workspaceId: r.workspace_id, createdBy: r.created_by,
     accountId: r.account_id ?? '', customerId: r.customer_id ?? undefined,
+    projectId: r.project_id ?? undefined,
     type: r.type, title: r.title ?? undefined, body: r.body ?? undefined,
     payload: typeof r.payload === 'string' ? r.payload : JSON.stringify(r.payload ?? {}),
     status: r.status ?? 'open', dueAt: r.due_at ?? undefined,
@@ -30,6 +31,7 @@ export function activityPayloadToRow(
   return {
     id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy,
     account_id: p.accountId || null, customer_id: p.customerId ?? null,
+    project_id: p.projectId ?? null,
     type: p.type, title: p.title ?? null, body: p.body ?? null,
     payload, status: p.status ?? 'open', due_at: p.dueAt ?? null,
     assignee: p.assignee ?? null,

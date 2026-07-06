@@ -36,6 +36,7 @@ export function activityToTodo(a: Activity): Todo {
   let source: Todo['source']
   let actionType: Todo['actionType']
   let sourceRef: string | undefined
+  let projectPhaseId: string | undefined
 
   try {
     const p = JSON.parse(a.payload ?? '{}')
@@ -53,6 +54,7 @@ export function activityToTodo(a: Activity): Todo {
     const VALID_ACTION_TYPES: readonly string[] = ['send_reminder']
     actionType      = VALID_ACTION_TYPES.includes(p.actionType) ? p.actionType as Todo['actionType'] : undefined
     sourceRef       = typeof p.sourceRef === 'string' ? p.sourceRef : undefined
+    projectPhaseId  = typeof p.projectPhaseId === 'string' ? p.projectPhaseId : undefined
   } catch {}
 
   const status: Todo['status'] = a.status === 'done'
@@ -79,6 +81,8 @@ export function activityToTodo(a: Activity): Todo {
     source,
     actionType,
     sourceRef,
+    projectId: a.projectId,
+    projectPhaseId,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   }
@@ -92,6 +96,7 @@ function buildTaskPayloadJson(p: UpsertTodoPayload): string {
     scheduledAt: p.scheduledAt ?? null, plannedMinutes: p.plannedMinutes ?? null,
     notes: p.notes ?? null, aiSummary: p.aiSummary ?? null, calendarEventId: p.calendarEventId ?? null,
     source: p.source ?? null, actionType: p.actionType ?? null, sourceRef: p.sourceRef ?? null,
+    projectPhaseId: p.projectPhaseId ?? null,
     is_follow_up: false,
   })
 }
@@ -101,6 +106,7 @@ export function todoToCreatePayload(
 ): CreateActivityPayload {
   return {
     workspaceId: ctx.workspaceId, createdBy: ctx.createdBy, accountId: p.customerId ?? '',
+    projectId: p.projectId ?? undefined,
     type: 'task', title: p.title, status: p.status ?? 'open', dueAt: p.dueDate ?? undefined,
     assignee: p.assignee ?? undefined, payload: buildTaskPayloadJson(p),
   }

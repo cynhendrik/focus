@@ -31,6 +31,14 @@ export const ActivitiesGateway = {
     return (data ?? []).map(activityRowToActivity)
   },
 
+  async getByProject(projectId: string): Promise<Activity[]> {
+    if (!shared()) return invoke<Activity[]>('get_activities_by_project', { projectId })
+    const { data, error } = await supabase.from('activities').select('*')
+      .eq('project_id', projectId).order('created_at', { ascending: false })
+    if (error) fail(error)
+    return (data ?? []).map(activityRowToActivity)
+  },
+
   async getOpenFollowups(workspaceId: string): Promise<Activity[]> {
     if (!shared()) return invoke<Activity[]>('get_open_followups', { workspaceId })
     const { data, error } = await supabase.from('activities').select('*')

@@ -89,3 +89,39 @@ describe('activities.mapper — account_id empty→null (FK safety)', () => {
     expect(r.account_id).toBe('acc1')
   })
 })
+
+describe('activities.mapper — projectId', () => {
+  it('activityRowToActivity reads project_id', () => {
+    const row = {
+      id: 'act1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1',
+      project_id: 'p1', type: 'note', status: 'open',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }
+    expect(activityRowToActivity(row).projectId).toBe('p1')
+  })
+
+  it('activityRowToActivity leaves projectId undefined when absent', () => {
+    const row = {
+      id: 'act1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1',
+      type: 'note', status: 'open',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }
+    expect(activityRowToActivity(row).projectId).toBeUndefined()
+  })
+
+  it('activityPayloadToRow writes project_id when set', () => {
+    const row = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', projectId: 'p1', type: 'note' },
+      { id: 'act1', now: '2026-01-01T00:00:00Z' },
+    )
+    expect(row.project_id).toBe('p1')
+  })
+
+  it('activityPayloadToRow writes null project_id when absent', () => {
+    const row = activityPayloadToRow(
+      { workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', type: 'note' },
+      { id: 'act1', now: '2026-01-01T00:00:00Z' },
+    )
+    expect(row.project_id).toBeNull()
+  })
+})

@@ -35,3 +35,40 @@ describe('todos.mapper', () => {
     expect(JSON.parse(p.payload!).priority).toBe('p1')
   })
 })
+
+function baseActivity(overrides: Partial<Activity> = {}): Activity {
+  return {
+    id: 'a1', workspaceId: 'ws1', createdBy: 'u1', accountId: 'acc1',
+    type: 'task', status: 'open', payload: '{}',
+    createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+describe('todos.mapper — projectId/projectPhaseId', () => {
+  it('activityToTodo reads projectId from the activity and projectPhaseId from payload', () => {
+    const activity = baseActivity({
+      projectId: 'p1',
+      payload: JSON.stringify({ bucket: 'today', projectPhaseId: 'ph1' }),
+    })
+    const todo = activityToTodo(activity)
+    expect(todo.projectId).toBe('p1')
+    expect(todo.projectPhaseId).toBe('ph1')
+  })
+
+  it('activityToTodo leaves project fields undefined when absent', () => {
+    const todo = activityToTodo(baseActivity())
+    expect(todo.projectId).toBeUndefined()
+    expect(todo.projectPhaseId).toBeUndefined()
+  })
+
+  it('todoToCreatePayload forwards projectId onto the activity payload and projectPhaseId into the JSON blob', () => {
+    const payload = todoToCreatePayload(
+      { title: 'Test-Aufgabe', projectId: 'p1', projectPhaseId: 'ph1' },
+      { workspaceId: 'ws1', createdBy: 'u1' },
+    )
+    expect(payload.projectId).toBe('p1')
+    const packed = JSON.parse(payload.payload!)
+    expect(packed.projectPhaseId).toBe('ph1')
+  })
+})

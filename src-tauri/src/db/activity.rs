@@ -166,6 +166,17 @@ pub fn get_by_customer(conn: &Connection, customer_id: &str) -> Result<Vec<Activ
     Ok(rows)
 }
 
+pub fn get_by_project(conn: &Connection, project_id: &str) -> Result<Vec<Activity>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
+                title, body, payload, status, due_at, assignee, outcome, direction, email_id,
+                created_at, updated_at
+         FROM activities WHERE project_id = ?1 ORDER BY created_at DESC"
+    )?;
+    let rows = stmt.query_map([project_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 pub fn get_open_followups(conn: &Connection, workspace_id: &str) -> Result<Vec<Activity>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, workspace_id, created_by, account_id, contact_id, deal_id, type,
@@ -373,6 +384,40 @@ mod tests {
             status: None, due_at: None, assignee: None, outcome: None,
         });
         assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn get_by_project_returns_only_matching_activities() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at)
+             VALUES ('p1','ws-1','a1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        insert(&conn, CreateActivityPayload {
+            workspace_id: "ws-1".into(), created_by: "u-1".into(), account_id: Some("a1".into()),
+            contact_id: None, deal_id: None, customer_id: None, activity_type: "note".into(),
+            title: Some("Projekt-Notiz".into()), body: None, payload: None, status: None,
+            due_at: None, assignee: None, outcome: None, direction: None, email_id: None,
+        }).unwrap();
+        conn.execute(
+            "UPDATE activities SET project_id = 'p1' WHERE title = 'Projekt-Notiz'", [],
+        ).unwrap();
+        insert(&conn, CreateActivityPayload {
+            workspace_id: "ws-1".into(), created_by: "u-1".into(), account_id: Some("a1".into()),
+            contact_id: None, deal_id: None, customer_id: None, activity_type: "note".into(),
+            title: Some("Andere Notiz".into()), body: None, payload: None, status: None,
+            due_at: None, assignee: None, outcome: None, direction: None, email_id: None,
+        }).unwrap();
+
+        let results = get_by_project(&conn, "p1").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, Some("Projekt-Notiz".to_string()));
     }
 
     #[test]

@@ -30,6 +30,10 @@ export interface Todo {
   source?: TodoSource
   actionType?: TodoActionType
   sourceRef?: string
+  /** Projekt-Verknuepfung (Projektplaner). projectId ist eine echte activities.project_id-Spalte;
+   *  projectPhaseId lebt wie bucket/notes im payload-JSON (siehe todos.mapper.ts). */
+  projectId?: string
+  projectPhaseId?: string
   createdAt: string
   updatedAt: string
 }
@@ -53,4 +57,6 @@ export interface UpsertTodoPayload {
   source?: TodoSource
   actionType?: TodoActionType
   sourceRef?: string
+  projectId?: string
+  projectPhaseId?: string
 }

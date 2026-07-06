@@ -312,6 +312,7 @@ fn main() {
             commands::activity::update_activity,
             commands::activity::delete_activity,
             commands::activity::get_activities_by_account,
+            commands::activity::get_activities_by_project,
             commands::activity::get_activities_by_deal,
             commands::activity::get_open_tasks,
             commands::activity::get_last_activity_dates,
