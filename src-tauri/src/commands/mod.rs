@@ -7,6 +7,8 @@ pub mod chat;
 pub mod folder;
 pub mod company;
 pub mod pipeline_stage;
+pub mod project;
+pub mod project_phase;
 pub mod lead_stage;
 pub mod automation_rule;
 pub mod lead;
