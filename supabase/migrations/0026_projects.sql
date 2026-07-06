@@ -1,4 +1,6 @@
--- NICHT automatisch anwenden -- manuell via Management-API einspielen.
+-- ANGEWANDT 2026-07-06 via Management-API (Projekt mqbjmquscjtytpjebosw).
+-- Verifiziert: projects/project_phases-Tabellen+Spalten+Defaults, activities.project_id,
+-- RLS aktiv auf beiden Tabellen, beide Policies, alle Indizes -- alles wie erwartet.
 -- Cloud-Gegenstueck zu SQLite-Migration v37 (src-tauri/src/db/migrations.rs).
 
 create table if not exists public.projects (
