@@ -46,6 +46,8 @@ const LeverageLeadsRoute    = lazy(() => named(import('@/routes/leverage/Leverag
 const LeveragePipelineRoute = lazy(() => named(import('@/routes/leverage/LeveragePipelineRoute'), 'LeveragePipelineRoute'))
 const LeverageMailRoute     = lazy(() => named(import('@/routes/leverage/LeverageMailRoute'), 'LeverageMailRoute'))
 const LeverageLeadRoute     = lazy(() => named(import('@/routes/leverage/LeverageLeadRoute'), 'LeverageLeadRoute'))
+const ProjectsOverviewRoute = lazy(() => named(import('@/routes/ProjectsOverviewRoute'), 'ProjectsOverviewRoute'))
+const ProjectDetailRoute    = lazy(() => named(import('@/routes/ProjectDetailRoute'), 'ProjectDetailRoute'))
 
 // Always-mounted editor components pull in TipTap/ProseMirror (~heavy). Code-
 // split so that engine lands in its own chunk and loads after first paint
@@ -259,6 +261,8 @@ export default function App() {
       case 'leverage_pipeline':    return <LeveragePipelineRoute />
       case 'leverage_mail':        return <LeverageMailRoute />
       case 'leverage_lead_detail': return <LeverageLeadRoute />
+      case 'projects': return <ProjectsOverviewRoute />
+      case 'project_detail': return <ProjectDetailRoute />
       // Redirect: Mail-Alias auf den Posteingang
       case 'mail':            return <PosteingangRoute />
       default:             return <DashboardRoute />

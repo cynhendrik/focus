@@ -86,6 +86,9 @@ export type AppView =
   | 'leverage_pipeline'
   | 'leverage_mail'
   | 'leverage_lead_detail'
+  // Projektplaner
+  | 'projects'
+  | 'project_detail'
 
 interface UiState {
   theme: Theme
@@ -109,6 +112,8 @@ interface UiState {
   sidebarCollapsed: boolean
   /** Aktiver Lead im LEVERAGE-Modus (für die Detail-Ansicht). */
   selectedLeverageLeadId: string | null
+  /** Aktives Projekt im Projektplaner (für die Detail-Ansicht). */
+  selectedProjectId: string | null
   setColorStyle: (style: ColorStyle) => void
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
@@ -128,6 +133,7 @@ interface UiState {
   setSettingsTab: (tab: SettingsTab) => void
   toggleSidebar: () => void
   setSelectedLeverageLeadId: (id: string | null) => void
+  setSelectedProjectId: (id: string | null) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -151,6 +157,7 @@ export const useUiStore = create<UiState>()(
       settingsTab: 'workspace',
       sidebarCollapsed: false,
       selectedLeverageLeadId: null,
+      selectedProjectId: null,
 
       setColorStyle: (style) =>
         set({ colorStyle: style }),
@@ -208,6 +215,9 @@ export const useUiStore = create<UiState>()(
 
       setSelectedLeverageLeadId: (id) =>
         set({ selectedLeverageLeadId: id }),
+
+      setSelectedProjectId: (id) =>
+        set({ selectedProjectId: id }),
     }),
     {
       name: 'focus-ui-v2',

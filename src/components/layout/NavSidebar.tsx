@@ -20,6 +20,7 @@ import {
   Target, TrendingUp,
   Mail, Calendar, Inbox, UserPlus,
   Settings, PanelLeftClose, PanelLeftOpen, Sparkles, HelpCircle, MessagesSquare,
+  FolderKanban,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -136,6 +137,8 @@ export function NavSidebar() {
         onClick={() => setAppView('clients')} kbd="C" />}
       {mod('finanzen') && canFinances && <NavItem icon={CreditCard} label="Finanzen" active={appView === 'invoices'}
         onClick={() => setAppView('invoices')} kbd="F" badge={overdueCount || undefined} />}
+      <NavItem icon={FolderKanban} label="Projekte" active={appView === 'projects' || appView === 'project_detail'}
+        onClick={() => setAppView('projects')} />
       {/* ── AKQUISE — Leads → Deals, der Weg zum Neukunden ─────────────── */}
       {!collapsed && <SectionLabel>Akquise</SectionLabel>}
       <NavItem icon={Inbox}      label="Follow-Ups" active={appView === 'leverage_inbox'}
