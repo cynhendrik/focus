@@ -41,13 +41,15 @@ Referenz-Mockup (Cultera-OS-Design-Tokens, nicht Teil des Produktivcodes): siehe
 id            TEXT PRIMARY KEY
 workspace_id  TEXT NOT NULL
 account_id    TEXT NOT NULL REFERENCES accounts(id)  -- Pflicht: ein Projekt gehört zu genau einem Kunden
-title         TEXT NOT NULL
-description   TEXT
-status        TEXT NOT NULL DEFAULT 'active'  -- 'active' | 'completed'
-created_at    TEXT NOT NULL
-updated_at    TEXT NOT NULL
-completed_at  TEXT
+title             TEXT NOT NULL
+description       TEXT
+status            TEXT NOT NULL DEFAULT 'active'  -- 'active' | 'completed'
+current_phase_id  TEXT REFERENCES project_phases(id)  -- Zeiger auf die aktuelle Phase; NULL erst wenn noch keine Phase existiert
+created_at        TEXT NOT NULL
+updated_at        TEXT NOT NULL
+completed_at      TEXT
 ```
+`current_phase_id` ist der einzige Ort, an dem "wo steht das Projekt" festgehalten wird — Phasen mit kleinerem `order_index` als die aktuelle gelten als erledigt, mit größerem als geplant. Analog zum bestehenden `accounts.primary_deal_id`-Zeiger-Muster. Beim Anlegen des Projekts wird `current_phase_id` auf die erste Phase (kleinster `order_index`) gesetzt, sobald mindestens eine Phase existiert.
 
 **Neue Tabelle `project_phases`:**
 ```
@@ -67,7 +69,7 @@ Freie Liste pro Projekt (Nutzer benennt/ordnet eigene Phasen beim Anlegen), anal
 
 ## Lifecycle
 
-- „Phase abschließen" (im Detail-Header) rückt das Projekt zur nächsten Phase vor (kein separates „Projekt abschließen" auf der letzten Phase nötig — Abschließen der letzten Phase setzt `status='completed'` + `completed_at`).
+- „Phase abschließen" (im Detail-Header) setzt `current_phase_id` auf die Phase mit dem nächsthöheren `order_index`. Gibt es keine weitere Phase (aktuelle Phase hat den höchsten `order_index`), setzt derselbe Klick stattdessen `status='completed'` + `completed_at` (kein separater „Projekt abschließen"-Button nötig).
 - Abgeschlossene Projekte werden schreibgeschützt (keine neuen Aufgaben/Phasen-Änderungen), bleiben aber sichtbar/durchsuchbar (verschwinden aus den drei aktiven Buckets der Übersicht, ggf. eigener „Abgeschlossen"-Filter — Detail dazu in der Planungsphase).
 - Kein Kaskadieren auf verknüpfte Aufgaben — offene Todos bleiben offen, das Abschließen eines Projekts ändert nichts automatisch an ihnen.
 
