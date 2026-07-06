@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useProjectsStore } from '@/store/projects.store'
 import { useCustomersStore } from '@/store/customers.store'
 import { useUiStore } from '@/store/ui.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { Project } from '@/types/project.types'
 import { FolderKanban } from 'lucide-react'
+import { NewProjectModal } from '@/components/projects/NewProjectModal'
 
 function ProjectRow({ project, customerName, onOpen }: {
   project: Project
@@ -84,6 +85,8 @@ export function ProjectsOverviewRoute() {
   const setAppView = useUiStore(s => s.setAppView)
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
 
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+
   useEffect(() => { if (workspaceId) loadProjects(workspaceId) }, [workspaceId, loadProjects])
 
   const customerNameFor = (accountId: string) =>
@@ -105,13 +108,18 @@ export function ProjectsOverviewRoute() {
 
   return (
     <div className="main-inner" style={{ padding: '24px 28px 40px', overflowY: 'auto', height: '100%' }}>
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 650, margin: '0 0 5px', letterSpacing: '-0.01em' }}>
-          Alle Projekte
-        </h1>
-        <p style={{ margin: 0, color: 'var(--fg-muted)', fontSize: 14 }}>
-          {projects.length} Projekt{projects.length === 1 ? '' : 'e'} insgesamt — {active.length} aktiv, {paused.length} pausiert.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 650, margin: '0 0 5px', letterSpacing: '-0.01em' }}>
+            Alle Projekte
+          </h1>
+          <p style={{ margin: 0, color: 'var(--fg-muted)', fontSize: 14 }}>
+            {projects.length} Projekt{projects.length === 1 ? '' : 'e'} insgesamt — {active.length} aktiv, {paused.length} pausiert.
+          </p>
+        </div>
+        <button className="btn-primary" onClick={() => setShowNewProjectModal(true)}>
+          + Neues Projekt
+        </button>
       </div>
 
       {projects.length === 0 ? (
@@ -121,6 +129,9 @@ export function ProjectsOverviewRoute() {
         }}>
           <FolderKanban size={32} />
           <div>Noch keine Projekte angelegt.</div>
+          <button className="btn-primary" style={{ marginTop: 8 }} onClick={() => setShowNewProjectModal(true)}>
+            + Neues Projekt
+          </button>
         </div>
       ) : (
         <>
@@ -129,6 +140,7 @@ export function ProjectsOverviewRoute() {
           <Bucket title="Abgeschlossen" projects={completed} customerNameFor={customerNameFor} onOpen={openProject} />
         </>
       )}
+      {showNewProjectModal && <NewProjectModal onClose={() => setShowNewProjectModal(false)} />}
     </div>
   )
 }
