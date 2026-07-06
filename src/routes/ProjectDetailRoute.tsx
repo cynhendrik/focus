@@ -10,6 +10,12 @@ import { activityToTodo } from '@/data/todos.mapper'
 import type { Activity } from '@/types/pipeline.types'
 import type { Todo } from '@/types/todo.types'
 import type { MemberProfile } from '@/types/profile.types'
+import { useMentionPopoverState, extractMentionQuery } from '@/components/tasks/MentionPopover'
+import { buildTaskMentionCandidates, markerForTask } from '@/components/tasks/task-mentions'
+import type { TaskMentionCandidate } from '@/components/tasks/task-mentions'
+import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/TaskMentionPopover'
+import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
+import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
 
 function Stepper({ phases, currentPhaseId }: {
   phases: { id: string; name: string; orderIndex: number }[]
@@ -72,14 +78,46 @@ function NewTaskForm({ members, onCreate }: {
   members: MemberProfile[]
   onCreate: (title: string, assigneeId: string | undefined) => void
 }) {
-  const [title, setTitle] = useState('')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [text, setText] = useState('')
+  const [resolvedMentions, setResolvedMentions] = useState<ResolvedInputMention[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { ctx, setCtx, activeIdx, setActiveIdx, close } = useMentionPopoverState()
+
+  const candidates = useMemo(() => buildTaskMentionCandidates(members, []), [members])
+  const filtered = useMemo(() => filterTaskCandidates(candidates, ctx.query), [candidates, ctx.query])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setText(value)
+    const cursor = e.target.selectionStart ?? value.length
+    const found = extractMentionQuery(value.slice(0, cursor))
+    if (found) {
+      setCtx({ open: true, query: found.query, startOffset: found.startOffset, anchor: getInputCaretAnchor(e.target) })
+    } else {
+      close()
+    }
+  }
+
+  const pick = (cand: TaskMentionCandidate) => {
+    if (!ctx.open || !inputRef.current) return
+    const marker = markerForTask(cand)
+    const cursor = inputRef.current.selectionStart ?? text.length
+    const { value, cursor: newCursor } = insertMentionMarker(text, ctx.startOffset, cursor, marker)
+    setText(value)
+    setResolvedMentions(prev => [
+      ...prev.filter(m => m.marker.toLowerCase() !== marker.toLowerCase()),
+      { marker, id: cand.id },
+    ])
+    close()
+    requestAnimationFrame(() => inputRef.current?.setSelectionRange(newCursor, newCursor))
+  }
 
   const submit = () => {
-    if (!title.trim()) return
-    onCreate(title.trim(), assigneeId || undefined)
-    setTitle('')
-    setAssigneeId('')
+    const { cleanTitle, assigneeId } = stripResolvedMentions(text, resolvedMentions)
+    if (!cleanTitle.trim()) return
+    onCreate(cleanTitle.trim(), assigneeId)
+    setText('')
+    setResolvedMentions([])
   }
 
   return (
@@ -88,24 +126,25 @@ function NewTaskForm({ members, onCreate }: {
       marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)',
     }}>
       <input
-        className="mock-input" value={title} onChange={e => setTitle(e.target.value)}
-        placeholder="Neue Aufgabe" style={{ fontSize: 13 }}
-        onKeyDown={e => { if (e.key === 'Enter') submit() }}
+        ref={inputRef} className="mock-input" value={text} onChange={handleChange}
+        placeholder="Neue Aufgabe, @Name zum Zuweisen" style={{ fontSize: 13 }}
+        onKeyDown={e => {
+          if (ctx.open) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(Math.min(activeIdx + 1, filtered.length - 1)); return }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(Math.max(activeIdx - 1, 0)); return }
+            if (e.key === 'Enter') { e.preventDefault(); if (filtered[activeIdx]) pick(filtered[activeIdx]); return }
+            if (e.key === 'Escape') { close(); return }
+          }
+          if (e.key === 'Enter') submit()
+        }}
       />
-      {members.length > 0 && (
-        <select
-          className="mock-input" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
-          style={{ fontSize: 12 }}
-        >
-          <option value="">— Niemand —</option>
-          {members.map(m => (
-            <option key={m.id} value={m.id}>{m.displayName}</option>
-          ))}
-        </select>
-      )}
+      <TaskMentionPopover
+        open={ctx.open} query={ctx.query} candidates={candidates} anchor={ctx.anchor}
+        activeIdx={activeIdx} setActiveIdx={setActiveIdx} onSelect={pick} onClose={close}
+      />
       <button
         className="btn-primary" style={{ fontSize: 12, padding: '6px 12px', alignSelf: 'flex-start' }}
-        disabled={!title.trim()}
+        disabled={!text.trim()}
         onClick={submit}
       >
         + Aufgabe
