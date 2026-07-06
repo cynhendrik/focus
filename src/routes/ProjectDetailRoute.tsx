@@ -163,7 +163,7 @@ export function ProjectDetailRoute() {
     [activities],
   )
   const tasksInCurrentPhase = useMemo(
-    () => tasks.filter(t => t.projectPhaseId === project?.currentPhaseId),
+    () => tasks.filter(t => (t.projectPhaseId ?? null) === (project?.currentPhaseId ?? null)),
     [tasks, project?.currentPhaseId],
   )
   const currentPhase = phases.find(p => p.id === project?.currentPhaseId)
