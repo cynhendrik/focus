@@ -43,7 +43,7 @@ workspace_id  TEXT NOT NULL
 account_id    TEXT NOT NULL REFERENCES accounts(id)  -- Pflicht: ein Projekt gehört zu genau einem Kunden
 title             TEXT NOT NULL
 description       TEXT
-status            TEXT NOT NULL DEFAULT 'active'  -- 'active' | 'completed'
+status            TEXT NOT NULL DEFAULT 'active'  -- 'active' | 'paused' | 'completed'
 current_phase_id  TEXT REFERENCES project_phases(id)  -- Zeiger auf die aktuelle Phase; NULL erst wenn noch keine Phase existiert
 created_at        TEXT NOT NULL
 updated_at        TEXT NOT NULL
@@ -74,6 +74,7 @@ Freie Liste pro Projekt (Nutzer benennt/ordnet eigene Phasen beim Anlegen), anal
 ## Lifecycle
 
 - „Phase abschließen" (im Detail-Header) setzt `current_phase_id` auf die Phase mit dem nächsthöheren `order_index`. Gibt es keine weitere Phase (aktuelle Phase hat den höchsten `order_index`), setzt derselbe Klick stattdessen `status='completed'` + `completed_at` (kein separater „Projekt abschließen"-Button nötig).
+- **„Pausieren"/"Fortsetzen"** — zusätzlicher, manueller Umschalter im Detail-Header (`status` wechselt `active` ↔ `paused`), unabhängig vom Phasen-Fortschritt. Ergänzt, weil das freigegebene Mockup einen „Pausiert"-Bucket + Status-Chip zeigt (`Frau Dr. Klein — Praxis-Rebranding`, „wartet auf Kunde") — ohne diesen dritten Status wäre die bereits gebilligte Übersichts-Gruppierung nicht baubar.
 - Abgeschlossene Projekte werden schreibgeschützt (keine neuen Aufgaben/Phasen-Änderungen), bleiben aber sichtbar/durchsuchbar (verschwinden aus den drei aktiven Buckets der Übersicht, ggf. eigener „Abgeschlossen"-Filter — Detail dazu in der Planungsphase).
 - Kein Kaskadieren auf verknüpfte Aufgaben — offene Todos bleiben offen, das Abschließen eines Projekts ändert nichts automatisch an ihnen.
 
