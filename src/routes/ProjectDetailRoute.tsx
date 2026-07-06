@@ -21,10 +21,25 @@ import type { ResolvedInputMention } from '@/components/tasks/plain-input-mentio
 function Stepper({ phases, currentPhaseId, onDeletePhase }: {
   phases: { id: string; name: string; orderIndex: number }[]
   currentPhaseId: string | null
-  onDeletePhase: (phaseId: string) => void
+  onDeletePhase: (phaseId: string) => Promise<void>
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const currentIndex = phases.findIndex(p => p.id === currentPhaseId)
+
+  const handleConfirmDelete = async (phaseId: string) => {
+    setDeletingId(phaseId)
+    try {
+      await onDeletePhase(phaseId)
+      setConfirmId(null)
+    } catch {
+      // Fehler wird bereits vom Elternteil (phaseError) angezeigt -- hier nur
+      // verhindern, dass confirmId geloescht wird, und keine unhandled rejection.
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22,
@@ -54,13 +69,15 @@ function Stepper({ phases, currentPhaseId, onDeletePhase }: {
                 confirmId === phase.id ? (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button
-                      onClick={() => { onDeletePhase(phase.id); setConfirmId(null) }}
+                      onClick={() => handleConfirmDelete(phase.id)}
+                      disabled={deletingId === phase.id}
                       style={{ fontSize: 10.5, color: 'oklch(72% 0.18 25)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 650 }}
                     >
-                      Wirklich löschen
+                      {deletingId === phase.id ? 'Löscht…' : 'Wirklich löschen'}
                     </button>
                     <button
                       onClick={() => setConfirmId(null)}
+                      disabled={deletingId === phase.id}
                       style={{ fontSize: 10.5, color: 'var(--fg-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                     >
                       Abbrechen
@@ -204,6 +221,7 @@ export function ProjectDetailRoute() {
 
   const [activities, setActivities] = useState<Activity[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
+  const [phaseError, setPhaseError] = useState<string | null>(null)
   const activeProjectIdRef = useRef<string | null>(null)
 
   const refreshActivities = (projectId: string) =>
@@ -258,14 +276,13 @@ export function ProjectDetailRoute() {
     await refreshActivities(project.id)
   }
 
-  const [phaseError, setPhaseError] = useState<string | null>(null)
-
   const handleDeletePhase = async (phaseId: string) => {
     setPhaseError(null)
     try {
       await deletePhase(phaseId, project.id)
     } catch (err) {
       setPhaseError(err instanceof Error ? err.message : String(err))
+      throw err
     }
   }
 
