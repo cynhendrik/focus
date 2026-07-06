@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { useActivitiesStore } from '@/store/activities.store'
+import { useAuthStore } from '@/store/auth.store'
 import { useProjectsStore } from '@/store/projects.store'
 import { useUiStore } from '@/store/ui.store'
 import { useCustomersStore } from '@/store/customers.store'
@@ -200,6 +202,35 @@ function NewTaskForm({ members, onCreate }: {
   )
 }
 
+function NewNoteForm({ onCreate }: { onCreate: (body: string) => void }) {
+  const [body, setBody] = useState('')
+
+  const submit = () => {
+    if (!body.trim()) return
+    onCreate(body.trim())
+    setBody('')
+  }
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 6,
+      marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)',
+    }}>
+      <textarea
+        className="mock-input" value={body} onChange={e => setBody(e.target.value)}
+        placeholder="Neue Notiz" rows={2} style={{ fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+      />
+      <button
+        className="btn-primary" style={{ fontSize: 12, padding: '6px 12px', alignSelf: 'flex-start' }}
+        disabled={!body.trim()}
+        onClick={submit}
+      >
+        + Notiz
+      </button>
+    </div>
+  )
+}
+
 export function ProjectDetailRoute() {
   const selectedProjectId = useUiStore(s => s.selectedProjectId)
   const setAppView = useUiStore(s => s.setAppView)
@@ -210,6 +241,8 @@ export function ProjectDetailRoute() {
   const setStatus = useProjectsStore(s => s.setStatus)
   const createPhase = useProjectsStore(s => s.createPhase)
   const deletePhase = useProjectsStore(s => s.deletePhase)
+  const createActivity = useActivitiesStore(s => s.create)
+  const userEmail = useAuthStore(s => s.user?.email ?? 'user')
   const customers = useCustomersStore(s => s.customers)
   const upsertTodo = useTodosStore(s => s.upsert)
   const setTodoAssignee = useTodosStore(s => s.setAssignee)
@@ -286,6 +319,14 @@ export function ProjectDetailRoute() {
     }
   }
 
+  const handleCreateNote = async (body: string) => {
+    await createActivity({
+      workspaceId, createdBy: userEmail, accountId: project.accountId,
+      customerId: project.accountId, projectId: project.id, type: 'note', body,
+    })
+    await refreshActivities(project.id)
+  }
+
   const isLastPhase = phases.length > 0 && phases[phases.length - 1]?.id === project.currentPhaseId
   const canPause = project.status !== 'completed'
 
@@ -358,6 +399,7 @@ export function ProjectDetailRoute() {
               </div>
             ))
           )}
+          <NewNoteForm onCreate={handleCreateNote} />
         </div>
 
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
