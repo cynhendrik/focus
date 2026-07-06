@@ -113,6 +113,7 @@ function NewTaskForm({ members, onCreate }: {
   }
 
   const submit = () => {
+    close()
     const { cleanTitle, assigneeId } = stripResolvedMentions(text, resolvedMentions)
     if (!cleanTitle.trim()) return
     onCreate(cleanTitle.trim(), assigneeId)
