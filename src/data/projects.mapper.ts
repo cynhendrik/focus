@@ -17,9 +17,9 @@ export function projectRowToProject(r: any): Project {
 
 export function projectToRow(
   p: { workspaceId: string; accountId: string; title: string; description?: string },
-  ctx: { id: string; now: string },
+  ctx: { id: string; now: string; isNew: boolean },
 ): Record<string, unknown> {
-  return {
+  const row: Record<string, unknown> = {
     id: ctx.id,
     workspace_id: p.workspaceId,
     account_id: p.accountId,
@@ -27,6 +27,11 @@ export function projectToRow(
     description: p.description ?? null,
     updated_at: ctx.now,
   }
+  if (ctx.isNew) {
+    row.created_at = ctx.now
+    row.status = 'active'
+  }
+  return row
 }
 
 export function projectPhaseRowToPhase(r: any): ProjectPhase {

@@ -35,7 +35,7 @@ export const ProjectsGateway = {
     const id = payload.id ?? crypto.randomUUID()
     const now = new Date().toISOString()
     const { data, error } = await supabase.from('projects')
-      .upsert(projectToRow(payload, { id, now }), { onConflict: 'id' }).select('*').single()
+      .upsert(projectToRow(payload, { id, now, isNew: !payload.id }), { onConflict: 'id' }).select('*').single()
     if (error) fail(error)
     return projectRowToProject(data)
   },
