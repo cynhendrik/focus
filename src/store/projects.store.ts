@@ -40,6 +40,7 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
   },
 
   loadPhases: async (projectId) => {
+    set({ error: null })
     try {
       const phases = await ProjectsGateway.getPhases(projectId)
       set(s => ({ phasesByProject: { ...s.phasesByProject, [projectId]: phases } }))
@@ -118,8 +119,7 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
       }))
       // Erste Phase eines Projekts setzt server-seitig current_phase_id -- lokalen
       // Projekt-Zustand nachziehen, damit die UI ohne Reload den Stepper korrekt zeigt.
-      const isFirst = (get().phasesByProject[payload.projectId]?.length ?? 0) === 1
-      if (isFirst) {
+      if (phase.orderIndex === 0) {
         set(s => ({
           projects: s.projects.map(p => p.id === payload.projectId ? { ...p, currentPhaseId: phase.id } : p),
         }))
