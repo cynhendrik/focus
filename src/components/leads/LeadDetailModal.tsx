@@ -29,6 +29,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   const showToast       = useToastStore(s => s.show)
   const dialogRef       = useDialogFocus(true)
   const mailAccounts    = useMailStore(s => s.accounts)
+  const canMail         = !!lead.email && mailAccounts.length > 0
   const [showConvertChoice, setShowConvertChoice] = useState(false)
   const [showCompose, setShowCompose]     = useState(false)
   const [deleting, setDeleting]     = useState(false)
@@ -155,10 +156,15 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
   }
 
   useEffect(() => {
-    const hide = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    // Child overlays (Mail schreiben / Zu Kunde machen) own their Escape
+    // handling and close only themselves — don't also close this modal
+    // underneath them (would discard an in-progress mail draft).
+    const hide = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !showCompose && !showConvertChoice) onClose()
+    }
     document.addEventListener('keydown', hide)
     return () => document.removeEventListener('keydown', hide)
-  }, [onClose])
+  }, [onClose, showCompose, showConvertChoice])
 
   return (
     <div
@@ -196,7 +202,7 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 onClick={() => setShowCompose(true)}
-                disabled={!lead.email || mailAccounts.length === 0}
+                disabled={!canMail}
                 title={!lead.email
                   ? 'Ohne E-Mail-Adresse nicht möglich'
                   : mailAccounts.length === 0
@@ -205,10 +211,10 @@ export function LeadDetailModal({ lead, workspaceId, onClose }: Props) {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', borderRadius: 8,
-                  cursor: (!lead.email || mailAccounts.length === 0) ? 'default' : 'pointer',
+                  cursor: canMail ? 'pointer' : 'default',
                   border: '1px solid var(--accent)', background: 'transparent',
                   color: 'var(--accent-text)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  opacity: (!lead.email || mailAccounts.length === 0) ? 0.55 : 1,
+                  opacity: canMail ? 1 : 0.55,
                 }}
               >
                 <Mail size={14} /> Mail schreiben
