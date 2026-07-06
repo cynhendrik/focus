@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { useProjectsStore } from '@/store/projects.store'
 import { useUiStore } from '@/store/ui.store'
 import { useCustomersStore } from '@/store/customers.store'
@@ -17,10 +18,12 @@ import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/Tas
 import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
 import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
 
-function Stepper({ phases, currentPhaseId }: {
+function Stepper({ phases, currentPhaseId, onDeletePhase }: {
   phases: { id: string; name: string; orderIndex: number }[]
   currentPhaseId: string | null
+  onDeletePhase: (phaseId: string) => void
 }) {
+  const [confirmId, setConfirmId] = useState<string | null>(null)
   const currentIndex = phases.findIndex(p => p.id === currentPhaseId)
   return (
     <div style={{
@@ -30,8 +33,9 @@ function Stepper({ phases, currentPhaseId }: {
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${phases.length || 1}, 1fr)`, position: 'relative' }}>
         {phases.map((phase, i) => {
           const state = currentIndex < 0 ? 'upcoming' : i < currentIndex ? 'done' : i === currentIndex ? 'now' : 'upcoming'
+          const isCurrent = phase.id === currentPhaseId
           return (
-            <div key={phase.id} style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>
+            <div key={phase.id} style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
               <div style={{
                 width: state === 'now' ? 52 : 44, height: state === 'now' ? 52 : 44, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -46,6 +50,31 @@ function Stepper({ phases, currentPhaseId }: {
               <div style={{ fontSize: 14, fontWeight: 650, color: state === 'now' ? 'var(--accent-text)' : 'var(--fg)' }}>
                 {phase.name}
               </div>
+              {!isCurrent && (
+                confirmId === phase.id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      onClick={() => { onDeletePhase(phase.id); setConfirmId(null) }}
+                      style={{ fontSize: 10.5, color: 'oklch(72% 0.18 25)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 650 }}
+                    >
+                      Wirklich löschen
+                    </button>
+                    <button
+                      onClick={() => setConfirmId(null)}
+                      style={{ fontSize: 10.5, color: 'var(--fg-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmId(phase.id)} title="Phase löschen"
+                    style={{ display: 'flex', alignItems: 'center', color: 'var(--fg-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                )
+              )}
             </div>
           )
         })}
@@ -163,6 +192,7 @@ export function ProjectDetailRoute() {
   const advancePhase = useProjectsStore(s => s.advancePhase)
   const setStatus = useProjectsStore(s => s.setStatus)
   const createPhase = useProjectsStore(s => s.createPhase)
+  const deletePhase = useProjectsStore(s => s.deletePhase)
   const customers = useCustomersStore(s => s.customers)
   const upsertTodo = useTodosStore(s => s.upsert)
   const setTodoAssignee = useTodosStore(s => s.setAssignee)
@@ -228,6 +258,17 @@ export function ProjectDetailRoute() {
     await refreshActivities(project.id)
   }
 
+  const [phaseError, setPhaseError] = useState<string | null>(null)
+
+  const handleDeletePhase = async (phaseId: string) => {
+    setPhaseError(null)
+    try {
+      await deletePhase(phaseId, project.id)
+    } catch (err) {
+      setPhaseError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const isLastPhase = phases.length > 0 && phases[phases.length - 1]?.id === project.currentPhaseId
   const canPause = project.status !== 'completed'
 
@@ -266,11 +307,17 @@ export function ProjectDetailRoute() {
         </div>
       </div>
 
+      {phaseError && (
+        <div style={{ fontSize: 12, color: 'oklch(72% 0.18 25)', marginBottom: 12 }}>
+          Phase konnte nicht gelöscht werden: {phaseError}
+        </div>
+      )}
+
       {phases.length === 0 ? (
         <NewPhaseForm onCreate={name => createPhase({ projectId: project.id, name })} />
       ) : (
         <>
-          <Stepper phases={phases} currentPhaseId={project.currentPhaseId} />
+          <Stepper phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase} />
           <NewPhaseForm onCreate={name => createPhase({ projectId: project.id, name })} />
         </>
       )}
