@@ -19,11 +19,12 @@ function pct(offset: number, totalWeeks: number): string {
   return `${(offset / totalWeeks) * 100}%`
 }
 
-function ProjectLane({ project, phases, customerName, weeks, onOpen }: {
+function ProjectLane({ project, phases, customerName, weeks, today, onOpen }: {
   project: Project
   phases: ProjectPhase[]
   customerName: string
   weeks: TimelineWeek[]
+  today: Date
   onOpen: () => void
 }) {
   const totalWeeks = weeks.length
@@ -53,7 +54,7 @@ function ProjectLane({ project, phases, customerName, weeks, onOpen }: {
           </span>
         </span>
         <span style={{ display: 'flex', gap: 3, flex: 'none' }} title="Zeit · Budget · Stimmung">
-          {([projectHealthZeit(phases, new Date()), projectHealthBudget(), projectHealthStimmung()] as HealthLevel[]).map((h, i) => (
+          {([projectHealthZeit(phases, today), projectHealthBudget(), projectHealthStimmung()] as HealthLevel[]).map((h, i) => (
             <i key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: HEALTH_COLOR[h], display: 'block' }} />
           ))}
         </span>
@@ -67,7 +68,12 @@ function ProjectLane({ project, phases, customerName, weeks, onOpen }: {
         {phases.map(phase => {
           const from = dateToTimelineOffset(phase.startDate, weeks)
           const to = dateToTimelineOffset(phase.endDate, weeks)
-          if (from == null && to == null) return null
+          const startDate = new Date(`${phase.startDate}T00:00:00`)
+          const endDate = new Date(`${phase.endDate}T00:00:00`)
+          const windowStart = weeks[0]?.start
+          const windowEnd = weeks.length ? new Date(weeks[weeks.length - 1].start.getTime() + 7 * 86400000) : null
+          const fullyOutside = !!(windowStart && windowEnd && (endDate < windowStart || startDate > windowEnd))
+          if (fullyOutside) return null
           const left = Math.max(0, from ?? 0)
           const right = Math.min(totalWeeks, to ?? totalWeeks)
           if (right <= left) return null
@@ -151,6 +157,7 @@ export function ProjectsTimeline({ projects, phasesByProject, customerNameFor, w
               phases={phasesByProject[project.id] ?? []}
               customerName={customerNameFor(project.accountId)}
               weeks={weeks}
+              today={today}
               onOpen={() => onOpen(project.id)}
             />
           ))}
