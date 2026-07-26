@@ -1539,11 +1539,69 @@ git commit -m "feat(lib): Zeit-Ampel und Gate-Signale fuer Projekte"
 
 **Files:**
 - Create: `src/components/projects/ProjectsArchiveList.tsx`
+- Test: `src/components/projects/ProjectsArchiveList.test.tsx`
 - Modify: `src/routes/ProjectsOverviewRoute.tsx` (in Task 15 final verdrahtet — dieser Task extrahiert nur die Komponente)
 
 **Interfaces:**
 - Consumes: `Project` (Task 6).
 - Produces: `ProjectsArchiveList({ projects, customerNameFor, onOpen }): JSX.Element` — rendert die bestehenden "Pausiert"/"Abgeschlossen"-Buckets (unverändertes Aussehen, nur ausgelagert). Task 15 rendert diese Komponente, wenn der Archiv-Umschalter aktiv ist.
+
+- [ ] **Step 0: Fehlschlagenden Test zuerst schreiben**
+
+`@testing-library/react` und `@testing-library/jest-dom` sind bereits Projekt-Abhängigkeiten (siehe `src/components/onboarding/WelcomeIntro.test.tsx` als Referenzmuster). Neue Datei `src/components/projects/ProjectsArchiveList.test.tsx`:
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { ProjectsArchiveList } from './ProjectsArchiveList'
+import type { Project } from '@/types/project.types'
+
+afterEach(cleanup)
+
+function project(overrides: Partial<Project> = {}): Project {
+  return {
+    id: 'p1', workspaceId: 'ws-1', accountId: 'a1', title: 'Test-Projekt', description: null,
+    status: 'paused', currentPhaseId: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', completedAt: null,
+    retainerMonthly: 0, retainerHours: 0, retainerMonths: null,
+    ...overrides,
+  }
+}
+
+describe('ProjectsArchiveList', () => {
+  it('zeigt eine Leer-Meldung, wenn kein Projekt pausiert oder abgeschlossen ist', () => {
+    render(<ProjectsArchiveList projects={[]} customerNameFor={() => 'Kunde'} onOpen={() => {}} />)
+    expect(screen.getByText(/Kein pausiertes oder abgeschlossenes Projekt/)).toBeTruthy()
+  })
+
+  it('gruppiert Projekte nach pausiert und abgeschlossen', () => {
+    render(
+      <ProjectsArchiveList
+        projects={[project({ id: 'p1', title: 'Pausiert-Projekt', status: 'paused' }), project({ id: 'p2', title: 'Fertig-Projekt', status: 'completed' })]}
+        customerNameFor={() => 'Kunde'} onOpen={() => {}}
+      />,
+    )
+    expect(screen.getByText('Pausiert-Projekt')).toBeTruthy()
+    expect(screen.getByText('Fertig-Projekt')).toBeTruthy()
+    expect(screen.getByText('Pausiert')).toBeTruthy()
+    expect(screen.getByText('Abgeschlossen')).toBeTruthy()
+  })
+
+  it('ruft onOpen mit der Projekt-Id auf, wenn eine Zeile geklickt wird', () => {
+    const opened: string[] = []
+    render(
+      <ProjectsArchiveList
+        projects={[project({ id: 'p1', title: 'Pausiert-Projekt' })]}
+        customerNameFor={() => 'Kunde'} onOpen={id => opened.push(id)}
+      />,
+    )
+    fireEvent.click(screen.getByText('Pausiert-Projekt'))
+    expect(opened).toEqual(['p1'])
+  })
+})
+```
+
+Run: `npx vitest run src/components/projects/ProjectsArchiveList.test.tsx`
+Expected: FAIL — Modul `./ProjectsArchiveList` existiert nicht.
 
 - [ ] **Step 1: Komponente aus dem bestehenden Code extrahieren**
 
@@ -1642,16 +1700,21 @@ export function ProjectsArchiveList({ projects, customerNameFor, onOpen }: {
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [ ] **Step 2: Test ausführen, Erfolg verifizieren**
+
+Run: `npx vitest run src/components/projects/ProjectsArchiveList.test.tsx`
+Expected: PASS (3 Tests).
+
+- [ ] **Step 3: Typecheck**
 
 Run: `npm run typecheck 2>&1 | grep ProjectsArchiveList`
 Expected: keine Fehler (Datei wird noch nirgends importiert — folgt in Task 15).
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/projects/ProjectsArchiveList.tsx
-git commit -m "refactor(projects): Bucket-Ansicht als ProjectsArchiveList extrahiert"
+git add src/components/projects/ProjectsArchiveList.tsx src/components/projects/ProjectsArchiveList.test.tsx
+git commit -m "refactor(projects): Bucket-Ansicht als ProjectsArchiveList extrahiert, mit Tests"
 ```
 
 ---
@@ -1660,10 +1723,84 @@ git commit -m "refactor(projects): Bucket-Ansicht als ProjectsArchiveList extrah
 
 **Files:**
 - Create: `src/components/projects/ProjectsTimeline.tsx`
+- Test: `src/components/projects/ProjectsTimeline.test.tsx`
 
 **Interfaces:**
-- Consumes: `Project`, `ProjectPhase` (Task 6); `TimelineWeek`, `dateToTimelineOffset` (Task 11); `HealthLevel`, `projectHealthZeit`, `projectHealthBudget`, `projectHealthStimmung` (Task 12).
+- Consumes: `Project`, `ProjectPhase` (Task 6); `TimelineWeek`, `dateToTimelineOffset`, `rollingWeeks` (Task 11); `HealthLevel`, `projectHealthZeit`, `projectHealthBudget`, `projectHealthStimmung` (Task 12).
 - Produces: `ProjectsTimeline({ projects, phasesByProject, customerNameFor, weeks, today, onOpen }): JSX.Element`. Task 15 rendert diese Komponente mit den gefilterten aktiven Projekten.
+
+- [ ] **Step 0: Fehlschlagenden Test zuerst schreiben**
+
+Neue Datei `src/components/projects/ProjectsTimeline.test.tsx`:
+
+```typescript
+import { describe, it, expect, afterEach } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { ProjectsTimeline } from './ProjectsTimeline'
+import { rollingWeeks } from '@/lib/projects/timeline-weeks'
+import type { Project, ProjectPhase } from '@/types/project.types'
+
+afterEach(cleanup)
+
+const today = new Date(2026, 4, 18) // Mo, 18.05.2026 -> KW 21
+const weeks = rollingWeeks(today, 4, 10)
+
+function project(overrides: Partial<Project> = {}): Project {
+  return {
+    id: 'p1', workspaceId: 'ws-1', accountId: 'a1', title: 'Brand Refresh', description: null,
+    status: 'active', currentPhaseId: null, createdAt: '2026-01-01', updatedAt: '2026-01-01', completedAt: null,
+    retainerMonthly: 8500, retainerHours: 60, retainerMonths: 12,
+    ...overrides,
+  }
+}
+
+function phase(overrides: Partial<ProjectPhase> = {}): ProjectPhase {
+  return {
+    id: 'ph1', projectId: 'p1', name: 'Konzeptfreigabe', orderIndex: 0, createdAt: '2026-01-01',
+    startDate: '2026-04-27', endDate: '2026-05-11', gateName: 'Konzeptfreigabe',
+    gateState: 'pending', gateDate: '2026-05-11', gateApprovedBy: null, progressPercent: 78,
+    ...overrides,
+  }
+}
+
+describe('ProjectsTimeline', () => {
+  it('zeigt eine Leer-Meldung, wenn kein Projekt im Filter ist', () => {
+    render(<ProjectsTimeline projects={[]} phasesByProject={{}} customerNameFor={() => 'Kunde'} weeks={weeks} today={today} onOpen={() => {}} />)
+    expect(screen.getByText('Kein Projekt in diesem Filter.')).toBeTruthy()
+  })
+
+  it('rendert die KW-Nummer der ersten Woche im Kopf', () => {
+    render(<ProjectsTimeline projects={[]} phasesByProject={{}} customerNameFor={() => 'Kunde'} weeks={weeks} today={today} onOpen={() => {}} />)
+    expect(screen.getByText(String(weeks[0].kw))).toBeTruthy()
+  })
+
+  it('rendert Projekttitel und Phasenbalken-Titel mit Fortschritt', () => {
+    render(
+      <ProjectsTimeline
+        projects={[project()]} phasesByProject={{ p1: [phase()] }}
+        customerNameFor={() => 'TechCorp'} weeks={weeks} today={today} onOpen={() => {}}
+      />,
+    )
+    expect(screen.getByText('Brand Refresh')).toBeTruthy()
+    expect(screen.getByTitle('Konzeptfreigabe · 78 %')).toBeTruthy()
+  })
+
+  it('ruft onOpen mit der Projekt-Id auf, wenn eine Zeile geklickt wird', () => {
+    const opened: string[] = []
+    render(
+      <ProjectsTimeline
+        projects={[project()]} phasesByProject={{ p1: [phase()] }}
+        customerNameFor={() => 'TechCorp'} weeks={weeks} today={today} onOpen={id => opened.push(id)}
+      />,
+    )
+    fireEvent.click(screen.getByText('Brand Refresh'))
+    expect(opened).toEqual(['p1'])
+  })
+})
+```
+
+Run: `npx vitest run src/components/projects/ProjectsTimeline.test.tsx`
+Expected: FAIL — Modul `./ProjectsTimeline` existiert nicht.
 
 - [ ] **Step 1: Komponente schreiben**
 
@@ -1835,16 +1972,21 @@ export function ProjectsTimeline({ projects, phasesByProject, customerNameFor, w
 }
 ```
 
-- [ ] **Step 2: Typecheck**
+- [ ] **Step 2: Test ausführen, Erfolg verifizieren**
+
+Run: `npx vitest run src/components/projects/ProjectsTimeline.test.tsx`
+Expected: PASS (4 Tests).
+
+- [ ] **Step 3: Typecheck**
 
 Run: `npm run typecheck 2>&1 | grep ProjectsTimeline`
 Expected: keine Fehler (noch nicht importiert — folgt in Task 15).
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/components/projects/ProjectsTimeline.tsx
-git commit -m "feat(projects): ProjectsTimeline -- Wochen-Grid mit Phasen-Balken und Gates"
+git add src/components/projects/ProjectsTimeline.tsx src/components/projects/ProjectsTimeline.test.tsx
+git commit -m "feat(projects): ProjectsTimeline -- Wochen-Grid mit Phasen-Balken und Gates, mit Tests"
 ```
 
 ---
@@ -2318,9 +2460,9 @@ git commit -m "feat(projects): Phase-Anlage mit Zeitraum/Gate, Fortschritts-Regl
 - "+Phase"-Flow mit Pflicht-Datum/Gate-Name → Task 17. ✓
 - Fortschritts-Eingabe an aktiver Phase → Task 17. ✓
 - Design-Tokens (Live-Aurora/Sunset, nicht Kobalt/Navy) → alle UI-Tasks nutzen ausschließlich bestehende `var(--...)`-Tokens, keine neuen Farbwerte. ✓
-- Testing-Abschnitt der Spec (Rust-Unit-Tests, Frontend-Grenzfälle, Komponenten-Test) → Rust: Task 1/3/4. Frontend-Grenzfälle: Task 11/12. Komponenten-Test der Timeline: bewusst ausgelassen (siehe Anmerkung unten), stattdessen manuelle Prüfschritte in Task 15/17.
+- Testing-Abschnitt der Spec (Rust-Unit-Tests, Frontend-Grenzfälle, Komponenten-Test) → Rust: Task 1/3/4. Frontend-Grenzfälle: Task 11/12. Komponenten-Test der Timeline: Task 14 (`ProjectsTimeline.test.tsx`); Komponenten-Test des Archivs: Task 13 (`ProjectsArchiveList.test.tsx`). Beide zusätzlich mit manuellen Prüfschritten in Task 15/17 abgesichert.
 
-**Abweichung von der Spec, bewusst:** Die Spec nennt einen "Komponenten-Test: Timeline-Übersicht (Filter-Zustände, leere Liste, Positionierung)". Im Code-Audit vor der Planerstellung wurde festgestellt, dass für keine bestehende Route/Komponente in diesem Repo ein `.test.tsx`-Component-Test existiert (`Glob src/routes/*.test.tsx` → 0 Treffer) — Testabdeckung konzentriert sich durchgehend auf Stores/Mapper/reine Logik. Um dem etablierten Repo-Muster zu folgen, wurde die Filter-/Positionierungs-Logik vollständig in testbare reine Funktionen ausgelagert (`timeline-weeks.ts`, `signals.ts`, beide mit Tests), und die Komponenten selbst bekommen manuelle Verifikationsschritte statt React-Testing-Library-Tests. Falls das nicht gewünscht ist, bitte vor Ausführung Bescheid geben — dann käme ein zusätzlicher Task mit `@testing-library/react`-Setup dazu (aktuell keine Abhängigkeit im Repo).
+**Korrektur während der Plan-Erstellung:** Der erste Entwurf dieses Plans hatte die Timeline-Komponente nur mit manuellen Prüfschritten versehen, mit der Begründung, `@testing-library/react` sei keine Repo-Abhängigkeit. Beim Prüfen der Baseline im Worktree (`npm install` + `npx vitest run`) stellte sich heraus, dass `@testing-library/react`/`@testing-library/jest-dom` bereits Abhängigkeiten sind und an mehreren Stellen genutzt werden (z.B. `src/components/onboarding/WelcomeIntro.test.tsx`) — der ursprüngliche Scan (`Glob src/routes/*.test.tsx` → 0 Treffer) hatte nur Routes geprüft, nicht Components. Task 13 und Task 14 wurden daraufhin vor Ausführung um `.test.tsx`-Dateien nach demselben Muster ergänzt.
 
 **Platzhalter-Scan:** keine TBD/TODO, keine "add error handling"-Anweisungen ohne Code gefunden.
 
