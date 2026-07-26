@@ -20,3 +20,10 @@ pub fn cmd_delete_project_phase(db: State<'_, DbPool>, id: String, project_id: S
 pub fn cmd_reorder_project_phases(db: State<'_, DbPool>, project_id: String, ordered_ids: Vec<String>) -> Result<(), AppError> {
     db::project_phase::reorder(&db.conn(), &project_id, &ordered_ids)
 }
+
+#[tauri::command]
+pub fn cmd_update_project_phase_progress(
+    db: State<'_, DbPool>, id: String, project_id: String, progress_percent: i32,
+) -> Result<ProjectPhase, AppError> {
+    db::project_phase::update_progress(&db.conn(), &id, &project_id, progress_percent)
+}
