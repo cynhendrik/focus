@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 37;
+const CURRENT_VERSION: u32 = 38;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -872,6 +872,34 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             }
             Ok(())
         }
+        38 => {
+            // Etappe 1 des Projekt-Ausbaus: Retainer am Projekt, Zeitraum + Gate
+            // an der Phase. Additive Spalten mit Backfill fuer Bestandsdaten.
+            if !column_exists(conn, "projects", "retainer_monthly") {
+                conn.execute_batch(
+                    "ALTER TABLE projects ADD COLUMN retainer_monthly REAL NOT NULL DEFAULT 0;
+                     ALTER TABLE projects ADD COLUMN retainer_hours   INTEGER NOT NULL DEFAULT 0;
+                     ALTER TABLE projects ADD COLUMN retainer_months  INTEGER;"
+                )?;
+            }
+            if !column_exists(conn, "project_phases", "start_date") {
+                conn.execute_batch(
+                    "ALTER TABLE project_phases ADD COLUMN start_date        TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE project_phases ADD COLUMN end_date          TEXT NOT NULL DEFAULT '';
+                     ALTER TABLE project_phases ADD COLUMN gate_name         TEXT NOT NULL DEFAULT 'Freigabe';
+                     ALTER TABLE project_phases ADD COLUMN gate_state        TEXT NOT NULL DEFAULT 'open';
+                     ALTER TABLE project_phases ADD COLUMN gate_date         TEXT;
+                     ALTER TABLE project_phases ADD COLUMN gate_approved_by  TEXT;
+                     ALTER TABLE project_phases ADD COLUMN progress_percent  INTEGER NOT NULL DEFAULT 0;"
+                )?;
+                conn.execute_batch(
+                    "UPDATE project_phases
+                     SET start_date = date(created_at), end_date = date(created_at, '+14 days')
+                     WHERE start_date = '';"
+                )?;
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -1708,5 +1736,60 @@ mod tests {
             "SELECT COUNT(*) FROM project_phases WHERE project_id = 'p1'", [], |r| r.get(0),
         ).unwrap();
         assert_eq!(count, 0, "project_phases should cascade-delete with its project");
+    }
+
+    #[test]
+    fn migration_38_adds_retainer_and_gate_columns_with_backfill() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+
+        // Bestandsdaten VOR Migration 38 anlegen, damit der Backfill-Pfad greift.
+        // Migration 37 legt projects/project_phases bereits ohne die neuen Spalten an,
+        // also reicht es, bis inklusive Version 37 zu laufen.
+        for v in 1..=37u32 {
+            apply(&conn, v).unwrap();
+            set_version(&conn, v).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at)
+             VALUES ('p1','ws-1','a1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO project_phases (id, project_id, name, order_index, created_at)
+             VALUES ('ph1','p1','Konzept',0,'2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        run(&conn).unwrap();
+
+        assert!(column_exists(&conn, "projects", "retainer_monthly"));
+        assert!(column_exists(&conn, "project_phases", "gate_state"));
+
+        let (start, end, gate_state, progress): (String, String, String, i32) = conn.query_row(
+            "SELECT start_date, end_date, gate_state, progress_percent FROM project_phases WHERE id = 'ph1'",
+            [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        ).unwrap();
+        assert_eq!(start, "2026-01-01");
+        assert_eq!(end, "2026-01-15");
+        assert_eq!(gate_state, "open");
+        assert_eq!(progress, 0);
+
+        // Idempotent.
+        run(&conn).unwrap();
+    }
+
+    #[test]
+    fn migration_38_runs_idempotently_on_fresh_db() {
+        let conn = in_memory_db();
+        run(&conn).unwrap();
+        run(&conn).unwrap();
+        assert_eq!(get_version(&conn).unwrap(), CURRENT_VERSION);
     }
 }
