@@ -16,6 +16,9 @@ pub struct Project {
     pub created_at: String,
     pub updated_at: String,
     pub completed_at: Option<String>,
+    pub retainer_monthly: f64,
+    pub retainer_hours: i32,
+    pub retainer_months: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +29,9 @@ pub struct UpsertProjectPayload {
     pub account_id: String,
     pub title: String,
     pub description: Option<String>,
+    pub retainer_monthly: f64,
+    pub retainer_hours: i32,
+    pub retainer_months: Option<i32>,
 }
 
 fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
@@ -40,11 +46,14 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         created_at: r.get(7)?,
         updated_at: r.get(8)?,
         completed_at: r.get(9)?,
+        retainer_monthly: r.get(10)?,
+        retainer_hours: r.get(11)?,
+        retainer_months: r.get(12)?,
     })
 }
 
 const SELECT_COLUMNS: &str =
-    "id, workspace_id, account_id, title, description, status, current_phase_id, created_at, updated_at, completed_at";
+    "id, workspace_id, account_id, title, description, status, current_phase_id, created_at, updated_at, completed_at, retainer_monthly, retainer_hours, retainer_months";
 
 pub fn get_all_for_workspace(conn: &Connection, workspace_id: &str) -> Result<Vec<Project>, AppError> {
     let sql = format!("SELECT {SELECT_COLUMNS} FROM projects WHERE workspace_id = ?1 ORDER BY created_at DESC");
@@ -62,11 +71,18 @@ pub fn upsert(conn: &Connection, payload: UpsertProjectPayload) -> Result<Projec
     let id = payload.id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
-        "INSERT INTO projects (id, workspace_id, account_id, title, description, status, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?6)
+        "INSERT INTO projects
+           (id, workspace_id, account_id, title, description, status, created_at, updated_at,
+            retainer_monthly, retainer_hours, retainer_months)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?6, ?7, ?8, ?9)
          ON CONFLICT(id) DO UPDATE SET
-           title=excluded.title, description=excluded.description, updated_at=excluded.updated_at",
-        rusqlite::params![id, payload.workspace_id, payload.account_id, payload.title, payload.description, now],
+           title=excluded.title, description=excluded.description, updated_at=excluded.updated_at,
+           retainer_monthly=excluded.retainer_monthly, retainer_hours=excluded.retainer_hours,
+           retainer_months=excluded.retainer_months",
+        rusqlite::params![
+            id, payload.workspace_id, payload.account_id, payload.title, payload.description, now,
+            payload.retainer_monthly, payload.retainer_hours, payload.retainer_months,
+        ],
     )?;
     get_by_id(conn, &id)
 }
@@ -152,62 +168,75 @@ mod tests {
         conn
     }
 
+    fn payload(title: &str) -> UpsertProjectPayload {
+        UpsertProjectPayload {
+            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
+            title: title.into(), description: None,
+            retainer_monthly: 0.0, retainer_hours: 0, retainer_months: None,
+        }
+    }
+
     #[test]
     fn upsert_creates_new_project_with_active_status() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Website-Relaunch".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Website-Relaunch")).unwrap();
         assert_eq!(p.title, "Website-Relaunch");
         assert_eq!(p.status, "active");
         assert_eq!(p.current_phase_id, None);
     }
 
     #[test]
-    fn upsert_updates_existing_project_title() {
+    fn upsert_stores_retainer_fields() {
         let conn = setup();
-        let created = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Alt".into(), description: None,
+        let p = upsert(&conn, UpsertProjectPayload {
+            retainer_monthly: 8500.0, retainer_hours: 60, retainer_months: Some(12),
+            ..payload("Brand Refresh")
         }).unwrap();
+        assert_eq!(p.retainer_monthly, 8500.0);
+        assert_eq!(p.retainer_hours, 60);
+        assert_eq!(p.retainer_months, Some(12));
+    }
+
+    #[test]
+    fn upsert_updates_existing_project_title_and_retainer() {
+        let conn = setup();
+        let created = upsert(&conn, payload("Alt")).unwrap();
         let updated = upsert(&conn, UpsertProjectPayload {
-            id: Some(created.id.clone()), workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Neu".into(), description: Some("Beschreibung".into()),
+            id: Some(created.id.clone()), description: Some("Beschreibung".into()),
+            retainer_monthly: 4000.0, retainer_hours: 20, retainer_months: None,
+            ..payload("Neu")
         }).unwrap();
         assert_eq!(updated.id, created.id);
         assert_eq!(updated.title, "Neu");
         assert_eq!(updated.description, Some("Beschreibung".to_string()));
+        assert_eq!(updated.retainer_monthly, 4000.0);
     }
 
     #[test]
     fn advance_phase_moves_to_next_phase() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         let phase1 = project_phase::create(&conn, project_phase::CreateProjectPhasePayload {
             project_id: p.id.clone(), name: "Konzept".into(),
+            start_date: "2026-04-27".into(), end_date: "2026-05-11".into(), gate_name: "Freigabe".into(),
         }).unwrap();
         let phase2 = project_phase::create(&conn, project_phase::CreateProjectPhasePayload {
             project_id: p.id.clone(), name: "Umsetzung".into(),
+            start_date: "2026-05-11".into(), end_date: "2026-06-01".into(), gate_name: "Freigabe".into(),
         }).unwrap();
         let advanced = advance_phase(&conn, &p.id).unwrap();
         assert_eq!(advanced.current_phase_id, Some(phase2.id));
         assert_eq!(advanced.status, "active");
-        let _ = phase1; // erste Phase wird nicht mehr referenziert, aber existiert weiterhin
+        let _ = phase1;
     }
 
     #[test]
     fn advance_phase_completes_project_after_last_phase() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         project_phase::create(&conn, project_phase::CreateProjectPhasePayload {
             project_id: p.id.clone(), name: "Nur Phase".into(),
+            start_date: "2026-04-27".into(), end_date: "2026-05-11".into(), gate_name: "Freigabe".into(),
         }).unwrap();
         let completed = advance_phase(&conn, &p.id).unwrap();
         assert_eq!(completed.status, "completed");
@@ -217,14 +246,12 @@ mod tests {
     #[test]
     fn advance_phase_rejects_already_completed_project() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         project_phase::create(&conn, project_phase::CreateProjectPhasePayload {
             project_id: p.id.clone(), name: "Nur Phase".into(),
+            start_date: "2026-04-27".into(), end_date: "2026-05-11".into(), gate_name: "Freigabe".into(),
         }).unwrap();
-        advance_phase(&conn, &p.id).unwrap(); // -> completed
+        advance_phase(&conn, &p.id).unwrap();
         let result = advance_phase(&conn, &p.id);
         assert!(matches!(result, Err(AppError::Validation(_))));
     }
@@ -232,10 +259,7 @@ mod tests {
     #[test]
     fn set_status_toggles_active_and_paused() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         let paused = set_status(&conn, &p.id, "paused").unwrap();
         assert_eq!(paused.status, "paused");
         let reactivated = set_status(&conn, &p.id, "active").unwrap();
@@ -245,14 +269,12 @@ mod tests {
     #[test]
     fn set_status_rejects_completed_project() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         project_phase::create(&conn, project_phase::CreateProjectPhasePayload {
             project_id: p.id.clone(), name: "Nur Phase".into(),
+            start_date: "2026-04-27".into(), end_date: "2026-05-11".into(), gate_name: "Freigabe".into(),
         }).unwrap();
-        advance_phase(&conn, &p.id).unwrap(); // -> completed
+        advance_phase(&conn, &p.id).unwrap();
         let result = set_status(&conn, &p.id, "paused");
         assert!(matches!(result, Err(AppError::Validation(_))));
     }
@@ -260,10 +282,7 @@ mod tests {
     #[test]
     fn delete_removes_project() {
         let conn = setup();
-        let p = upsert(&conn, UpsertProjectPayload {
-            id: None, workspace_id: "ws-1".into(), account_id: "a1".into(),
-            title: "Test".into(), description: None,
-        }).unwrap();
+        let p = upsert(&conn, payload("Test")).unwrap();
         delete(&conn, &p.id, "ws-1").unwrap();
         let all = get_all_for_workspace(&conn, "ws-1").unwrap();
         assert!(all.is_empty());

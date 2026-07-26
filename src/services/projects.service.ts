@@ -34,4 +34,7 @@ export const ProjectsService = {
   reorderPhases(projectId: string, orderedIds: string[]): Promise<void> {
     return invoke('cmd_reorder_project_phases', { projectId, orderedIds })
   },
+  updatePhaseProgress(id: string, projectId: string, progressPercent: number): Promise<ProjectPhase> {
+    return invoke('cmd_update_project_phase_progress', { id, projectId, progressPercent })
+  },
 }

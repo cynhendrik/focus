@@ -22,6 +22,9 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [firstPhaseName, setFirstPhaseName] = useState('')
+  const [retainerMonthly, setRetainerMonthly] = useState('')
+  const [retainerHours, setRetainerHours] = useState('')
+  const [retainerMonths, setRetainerMonths] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
@@ -41,12 +44,22 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
           accountId: customerId,
           title: title.trim(),
           description: description.trim() || undefined,
+          retainerMonthly: Number(retainerMonthly) || 0,
+          retainerHours: Number(retainerHours) || 0,
+          retainerMonths: retainerMonths.trim() ? Number(retainerMonths) : null,
         })
         projectId = project.id
         setCreatedProjectId(projectId)
       }
       if (firstPhaseName.trim()) {
-        await createPhase({ projectId, name: firstPhaseName.trim() })
+        const start = new Date()
+        const end = new Date(start)
+        end.setDate(end.getDate() + 14)
+        const toIsoDate = (d: Date) => d.toISOString().slice(0, 10)
+        await createPhase({
+          projectId, name: firstPhaseName.trim(),
+          startDate: toIsoDate(start), endDate: toIsoDate(end), gateName: 'Freigabe',
+        })
       }
       setSelectedProjectId(projectId)
       setAppView('project_detail')
@@ -123,6 +136,30 @@ export function NewProjectModal({ presetCustomerId, onClose }: Props) {
               className="mock-input" value={firstPhaseName} onChange={e => setFirstPhaseName(e.target.value)}
               placeholder="z.B. Konzeption (optional, kann auch später angelegt werden)"
             />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Retainer € / Monat</label>
+              <input
+                className="mock-input" type="number" min={0} value={retainerMonthly}
+                onChange={e => setRetainerMonthly(e.target.value)} placeholder="z.B. 4500"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Inkl. Std. / Monat</label>
+              <input
+                className="mock-input" type="number" min={0} value={retainerHours}
+                onChange={e => setRetainerHours(e.target.value)} placeholder="z.B. 30"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-muted)', display: 'block', marginBottom: 5 }}>Laufzeit (Monate)</label>
+              <input
+                className="mock-input" type="number" min={0} value={retainerMonths}
+                onChange={e => setRetainerMonths(e.target.value)} placeholder="leer = unbefristet"
+              />
+            </div>
           </div>
         </div>
 

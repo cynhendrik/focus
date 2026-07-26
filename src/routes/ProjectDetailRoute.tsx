@@ -20,10 +20,11 @@ import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/Tas
 import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
 import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
 
-function Stepper({ phases, currentPhaseId, onDeletePhase }: {
-  phases: { id: string; name: string; orderIndex: number }[]
+function Stepper({ phases, currentPhaseId, onDeletePhase, onUpdateProgress }: {
+  phases: { id: string; name: string; orderIndex: number; progressPercent: number }[]
   currentPhaseId: string | null
   onDeletePhase: (phaseId: string) => Promise<void>
+  onUpdateProgress: (phaseId: string, progressPercent: number) => void
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -67,6 +68,18 @@ function Stepper({ phases, currentPhaseId, onDeletePhase }: {
               <div style={{ fontSize: 14, fontWeight: 650, color: state === 'now' ? 'var(--accent-text)' : 'var(--fg)' }}>
                 {phase.name}
               </div>
+              {state === 'now' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="range" min={0} max={100} value={phase.progressPercent}
+                    onChange={e => onUpdateProgress(phase.id, Number(e.target.value))}
+                    style={{ width: 90 }}
+                  />
+                  <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
+                    {phase.progressPercent}%
+                  </span>
+                </div>
+              )}
               {!isCurrent && (
                 confirmId === phase.id ? (
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -102,20 +115,53 @@ function Stepper({ phases, currentPhaseId, onDeletePhase }: {
   )
 }
 
-function NewPhaseForm({ onCreate }: { onCreate: (name: string) => void }) {
+function NewPhaseForm({ onCreate }: {
+  onCreate: (name: string, startDate: string, endDate: string, gateName: string) => void
+}) {
   const [name, setName] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [gateName, setGateName] = useState('Freigabe')
+
+  const canCreate = name.trim() !== '' && startDate !== '' && endDate !== '' && gateName.trim() !== ''
+
+  const submit = () => {
+    if (!canCreate) return
+    onCreate(name.trim(), startDate, endDate, gateName.trim())
+    setName(''); setStartDate(''); setEndDate(''); setGateName('Freigabe')
+  }
+
   return (
-    <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-      <input
-        className="mock-input" value={name} onChange={e => setName(e.target.value)}
-        placeholder="Neue Phase, z.B. Review" style={{ fontSize: 13, flex: 1, maxWidth: 260 }}
-        onKeyDown={e => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim()); setName('') } }}
-      />
-      <button
-        className="btn-primary" style={{ fontSize: 12, padding: '6px 12px' }}
-        disabled={!name.trim()}
-        onClick={() => { if (name.trim()) { onCreate(name.trim()); setName('') } }}
-      >
+    <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <div>
+        <label style={{ fontSize: 10.5, color: 'var(--fg-dim)', display: 'block', marginBottom: 3 }}>Name</label>
+        <input
+          className="mock-input" value={name} onChange={e => setName(e.target.value)}
+          placeholder="z.B. Review" style={{ fontSize: 13, width: 180 }}
+        />
+      </div>
+      <div>
+        <label style={{ fontSize: 10.5, color: 'var(--fg-dim)', display: 'block', marginBottom: 3 }}>Start</label>
+        <input
+          className="mock-input" type="date" value={startDate}
+          onChange={e => setStartDate(e.target.value)} style={{ fontSize: 13 }}
+        />
+      </div>
+      <div>
+        <label style={{ fontSize: 10.5, color: 'var(--fg-dim)', display: 'block', marginBottom: 3 }}>Ende</label>
+        <input
+          className="mock-input" type="date" value={endDate}
+          onChange={e => setEndDate(e.target.value)} style={{ fontSize: 13 }}
+        />
+      </div>
+      <div>
+        <label style={{ fontSize: 10.5, color: 'var(--fg-dim)', display: 'block', marginBottom: 3 }}>Gate-Name</label>
+        <input
+          className="mock-input" value={gateName} onChange={e => setGateName(e.target.value)}
+          placeholder="Freigabe" style={{ fontSize: 13, width: 140 }}
+        />
+      </div>
+      <button className="btn-primary" style={{ fontSize: 12, padding: '6px 12px' }} disabled={!canCreate} onClick={submit}>
         + Phase
       </button>
     </div>
@@ -241,6 +287,7 @@ export function ProjectDetailRoute() {
   const setStatus = useProjectsStore(s => s.setStatus)
   const createPhase = useProjectsStore(s => s.createPhase)
   const deletePhase = useProjectsStore(s => s.deletePhase)
+  const updatePhaseProgress = useProjectsStore(s => s.updatePhaseProgress)
   const createActivity = useActivitiesStore(s => s.create)
   const userEmail = useAuthStore(s => s.user?.email ?? 'user')
   const customers = useCustomersStore(s => s.customers)
@@ -372,11 +419,16 @@ export function ProjectDetailRoute() {
       )}
 
       {phases.length === 0 ? (
-        <NewPhaseForm onCreate={name => createPhase({ projectId: project.id, name })} />
+        <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
+          createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
       ) : (
         <>
-          <Stepper phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase} />
-          <NewPhaseForm onCreate={name => createPhase({ projectId: project.id, name })} />
+          <Stepper
+            phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase}
+            onUpdateProgress={(phaseId, progressPercent) => updatePhaseProgress(phaseId, project.id, progressPercent)}
+          />
+          <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
+            createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
         </>
       )}
 

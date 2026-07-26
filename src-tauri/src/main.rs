@@ -292,6 +292,7 @@ fn main() {
             commands::project_phase::cmd_create_project_phase,
             commands::project_phase::cmd_delete_project_phase,
             commands::project_phase::cmd_reorder_project_phases,
+            commands::project_phase::cmd_update_project_phase_progress,
             commands::lead_stage::cmd_get_lead_stages,
             commands::lead_stage::cmd_upsert_lead_stage,
             commands::lead_stage::cmd_delete_lead_stage,

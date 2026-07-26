@@ -99,7 +99,11 @@ export const ProjectsGateway = {
     if (eErr) fail(eErr)
     const orderIndex = existing && existing.length > 0 ? existing[0].order_index + 1 : 0
     const { data, error } = await supabase.from('project_phases')
-      .insert({ id, project_id: payload.projectId, name: payload.name, order_index: orderIndex, created_at: now })
+      .insert({
+        id, project_id: payload.projectId, name: payload.name, order_index: orderIndex, created_at: now,
+        start_date: payload.startDate, end_date: payload.endDate, gate_name: payload.gateName,
+        gate_state: 'open', progress_percent: 0,
+      })
       .select('*').single()
     if (error) fail(error)
     if (orderIndex === 0) {
@@ -127,5 +131,14 @@ export const ProjectsGateway = {
       const { error } = await supabase.from('project_phases').update({ order_index: i }).eq('id', orderedIds[i])
       if (error) fail(error)
     }
+  },
+
+  async updatePhaseProgress(id: string, projectId: string, progressPercent: number): Promise<ProjectPhase> {
+    if (!shared()) return ProjectsService.updatePhaseProgress(id, projectId, progressPercent)
+    const { data, error } = await supabase.from('project_phases')
+      .update({ progress_percent: progressPercent }).eq('id', id).eq('project_id', projectId)
+      .select('*').single()
+    if (error) fail(error)
+    return projectPhaseRowToPhase(data)
   },
 }
