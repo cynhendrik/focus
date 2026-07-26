@@ -57,7 +57,7 @@ export function ProjectsOverviewRoute() {
   const filteredProjects = useMemo(() => {
     if (filter === 'alle') return active
     if (filter === 'brauchen') return active.filter(p => decisions.some(d => d.project.id === p.id))
-    return active.filter(p => (phasesByProject[p.id] ?? []).some(ph => ph.gateState === 'pending'))
+    return active.filter(p => (phasesByProject[p.id] ?? []).some(ph => ph.gateState === 'open'))
   }, [active, filter, decisions, phasesByProject])
 
   const mrr = active.reduce((s, p) => s + p.retainerMonthly, 0)
