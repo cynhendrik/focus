@@ -12,11 +12,17 @@ export function projectRowToProject(r: any): Project {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     completedAt: r.completed_at ?? null,
+    retainerMonthly: r.retainer_monthly ?? 0,
+    retainerHours: r.retainer_hours ?? 0,
+    retainerMonths: r.retainer_months ?? null,
   }
 }
 
 export function projectToRow(
-  p: { workspaceId: string; accountId: string; title: string; description?: string },
+  p: {
+    workspaceId: string; accountId: string; title: string; description?: string
+    retainerMonthly: number; retainerHours: number; retainerMonths: number | null
+  },
   ctx: { id: string; now: string; isNew: boolean },
 ): Record<string, unknown> {
   const row: Record<string, unknown> = {
@@ -26,6 +32,9 @@ export function projectToRow(
     title: p.title,
     description: p.description ?? null,
     updated_at: ctx.now,
+    retainer_monthly: p.retainerMonthly,
+    retainer_hours: p.retainerHours,
+    retainer_months: p.retainerMonths,
   }
   if (ctx.isNew) {
     row.created_at = ctx.now
@@ -41,5 +50,12 @@ export function projectPhaseRowToPhase(r: any): ProjectPhase {
     name: r.name,
     orderIndex: r.order_index ?? 0,
     createdAt: r.created_at,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    gateName: r.gate_name,
+    gateState: r.gate_state ?? 'open',
+    gateDate: r.gate_date ?? null,
+    gateApprovedBy: r.gate_approved_by ?? null,
+    progressPercent: r.progress_percent ?? 0,
   }
 }
