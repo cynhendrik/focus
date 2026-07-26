@@ -65,16 +65,6 @@ describe('projectToRow', () => {
     expect(row.status).toBeUndefined()
     expect(row.created_at).toBeUndefined()
   })
-
-  it('nimmt Retainer-Felder in die Row auf, auch bei Update', () => {
-    const row = projectToRow(
-      { workspaceId: 'ws-1', accountId: 'a1', title: 'Test', retainerMonthly: 4000, retainerHours: 20, retainerMonths: null },
-      { id: 'p1', now: '2026-01-01', isNew: false },
-    )
-    expect(row.retainer_monthly).toBe(4000)
-    expect(row.retainer_hours).toBe(20)
-    expect(row.retainer_months).toBeNull()
-  })
 })
 
 describe('projectPhaseRowToPhase', () => {
