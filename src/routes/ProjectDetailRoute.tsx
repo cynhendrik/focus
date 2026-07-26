@@ -19,6 +19,10 @@ import type { TaskMentionCandidate } from '@/components/tasks/task-mentions'
 import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/TaskMentionPopover'
 import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
 import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
+import { Target, Milestone } from 'lucide-react'
+import { TabBar } from '@/components/shared/TabBar'
+import { ProjectCockpit } from '@/components/projects/ProjectCockpit'
+import { formatDateDe } from '@/lib/projects/signals'
 
 function Stepper({ phases, currentPhaseId, onDeletePhase, onUpdateProgress }: {
   phases: { id: string; name: string; orderIndex: number; progressPercent: number }[]
@@ -280,6 +284,8 @@ function NewNoteForm({ onCreate }: { onCreate: (body: string) => void }) {
 export function ProjectDetailRoute() {
   const selectedProjectId = useUiStore(s => s.selectedProjectId)
   const setAppView = useUiStore(s => s.setAppView)
+  const activeTab = useUiStore(s => s.activeProjectTab)
+  const setActiveTab = useUiStore(s => s.setActiveProjectTab)
   const project = useProjectsStore(s => s.projects.find(p => p.id === selectedProjectId))
   const phases = useProjectsStore(s => s.phasesByProject[selectedProjectId ?? ''] ?? [])
   const loadPhases = useProjectsStore(s => s.loadPhases)
@@ -335,6 +341,7 @@ export function ProjectDetailRoute() {
     [tasks, project?.currentPhaseId],
   )
   const currentPhase = phases.find(p => p.id === project?.currentPhaseId)
+  const today = useMemo(() => new Date(), [])
 
   if (!project) {
     return (
@@ -377,6 +384,12 @@ export function ProjectDetailRoute() {
   const isLastPhase = phases.length > 0 && phases[phases.length - 1]?.id === project.currentPhaseId
   const canPause = project.status !== 'completed'
 
+  const pendingGateCount = phases.filter(p => p.gateState === 'pending').length
+  const tabs = [
+    { id: 'cockpit', label: 'Cockpit', icon: Target },
+    { id: 'phasen', label: 'Phasen', icon: Milestone, count: pendingGateCount > 0 ? pendingGateCount : undefined },
+  ]
+
   return (
     <div className="main-inner" style={{ padding: '24px 28px 40px', overflowY: 'auto', height: '100%' }}>
       <div style={{ marginBottom: 18 }}>
@@ -394,6 +407,9 @@ export function ProjectDetailRoute() {
             {customerName}
           </div>
           <h1 style={{ fontSize: 24, margin: 0, fontWeight: 650, letterSpacing: '-0.01em' }}>{project.title}</h1>
+          <div style={{ fontSize: 12.5, color: 'var(--fg-muted)', marginTop: 6 }}>
+            Retainer {project.retainerMonthly.toLocaleString('de-DE')} € / Monat · {project.retainerHours} Std. inkl. · seit {formatDateDe(project.createdAt.slice(0, 10))}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {canPause && (
@@ -412,70 +428,80 @@ export function ProjectDetailRoute() {
         </div>
       </div>
 
-      {phaseError && (
-        <div style={{ fontSize: 12, color: 'oklch(72% 0.18 25)', marginBottom: 12 }}>
-          Phase konnte nicht gelöscht werden: {phaseError}
-        </div>
-      )}
+      <TabBar tabs={tabs} activeId={activeTab} onChange={id => setActiveTab(id as 'cockpit' | 'phasen')} />
 
-      {phases.length === 0 ? (
-        <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
-          createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
-      ) : (
-        <>
-          <Stepper
-            phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase}
-            onUpdateProgress={(phaseId, progressPercent) => updatePhaseProgress(phaseId, project.id, progressPercent)}
+      <div style={{ paddingTop: 24 }}>
+        {activeTab === 'cockpit' && (
+          <ProjectCockpit
+            phases={phases} currentPhaseId={project.currentPhaseId} today={today}
+            onGoToPhases={() => setActiveTab('phasen')}
           />
-          <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
-            createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
-        </>
-      )}
+        )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr 1fr', gap: 20, alignItems: 'start' }}>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
-          <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 4 }}>🖼️ Moodboard</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Bild-Upload folgt in einer späteren Runde.</div>
-        </div>
-
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
-          <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 8 }}>📝 Notizen &amp; Konzeption</div>
-          {loadingActivities ? (
-            <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Lädt…</div>
-          ) : notes.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Noch keine Notizen.</div>
-          ) : (
-            notes.map(n => (
-              <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.5 }}>{n.body}</div>
+        {activeTab === 'phasen' && (
+          <>
+            {phaseError && (
+              <div style={{ fontSize: 12, color: 'oklch(72% 0.18 25)', marginBottom: 12 }}>
+                Phase konnte nicht gelöscht werden: {phaseError}
               </div>
-            ))
-          )}
-          <NewNoteForm onCreate={handleCreateNote} />
-        </div>
+            )}
 
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
-          <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 8 }}>
-            ✅ Aufgaben{currentPhase ? ` — ${currentPhase.name}` : ''}
-          </div>
-          {loadingActivities ? (
-            <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Lädt…</div>
-          ) : tasksInCurrentPhase.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Keine Aufgaben in dieser Phase.</div>
-          ) : (
-            tasksInCurrentPhase.map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 13, color: t.status === 'done' ? 'var(--fg-dim)' : 'var(--fg)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
-                  {t.title}
-                  {t.assignee && (
-                    <span style={{ color: 'var(--fg-dim)', fontWeight: 400 }}> · {nameOf(t.assignee)}</span>
-                  )}
-                </span>
+            {phases.length === 0 ? (
+              <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
+                createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
+            ) : (
+              <>
+                <Stepper
+                  phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase}
+                  onUpdateProgress={(phaseId, progressPercent) => updatePhaseProgress(phaseId, project.id, progressPercent)}
+                />
+                <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
+                  createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
+              </>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
+                <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 8 }}>📝 Notizen &amp; Konzeption</div>
+                {loadingActivities ? (
+                  <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Lädt…</div>
+                ) : notes.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Noch keine Notizen.</div>
+                ) : (
+                  notes.map(n => (
+                    <div key={n.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 13, color: 'var(--fg-muted)', lineHeight: 1.5 }}>{n.body}</div>
+                    </div>
+                  ))
+                )}
+                <NewNoteForm onCreate={handleCreateNote} />
               </div>
-            ))
-          )}
-          <NewTaskForm members={members} onCreate={handleCreateTask} />
-        </div>
+
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22, padding: '16px 18px' }}>
+                <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 8 }}>
+                  ✅ Aufgaben{currentPhase ? ` — ${currentPhase.name}` : ''}
+                </div>
+                {loadingActivities ? (
+                  <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Lädt…</div>
+                ) : tasksInCurrentPhase.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Keine Aufgaben in dieser Phase.</div>
+                ) : (
+                  tasksInCurrentPhase.map(t => (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 13, color: t.status === 'done' ? 'var(--fg-dim)' : 'var(--fg)', textDecoration: t.status === 'done' ? 'line-through' : 'none' }}>
+                        {t.title}
+                        {t.assignee && (
+                          <span style={{ color: 'var(--fg-dim)', fontWeight: 400 }}> · {nameOf(t.assignee)}</span>
+                        )}
+                      </span>
+                    </div>
+                  ))
+                )}
+                <NewTaskForm members={members} onCreate={handleCreateTask} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
