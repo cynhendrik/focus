@@ -34,9 +34,12 @@ describe('rollingWeeks', () => {
 describe('dateToTimelineOffset', () => {
   const weeks = rollingWeeks(new Date(2026, 4, 18), 4, 10)
 
-  it('gibt 0 für den Start der ersten Woche zurück', () => {
-    const iso = weeks[0].start.toISOString().slice(0, 10)
-    expect(dateToTimelineOffset(iso, weeks)).toBe(0)
+  it('gibt 0 für den Start der ersten Woche zurück (27.04.2026)', () => {
+    expect(dateToTimelineOffset('2026-04-27', weeks)).toBe(0)
+  })
+
+  it('gibt 1 für den Start der zweiten Woche zurück (04.05.2026)', () => {
+    expect(dateToTimelineOffset('2026-05-04', weeks)).toBe(1)
   })
 
   it('gibt null für ein Datum vor dem Fenster zurück', () => {

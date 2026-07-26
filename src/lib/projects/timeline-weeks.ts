@@ -44,12 +44,10 @@ export function rollingWeeks(today: Date, weeksBack = 4, weeksForward = 10): Tim
  * oder null wenn außerhalb des sichtbaren Fensters. */
 export function dateToTimelineOffset(dateIso: string, weeks: TimelineWeek[]): number | null {
   if (!weeks.length) return null
-  // The input dateIso is the UTC date part (from toISOString().slice(0,10))
-  const startIso = weeks[0].start.toISOString().slice(0, 10)
-  // Compare UTC date parts for consistency
   const d = new Date(`${dateIso}T00:00:00Z`)
-  const startUtc = new Date(`${startIso}T00:00:00Z`)
-  const diffWeeks = (d.getTime() - startUtc.getTime()) / (7 * 86400000)
+  const s = weeks[0].start
+  const startUtc = Date.UTC(s.getFullYear(), s.getMonth(), s.getDate())
+  const diffWeeks = (d.getTime() - startUtc) / (7 * 86400000)
   if (diffWeeks < 0 || diffWeeks > weeks.length) return null
   return diffWeeks
 }
