@@ -1,14 +1,10 @@
 import type { Project, ProjectPhase } from '@/types/project.types'
 import type { TimelineWeek } from '@/lib/projects/timeline-weeks'
 import { dateToTimelineOffset } from '@/lib/projects/timeline-weeks'
-import { projectHealthZeit, projectHealthBudget, projectHealthStimmung, type HealthLevel } from '@/lib/projects/signals'
+import { projectHealthZeit, projectHealthBudget, projectHealthStimmung, GATE_COLOR, type HealthLevel } from '@/lib/projects/signals'
 
 const HEALTH_COLOR: Record<HealthLevel, string> = {
-  ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--danger)',
-}
-
-const GATE_COLOR: Record<ProjectPhase['gateState'], string> = {
-  approved: 'var(--ok)', pending: 'var(--warn)', open: 'var(--border-strong)',
+  ok: 'var(--ok)', warn: 'var(--warn)', bad: 'var(--danger)', unknown: 'var(--fg-dim)',
 }
 
 function initials(name: string): string {
