@@ -73,6 +73,11 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
 }
 export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'lizenzen' | 'datenschutz' | 'developer' | 'gefahrenzone' | 'auftraege' | 'benachrichtigungen'
 
+/** Tabs im Projekt-Detail. Nur die Tabs, die wirklich Inhalt haben --
+ * Moodboard/Team/Rechnungen kommen erst als Tab dazu, wenn ihre jeweilige
+ * Etappe (5/4/6) tatsaechlich gebaut wird. */
+export type ProjectTab = 'cockpit' | 'phasen'
+
 export type AppView =
   | 'dashboard' | 'profile'
   | 'clients'   | 'invoices'
@@ -114,6 +119,8 @@ interface UiState {
   selectedLeverageLeadId: string | null
   /** Aktives Projekt im Projektplaner (für die Detail-Ansicht). */
   selectedProjectId: string | null
+  /** Aktiver Tab im Projekt-Detail. */
+  activeProjectTab: ProjectTab
   setColorStyle: (style: ColorStyle) => void
   toggleTheme: () => void
   setSelectedCustomer: (id: string | null) => void
@@ -134,6 +141,7 @@ interface UiState {
   toggleSidebar: () => void
   setSelectedLeverageLeadId: (id: string | null) => void
   setSelectedProjectId: (id: string | null) => void
+  setActiveProjectTab: (tab: ProjectTab) => void
 }
 
 export const useUiStore = create<UiState>()(
@@ -158,6 +166,7 @@ export const useUiStore = create<UiState>()(
       sidebarCollapsed: false,
       selectedLeverageLeadId: null,
       selectedProjectId: null,
+      activeProjectTab: 'cockpit',
 
       setColorStyle: (style) =>
         set({ colorStyle: style }),
@@ -218,6 +227,9 @@ export const useUiStore = create<UiState>()(
 
       setSelectedProjectId: (id) =>
         set({ selectedProjectId: id }),
+
+      setActiveProjectTab: (tab) =>
+        set({ activeProjectTab: tab }),
     }),
     {
       name: 'focus-ui-v2',
@@ -243,6 +255,7 @@ export const useUiStore = create<UiState>()(
         tasksTab: s.tasksTab,
         dashboardView: s.dashboardView,
         settingsTab: s.settingsTab,
+        activeProjectTab: s.activeProjectTab,
         sidebarCollapsed: s.sidebarCollapsed,
       }),
     }
