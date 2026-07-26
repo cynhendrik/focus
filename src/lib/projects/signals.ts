@@ -1,6 +1,6 @@
 import type { ProjectPhase } from '@/types/project.types'
 
-export type HealthLevel = 'ok' | 'warn' | 'bad'
+export type HealthLevel = 'ok' | 'warn' | 'bad' | 'unknown'
 
 export interface ProjectSignal {
   kind: 'gate_pending'
@@ -8,6 +8,18 @@ export interface ProjectSignal {
   label: string
   detail: string
   phaseId: string
+}
+
+export interface NextMove {
+  kind: 'gate_pending' | 'ruhe'
+  tone: 'bad' | 'warn' | 'ok'
+  title: string
+  why: string
+  phaseId: string | null
+}
+
+export const GATE_COLOR: Record<ProjectPhase['gateState'], string> = {
+  approved: 'var(--ok)', pending: 'var(--warn)', open: 'var(--border-strong)',
 }
 
 const GATE_WARN_DAYS = 5
@@ -19,13 +31,16 @@ function daysUntil(dateIso: string, today: Date): number {
   return Math.round((d.getTime() - t.getTime()) / 86400000)
 }
 
-function formatDateDe(iso: string): string {
+export function formatDateDe(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d}.${m}.${y}`
 }
 
 /** Zeit-Ampel: aus überfälligen/bald fälligen pending-Gates abgeleitet.
- * Budget/Stimmung sind in dieser Etappe fix 'ok' (siehe Spec Etappe 1). */
+ * Budget/Stimmung sind in dieser Etappe fix 'unknown' -- es gibt noch keine
+ * Zeiterfassung (Budget) bzw. kein Moodboard (Stimmung), also keine echte
+ * Datengrundlage. Ein fixes 'ok' waere eine Value-Luege (grüner Punkt fuer
+ * "alles im Rahmen", obwohl schlicht nichts gemessen wird). */
 export function projectHealthZeit(phases: ProjectPhase[], today: Date): HealthLevel {
   const pendingWithDate = phases.filter(p => p.gateState === 'pending' && p.gateDate)
   if (pendingWithDate.some(p => daysUntil(p.gateDate as string, today) < 0)) return 'bad'
@@ -34,11 +49,11 @@ export function projectHealthZeit(phases: ProjectPhase[], today: Date): HealthLe
 }
 
 export function projectHealthBudget(): HealthLevel {
-  return 'ok'
+  return 'unknown'
 }
 
 export function projectHealthStimmung(): HealthLevel {
-  return 'ok'
+  return 'unknown'
 }
 
 /** Aktuell nur "Gate wartet"-Signale. Erweiterbar (Etappe 6: Rechnungssignale),
@@ -56,4 +71,35 @@ export function projectSignals(phases: ProjectPhase[], today: Date): ProjectSign
         phaseId: p.id,
       }
     })
+}
+
+/** "Nächster Zug" fürs Cockpit: das dringendste pending Gate (überfällig oder
+ * am nächsten fällig zuerst, ohne Termin zuletzt), sonst eine neutrale
+ * Ruhe-Meldung. Nur Gate-basiert -- Rechnungs-/Scope-/Moodboard-Zweige
+ * kommen erst mit späteren Etappen dazu. */
+export function nextMove(phases: ProjectPhase[], today: Date): NextMove {
+  const pending = phases
+    .filter(p => p.gateState === 'pending')
+    .map(p => ({ p, days: p.gateDate ? daysUntil(p.gateDate, today) : Infinity }))
+    .sort((a, b) => a.days - b.days)
+
+  if (pending.length > 0) {
+    const { p, days } = pending[0]
+    const overdue = days < 0
+    return {
+      kind: 'gate_pending',
+      tone: overdue ? 'bad' : 'warn',
+      title: `${p.gateName} einholen` + (p.gateDate ? ` — ${formatDateDe(p.gateDate)}` : ''),
+      why: `Phase „${p.name}" wartet auf Freigabe. Ohne sie startet die nächste Phase nicht.`,
+      phaseId: p.id,
+    }
+  }
+
+  return {
+    kind: 'ruhe',
+    tone: 'ok',
+    title: 'Nichts brennt. Nächster Meilenstein läuft planmäßig.',
+    why: 'Kein offenes Gate wartet auf Freigabe.',
+    phaseId: null,
+  }
 }
