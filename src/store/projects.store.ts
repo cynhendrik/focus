@@ -19,6 +19,7 @@ interface ProjectsState {
   createPhase: (payload: CreateProjectPhasePayload) => Promise<void>
   deletePhase: (id: string, projectId: string) => Promise<void>
   reorderPhases: (projectId: string, orderedIds: string[]) => Promise<void>
+  updatePhaseProgress: (id: string, projectId: string, progressPercent: number) => Promise<void>
 }
 
 export const useProjectsStore = create<ProjectsState>()((set, get) => ({
@@ -167,6 +168,24 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
       await ProjectsGateway.reorderPhases(projectId, orderedIds)
     } catch (err) {
       set(s => ({ phasesByProject: { ...s.phasesByProject, [projectId]: prev } }))
+      throw err
+    }
+  },
+
+  updatePhaseProgress: async (id, projectId, progressPercent) => {
+    set({ error: null })
+    try {
+      const phase = await ProjectsGateway.updatePhaseProgress(id, projectId, progressPercent)
+      set(s => ({
+        phasesByProject: {
+          ...s.phasesByProject,
+          [projectId]: (s.phasesByProject[projectId] ?? []).map(p => p.id === id ? phase : p),
+        },
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to update project phase progress', { error, id, projectId })
       throw err
     }
   },
