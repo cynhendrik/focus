@@ -60,4 +60,32 @@ describe('ProjectsTimeline', () => {
     fireEvent.click(screen.getByText('Brand Refresh'))
     expect(opened).toEqual(['p1'])
   })
+
+  it('stapelt sich zeitlich überlappende Phasen auf unterschiedliche Reihen statt sich zu überdecken', () => {
+    const overlappingA = phase({ id: 'phA', name: 'Moodboard', startDate: '2026-05-04', endDate: '2026-05-18' })
+    const overlappingB = phase({ id: 'phB', name: 'Entwicklung Phase 1', startDate: '2026-05-04', endDate: '2026-05-18' })
+    render(
+      <ProjectsTimeline
+        projects={[project()]} phasesByProject={{ p1: [overlappingA, overlappingB] }}
+        customerNameFor={() => 'TechCorp'} weeks={weeks} today={today} onOpen={() => {}}
+      />,
+    )
+    const barA = screen.getByTitle('Moodboard · 78 %')
+    const barB = screen.getByTitle('Entwicklung Phase 1 · 78 %')
+    expect(barA.style.top).not.toBe(barB.style.top)
+  })
+
+  it('lässt nicht-überlappende Phasen weiterhin auf derselben Reihe (top) liegen', () => {
+    const sequentialA = phase({ id: 'phA', name: 'Moodboard', startDate: '2026-04-27', endDate: '2026-05-04' })
+    const sequentialB = phase({ id: 'phB', name: 'Entwicklung Phase 1', startDate: '2026-05-04', endDate: '2026-05-11' })
+    render(
+      <ProjectsTimeline
+        projects={[project()]} phasesByProject={{ p1: [sequentialA, sequentialB] }}
+        customerNameFor={() => 'TechCorp'} weeks={weeks} today={today} onOpen={() => {}}
+      />,
+    )
+    const barA = screen.getByTitle('Moodboard · 78 %')
+    const barB = screen.getByTitle('Entwicklung Phase 1 · 78 %')
+    expect(barA.style.top).toBe(barB.style.top)
+  })
 })
