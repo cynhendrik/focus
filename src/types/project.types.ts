@@ -50,6 +50,7 @@ export interface ProjectPhase {
   gateApprovedBy: string | null
   progressPercent: number
   deliverables: Deliverable[]
+  assigneeIds: string[]
 }
 
 export interface CreateProjectPhasePayload {
