@@ -87,6 +87,7 @@ interface FinanceState {
   deleteInvoice: (id: string) => Promise<void>
   approveInvoiceSuggestion: (id: string, approvedBy: string, workspaceId: string) => Promise<void>
   updateInvoiceStatus: (id: string, status: InvoiceStatus) => Promise<void>
+  setInvoiceProject: (id: string, projectId: string | null) => Promise<void>
 
   loadPayments: (workspaceId: string) => Promise<void>
   addPayment: (payload: CreatePaymentPayload) => Promise<void>
@@ -203,6 +204,13 @@ export const useFinanceStore = create<FinanceState>()((set, get) => ({
     if (status === 'paid' || status === 'open') {
       tryAutoSaveToAblage(updated)
     }
+  }),
+
+  setInvoiceProject: (id, projectId) => withErrorToast('Projekt-Zuordnung konnte nicht gespeichert werden.', async () => {
+    const updated = await FinanceGateway.setInvoiceProject(id, projectId)
+    set(s => ({
+      invoices: s.invoices.map(i => i.id === id ? updated : i),
+    }))
   }),
 
   loadPayments: async (workspaceId) => {
