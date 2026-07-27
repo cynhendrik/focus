@@ -23,6 +23,7 @@ interface ProjectsState {
   requestGate: (id: string, projectId: string, gateDate: string | null) => Promise<void>
   approveGate: (id: string, projectId: string, approvedBy: string) => Promise<void>
   updateDeliverables: (id: string, projectId: string, deliverables: Deliverable[]) => Promise<void>
+  updateAssignees: (id: string, projectId: string, assigneeIds: string[]) => Promise<void>
 }
 
 export const useProjectsStore = create<ProjectsState>()((set, get) => ({
@@ -243,6 +244,24 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to update deliverables', { error, id, projectId })
+      throw err
+    }
+  },
+
+  updateAssignees: async (id, projectId, assigneeIds) => {
+    set({ error: null })
+    try {
+      const phase = await ProjectsGateway.updateAssignees(id, projectId, assigneeIds)
+      set(s => ({
+        phasesByProject: {
+          ...s.phasesByProject,
+          [projectId]: (s.phasesByProject[projectId] ?? []).map(p => p.id === id ? phase : p),
+        },
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to update assignees', { error, id, projectId })
       throw err
     }
   },

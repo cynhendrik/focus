@@ -48,3 +48,10 @@ pub fn cmd_update_project_phase_deliverables(
 ) -> Result<ProjectPhase, AppError> {
     db::project_phase::update_deliverables(&db.conn(), &id, &project_id, deliverables_json)
 }
+
+#[tauri::command]
+pub fn cmd_update_project_phase_assignees(
+    db: State<'_, DbPool>, id: String, project_id: String, assignee_ids_json: String,
+) -> Result<ProjectPhase, AppError> {
+    db::project_phase::update_assignees(&db.conn(), &id, &project_id, assignee_ids_json)
+}

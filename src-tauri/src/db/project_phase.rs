@@ -18,6 +18,7 @@ pub struct ProjectPhase {
     pub gate_approved_by: Option<String>,
     pub progress_percent: i32,
     pub deliverables: String,
+    pub assignee_ids: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,7 +32,7 @@ pub struct CreateProjectPhasePayload {
 }
 
 const SELECT_COLUMNS: &str =
-    "id, project_id, name, order_index, created_at, start_date, end_date, gate_name, gate_state, gate_date, gate_approved_by, progress_percent, deliverables";
+    "id, project_id, name, order_index, created_at, start_date, end_date, gate_name, gate_state, gate_date, gate_approved_by, progress_percent, deliverables, assignee_ids";
 
 fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectPhase> {
     Ok(ProjectPhase {
@@ -48,6 +49,7 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectPhase> {
         gate_approved_by: r.get(10)?,
         progress_percent: r.get(11)?,
         deliverables: r.get(12)?,
+        assignee_ids: r.get(13)?,
     })
 }
 
@@ -171,6 +173,21 @@ pub fn update_deliverables(conn: &Connection, id: &str, project_id: &str, delive
     get_by_id(conn, id, project_id)
 }
 
+/// Ersetzt die Liste zugewiesener Mitglieder (user_ids). Rust prueft nur, dass
+/// es sich um gueltiges JSON handelt (Boundary-Validierung) -- analog zu
+/// update_deliverables. Rein informativ: keine Kapazitaets-/Rollen-Logik.
+pub fn update_assignees(conn: &Connection, id: &str, project_id: &str, assignee_ids_json: String) -> Result<ProjectPhase, AppError> {
+    if serde_json::from_str::<serde_json::Value>(&assignee_ids_json).is_err() {
+        return Err(AppError::Validation("assignee_ids muss gueltiges JSON sein".to_string()));
+    }
+    get_by_id(conn, id, project_id)?;
+    conn.execute(
+        "UPDATE project_phases SET assignee_ids = ?1 WHERE id = ?2 AND project_id = ?3",
+        rusqlite::params![assignee_ids_json, id, project_id],
+    )?;
+    get_by_id(conn, id, project_id)
+}
+
 /// Blockiert das Loeschen der aktuellen Phase eines Projekts (sonst verliert
 /// das Projekt seinen current_phase_id-Zeiger). Aufgaben, die per payload-JSON
 /// auf diese Phase zeigen, werden NICHT geprueft (siehe Plan-Notiz: project_phase_id
@@ -253,6 +270,7 @@ mod tests {
         assert_eq!(phase.progress_percent, 0);
         assert_eq!(phase.start_date, "2026-04-27");
         assert_eq!(phase.deliverables, "[]");
+        assert_eq!(phase.assignee_ids, "[]");
         let current: Option<String> = conn.query_row(
             "SELECT current_phase_id FROM projects WHERE id = 'p1'", [], |r| r.get(0),
         ).unwrap();
@@ -409,6 +427,30 @@ mod tests {
     fn update_deliverables_rejects_unknown_phase() {
         let conn = setup();
         let result = update_deliverables(&conn, "missing", "p1", "[]".to_string());
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn update_assignees_stores_valid_json() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let json = r#"["u-1","u-2"]"#.to_string();
+        let updated = update_assignees(&conn, &phase.id, "p1", json.clone()).unwrap();
+        assert_eq!(updated.assignee_ids, json);
+    }
+
+    #[test]
+    fn update_assignees_rejects_invalid_json() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let result = update_assignees(&conn, &phase.id, "p1", "not json".to_string());
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn update_assignees_rejects_unknown_phase() {
+        let conn = setup();
+        let result = update_assignees(&conn, "missing", "p1", "[]".to_string());
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 }

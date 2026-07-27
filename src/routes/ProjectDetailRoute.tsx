@@ -203,6 +203,7 @@ export function ProjectDetailRoute() {
   const requestGate = useProjectsStore(s => s.requestGate)
   const approveGate = useProjectsStore(s => s.approveGate)
   const updateDeliverables = useProjectsStore(s => s.updateDeliverables)
+  const updateAssignees = useProjectsStore(s => s.updateAssignees)
   const showToast = useToastStore(s => s.show)
   const createActivity = useActivitiesStore(s => s.create)
   const userEmail = useAuthStore(s => s.user?.email ?? 'user')
@@ -369,6 +370,8 @@ export function ProjectDetailRoute() {
                   onApproveGate={(phaseId, approvedBy) => approveGate(phaseId, project.id, approvedBy)}
                   onUpdateDeliverables={(phaseId, deliverables) => updateDeliverables(phaseId, project.id, deliverables)}
                   onRemind={() => showToast({ message: 'Erinnerung vorbereitet (Mail-Versand folgt in einer späteren Runde)' })}
+                  members={members} nameOf={nameOf}
+                  onUpdateAssignees={(phaseId, assigneeIds) => updateAssignees(phaseId, project.id, assigneeIds)}
                 />
                 <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
                   createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />

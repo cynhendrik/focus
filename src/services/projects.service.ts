@@ -46,4 +46,7 @@ export const ProjectsService = {
   updateDeliverables(id: string, projectId: string, deliverablesJson: string): Promise<ProjectPhase> {
     return invoke('cmd_update_project_phase_deliverables', { id, projectId, deliverablesJson })
   },
+  updateAssignees(id: string, projectId: string, assigneeIdsJson: string): Promise<ProjectPhase> {
+    return invoke('cmd_update_project_phase_assignees', { id, projectId, assigneeIdsJson })
+  },
 }

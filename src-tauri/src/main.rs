@@ -296,6 +296,7 @@ fn main() {
             commands::project_phase::cmd_request_gate,
             commands::project_phase::cmd_approve_gate,
             commands::project_phase::cmd_update_project_phase_deliverables,
+            commands::project_phase::cmd_update_project_phase_assignees,
             commands::lead_stage::cmd_get_lead_stages,
             commands::lead_stage::cmd_upsert_lead_stage,
             commands::lead_stage::cmd_delete_lead_stage,

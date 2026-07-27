@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Trash2, X } from 'lucide-react'
 import { GATE_COLOR, formatDateDe } from '@/lib/projects/signals'
 import type { ProjectPhase, Deliverable, DeliverableStatus } from '@/types/project.types'
+import type { MemberProfile } from '@/types/profile.types'
 
 const GATE_LABEL: Record<ProjectPhase['gateState'], string> = {
   open: 'geplant', pending: 'Freigabe offen', approved: 'freigegeben',
@@ -79,6 +80,69 @@ function DeliverablesChecklist({ deliverables, onChange }: {
   )
 }
 
+function AssigneesSection({ assigneeIds, members, nameOf, onChange }: {
+  assigneeIds: string[]
+  members: MemberProfile[]
+  nameOf: (userId: string) => string
+  onChange: (next: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const available = members.filter(m => !assigneeIds.includes(m.id))
+
+  const add = (userId: string) => {
+    onChange([...assigneeIds, userId])
+    setOpen(false)
+  }
+  const remove = (userId: string) => {
+    onChange(assigneeIds.filter(id => id !== userId))
+  }
+
+  return (
+    <div>
+      <span style={{ display: 'block', marginBottom: 8, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--fg-dim)' }}>
+        Team
+      </span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, alignItems: 'center' }}>
+        {assigneeIds.map(userId => (
+          <span
+            key={userId}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '4px 8px', borderRadius: 20, background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+          >
+            {nameOf(userId)}
+            <button
+              onClick={() => remove(userId)} aria-label={`${nameOf(userId)} entfernen`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', display: 'flex', padding: 0 }}
+            >
+              <X size={11} />
+            </button>
+          </span>
+        ))}
+        {assigneeIds.length === 0 && <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>Noch niemand zugewiesen.</span>}
+      </div>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button className="btn-ghost" style={{ fontSize: 11.5, padding: '5px 10px' }} onClick={() => setOpen(o => !o)}>
+          + Person
+        </button>
+        {open && (
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 10, minWidth: 180, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow-2)', padding: 4 }}>
+            {available.length === 0 && (
+              <div style={{ padding: '7px 10px', fontSize: 12, color: 'var(--fg-dim)' }}>Alle Mitglieder bereits zugewiesen.</div>
+            )}
+            {available.map(m => (
+              <button
+                key={m.id} onClick={() => add(m.id)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--fg)', fontSize: 13, fontFamily: 'inherit' }}
+              >
+                {m.displayName}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function GateSection({ phase, onRequestGate, onApproveGate, onRemind }: {
   phase: ProjectPhase
   onRequestGate: (gateDate: string | null) => void
@@ -145,7 +209,7 @@ function GateSection({ phase, onRequestGate, onApproveGate, onRemind }: {
   )
 }
 
-function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, onUpdateProgress, onRequestGate, onApproveGate, onUpdateDeliverables, onRemind }: {
+function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, onUpdateProgress, onRequestGate, onApproveGate, onUpdateDeliverables, onRemind, members, nameOf, onUpdateAssignees }: {
   phase: ProjectPhase
   index: number
   isCurrent: boolean
@@ -157,6 +221,9 @@ function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, o
   onApproveGate: (phaseId: string, approvedBy: string) => void
   onUpdateDeliverables: (phaseId: string, deliverables: Deliverable[]) => void
   onRemind: () => void
+  members: MemberProfile[]
+  nameOf: (userId: string) => string
+  onUpdateAssignees: (phaseId: string, assigneeIds: string[]) => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -241,13 +308,19 @@ function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, o
       </button>
 
       {isOpen && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '16px 17px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 22 }}>
-          <DeliverablesChecklist deliverables={phase.deliverables} onChange={next => onUpdateDeliverables(phase.id, next)} />
-          <GateSection
-            phase={phase}
-            onRequestGate={gateDate => onRequestGate(phase.id, gateDate)}
-            onApproveGate={approvedBy => onApproveGate(phase.id, approvedBy)}
-            onRemind={onRemind}
+        <div style={{ borderTop: '1px solid var(--border)', padding: '16px 17px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 22, marginBottom: 18 }}>
+            <DeliverablesChecklist deliverables={phase.deliverables} onChange={next => onUpdateDeliverables(phase.id, next)} />
+            <GateSection
+              phase={phase}
+              onRequestGate={gateDate => onRequestGate(phase.id, gateDate)}
+              onApproveGate={approvedBy => onApproveGate(phase.id, approvedBy)}
+              onRemind={onRemind}
+            />
+          </div>
+          <AssigneesSection
+            assigneeIds={phase.assigneeIds} members={members} nameOf={nameOf}
+            onChange={next => onUpdateAssignees(phase.id, next)}
           />
         </div>
       )}
@@ -255,7 +328,7 @@ function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, o
   )
 }
 
-export function ProjectPhasesList({ phases, currentPhaseId, onDeletePhase, onUpdateProgress, onRequestGate, onApproveGate, onUpdateDeliverables, onRemind }: {
+export function ProjectPhasesList({ phases, currentPhaseId, onDeletePhase, onUpdateProgress, onRequestGate, onApproveGate, onUpdateDeliverables, onRemind, members, nameOf, onUpdateAssignees }: {
   phases: ProjectPhase[]
   currentPhaseId: string | null
   onDeletePhase: (phaseId: string) => Promise<void>
@@ -264,6 +337,9 @@ export function ProjectPhasesList({ phases, currentPhaseId, onDeletePhase, onUpd
   onApproveGate: (phaseId: string, approvedBy: string) => void
   onUpdateDeliverables: (phaseId: string, deliverables: Deliverable[]) => void
   onRemind: () => void
+  members: MemberProfile[]
+  nameOf: (userId: string) => string
+  onUpdateAssignees: (phaseId: string, assigneeIds: string[]) => void
 }) {
   const [openId, setOpenId] = useState<string | null>(currentPhaseId)
 
@@ -277,6 +353,7 @@ export function ProjectPhasesList({ phases, currentPhaseId, onDeletePhase, onUpd
           onDeletePhase={onDeletePhase} onUpdateProgress={onUpdateProgress}
           onRequestGate={onRequestGate} onApproveGate={onApproveGate}
           onUpdateDeliverables={onUpdateDeliverables} onRemind={onRemind}
+          members={members} nameOf={nameOf} onUpdateAssignees={onUpdateAssignees}
         />
       ))}
     </div>
