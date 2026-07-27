@@ -8,6 +8,7 @@ export interface Invoice {
   createdBy: string
   accountId: string
   dealId?: string
+  projectId?: string
   number?: string
   date: string
   dueDate: string
@@ -72,6 +73,7 @@ export interface UpsertInvoicePayload {
   createdBy: string
   accountId: string
   dealId?: string
+  projectId?: string
   number?: string
   date: string
   dueDate: string
