@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 38;
+const CURRENT_VERSION: u32 = 39;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -900,6 +900,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             }
             Ok(())
         }
+        39 => {
+            // Etappe 3 des Projekt-Ausbaus: Deliverables (Ergebnisse) pro Phase
+            // als JSON-Liste, analog zum todos.checklist-Muster -- Rust parst
+            // den Inhalt nicht, nur TypeScript.
+            if !column_exists(conn, "project_phases", "deliverables") {
+                conn.execute_batch(
+                    "ALTER TABLE project_phases ADD COLUMN deliverables TEXT NOT NULL DEFAULT '[]';"
+                )?;
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -1791,5 +1802,43 @@ mod tests {
         run(&conn).unwrap();
         run(&conn).unwrap();
         assert_eq!(get_version(&conn).unwrap(), CURRENT_VERSION);
+    }
+
+    #[test]
+    fn migration_39_adds_deliverables_column_with_default() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+
+        for v in 1..=38u32 {
+            apply(&conn, v).unwrap();
+            set_version(&conn, v).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at,
+             retainer_monthly, retainer_hours, retainer_months)
+             VALUES ('p1','ws-1','a1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,0,NULL)",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO project_phases (id, project_id, name, order_index, created_at, start_date, end_date, gate_name, gate_state, progress_percent)
+             VALUES ('ph1','p1','Konzept',0,'2026-01-01T00:00:00Z','2026-01-01','2026-01-15','Freigabe','open',0)",
+            [],
+        ).unwrap();
+
+        run(&conn).unwrap();
+
+        assert!(column_exists(&conn, "project_phases", "deliverables"));
+        let deliverables: String = conn.query_row(
+            "SELECT deliverables FROM project_phases WHERE id = 'ph1'", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(deliverables, "[]");
+
+        run(&conn).unwrap(); // idempotent
     }
 }
