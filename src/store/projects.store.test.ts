@@ -9,6 +9,8 @@ vi.mock('@/data/projects.gateway', () => ({
     approveGate: vi.fn(),
     updateDeliverables: vi.fn(),
     updateAssignees: vi.fn(),
+    updateMoodboardItems: vi.fn(),
+    uploadMoodboardImage: vi.fn(),
   },
 }))
 
@@ -87,6 +89,47 @@ describe('useProjectsStore gate/deliverables actions', () => {
   it('setzt error im Store, wenn approveGate wirft', async () => {
     vi.mocked(ProjectsGateway.approveGate).mockRejectedValue(new Error('boom'))
     await expect(useProjectsStore.getState().approveGate('ph1', 'p1', 'X')).rejects.toThrow('boom')
+    expect(useProjectsStore.getState().error).not.toBeNull()
+  })
+})
+
+describe('useProjectsStore moodboard actions', () => {
+  const baseProject = {
+    id: 'p1', workspaceId: 'ws1', accountId: 'a1', title: 'Relaunch', description: null,
+    status: 'active' as const, currentPhaseId: null, createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    completedAt: null, retainerMonthly: 0, retainerHours: 0, retainerMonths: null, moodboardItems: [],
+  }
+
+  beforeEach(() => {
+    useProjectsStore.setState({ projects: [baseProject], phasesByProject: {}, isLoading: false, error: null })
+    vi.mocked(ProjectsGateway.updateMoodboardItems).mockReset()
+    vi.mocked(ProjectsGateway.uploadMoodboardImage).mockReset()
+  })
+
+  it('updateMoodboardItems aktualisiert das Projekt im Store', async () => {
+    const items = [{ id: 'm1', kind: 'note' as const, x: 10, y: 10, w: 20, h: 15, cap: 'Notiz', text: 'Hallo' }]
+    vi.mocked(ProjectsGateway.updateMoodboardItems).mockResolvedValue({ ...baseProject, moodboardItems: items })
+    await useProjectsStore.getState().updateMoodboardItems('p1', items)
+    expect(useProjectsStore.getState().projects[0].moodboardItems).toEqual(items)
+  })
+
+  it('uploadMoodboardImage setzt den storageKey des passenden Items und persistiert die Liste', async () => {
+    const items = [{ id: 'm1', kind: 'image' as const, x: 10, y: 10, w: 24, h: 26, cap: 'Bild', storageKey: null }]
+    useProjectsStore.setState({ projects: [{ ...baseProject, moodboardItems: items }], phasesByProject: {}, isLoading: false, error: null })
+    vi.mocked(ProjectsGateway.uploadMoodboardImage).mockResolvedValue('storage-key-1')
+    vi.mocked(ProjectsGateway.updateMoodboardItems).mockResolvedValue({
+      ...baseProject, moodboardItems: [{ ...items[0], storageKey: 'storage-key-1' }],
+    })
+    const file = new File(['x'], 'bild.png', { type: 'image/png' })
+    await useProjectsStore.getState().uploadMoodboardImage('ws1', 'p1', 'm1', file)
+    expect(ProjectsGateway.uploadMoodboardImage).toHaveBeenCalledWith('ws1', 'p1', 'm1', file)
+    expect(ProjectsGateway.updateMoodboardItems).toHaveBeenCalledWith('p1', [{ ...items[0], storageKey: 'storage-key-1' }])
+    expect(useProjectsStore.getState().projects[0].moodboardItems[0].storageKey).toBe('storage-key-1')
+  })
+
+  it('setzt error im Store, wenn updateMoodboardItems wirft', async () => {
+    vi.mocked(ProjectsGateway.updateMoodboardItems).mockRejectedValue(new Error('boom'))
+    await expect(useProjectsStore.getState().updateMoodboardItems('p1', [])).rejects.toThrow('boom')
     expect(useProjectsStore.getState().error).not.toBeNull()
   })
 })

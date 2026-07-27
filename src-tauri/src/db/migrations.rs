@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 40;
+const CURRENT_VERSION: u32 = 41;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -918,6 +918,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             if !column_exists(conn, "project_phases", "assignee_ids") {
                 conn.execute_batch(
                     "ALTER TABLE project_phases ADD COLUMN assignee_ids TEXT NOT NULL DEFAULT '[]';"
+                )?;
+            }
+            Ok(())
+        }
+        41 => {
+            // Etappe 5 des Projekt-Ausbaus: Moodboard-Kacheln (moodboard_items)
+            // pro Projekt als JSON-Liste, gleiches Muster wie deliverables/
+            // assignee_ids -- Rust parst den Inhalt nicht, nur TypeScript.
+            if !column_exists(conn, "projects", "moodboard_items") {
+                conn.execute_batch(
+                    "ALTER TABLE projects ADD COLUMN moodboard_items TEXT NOT NULL DEFAULT '[]';"
                 )?;
             }
             Ok(())
@@ -1887,6 +1898,39 @@ mod tests {
             "SELECT assignee_ids FROM project_phases WHERE id = 'ph1'", [], |r| r.get(0),
         ).unwrap();
         assert_eq!(assignee_ids, "[]");
+
+        run(&conn).unwrap(); // idempotent
+    }
+
+    #[test]
+    fn migration_41_adds_moodboard_items_column_with_default() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+
+        for v in 1..=40u32 {
+            apply(&conn, v).unwrap();
+            set_version(&conn, v).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at,
+             retainer_monthly, retainer_hours, retainer_months)
+             VALUES ('p1','ws-1','a1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,0,NULL)",
+            [],
+        ).unwrap();
+
+        run(&conn).unwrap();
+
+        assert!(column_exists(&conn, "projects", "moodboard_items"));
+        let items: String = conn.query_row(
+            "SELECT moodboard_items FROM projects WHERE id = 'p1'", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(items, "[]");
 
         run(&conn).unwrap(); // idempotent
     }

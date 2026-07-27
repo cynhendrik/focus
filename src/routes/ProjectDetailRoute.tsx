@@ -18,11 +18,13 @@ import type { TaskMentionCandidate } from '@/components/tasks/task-mentions'
 import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/TaskMentionPopover'
 import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
 import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
-import { Target, Milestone } from 'lucide-react'
+import { Target, Milestone, Image as ImageIcon } from 'lucide-react'
 import { TabBar } from '@/components/shared/TabBar'
 import { ProjectCockpit } from '@/components/projects/ProjectCockpit'
 import { formatDateDe } from '@/lib/projects/signals'
 import { ProjectPhasesList } from '@/components/projects/ProjectPhasesList'
+import { ProjectMoodboard } from '@/components/projects/ProjectMoodboard'
+import { ProjectsGateway } from '@/data/projects.gateway'
 import { useToastStore } from '@/store/toast.store'
 
 function NewPhaseForm({ onCreate }: {
@@ -204,6 +206,8 @@ export function ProjectDetailRoute() {
   const approveGate = useProjectsStore(s => s.approveGate)
   const updateDeliverables = useProjectsStore(s => s.updateDeliverables)
   const updateAssignees = useProjectsStore(s => s.updateAssignees)
+  const updateMoodboardItems = useProjectsStore(s => s.updateMoodboardItems)
+  const uploadMoodboardImage = useProjectsStore(s => s.uploadMoodboardImage)
   const showToast = useToastStore(s => s.show)
   const createActivity = useActivitiesStore(s => s.create)
   const userEmail = useAuthStore(s => s.user?.email ?? 'user')
@@ -299,6 +303,7 @@ export function ProjectDetailRoute() {
   const tabs = [
     { id: 'cockpit', label: 'Cockpit', icon: Target },
     { id: 'phasen', label: 'Phasen', icon: Milestone, count: pendingGateCount > 0 ? pendingGateCount : undefined },
+    { id: 'moodboard', label: 'Moodboard', icon: ImageIcon },
   ]
 
   return (
@@ -339,7 +344,7 @@ export function ProjectDetailRoute() {
         </div>
       </div>
 
-      <TabBar tabs={tabs} activeId={activeTab} onChange={id => setActiveTab(id as 'cockpit' | 'phasen')} />
+      <TabBar tabs={tabs} activeId={activeTab} onChange={id => setActiveTab(id as 'cockpit' | 'phasen' | 'moodboard')} />
 
       <div style={{ paddingTop: 24 }}>
         {activeTab === 'cockpit' && (
@@ -419,6 +424,21 @@ export function ProjectDetailRoute() {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'moodboard' && (
+          <ProjectMoodboard
+            items={project.moodboardItems}
+            onChange={items => updateMoodboardItems(project.id, items)}
+            onUploadImage={(itemId, file) => uploadMoodboardImage(workspaceId, project.id, itemId, file)}
+            onRemoveImage={itemId => {
+              const item = project.moodboardItems.find(i => i.id === itemId)
+              if (item?.kind === 'image' && item.storageKey) {
+                void ProjectsGateway.deleteMoodboardImage(workspaceId, item.storageKey)
+              }
+            }}
+            readImage={(_itemId, storageKey) => ProjectsGateway.readMoodboardImage(workspaceId, storageKey)}
+          />
         )}
       </div>
     </div>

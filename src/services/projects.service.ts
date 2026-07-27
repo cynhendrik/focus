@@ -49,4 +49,16 @@ export const ProjectsService = {
   updateAssignees(id: string, projectId: string, assigneeIdsJson: string): Promise<ProjectPhase> {
     return invoke('cmd_update_project_phase_assignees', { id, projectId, assigneeIdsJson })
   },
+  updateMoodboardItems(id: string, moodboardItemsJson: string): Promise<Project> {
+    return invoke('cmd_update_project_moodboard_items', { id, moodboardItemsJson })
+  },
+  importMoodboardImage(workspaceId: string, name: string, data: number[], mimeType: string | null): Promise<{ id: string; path: string }> {
+    return invoke('cmd_import_ws_file', { workspaceId, folderId: null, name, data, mimeType })
+  },
+  readMoodboardImage(id: string): Promise<number[]> {
+    return invoke('cmd_read_ws_file', { id })
+  },
+  deleteMoodboardImage(id: string): Promise<void> {
+    return invoke('cmd_delete_ws_file', { id })
+  },
 }

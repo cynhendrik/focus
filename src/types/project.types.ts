@@ -9,6 +9,42 @@ export interface Deliverable {
   status: DeliverableStatus
 }
 
+export type MoodboardItemKind = 'image' | 'color' | 'type' | 'note'
+
+export interface MoodboardItemBase {
+  id: string
+  kind: MoodboardItemKind
+  x: number
+  y: number
+  w: number
+  h: number
+  cap: string
+}
+
+export interface MoodboardImageItem extends MoodboardItemBase {
+  kind: 'image'
+  storageKey: string | null
+}
+
+export interface MoodboardColorItem extends MoodboardItemBase {
+  kind: 'color'
+  colors: string[]
+}
+
+export interface MoodboardTypeItem extends MoodboardItemBase {
+  kind: 'type'
+  font: string
+  sample: string
+  note: string
+}
+
+export interface MoodboardNoteItem extends MoodboardItemBase {
+  kind: 'note'
+  text: string
+}
+
+export type MoodboardItem = MoodboardImageItem | MoodboardColorItem | MoodboardTypeItem | MoodboardNoteItem
+
 export interface Project {
   id: string
   workspaceId: string
@@ -23,6 +59,7 @@ export interface Project {
   retainerMonthly: number
   retainerHours: number
   retainerMonths: number | null
+  moodboardItems: MoodboardItem[]
 }
 
 export interface UpsertProjectPayload {

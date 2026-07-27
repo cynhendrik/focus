@@ -30,3 +30,10 @@ pub fn cmd_advance_project_phase(db: State<'_, DbPool>, project_id: String) -> R
 pub fn cmd_set_project_status(db: State<'_, DbPool>, project_id: String, status: String) -> Result<Project, AppError> {
     db::project::set_status(&db.conn(), &project_id, &status)
 }
+
+#[tauri::command]
+pub fn cmd_update_project_moodboard_items(
+    db: State<'_, DbPool>, id: String, moodboard_items_json: String,
+) -> Result<Project, AppError> {
+    db::project::update_moodboard_items(&db.conn(), &id, moodboard_items_json)
+}
