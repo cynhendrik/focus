@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, Plus, X } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import { GATE_COLOR, formatDateDe } from '@/lib/projects/signals'
 import type { ProjectPhase, Deliverable, DeliverableStatus } from '@/types/project.types'
 
@@ -28,9 +28,8 @@ function DeliverablesChecklist({ deliverables, onChange }: {
   const cycle = (id: string) => {
     onChange(deliverables.map(d => d.id === id ? { ...d, status: DELIVERABLE_NEXT[d.status] } : d))
   }
-  const remove = (id: string, dName: string) => {
+  const remove = (id: string) => {
     onChange(deliverables.filter(d => d.id !== id))
-    void dName
   }
 
   return (
@@ -57,7 +56,7 @@ function DeliverablesChecklist({ deliverables, onChange }: {
               </span>
             )}
             <button
-              onClick={() => remove(d.id, d.name)} aria-label={`${d.name} entfernen`}
+              onClick={() => remove(d.id)} aria-label={`${d.name} entfernen`}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--fg-dim)', display: 'flex', padding: 0 }}
             >
               <X size={12} />
@@ -73,7 +72,7 @@ function DeliverablesChecklist({ deliverables, onChange }: {
           onKeyDown={e => { if (e.key === 'Enter') add() }}
         />
         <button className="btn-primary" style={{ fontSize: 11.5, padding: '5px 10px' }} disabled={!name.trim()} onClick={add}>
-          + <Plus size={12} /> Deliverable
+          + Deliverable
         </button>
       </div>
     </div>
@@ -131,10 +130,13 @@ function GateSection({ phase, onRequestGate, onApproveGate, onRemind }: {
       <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>{phase.gateName}</div>
       <p style={{ fontSize: 12, color: 'var(--fg-muted)', margin: '0 0 10px' }}>Noch keine Freigabe angefragt.</p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input
-          type="date" className="mock-input" value={gateDate} onChange={e => setGateDate(e.target.value)}
-          style={{ fontSize: 12.5 }}
-        />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10.5, color: 'var(--fg-dim)' }}>
+          Fällig bis (optional)
+          <input
+            type="date" className="mock-input" value={gateDate} onChange={e => setGateDate(e.target.value)}
+            style={{ fontSize: 12.5 }}
+          />
+        </label>
         <button className="btn-primary" style={{ fontSize: 12, padding: '6px 12px' }} onClick={() => onRequestGate(gateDate || null)}>
           Freigabe anfragen
         </button>
