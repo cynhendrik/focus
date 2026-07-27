@@ -183,4 +183,13 @@ export const ProjectsGateway = {
     if (error) fail(error)
     return projectPhaseRowToPhase(data)
   },
+
+  async updateAssignees(id: string, projectId: string, assigneeIds: string[]): Promise<ProjectPhase> {
+    if (!shared()) return ProjectsService.updateAssignees(id, projectId, JSON.stringify(assigneeIds))
+    const { data, error } = await supabase.from('project_phases')
+      .update({ assignee_ids: assigneeIds }).eq('id', id).eq('project_id', projectId)
+      .select('*').single()
+    if (error) fail(error)
+    return projectPhaseRowToPhase(data)
+  },
 }
