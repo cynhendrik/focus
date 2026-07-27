@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X } from 'lucide-react'
-import type { MoodboardItem, MoodboardColorItem, MoodboardTypeItem, MoodboardNoteItem } from '@/types/project.types'
+import type { MoodboardItem, MoodboardColorItem, MoodboardTypeItem, MoodboardNoteItem, MoodboardImageItem } from '@/types/project.types'
 
 const DEFAULT_COLORS = ['oklch(80% 0.06 60)', 'oklch(60% 0.08 250)', 'oklch(92% 0.01 90)']
 
@@ -42,11 +42,57 @@ function NoteTile({ item, onEdit }: { item: MoodboardNoteItem; onEdit: (patch: P
   )
 }
 
-export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage }: {
+function ImageTile({ item, onUpload, readImage }: {
+  item: MoodboardImageItem
+  onUpload: (file: File) => void
+  readImage: (storageKey: string) => Promise<Blob>
+}) {
+  const [url, setUrl] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!item.storageKey) { setUrl(null); return }
+    let cancelled = false
+    let objectUrl: string | null = null
+    readImage(item.storageKey).then(blob => {
+      if (cancelled) return
+      objectUrl = URL.createObjectURL(blob)
+      setUrl(objectUrl)
+    })
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [item.storageKey, readImage])
+
+  if (!item.storageKey) {
+    return (
+      <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
+        <label style={{ fontSize: 11.5, cursor: 'pointer', color: 'var(--accent)' }}>
+          Bild auswählen
+          <input
+            ref={inputRef} type="file" accept="image/*" aria-label="Bild auswählen"
+            style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f) }}
+          />
+        </label>
+      </div>
+    )
+  }
+
+  return url ? (
+    <img src={url} alt={item.cap} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+  ) : (
+    <div style={{ display: 'grid', placeItems: 'center', height: '100%', fontSize: 11, color: 'var(--fg-dim)' }}>Lädt…</div>
+  )
+}
+
+export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage, readImage }: {
   items: MoodboardItem[]
   onChange: (next: MoodboardItem[]) => void
   onUploadImage: (itemId: string, file: File) => void
   onRemoveImage: (itemId: string) => void
+  readImage: (itemId: string, storageKey: string) => Promise<Blob>
 }) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: string; ox: number; oy: number; x: number; y: number; bw: number; bh: number } | null>(null)
@@ -116,9 +162,7 @@ export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage
               {it.kind === 'type' && <TypeTile item={it} onEdit={patch => edit(it.id, patch)} />}
               {it.kind === 'note' && <NoteTile item={it} onEdit={patch => edit(it.id, patch)} />}
               {it.kind === 'image' && (
-                <div style={{ display: 'grid', placeItems: 'center', height: '100%', fontSize: 11, color: 'var(--fg-dim)', textAlign: 'center', padding: 6 }}>
-                  Bild-Anzeige folgt (Task 14)
-                </div>
+                <ImageTile item={it} onUpload={file => onUploadImage(it.id, file)} readImage={key => readImage(it.id, key)} />
               )}
             </div>
           </div>

@@ -5,6 +5,11 @@ import type { MoodboardItem } from '@/types/project.types'
 
 afterEach(cleanup)
 
+// jsdom does not implement the Blob URL APIs; ImageTile's real display path (Task 14)
+// calls both. Polyfill minimally so the async image test can observe a real <img>.
+if (!URL.createObjectURL) URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+if (!URL.revokeObjectURL) URL.revokeObjectURL = vi.fn()
+
 function renderBoard(items: MoodboardItem[] = [], overrides: Partial<Parameters<typeof ProjectMoodboard>[0]> = {}) {
   return render(
     <ProjectMoodboard
@@ -12,6 +17,7 @@ function renderBoard(items: MoodboardItem[] = [], overrides: Partial<Parameters<
       onChange={vi.fn()}
       onUploadImage={vi.fn()}
       onRemoveImage={vi.fn()}
+      readImage={vi.fn().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))}
       {...overrides}
     />,
   )
@@ -86,5 +92,32 @@ describe('ProjectMoodboard', () => {
     expect(onChange).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'm1', text: 'Neu' }),
     ])
+  })
+
+  it('zeigt einen Auswahl-Button bei einer Bild-Kachel ohne storageKey', () => {
+    renderBoard([{ id: 'm1', kind: 'image', x: 10, y: 10, w: 24, h: 26, cap: 'Neues Bild', storageKey: null }])
+    expect(screen.getByText('Bild auswählen')).toBeTruthy()
+  })
+
+  it('ruft onUploadImage mit der ausgewaehlten Datei auf', () => {
+    const onUploadImage = vi.fn()
+    renderBoard(
+      [{ id: 'm1', kind: 'image', x: 10, y: 10, w: 24, h: 26, cap: 'Neues Bild', storageKey: null }],
+      { onUploadImage },
+    )
+    const file = new File(['x'], 'bild.png', { type: 'image/png' })
+    const input = screen.getByLabelText('Bild auswählen') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onUploadImage).toHaveBeenCalledWith('m1', file)
+  })
+
+  it('ruft readImage auf und zeigt das Bild bei gesetztem storageKey', async () => {
+    const readImage = vi.fn().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    renderBoard(
+      [{ id: 'm1', kind: 'image', x: 10, y: 10, w: 24, h: 26, cap: 'Bild', storageKey: 'key-1' }],
+      { readImage },
+    )
+    await vi.waitFor(() => expect(readImage).toHaveBeenCalledWith('m1', 'key-1'))
+    await vi.waitFor(() => expect(screen.getByRole('img')).toBeTruthy())
   })
 })
