@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { FileText, Tag, Clock, ChevronRight, Download, Banknote } from 'lucide-react'
+import { FileText, Tag, Clock, ChevronRight, Download } from 'lucide-react'
 import { FinanceService } from '@/services/finance.service'
 import { useFinanceStore } from '@/store/finance.store'
 import { useAuftraege }   from '@/store/auftraege.store'
@@ -9,8 +9,9 @@ import { useUiStore }        from '@/store/ui.store'
 import { useCompanyStore }   from '@/store/company.store'
 import { useAccountsStore }  from '@/store/accounts.store'
 import { useToastStore }     from '@/store/toast.store'
-import { isOverdue, paidAmount, remaining, displayInvoiceStatus } from '@/lib/invoice-status'
+import { useProjectsStore }  from '@/store/projects.store'
 import { PaymentModal }      from '@/components/finance/PaymentModal'
+import { InvoiceRow }        from '@/components/finance/InvoiceRow'
 import type { Invoice, Offer, Payment } from '@/types/finance.types'
 import type { Zeiteintrag }   from '@/types/auftrag.types'
 
@@ -64,58 +65,6 @@ const thS: React.CSSProperties = {
 const tdS: React.CSSProperties = { padding: '9px 14px', verticalAlign: 'middle' }
 
 // ── Row sub-components with hover state ───────────────────────────────────────
-
-function InvoiceRow({ inv, payments, pdfBusy, onPayment, onDownload }: {
-  inv: Invoice
-  payments: Payment[]
-  pdfBusy: string | null
-  onPayment: (inv: Invoice) => void
-  onDownload: (inv: Invoice) => void
-}) {
-  const [hover, setHover] = useState(false)
-  const paid = paidAmount(payments, inv.id)
-  const s = displayInvoiceStatus(inv, paid)
-  return (
-    <tr
-      style={{
-        borderBottom: '1px solid var(--border)',
-        background: hover ? 'var(--surface-2)' : 'transparent',
-        transition: 'background 100ms',
-      }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
-      <td style={tdS}><span className="mono" style={{ fontSize: 11 }}>{inv.number ?? '—'}</span></td>
-      <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.date)}</td>
-      <td style={{ ...tdS, color: 'var(--fg-dim)', fontSize: 12 }}>{relDate(inv.dueDate)}</td>
-      <td style={{ ...tdS, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmt(inv.total)}</td>
-      <td style={tdS}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span className="chip" data-tone={STATUS_TONE[s] ?? ''}>{STATUS_LABEL[s] ?? s}</span>
-          {s === 'partly' && (
-            <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
-              {fmt(remaining(inv, paid))} offen
-            </span>
-          )}
-        </span>
-      </td>
-      <td style={{ ...tdS, textAlign: 'right' }}>
-        <div style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
-          {inv.status !== 'draft' && inv.status !== 'cancelled' && (
-            <button onClick={() => onPayment(inv)} title="Zahlung erfassen"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg-muted)', cursor: 'pointer', fontSize: 11, transition: 'border-color 100ms, color 100ms' }}>
-              <Banknote size={12} /> Zahlung
-            </button>
-          )}
-          <button onClick={() => onDownload(inv)} disabled={pdfBusy === inv.id} title="Rechnung als PDF"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--fg-muted)', cursor: pdfBusy === inv.id ? 'wait' : 'pointer', fontSize: 11 }}>
-            <Download size={12} /> {pdfBusy === inv.id ? '…' : 'PDF'}
-          </button>
-        </div>
-      </td>
-    </tr>
-  )
-}
 
 function OfferRow({ offer, pdfBusy, onDownload }: {
   offer: Offer
@@ -193,6 +142,13 @@ export function FinanzPane({ customerId }: Props) {
   const setAppView        = useUiStore(s => s.setAppView)
   const payments          = useFinanceStore(s => s.payments)
   const loadPayments      = useFinanceStore(s => s.loadPayments)
+  const setInvoiceProject = useFinanceStore(s => s.setInvoiceProject)
+  const allProjects       = useProjectsStore(s => s.projects)
+  const loadProjects      = useProjectsStore(s => s.load)
+  const projectsForAccount = useMemo(
+    () => allProjects.filter(p => p.accountId === customerId),
+    [allProjects, customerId],
+  )
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
 
   useEffect(() => {
@@ -206,6 +162,10 @@ export function FinanzPane({ customerId }: Props) {
       setOffers(off)
     }).finally(() => setLoading(false))
   }, [customerId, workspaceId, loadPayments])
+
+  useEffect(() => {
+    if (workspaceId) loadProjects(workspaceId)
+  }, [workspaceId, loadProjects])
 
   // Group unbilled entries by Auftrag
   const groups: AuftragGroup[] = useMemo(() => {
@@ -383,14 +343,18 @@ export function FinanzPane({ customerId }: Props) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-                {['Nummer', 'Datum', 'Fällig', 'Betrag', 'Status', ''].map(h => (
+                {['Nummer', 'Datum', 'Fällig', 'Betrag', 'Status', 'Projekt', ''].map(h => (
                   <th key={h} style={{ ...thS, textAlign: h === 'Betrag' ? 'right' : 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {invoices.map(inv => (
-                <InvoiceRow key={inv.id} inv={inv} payments={payments} pdfBusy={pdfBusy} onPayment={setPaymentInvoice} onDownload={downloadInvoice} />
+                <InvoiceRow
+                  key={inv.id} inv={inv} payments={payments} pdfBusy={pdfBusy}
+                  projects={projectsForAccount} onPayment={setPaymentInvoice} onDownload={downloadInvoice}
+                  onAssignProject={(id, projectId) => setInvoiceProject(id, projectId)}
+                />
               ))}
             </tbody>
           </table>
