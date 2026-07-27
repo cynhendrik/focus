@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { ProjectsService } from '@/services/projects.service'
 import { projectRowToProject, projectToRow, projectPhaseRowToPhase } from './projects.mapper'
 import type {
-  Project, UpsertProjectPayload, ProjectPhase, CreateProjectPhasePayload, Deliverable,
+  Project, UpsertProjectPayload, ProjectPhase, CreateProjectPhasePayload, Deliverable, MoodboardItem,
 } from '@/types/project.types'
 
 function shared(): boolean {
@@ -77,6 +77,14 @@ export const ProjectsGateway = {
     const now = new Date().toISOString()
     const { data, error } = await supabase.from('projects')
       .update({ status, updated_at: now }).eq('id', projectId).select('*').single()
+    if (error) fail(error)
+    return projectRowToProject(data)
+  },
+
+  async updateMoodboardItems(id: string, moodboardItems: MoodboardItem[]): Promise<Project> {
+    if (!shared()) return ProjectsService.updateMoodboardItems(id, JSON.stringify(moodboardItems))
+    const { data, error } = await supabase.from('projects')
+      .update({ moodboard_items: moodboardItems }).eq('id', id).select('*').single()
     if (error) fail(error)
     return projectRowToProject(data)
   },
