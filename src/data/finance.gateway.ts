@@ -48,6 +48,14 @@ export const FinanceGateway = {
     return (data ?? []).map(invoiceRowToInvoice)
   },
 
+  async getInvoicesByProject(projectId: string): Promise<Invoice[]> {
+    if (!shared()) return FinanceService.getInvoicesByProject(projectId)
+    const { data, error } = await supabase.from('invoices').select('*')
+      .eq('project_id', projectId).order('created_at', { ascending: false })
+    if (error) fail(error)
+    return (data ?? []).map(invoiceRowToInvoice)
+  },
+
   async getOffers(workspaceId: string): Promise<Offer[]> {
     if (!shared()) return FinanceService.getOffers(workspaceId)
     const { data, error } = await supabase.from('offers').select('*')
@@ -164,6 +172,14 @@ export const FinanceGateway = {
     if (!shared()) return FinanceService.deleteInvoice(id)
     const { error } = await supabase.from('invoices').delete().eq('id', id)
     if (error) fail(error)
+  },
+
+  async setInvoiceProject(id: string, projectId: string | null): Promise<Invoice> {
+    if (!shared()) return FinanceService.setInvoiceProject(id, projectId)
+    const { data, error } = await supabase.from('invoices')
+      .update({ project_id: projectId }).eq('id', id).select('*').single()
+    if (error) fail(error)
+    return invoiceRowToInvoice(data)
   },
 
   async createOffer(payload: UpsertOfferPayload): Promise<OfferWithItems> {
