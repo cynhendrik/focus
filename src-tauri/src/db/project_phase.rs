@@ -17,6 +17,7 @@ pub struct ProjectPhase {
     pub gate_date: Option<String>,
     pub gate_approved_by: Option<String>,
     pub progress_percent: i32,
+    pub deliverables: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,7 +31,7 @@ pub struct CreateProjectPhasePayload {
 }
 
 const SELECT_COLUMNS: &str =
-    "id, project_id, name, order_index, created_at, start_date, end_date, gate_name, gate_state, gate_date, gate_approved_by, progress_percent";
+    "id, project_id, name, order_index, created_at, start_date, end_date, gate_name, gate_state, gate_date, gate_approved_by, progress_percent, deliverables";
 
 fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectPhase> {
     Ok(ProjectPhase {
@@ -46,6 +47,7 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectPhase> {
         gate_date: r.get(9)?,
         gate_approved_by: r.get(10)?,
         progress_percent: r.get(11)?,
+        deliverables: r.get(12)?,
     })
 }
 
@@ -54,6 +56,18 @@ pub fn get_all_for_project(conn: &Connection, project_id: &str) -> Result<Vec<Pr
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map([project_id], map_row)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
+}
+
+/// Einzelne Phase per id+project_id, mit korrekter NotFound-Konvertierung.
+/// Von request_gate/approve_gate/update_deliverables genutzt, um Existenz-Check
+/// und aktuellen Zustand in einer Abfrage zu bekommen (statt separatem COUNT(*)).
+fn get_by_id(conn: &Connection, id: &str, project_id: &str) -> Result<ProjectPhase, AppError> {
+    let sql = format!("SELECT {SELECT_COLUMNS} FROM project_phases WHERE id = ?1 AND project_id = ?2");
+    conn.query_row(&sql, rusqlite::params![id, project_id], map_row)
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(format!("Phase {id} not found")),
+            other => AppError::from(other),
+        })
 }
 
 /// Haengt eine neue Phase ans Ende an (order_index = aktuelles Maximum + 1).
@@ -105,6 +119,56 @@ pub fn update_progress(conn: &Connection, id: &str, project_id: &str, progress_p
     )?;
     let sql = format!("SELECT {SELECT_COLUMNS} FROM project_phases WHERE id = ?1");
     conn.query_row(&sql, [id], map_row).map_err(AppError::from)
+}
+
+/// Fragt die Freigabe fuer ein Gate an (open -> pending). gate_date ist
+/// optional und wird 1:1 uebernommen -- NIE automatisch "heute", das eine
+/// Dringlichkeit vortaeuschen wuerde, die so nicht gemeint ist.
+pub fn request_gate(conn: &Connection, id: &str, project_id: &str, gate_date: Option<String>) -> Result<ProjectPhase, AppError> {
+    let phase = get_by_id(conn, id, project_id)?;
+    if phase.gate_state != "open" {
+        return Err(AppError::Validation("Freigabe kann nur aus dem Zustand 'open' angefragt werden".to_string()));
+    }
+    conn.execute(
+        "UPDATE project_phases SET gate_state = 'pending', gate_date = ?1 WHERE id = ?2 AND project_id = ?3",
+        rusqlite::params![gate_date, id, project_id],
+    )?;
+    get_by_id(conn, id, project_id)
+}
+
+/// Traegt die Freigabe ein (pending -> approved). approved_by ist Pflicht
+/// (Freitext, meist der Name der Person beim Kunden, die freigegeben hat --
+/// nicht automatisch der eigene Name, da die Freigabe meist vom Kunden kommt).
+pub fn approve_gate(conn: &Connection, id: &str, project_id: &str, approved_by: String) -> Result<ProjectPhase, AppError> {
+    let trimmed = approved_by.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation("approved_by darf nicht leer sein".to_string()));
+    }
+    let phase = get_by_id(conn, id, project_id)?;
+    if phase.gate_state != "pending" {
+        return Err(AppError::Validation("Freigabe kann nur aus dem Zustand 'pending' eingetragen werden".to_string()));
+    }
+    let today = chrono::Utc::now().date_naive().to_string();
+    conn.execute(
+        "UPDATE project_phases SET gate_state = 'approved', gate_date = ?1, gate_approved_by = ?2 WHERE id = ?3 AND project_id = ?4",
+        rusqlite::params![today, trimmed, id, project_id],
+    )?;
+    get_by_id(conn, id, project_id)
+}
+
+/// Ersetzt die Deliverables-Liste. Rust prueft nur, dass es sich um gueltiges
+/// JSON handelt (Boundary-Validierung) -- die Struktur (Feldnamen etc.) wird
+/// nur auf TypeScript-Seite verstanden, analog zum todos.checklist-Muster.
+pub fn update_deliverables(conn: &Connection, id: &str, project_id: &str, deliverables_json: String) -> Result<ProjectPhase, AppError> {
+    if serde_json::from_str::<serde_json::Value>(&deliverables_json).is_err() {
+        return Err(AppError::Validation("deliverables muss gueltiges JSON sein".to_string()));
+    }
+    get_by_id(conn, id, project_id)?;
+    conn.execute(
+        "UPDATE project_phases SET deliverables = ?1 WHERE id = ?2 AND project_id = ?3",
+        rusqlite::params![deliverables_json, id, project_id],
+    )?;
+    get_by_id(conn, id, project_id)
 }
 
 /// Blockiert das Loeschen der aktuellen Phase eines Projekts (sonst verliert
@@ -188,6 +252,7 @@ mod tests {
         assert_eq!(phase.gate_state, "open");
         assert_eq!(phase.progress_percent, 0);
         assert_eq!(phase.start_date, "2026-04-27");
+        assert_eq!(phase.deliverables, "[]");
         let current: Option<String> = conn.query_row(
             "SELECT current_phase_id FROM projects WHERE id = 'p1'", [], |r| r.get(0),
         ).unwrap();
@@ -265,6 +330,85 @@ mod tests {
     fn update_progress_rejects_unknown_phase() {
         let conn = setup();
         let result = update_progress(&conn, "missing", "p1", 50);
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn request_gate_moves_open_to_pending_with_given_date() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let updated = request_gate(&conn, &phase.id, "p1", Some("2026-06-01".to_string())).unwrap();
+        assert_eq!(updated.gate_state, "pending");
+        assert_eq!(updated.gate_date, Some("2026-06-01".to_string()));
+    }
+
+    #[test]
+    fn request_gate_allows_no_date() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let updated = request_gate(&conn, &phase.id, "p1", None).unwrap();
+        assert_eq!(updated.gate_state, "pending");
+        assert_eq!(updated.gate_date, None);
+    }
+
+    #[test]
+    fn request_gate_rejects_non_open_phase() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        request_gate(&conn, &phase.id, "p1", None).unwrap();
+        let result = request_gate(&conn, &phase.id, "p1", None);
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn approve_gate_moves_pending_to_approved_with_approver_and_todays_date() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        request_gate(&conn, &phase.id, "p1", None).unwrap();
+        let updated = approve_gate(&conn, &phase.id, "p1", "M. Weber, TechCorp".to_string()).unwrap();
+        assert_eq!(updated.gate_state, "approved");
+        assert_eq!(updated.gate_approved_by, Some("M. Weber, TechCorp".to_string()));
+        assert!(updated.gate_date.is_some());
+    }
+
+    #[test]
+    fn approve_gate_rejects_empty_approved_by() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        request_gate(&conn, &phase.id, "p1", None).unwrap();
+        let result = approve_gate(&conn, &phase.id, "p1", "   ".to_string());
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn approve_gate_rejects_non_pending_phase() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let result = approve_gate(&conn, &phase.id, "p1", "M. Weber".to_string());
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn update_deliverables_stores_valid_json() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let json = r#"[{"id":"d1","name":"Moodboard","status":"open"}]"#.to_string();
+        let updated = update_deliverables(&conn, &phase.id, "p1", json.clone()).unwrap();
+        assert_eq!(updated.deliverables, json);
+    }
+
+    #[test]
+    fn update_deliverables_rejects_invalid_json() {
+        let conn = setup();
+        let phase = create(&conn, phase_payload("p1", "Konzept")).unwrap();
+        let result = update_deliverables(&conn, &phase.id, "p1", "not json".to_string());
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn update_deliverables_rejects_unknown_phase() {
+        let conn = setup();
+        let result = update_deliverables(&conn, "missing", "p1", "[]".to_string());
         assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 }
