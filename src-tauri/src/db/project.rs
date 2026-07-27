@@ -19,6 +19,7 @@ pub struct Project {
     pub retainer_monthly: f64,
     pub retainer_hours: i32,
     pub retainer_months: Option<i32>,
+    pub moodboard_items: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,11 +50,12 @@ fn map_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         retainer_monthly: r.get(10)?,
         retainer_hours: r.get(11)?,
         retainer_months: r.get(12)?,
+        moodboard_items: r.get(13)?,
     })
 }
 
 const SELECT_COLUMNS: &str =
-    "id, workspace_id, account_id, title, description, status, current_phase_id, created_at, updated_at, completed_at, retainer_monthly, retainer_hours, retainer_months";
+    "id, workspace_id, account_id, title, description, status, current_phase_id, created_at, updated_at, completed_at, retainer_monthly, retainer_hours, retainer_months, moodboard_items";
 
 pub fn get_all_for_workspace(conn: &Connection, workspace_id: &str) -> Result<Vec<Project>, AppError> {
     let sql = format!("SELECT {SELECT_COLUMNS} FROM projects WHERE workspace_id = ?1 ORDER BY created_at DESC");
@@ -150,6 +152,23 @@ pub fn set_status(conn: &Connection, project_id: &str, status: &str) -> Result<P
     get_by_id(conn, project_id)
 }
 
+/// Ersetzt die Moodboard-Kacheln-Liste. Rust prueft nur, dass es sich um
+/// gueltiges JSON handelt (Boundary-Validierung) -- analog zu
+/// update_deliverables/update_assignees auf project_phases. Bild-Kacheln
+/// enthalten nur einen storageKey-Verweis, keine Bytes -- die liegen ausserhalb
+/// dieser Spalte (lokal via workspace_ablage, cloud via Supabase Storage).
+pub fn update_moodboard_items(conn: &Connection, id: &str, moodboard_items_json: String) -> Result<Project, AppError> {
+    if serde_json::from_str::<serde_json::Value>(&moodboard_items_json).is_err() {
+        return Err(AppError::Validation("moodboard_items muss gueltiges JSON sein".to_string()));
+    }
+    get_by_id(conn, id)?;
+    conn.execute(
+        "UPDATE projects SET moodboard_items = ?1 WHERE id = ?2",
+        rusqlite::params![moodboard_items_json, id],
+    )?;
+    get_by_id(conn, id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,6 +202,7 @@ mod tests {
         assert_eq!(p.title, "Website-Relaunch");
         assert_eq!(p.status, "active");
         assert_eq!(p.current_phase_id, None);
+        assert_eq!(p.moodboard_items, "[]");
     }
 
     #[test]
@@ -286,5 +306,29 @@ mod tests {
         delete(&conn, &p.id, "ws-1").unwrap();
         let all = get_all_for_workspace(&conn, "ws-1").unwrap();
         assert!(all.is_empty());
+    }
+
+    #[test]
+    fn update_moodboard_items_stores_valid_json() {
+        let conn = setup();
+        let p = upsert(&conn, payload("Test")).unwrap();
+        let json = r#"[{"id":"m1","kind":"note","x":10,"y":10,"w":20,"h":15,"cap":"Notiz","text":"Hallo"}]"#.to_string();
+        let updated = update_moodboard_items(&conn, &p.id, json.clone()).unwrap();
+        assert_eq!(updated.moodboard_items, json);
+    }
+
+    #[test]
+    fn update_moodboard_items_rejects_invalid_json() {
+        let conn = setup();
+        let p = upsert(&conn, payload("Test")).unwrap();
+        let result = update_moodboard_items(&conn, &p.id, "not json".to_string());
+        assert!(matches!(result, Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn update_moodboard_items_rejects_unknown_project() {
+        let conn = setup();
+        let result = update_moodboard_items(&conn, "missing", "[]".to_string());
+        assert!(result.is_err());
     }
 }
