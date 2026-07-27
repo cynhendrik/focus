@@ -22,11 +22,21 @@ function ColorTile({ item }: { item: MoodboardColorItem }) {
 }
 
 function TypeTile({ item, onEdit }: { item: MoodboardTypeItem; onEdit: (patch: Partial<MoodboardTypeItem>) => void }) {
+  const [note, setNote] = useState(item.note)
+  const isFocused = useRef(false)
+
+  useEffect(() => {
+    if (!isFocused.current) setNote(item.note)
+  }, [item.note])
+
   return (
     <div style={{ padding: 8 }}>
       <span style={{ display: 'block', fontSize: 22, fontFamily: item.font }}>{item.sample}</span>
       <input
-        className="mock-input" value={item.note} onChange={e => onEdit({ note: e.target.value })}
+        className="mock-input" value={note}
+        onChange={e => setNote(e.target.value)}
+        onFocus={() => { isFocused.current = true }}
+        onBlur={() => { isFocused.current = false; onEdit({ note }) }}
         style={{ fontSize: 11.5, marginTop: 4, width: '100%' }}
       />
     </div>
@@ -34,9 +44,19 @@ function TypeTile({ item, onEdit }: { item: MoodboardTypeItem; onEdit: (patch: P
 }
 
 function NoteTile({ item, onEdit }: { item: MoodboardNoteItem; onEdit: (patch: Partial<MoodboardNoteItem>) => void }) {
+  const [text, setText] = useState(item.text)
+  const isFocused = useRef(false)
+
+  useEffect(() => {
+    if (!isFocused.current) setText(item.text)
+  }, [item.text])
+
   return (
     <textarea
-      className="mock-input" value={item.text} onChange={e => onEdit({ text: e.target.value })}
+      className="mock-input" value={text}
+      onChange={e => setText(e.target.value)}
+      onFocus={() => { isFocused.current = true }}
+      onBlur={() => { isFocused.current = false; onEdit({ text }) }}
       style={{ width: '100%', height: '100%', resize: 'none', fontSize: 12.5, border: 'none', background: 'transparent' }}
     />
   )

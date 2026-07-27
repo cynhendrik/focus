@@ -80,15 +80,47 @@ describe('ProjectMoodboard', () => {
     expect(onChange).toHaveBeenCalledWith([])
   })
 
-  it('editiert den Text einer Notiz-Kachel inline', () => {
+  it('editiert den Text einer Notiz-Kachel inline (persistiert erst bei Blur)', () => {
     const onChange = vi.fn()
     renderBoard(
       [{ id: 'm1', kind: 'note', x: 10, y: 10, w: 24, h: 16, cap: 'Notiz', text: 'Alt' }],
       { onChange },
     )
-    fireEvent.change(screen.getByDisplayValue('Alt'), { target: { value: 'Neu' } })
+    const textarea = screen.getByDisplayValue('Alt')
+    fireEvent.change(textarea, { target: { value: 'Neu' } })
+    expect(screen.getByDisplayValue('Neu')).toBeTruthy()
+    fireEvent.blur(textarea)
     expect(onChange).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'm1', text: 'Neu' }),
+    ])
+  })
+
+  it('persistiert den Notiz-Text NICHT bei jedem Tastenanschlag, nur bei Blur', () => {
+    const onChange = vi.fn()
+    renderBoard(
+      [{ id: 'm1', kind: 'note', x: 10, y: 10, w: 24, h: 16, cap: 'Notiz', text: 'Alt' }],
+      { onChange },
+    )
+    const textarea = screen.getByDisplayValue('Alt')
+    fireEvent.change(textarea, { target: { value: 'A' } })
+    fireEvent.change(textarea, { target: { value: 'Ab' } })
+    expect(screen.getByDisplayValue('Ab')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('editiert die Notiz einer Typo-Kachel inline (persistiert erst bei Blur)', () => {
+    const onChange = vi.fn()
+    renderBoard(
+      [{ id: 'm1', kind: 'type', x: 10, y: 10, w: 24, h: 22, cap: 'Typo', font: 'serif', sample: 'Aa', note: 'Alt' }],
+      { onChange },
+    )
+    const input = screen.getByDisplayValue('Alt')
+    fireEvent.change(input, { target: { value: 'Neu' } })
+    expect(screen.getByDisplayValue('Neu')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.blur(input)
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'm1', note: 'Neu' }),
     ])
   })
 
