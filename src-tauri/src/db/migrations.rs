@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use crate::AppError;
 
-const CURRENT_VERSION: u32 = 41;
+const CURRENT_VERSION: u32 = 42;
 
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     let version = get_version(conn)?;
@@ -929,6 +929,17 @@ fn apply(conn: &Connection, version: u32) -> Result<(), AppError> {
             if !column_exists(conn, "projects", "moodboard_items") {
                 conn.execute_batch(
                     "ALTER TABLE projects ADD COLUMN moodboard_items TEXT NOT NULL DEFAULT '[]';"
+                )?;
+            }
+            Ok(())
+        }
+        42 => {
+            // Etappe 6 des Projekt-Ausbaus: optionale Projekt-Zuordnung fuer
+            // Rechnungen. NULL bleibt ein gueltiger Zustand -- nicht jede
+            // Rechnung ist an ein Projekt gekoppelt.
+            if !column_exists(conn, "invoices", "project_id") {
+                conn.execute_batch(
+                    "ALTER TABLE invoices ADD COLUMN project_id TEXT;"
                 )?;
             }
             Ok(())
@@ -1931,6 +1942,38 @@ mod tests {
             "SELECT moodboard_items FROM projects WHERE id = 'p1'", [], |r| r.get(0),
         ).unwrap();
         assert_eq!(items, "[]");
+
+        run(&conn).unwrap(); // idempotent
+    }
+
+    #[test]
+    fn migration_42_adds_invoices_project_id_column_nullable() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+        schema::create_tables(&conn).unwrap();
+
+        for v in 1..=41u32 {
+            apply(&conn, v).unwrap();
+            set_version(&conn, v).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO accounts (id, workspace_id, created_by, name, created_at, updated_at)
+             VALUES ('a1','ws-1','u-1','Test','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO invoices (id, workspace_id, created_by, account_id, date, due_date, status, tax_mode, subtotal, tax_amount, total, bank_info, created_at, updated_at)
+             VALUES ('inv-1','ws-1','u-1','a1','2026-01-01','2026-01-15','draft','standard',100,19,119,'{}','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        run(&conn).unwrap();
+
+        assert!(column_exists(&conn, "invoices", "project_id"));
+        let project_id: Option<String> = conn.query_row(
+            "SELECT project_id FROM invoices WHERE id = 'inv-1'", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(project_id, None);
 
         run(&conn).unwrap(); // idempotent
     }
