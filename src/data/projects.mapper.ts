@@ -13,6 +13,19 @@ function parseDeliverables(raw: unknown): Deliverable[] {
   return []
 }
 
+function parseAssigneeIds(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[]
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export function projectRowToProject(r: any): Project {
   return {
     id: r.id,
@@ -71,5 +84,6 @@ export function projectPhaseRowToPhase(r: any): ProjectPhase {
     gateApprovedBy: r.gate_approved_by ?? null,
     progressPercent: r.progress_percent ?? 0,
     deliverables: parseDeliverables(r.deliverables),
+    assigneeIds: parseAssigneeIds(r.assignee_ids),
   }
 }
