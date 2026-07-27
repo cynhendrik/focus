@@ -27,3 +27,24 @@ pub fn cmd_update_project_phase_progress(
 ) -> Result<ProjectPhase, AppError> {
     db::project_phase::update_progress(&db.conn(), &id, &project_id, progress_percent)
 }
+
+#[tauri::command]
+pub fn cmd_request_gate(
+    db: State<'_, DbPool>, id: String, project_id: String, gate_date: Option<String>,
+) -> Result<ProjectPhase, AppError> {
+    db::project_phase::request_gate(&db.conn(), &id, &project_id, gate_date)
+}
+
+#[tauri::command]
+pub fn cmd_approve_gate(
+    db: State<'_, DbPool>, id: String, project_id: String, approved_by: String,
+) -> Result<ProjectPhase, AppError> {
+    db::project_phase::approve_gate(&db.conn(), &id, &project_id, approved_by)
+}
+
+#[tauri::command]
+pub fn cmd_update_project_phase_deliverables(
+    db: State<'_, DbPool>, id: String, project_id: String, deliverables_json: String,
+) -> Result<ProjectPhase, AppError> {
+    db::project_phase::update_deliverables(&db.conn(), &id, &project_id, deliverables_json)
+}
