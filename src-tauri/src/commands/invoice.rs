@@ -73,6 +73,23 @@ pub fn get_invoices_by_account(
 }
 
 #[tauri::command]
+pub fn get_invoices_by_project(
+    db: State<'_, DbPool>,
+    project_id: String,
+) -> Result<Vec<Invoice>, AppError> {
+    db::invoice::get_by_project(&db.conn(), &project_id)
+}
+
+#[tauri::command]
+pub fn set_invoice_project(
+    db: State<'_, DbPool>,
+    id: String,
+    project_id: Option<String>,
+) -> Result<Invoice, AppError> {
+    db::invoice::set_project(&db.conn(), &id, project_id)
+}
+
+#[tauri::command]
 pub fn get_finance_kpis(
     db: State<'_, DbPool>,
     workspace_id: String,

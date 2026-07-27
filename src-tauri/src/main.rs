@@ -405,6 +405,8 @@ fn main() {
             commands::invoice::update_invoice_status,
             commands::invoice::get_invoice_suggestions,
             commands::invoice::get_invoices_by_account,
+            commands::invoice::get_invoices_by_project,
+            commands::invoice::set_invoice_project,
             commands::invoice::get_finance_kpis,
             commands::invoice::get_invoice_sequence,
             commands::invoice::set_invoice_start_number,
