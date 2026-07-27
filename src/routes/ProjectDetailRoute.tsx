@@ -230,6 +230,7 @@ export function ProjectDetailRoute() {
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
   const setInvoiceProject = useFinanceStore(s => s.setInvoiceProject)
   const payments = useFinanceStore(s => s.payments)
+  const loadPayments = useFinanceStore(s => s.loadPayments)
   const profile = useCompanyStore(s => s.profile)
   const account = useAccountsStore(s => s.accounts.find(a => a.id === project?.accountId))
   const toast = useToastStore(s => s.show)
@@ -265,7 +266,8 @@ export function ProjectDetailRoute() {
   useEffect(() => {
     if (!project) return
     FinanceGateway.getInvoicesByProject(project.id).then(setProjectInvoices)
-  }, [project])
+    if (workspaceId) loadPayments(workspaceId)
+  }, [project, workspaceId, loadPayments])
 
   const customerName = project ? (customers.find(c => c.id === project.accountId)?.name ?? 'Unbekannter Kunde') : ''
 
