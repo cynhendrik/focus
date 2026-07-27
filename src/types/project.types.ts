@@ -1,6 +1,14 @@
 export type ProjectStatus = 'active' | 'paused' | 'completed'
 export type GateState = 'open' | 'pending' | 'approved'
 
+export type DeliverableStatus = 'open' | 'review' | 'done'
+
+export interface Deliverable {
+  id: string
+  name: string
+  status: DeliverableStatus
+}
+
 export interface Project {
   id: string
   workspaceId: string
@@ -41,6 +49,7 @@ export interface ProjectPhase {
   gateDate: string | null
   gateApprovedBy: string | null
   progressPercent: number
+  deliverables: Deliverable[]
 }
 
 export interface CreateProjectPhasePayload {

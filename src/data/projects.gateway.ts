@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { ProjectsService } from '@/services/projects.service'
 import { projectRowToProject, projectToRow, projectPhaseRowToPhase } from './projects.mapper'
 import type {
-  Project, UpsertProjectPayload, ProjectPhase, CreateProjectPhasePayload,
+  Project, UpsertProjectPayload, ProjectPhase, CreateProjectPhasePayload, Deliverable,
 } from '@/types/project.types'
 
 function shared(): boolean {
@@ -137,6 +137,48 @@ export const ProjectsGateway = {
     if (!shared()) return ProjectsService.updatePhaseProgress(id, projectId, progressPercent)
     const { data, error } = await supabase.from('project_phases')
       .update({ progress_percent: progressPercent }).eq('id', id).eq('project_id', projectId)
+      .select('*').single()
+    if (error) fail(error)
+    return projectPhaseRowToPhase(data)
+  },
+
+  async requestGate(id: string, projectId: string, gateDate: string | null): Promise<ProjectPhase> {
+    if (!shared()) return ProjectsService.requestGate(id, projectId, gateDate)
+    const { data: current, error: cErr } = await supabase.from('project_phases')
+      .select('gate_state').eq('id', id).single()
+    if (cErr) fail(cErr)
+    if (current.gate_state !== 'open') {
+      throw new Error("Freigabe kann nur aus dem Zustand 'open' angefragt werden")
+    }
+    const { data, error } = await supabase.from('project_phases')
+      .update({ gate_state: 'pending', gate_date: gateDate }).eq('id', id).eq('project_id', projectId)
+      .select('*').single()
+    if (error) fail(error)
+    return projectPhaseRowToPhase(data)
+  },
+
+  async approveGate(id: string, projectId: string, approvedBy: string): Promise<ProjectPhase> {
+    const trimmed = approvedBy.trim()
+    if (!trimmed) throw new Error('approved_by darf nicht leer sein')
+    if (!shared()) return ProjectsService.approveGate(id, projectId, trimmed)
+    const { data: current, error: cErr } = await supabase.from('project_phases')
+      .select('gate_state').eq('id', id).single()
+    if (cErr) fail(cErr)
+    if (current.gate_state !== 'pending') {
+      throw new Error("Freigabe kann nur aus dem Zustand 'pending' eingetragen werden")
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const { data, error } = await supabase.from('project_phases')
+      .update({ gate_state: 'approved', gate_date: today, gate_approved_by: trimmed })
+      .eq('id', id).eq('project_id', projectId).select('*').single()
+    if (error) fail(error)
+    return projectPhaseRowToPhase(data)
+  },
+
+  async updateDeliverables(id: string, projectId: string, deliverables: Deliverable[]): Promise<ProjectPhase> {
+    if (!shared()) return ProjectsService.updateDeliverables(id, projectId, JSON.stringify(deliverables))
+    const { data, error } = await supabase.from('project_phases')
+      .update({ deliverables }).eq('id', id).eq('project_id', projectId)
       .select('*').single()
     if (error) fail(error)
     return projectPhaseRowToPhase(data)

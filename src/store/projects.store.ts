@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { ProjectsGateway } from '@/data/projects.gateway'
 import { log } from '@/lib/logger'
-import type { Project, ProjectPhase, UpsertProjectPayload, CreateProjectPhasePayload } from '@/types/project.types'
+import type { Project, ProjectPhase, UpsertProjectPayload, CreateProjectPhasePayload, Deliverable } from '@/types/project.types'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
 
@@ -20,6 +20,9 @@ interface ProjectsState {
   deletePhase: (id: string, projectId: string) => Promise<void>
   reorderPhases: (projectId: string, orderedIds: string[]) => Promise<void>
   updatePhaseProgress: (id: string, projectId: string, progressPercent: number) => Promise<void>
+  requestGate: (id: string, projectId: string, gateDate: string | null) => Promise<void>
+  approveGate: (id: string, projectId: string, approvedBy: string) => Promise<void>
+  updateDeliverables: (id: string, projectId: string, deliverables: Deliverable[]) => Promise<void>
 }
 
 export const useProjectsStore = create<ProjectsState>()((set, get) => ({
@@ -186,6 +189,60 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to update project phase progress', { error, id, projectId })
+      throw err
+    }
+  },
+
+  requestGate: async (id, projectId, gateDate) => {
+    set({ error: null })
+    try {
+      const phase = await ProjectsGateway.requestGate(id, projectId, gateDate)
+      set(s => ({
+        phasesByProject: {
+          ...s.phasesByProject,
+          [projectId]: (s.phasesByProject[projectId] ?? []).map(p => p.id === id ? phase : p),
+        },
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to request gate', { error, id, projectId })
+      throw err
+    }
+  },
+
+  approveGate: async (id, projectId, approvedBy) => {
+    set({ error: null })
+    try {
+      const phase = await ProjectsGateway.approveGate(id, projectId, approvedBy)
+      set(s => ({
+        phasesByProject: {
+          ...s.phasesByProject,
+          [projectId]: (s.phasesByProject[projectId] ?? []).map(p => p.id === id ? phase : p),
+        },
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to approve gate', { error, id, projectId })
+      throw err
+    }
+  },
+
+  updateDeliverables: async (id, projectId, deliverables) => {
+    set({ error: null })
+    try {
+      const phase = await ProjectsGateway.updateDeliverables(id, projectId, deliverables)
+      set(s => ({
+        phasesByProject: {
+          ...s.phasesByProject,
+          [projectId]: (s.phasesByProject[projectId] ?? []).map(p => p.id === id ? phase : p),
+        },
+      }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to update deliverables', { error, id, projectId })
       throw err
     }
   },

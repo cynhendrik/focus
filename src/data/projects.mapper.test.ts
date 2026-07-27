@@ -75,7 +75,7 @@ describe('projectPhaseRowToPhase', () => {
     expect(projectPhaseRowToPhase(row)).toEqual({
       id: 'ph1', projectId: 'p1', name: 'Konzept', orderIndex: 0, createdAt: '2026-01-01T00:00:00Z',
       startDate: '2026-04-27', endDate: '2026-05-11', gateName: 'Freigabe', gateState: 'open',
-      gateDate: null, gateApprovedBy: null, progressPercent: 0,
+      gateDate: null, gateApprovedBy: null, progressPercent: 0, deliverables: [],
     })
   })
 
@@ -89,5 +89,38 @@ describe('projectPhaseRowToPhase', () => {
     expect(phase.startDate).toBe('2026-04-27')
     expect(phase.gateState).toBe('pending')
     expect(phase.progressPercent).toBe(42)
+  })
+
+  it('parst deliverables aus einem JSON-String (lokaler SQLite-Pfad)', () => {
+    const row = {
+      id: 'ph1', project_id: 'p1', name: 'Konzept', order_index: 0, created_at: '2026-01-01',
+      start_date: '2026-04-27', end_date: '2026-05-11', gate_name: 'Freigabe',
+      gate_state: 'open', gate_date: null, gate_approved_by: null, progress_percent: 0,
+      deliverables: '[{"id":"d1","name":"Moodboard","status":"open"}]',
+    }
+    const phase = projectPhaseRowToPhase(row)
+    expect(phase.deliverables).toEqual([{ id: 'd1', name: 'Moodboard', status: 'open' }])
+  })
+
+  it('akzeptiert deliverables als bereits geparstes Array (Supabase-jsonb-Pfad)', () => {
+    const row = {
+      id: 'ph1', project_id: 'p1', name: 'Konzept', order_index: 0, created_at: '2026-01-01',
+      start_date: '2026-04-27', end_date: '2026-05-11', gate_name: 'Freigabe',
+      gate_state: 'open', gate_date: null, gate_approved_by: null, progress_percent: 0,
+      deliverables: [{ id: 'd1', name: 'Moodboard', status: 'open' }],
+    }
+    const phase = projectPhaseRowToPhase(row)
+    expect(phase.deliverables).toEqual([{ id: 'd1', name: 'Moodboard', status: 'open' }])
+  })
+
+  it('faellt auf leeres Array zurueck bei fehlendem/ungueltigem deliverables', () => {
+    const base = {
+      id: 'ph1', project_id: 'p1', name: 'Konzept', order_index: 0, created_at: '2026-01-01',
+      start_date: '2026-04-27', end_date: '2026-05-11', gate_name: 'Freigabe',
+      gate_state: 'open', gate_date: null, gate_approved_by: null, progress_percent: 0,
+    }
+    expect(projectPhaseRowToPhase({ ...base }).deliverables).toEqual([])
+    expect(projectPhaseRowToPhase({ ...base, deliverables: 'not json' }).deliverables).toEqual([])
+    expect(projectPhaseRowToPhase({ ...base, deliverables: '{"not":"an array"}' }).deliverables).toEqual([])
   })
 })

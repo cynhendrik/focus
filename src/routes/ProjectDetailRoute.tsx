@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
 import { useActivitiesStore } from '@/store/activities.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useProjectsStore } from '@/store/projects.store'
@@ -23,101 +22,8 @@ import { Target, Milestone } from 'lucide-react'
 import { TabBar } from '@/components/shared/TabBar'
 import { ProjectCockpit } from '@/components/projects/ProjectCockpit'
 import { formatDateDe } from '@/lib/projects/signals'
-
-function Stepper({ phases, currentPhaseId, onDeletePhase, onUpdateProgress }: {
-  phases: { id: string; name: string; orderIndex: number; progressPercent: number }[]
-  currentPhaseId: string | null
-  onDeletePhase: (phaseId: string) => Promise<void>
-  onUpdateProgress: (phaseId: string, progressPercent: number) => void
-}) {
-  const [confirmId, setConfirmId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const currentIndex = phases.findIndex(p => p.id === currentPhaseId)
-
-  const handleConfirmDelete = async (phaseId: string) => {
-    setDeletingId(phaseId)
-    try {
-      await onDeletePhase(phaseId)
-      setConfirmId(null)
-    } catch {
-      // Fehler wird bereits vom Elternteil (phaseError) angezeigt -- hier nur
-      // verhindern, dass confirmId geloescht wird, und keine unhandled rejection.
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 22,
-      padding: '28px 34px 22px', marginBottom: 28,
-    }}>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${phases.length || 1}, 1fr)`, position: 'relative' }}>
-        {phases.map((phase, i) => {
-          const state = currentIndex < 0 ? 'upcoming' : i < currentIndex ? 'done' : i === currentIndex ? 'now' : 'upcoming'
-          const isCurrent = phase.id === currentPhaseId
-          return (
-            <div key={phase.id} style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center' }}>
-              <div style={{
-                width: state === 'now' ? 52 : 44, height: state === 'now' ? 52 : 44, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: state === 'now' ? 18 : 16, fontWeight: 700,
-                border: state === 'upcoming' ? '2px solid var(--border-strong)' : 'none',
-                background: state === 'done' ? 'var(--ok)' : state === 'now' ? 'var(--accent-gradient)' : 'var(--surface-2)',
-                color: state === 'done' ? 'var(--bg)' : state === 'now' ? '#2a1208' : 'var(--fg-dim)',
-                boxShadow: state === 'now' ? '0 0 0 6px var(--accent-soft)' : 'none',
-              }}>
-                {state === 'done' ? '✓' : i + 1}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 650, color: state === 'now' ? 'var(--accent-text)' : 'var(--fg)' }}>
-                {phase.name}
-              </div>
-              {state === 'now' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="range" min={0} max={100} value={phase.progressPercent}
-                    onChange={e => onUpdateProgress(phase.id, Number(e.target.value))}
-                    style={{ width: 90 }}
-                  />
-                  <span style={{ fontSize: 10.5, color: 'var(--fg-dim)', fontVariantNumeric: 'tabular-nums' }}>
-                    {phase.progressPercent}%
-                  </span>
-                </div>
-              )}
-              {!isCurrent && (
-                confirmId === phase.id ? (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      onClick={() => handleConfirmDelete(phase.id)}
-                      disabled={deletingId === phase.id}
-                      style={{ fontSize: 10.5, color: 'oklch(72% 0.18 25)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 650 }}
-                    >
-                      {deletingId === phase.id ? 'Löscht…' : 'Wirklich löschen'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmId(null)}
-                      disabled={deletingId === phase.id}
-                      style={{ fontSize: 10.5, color: 'var(--fg-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmId(phase.id)} title="Phase löschen"
-                    style={{ display: 'flex', alignItems: 'center', color: 'var(--fg-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                )
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+import { ProjectPhasesList } from '@/components/projects/ProjectPhasesList'
+import { useToastStore } from '@/store/toast.store'
 
 function NewPhaseForm({ onCreate }: {
   onCreate: (name: string, startDate: string, endDate: string, gateName: string) => void
@@ -294,6 +200,10 @@ export function ProjectDetailRoute() {
   const createPhase = useProjectsStore(s => s.createPhase)
   const deletePhase = useProjectsStore(s => s.deletePhase)
   const updatePhaseProgress = useProjectsStore(s => s.updatePhaseProgress)
+  const requestGate = useProjectsStore(s => s.requestGate)
+  const approveGate = useProjectsStore(s => s.approveGate)
+  const updateDeliverables = useProjectsStore(s => s.updateDeliverables)
+  const showToast = useToastStore(s => s.show)
   const createActivity = useActivitiesStore(s => s.create)
   const userEmail = useAuthStore(s => s.user?.email ?? 'user')
   const customers = useCustomersStore(s => s.customers)
@@ -451,9 +361,14 @@ export function ProjectDetailRoute() {
                 createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />
             ) : (
               <>
-                <Stepper
-                  phases={phases} currentPhaseId={project.currentPhaseId} onDeletePhase={handleDeletePhase}
+                <ProjectPhasesList
+                  phases={phases} currentPhaseId={project.currentPhaseId}
+                  onDeletePhase={handleDeletePhase}
                   onUpdateProgress={(phaseId, progressPercent) => updatePhaseProgress(phaseId, project.id, progressPercent)}
+                  onRequestGate={(phaseId, gateDate) => requestGate(phaseId, project.id, gateDate)}
+                  onApproveGate={(phaseId, approvedBy) => approveGate(phaseId, project.id, approvedBy)}
+                  onUpdateDeliverables={(phaseId, deliverables) => updateDeliverables(phaseId, project.id, deliverables)}
+                  onRemind={() => showToast({ message: 'Erinnerung vorbereitet (Mail-Versand folgt in einer späteren Runde)' })}
                 />
                 <NewPhaseForm onCreate={(name, startDate, endDate, gateName) =>
                   createPhase({ projectId: project.id, name, startDate, endDate, gateName })} />

@@ -37,4 +37,13 @@ export const ProjectsService = {
   updatePhaseProgress(id: string, projectId: string, progressPercent: number): Promise<ProjectPhase> {
     return invoke('cmd_update_project_phase_progress', { id, projectId, progressPercent })
   },
+  requestGate(id: string, projectId: string, gateDate: string | null): Promise<ProjectPhase> {
+    return invoke('cmd_request_gate', { id, projectId, gateDate })
+  },
+  approveGate(id: string, projectId: string, approvedBy: string): Promise<ProjectPhase> {
+    return invoke('cmd_approve_gate', { id, projectId, approvedBy })
+  },
+  updateDeliverables(id: string, projectId: string, deliverablesJson: string): Promise<ProjectPhase> {
+    return invoke('cmd_update_project_phase_deliverables', { id, projectId, deliverablesJson })
+  },
 }
