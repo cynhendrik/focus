@@ -353,7 +353,10 @@ export function FinanzPane({ customerId }: Props) {
                 <InvoiceRow
                   key={inv.id} inv={inv} payments={payments} pdfBusy={pdfBusy}
                   projects={projectsForAccount} onPayment={setPaymentInvoice} onDownload={downloadInvoice}
-                  onAssignProject={(id, projectId) => setInvoiceProject(id, projectId)}
+                  onAssignProject={async (id, projectId) => {
+                    await setInvoiceProject(id, projectId)
+                    setInvoices(prev => prev.map(i => i.id === id ? { ...i, projectId: projectId ?? undefined } : i))
+                  }}
                 />
               ))}
             </tbody>
