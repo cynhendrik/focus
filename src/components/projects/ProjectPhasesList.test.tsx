@@ -38,7 +38,9 @@ describe('ProjectPhasesList', () => {
   })
 
   it('klappt beim Klick auf die Kopfzeile die Details auf und zeigt den Gate-Bereich', () => {
-    renderList()
+    // currentPhaseId: null, damit die Karte NICHT bereits per Default offen ist (openId startet bei currentPhaseId) --
+    // so testet dieser Fall wirklich das Oeffnen per Klick statt eines bereits offenen Panels.
+    renderList({ currentPhaseId: null })
     fireEvent.click(screen.getByText('Konzept'))
     expect(screen.getByText('Noch keine Freigabe angefragt.')).toBeTruthy()
     expect(screen.getByText('Freigabe anfragen')).toBeTruthy()
@@ -46,9 +48,9 @@ describe('ProjectPhasesList', () => {
 
   it('ruft onRequestGate mit dem eingegebenen Datum auf', () => {
     const onRequestGate = vi.fn()
+    // Panel ist bereits offen (openId startet bei currentPhaseId === 'ph1' === Phase-ID) -- kein Klick noetig.
     renderList({ onRequestGate })
-    fireEvent.click(screen.getByText('Konzept'))
-    const dateInput = screen.getByDisplayValue('') as HTMLInputElement
+    const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
     fireEvent.change(dateInput, { target: { value: '2026-06-01' } })
     fireEvent.click(screen.getByText('Freigabe anfragen'))
     expect(onRequestGate).toHaveBeenCalledWith('ph1', '2026-06-01')
@@ -56,7 +58,6 @@ describe('ProjectPhasesList', () => {
 
   it('zeigt bei pending Gate das Freitext-Feld und deaktiviert den Button bis Eingabe erfolgt', () => {
     renderList({ phases: [phase({ gateState: 'pending', gateDate: '2026-06-01' })] })
-    fireEvent.click(screen.getByText('Konzept'))
     const button = screen.getByText('Freigabe eintragen') as HTMLButtonElement
     expect(button.disabled).toBe(true)
     fireEvent.change(screen.getByPlaceholderText('Wer hat freigegeben?'), { target: { value: 'M. Weber' } })
@@ -66,7 +67,6 @@ describe('ProjectPhasesList', () => {
   it('ruft onApproveGate mit dem eingegebenen Namen auf', () => {
     const onApproveGate = vi.fn()
     renderList({ phases: [phase({ gateState: 'pending', gateDate: '2026-06-01' })], onApproveGate })
-    fireEvent.click(screen.getByText('Konzept'))
     fireEvent.change(screen.getByPlaceholderText('Wer hat freigegeben?'), { target: { value: 'M. Weber' } })
     fireEvent.click(screen.getByText('Freigabe eintragen'))
     expect(onApproveGate).toHaveBeenCalledWith('ph1', 'M. Weber')
@@ -74,7 +74,6 @@ describe('ProjectPhasesList', () => {
 
   it('zeigt bei approved Gate die Freigabe-Info ohne weitere Buttons', () => {
     renderList({ phases: [phase({ gateState: 'approved', gateDate: '2026-06-01', gateApprovedBy: 'M. Weber' })] })
-    fireEvent.click(screen.getByText('Konzept'))
     expect(screen.getByText(/Freigegeben am 01.06.2026 — M. Weber/)).toBeTruthy()
     expect(screen.queryByText('Freigabe anfragen')).toBeNull()
     expect(screen.queryByText('Freigabe eintragen')).toBeNull()
@@ -83,9 +82,11 @@ describe('ProjectPhasesList', () => {
   it('fuegt ein Deliverable hinzu und zyklt seinen Status durch Klick', () => {
     const onUpdateDeliverables = vi.fn()
     renderList({ onUpdateDeliverables })
-    fireEvent.click(screen.getByText('Konzept'))
+    const addButton = screen.getByText('+ Deliverable') as HTMLButtonElement
+    expect(addButton.disabled).toBe(true)
     fireEvent.change(screen.getByPlaceholderText('Neues Ergebnis'), { target: { value: 'Moodboard' } })
-    fireEvent.click(screen.getByText('+ Deliverable'))
+    expect(addButton.disabled).toBe(false)
+    fireEvent.click(addButton)
     expect(onUpdateDeliverables).toHaveBeenCalledWith('ph1', [expect.objectContaining({ name: 'Moodboard', status: 'open' })])
   })
 
@@ -95,7 +96,6 @@ describe('ProjectPhasesList', () => {
       phases: [phase({ deliverables: [{ id: 'd1', name: 'Moodboard', status: 'open' }] })],
       onUpdateDeliverables,
     })
-    fireEvent.click(screen.getByText('Konzept'))
     fireEvent.click(screen.getByTitle('offen'))
     expect(onUpdateDeliverables).toHaveBeenCalledWith('ph1', [{ id: 'd1', name: 'Moodboard', status: 'review' }])
   })
@@ -106,7 +106,6 @@ describe('ProjectPhasesList', () => {
       phases: [phase({ deliverables: [{ id: 'd1', name: 'Moodboard', status: 'open' }] })],
       onUpdateDeliverables,
     })
-    fireEvent.click(screen.getByText('Konzept'))
     fireEvent.click(screen.getByLabelText('Moodboard entfernen'))
     expect(onUpdateDeliverables).toHaveBeenCalledWith('ph1', [])
   })

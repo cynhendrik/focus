@@ -18,12 +18,12 @@ function DeliverablesChecklist({ deliverables, onChange }: {
   deliverables: Deliverable[]
   onChange: (next: Deliverable[]) => void
 }) {
-  const [name, setName] = useState('​')
+  const [name, setName] = useState('')
 
   const add = () => {
     if (!name.trim()) return
     onChange([...deliverables, { id: crypto.randomUUID(), name: name.trim(), status: 'open' }])
-    setName('​')
+    setName('')
   }
   const cycle = (id: string) => {
     onChange(deliverables.map(d => d.id === id ? { ...d, status: DELIVERABLE_NEXT[d.status] } : d))
@@ -239,14 +239,14 @@ function PhaseCard({ phase, index, isCurrent, isOpen, onToggle, onDeletePhase, o
       </button>
 
       {isOpen && (
-        <div style={{ borderTop: '1px solid var(--border)', padding: '16px 17px', display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 22 }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '16px 17px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 22 }}>
+          <DeliverablesChecklist deliverables={phase.deliverables} onChange={next => onUpdateDeliverables(phase.id, next)} />
           <GateSection
             phase={phase}
             onRequestGate={gateDate => onRequestGate(phase.id, gateDate)}
             onApproveGate={approvedBy => onApproveGate(phase.id, approvedBy)}
             onRemind={onRemind}
           />
-          <DeliverablesChecklist deliverables={phase.deliverables} onChange={next => onUpdateDeliverables(phase.id, next)} />
         </div>
       )}
     </div>
@@ -263,7 +263,7 @@ export function ProjectPhasesList({ phases, currentPhaseId, onDeletePhase, onUpd
   onUpdateDeliverables: (phaseId: string, deliverables: Deliverable[]) => void
   onRemind: () => void
 }) {
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(currentPhaseId)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
