@@ -27,6 +27,7 @@ pub struct Invoice {
     pub pending_sync: bool,
     pub created_at: String,
     pub updated_at: String,
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -59,6 +60,7 @@ pub struct UpsertInvoicePayload {
     pub created_by: String,
     pub account_id: String,
     pub deal_id: Option<String>,
+    pub project_id: Option<String>,
     pub number: Option<String>,
     pub date: String,
     pub due_date: String,
@@ -134,6 +136,7 @@ fn map_invoice(r: &rusqlite::Row<'_>) -> rusqlite::Result<Invoice> {
         pending_sync: r.get::<_, i32>(19)? != 0,
         created_at:   r.get(20)?,
         updated_at:   r.get(21)?,
+        project_id:   r.get(22)?,
     })
 }
 
@@ -156,7 +159,7 @@ fn map_item(r: &rusqlite::Row<'_>) -> rusqlite::Result<InvoiceItem> {
 const INVOICE_COLS: &str =
     "id, workspace_id, created_by, account_id, deal_id, number, date, due_date, \
      status, tax_mode, subtotal, tax_amount, total, bank_info, notes, pdf_path, \
-     is_suggestion, suggested_by, approved_by, pending_sync, created_at, updated_at";
+     is_suggestion, suggested_by, approved_by, pending_sync, created_at, updated_at, project_id";
 
 fn fetch_items(conn: &Connection, invoice_id: &str) -> Result<Vec<InvoiceItem>, AppError> {
     let mut stmt = conn.prepare(
@@ -315,12 +318,12 @@ pub fn create(conn: &Connection, payload: UpsertInvoicePayload) -> Result<Invoic
     let is_suggestion = payload.is_suggestion.unwrap_or(false);
     conn.execute(
         &format!("INSERT INTO invoices ({INVOICE_COLS})
-         VALUES (?1,?2,?3,?4,?5,NULL,?6,?7,?8,?9,?10,?11,?12,?13,?14,NULL,?15,?16,NULL,1,?17,?17)"),
+         VALUES (?1,?2,?3,?4,?5,NULL,?6,?7,?8,?9,?10,?11,?12,?13,?14,NULL,?15,?16,NULL,1,?17,?17,?18)"),
         rusqlite::params![
             id, payload.workspace_id, payload.created_by, payload.account_id, payload.deal_id,
             payload.date, payload.due_date, status, tax_mode,
             payload.subtotal, payload.tax_amount, payload.total, bank_info, payload.notes,
-            is_suggestion as i32, payload.suggested_by, now,
+            is_suggestion as i32, payload.suggested_by, now, payload.project_id,
         ],
     )?;
     // Assign invoice number immediately when creating a published (non-draft) invoice
@@ -387,12 +390,12 @@ pub fn update(conn: &Connection, id: &str, payload: UpsertInvoicePayload) -> Res
     let n = conn.execute(
         "UPDATE invoices SET account_id=?1, deal_id=?2, date=?3, due_date=?4,
          tax_mode=?5, subtotal=?6, tax_amount=?7, total=?8, bank_info=?9,
-         notes=?10, status=?11, pending_sync=1, updated_at=?12 WHERE id=?13",
+         notes=?10, status=?11, pending_sync=1, updated_at=?12, project_id=?13 WHERE id=?14",
         rusqlite::params![
             payload.account_id, payload.deal_id, payload.date, payload.due_date,
             payload.tax_mode.unwrap_or_else(|| "standard".into()),
             payload.subtotal, payload.tax_amount, payload.total, bank_info,
-            payload.notes, new_status, now, id,
+            payload.notes, new_status, now, payload.project_id, id,
         ],
     )?;
     if n == 0 { return Err(AppError::NotFound(format!("Invoice {id} not found"))); }
@@ -445,6 +448,41 @@ pub fn get_by_account(conn: &Connection, account_id: &str) -> Result<Vec<Invoice
     )?;
     let rows = stmt.query_map([account_id], map_invoice)?.collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
+}
+
+pub fn get_by_project(conn: &Connection, project_id: &str) -> Result<Vec<Invoice>, AppError> {
+    let mut stmt = conn.prepare(
+        &format!("SELECT {INVOICE_COLS} FROM invoices WHERE project_id=?1 ORDER BY created_at DESC")
+    )?;
+    let rows = stmt.query_map([project_id], map_invoice)?.collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+/// Setzt/entfernt die Projekt-Zuordnung einer bestehenden Rechnung. `None`
+/// entfernt die Zuordnung (Rechnung bleibt gueltig, wie zuvor die Migration
+/// es fuer alle Bestandsrechnungen tut). `Some(id)` erfordert ein existierendes
+/// Projekt -- sonst AppError::NotFound (kein stiller Fehlgriff auf eine
+/// nicht-existente Projekt-ID).
+pub fn set_project(conn: &Connection, id: &str, project_id: Option<String>) -> Result<Invoice, AppError> {
+    if let Some(ref pid) = project_id {
+        let exists: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM projects WHERE id = ?1", [pid], |r| r.get(0),
+        )?;
+        if exists == 0 {
+            return Err(AppError::NotFound(format!("Project {pid} not found")));
+        }
+    }
+    let n = conn.execute(
+        "UPDATE invoices SET project_id = ?1 WHERE id = ?2",
+        rusqlite::params![project_id, id],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound(format!("Invoice {id} not found")));
+    }
+    conn.query_row(
+        &format!("SELECT {INVOICE_COLS} FROM invoices WHERE id = ?1"),
+        [id], map_invoice,
+    ).map_err(AppError::from)
 }
 
 pub fn approve_suggestion(
@@ -692,12 +730,77 @@ mod tests {
         assert!(!invoice_number_exists(&conn, "ws-1", "RE-2026-999", None).unwrap());
     }
 
+    #[test]
+    fn create_stores_project_id_when_provided() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at,
+             retainer_monthly, retainer_hours, retainer_months)
+             VALUES ('p1','ws-1','acc-1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,0,NULL)",
+            [],
+        ).unwrap();
+        let mut p = sample_payload(vec![]);
+        p.project_id = Some("p1".into());
+        let result = create(&conn, p).unwrap();
+        assert_eq!(result.invoice.project_id, Some("p1".to_string()));
+    }
+
+    #[test]
+    fn get_by_project_filters_correctly() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at,
+             retainer_monthly, retainer_hours, retainer_months)
+             VALUES ('p1','ws-1','acc-1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,0,NULL)",
+            [],
+        ).unwrap();
+        let mut with_project = sample_payload(vec![]);
+        with_project.project_id = Some("p1".into());
+        create(&conn, with_project).unwrap();
+        create(&conn, sample_payload(vec![])).unwrap(); // ohne Projekt
+        let results = get_by_project(&conn, "p1").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].project_id, Some("p1".to_string()));
+    }
+
+    #[test]
+    fn set_project_assigns_and_removes() {
+        let conn = setup();
+        conn.execute(
+            "INSERT INTO projects (id, workspace_id, account_id, title, status, created_at, updated_at,
+             retainer_monthly, retainer_hours, retainer_months)
+             VALUES ('p1','ws-1','acc-1','Test-Projekt','active','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',0,0,NULL)",
+            [],
+        ).unwrap();
+        let created = create(&conn, sample_payload(vec![])).unwrap();
+        let assigned = set_project(&conn, &created.invoice.id, Some("p1".into())).unwrap();
+        assert_eq!(assigned.project_id, Some("p1".to_string()));
+        let removed = set_project(&conn, &created.invoice.id, None).unwrap();
+        assert_eq!(removed.project_id, None);
+    }
+
+    #[test]
+    fn set_project_rejects_unknown_project() {
+        let conn = setup();
+        let created = create(&conn, sample_payload(vec![])).unwrap();
+        let result = set_project(&conn, &created.invoice.id, Some("missing-project".into()));
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
+    #[test]
+    fn set_project_rejects_unknown_invoice() {
+        let conn = setup();
+        let result = set_project(&conn, "missing-invoice", None);
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+    }
+
     fn sample_payload(items: Vec<UpsertInvoiceItemPayload>) -> UpsertInvoicePayload {
         UpsertInvoicePayload {
             workspace_id: "ws-1".into(),
             created_by: "u-1".into(),
             account_id: "acc-1".into(),
             deal_id: None,
+            project_id: None,
             date: "2026-06-11".into(),
             due_date: "2026-06-25".into(),
             status: None,
@@ -939,6 +1042,7 @@ mod tests {
             created_by: "u-1".into(),
             account_id: "acc-1".into(),
             deal_id: None,
+            project_id: None,
             date: "2026-05-22".into(),
             due_date: "2026-05-29".into(),
             status: None,

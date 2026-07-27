@@ -285,6 +285,7 @@ pub fn convert_to_invoice(
         created_by: created_by.to_string(),
         account_id: offer.account_id.clone(),
         deal_id: None,
+        project_id: None,
         date: chrono::Utc::now().format("%Y-%m-%d").to_string(),
         due_date: (chrono::Utc::now() + chrono::Duration::days(14))
             .format("%Y-%m-%d")
