@@ -200,4 +200,34 @@ export const ProjectsGateway = {
     if (error) fail(error)
     return projectPhaseRowToPhase(data)
   },
+
+  async uploadMoodboardImage(workspaceId: string, projectId: string, itemId: string, file: File): Promise<string> {
+    const data = Array.from(new Uint8Array(await file.arrayBuffer()))
+    if (!shared()) {
+      const wsFile = await ProjectsService.importMoodboardImage(workspaceId, file.name, data, file.type || null)
+      return wsFile.id
+    }
+    const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin'
+    const storageKey = `${workspaceId}/${projectId}/${itemId}.${ext}`
+    const { error } = await supabase.storage.from('moodboard-images')
+      .upload(storageKey, file, { upsert: true, contentType: file.type || undefined })
+    if (error) fail(error)
+    return storageKey
+  },
+
+  async readMoodboardImage(workspaceId: string, storageKey: string): Promise<Blob> {
+    if (!shared()) {
+      const bytes = await ProjectsService.readMoodboardImage(storageKey)
+      return new Blob([new Uint8Array(bytes)])
+    }
+    const { data, error } = await supabase.storage.from('moodboard-images').download(storageKey)
+    if (error) fail(error)
+    return data
+  },
+
+  async deleteMoodboardImage(workspaceId: string, storageKey: string): Promise<void> {
+    if (!shared()) return ProjectsService.deleteMoodboardImage(storageKey)
+    const { error } = await supabase.storage.from('moodboard-images').remove([storageKey])
+    if (error) fail(error)
+  },
 }
