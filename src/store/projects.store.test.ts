@@ -8,6 +8,7 @@ vi.mock('@/data/projects.gateway', () => ({
     requestGate: vi.fn(),
     approveGate: vi.fn(),
     updateDeliverables: vi.fn(),
+    updateAssignees: vi.fn(),
   },
 }))
 
@@ -46,7 +47,7 @@ describe('useProjectsStore gate/deliverables actions', () => {
   const basePhase = {
     id: 'ph1', projectId: 'p1', name: 'Konzept', orderIndex: 0, createdAt: '2026-01-01',
     startDate: '2026-04-27', endDate: '2026-05-11', gateName: 'Freigabe', gateState: 'open' as const,
-    gateDate: null, gateApprovedBy: null, progressPercent: 0, deliverables: [],
+    gateDate: null, gateApprovedBy: null, progressPercent: 0, deliverables: [], assigneeIds: [],
   }
 
   beforeEach(() => {
@@ -54,6 +55,7 @@ describe('useProjectsStore gate/deliverables actions', () => {
     vi.mocked(ProjectsGateway.requestGate).mockReset()
     vi.mocked(ProjectsGateway.approveGate).mockReset()
     vi.mocked(ProjectsGateway.updateDeliverables).mockReset()
+    vi.mocked(ProjectsGateway.updateAssignees).mockReset()
   })
 
   it('requestGate aktualisiert die Phase im Store', async () => {
@@ -73,6 +75,13 @@ describe('useProjectsStore gate/deliverables actions', () => {
     vi.mocked(ProjectsGateway.updateDeliverables).mockResolvedValue({ ...basePhase, deliverables })
     await useProjectsStore.getState().updateDeliverables('ph1', 'p1', deliverables)
     expect(useProjectsStore.getState().phasesByProject['p1'][0].deliverables).toEqual(deliverables)
+  })
+
+  it('updateAssignees aktualisiert die Phase im Store', async () => {
+    const assigneeIds = ['u-1']
+    vi.mocked(ProjectsGateway.updateAssignees).mockResolvedValue({ ...basePhase, assigneeIds })
+    await useProjectsStore.getState().updateAssignees('ph1', 'p1', assigneeIds)
+    expect(useProjectsStore.getState().phasesByProject['p1'][0].assigneeIds).toEqual(assigneeIds)
   })
 
   it('setzt error im Store, wenn approveGate wirft', async () => {
