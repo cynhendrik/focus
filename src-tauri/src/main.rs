@@ -288,6 +288,7 @@ fn main() {
             commands::project::cmd_delete_project,
             commands::project::cmd_advance_project_phase,
             commands::project::cmd_set_project_status,
+            commands::project::cmd_update_project_moodboard_items,
             commands::project_phase::cmd_get_project_phases,
             commands::project_phase::cmd_create_project_phase,
             commands::project_phase::cmd_delete_project_phase,
