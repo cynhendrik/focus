@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { ProjectsGateway } from '@/data/projects.gateway'
 import { log } from '@/lib/logger'
-import type { Project, ProjectPhase, UpsertProjectPayload, CreateProjectPhasePayload, Deliverable } from '@/types/project.types'
+import type { Project, ProjectPhase, UpsertProjectPayload, CreateProjectPhasePayload, Deliverable, MoodboardItem } from '@/types/project.types'
 import type { AppError } from '@/types/error.types'
 import { isAppError, formatError } from '@/types/error.types'
 
@@ -24,6 +24,8 @@ interface ProjectsState {
   approveGate: (id: string, projectId: string, approvedBy: string) => Promise<void>
   updateDeliverables: (id: string, projectId: string, deliverables: Deliverable[]) => Promise<void>
   updateAssignees: (id: string, projectId: string, assigneeIds: string[]) => Promise<void>
+  updateMoodboardItems: (id: string, moodboardItems: MoodboardItem[]) => Promise<void>
+  uploadMoodboardImage: (workspaceId: string, projectId: string, itemId: string, file: File) => Promise<void>
 }
 
 export const useProjectsStore = create<ProjectsState>()((set, get) => ({
@@ -262,6 +264,37 @@ export const useProjectsStore = create<ProjectsState>()((set, get) => ({
       const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
       set({ error })
       log.error('Failed to update assignees', { error, id, projectId })
+      throw err
+    }
+  },
+
+  updateMoodboardItems: async (id, moodboardItems) => {
+    set({ error: null })
+    try {
+      const project = await ProjectsGateway.updateMoodboardItems(id, moodboardItems)
+      set(s => ({ projects: s.projects.map(p => p.id === id ? project : p) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to update moodboard items', { error, id })
+      throw err
+    }
+  },
+
+  uploadMoodboardImage: async (workspaceId, projectId, itemId, file) => {
+    set({ error: null })
+    try {
+      const storageKey = await ProjectsGateway.uploadMoodboardImage(workspaceId, projectId, itemId, file)
+      const current = get().projects.find(p => p.id === projectId)
+      const nextItems = (current?.moodboardItems ?? []).map(item =>
+        item.id === itemId && item.kind === 'image' ? { ...item, storageKey } : item,
+      )
+      const project = await ProjectsGateway.updateMoodboardItems(projectId, nextItems)
+      set(s => ({ projects: s.projects.map(p => p.id === projectId ? project : p) }))
+    } catch (err) {
+      const error = isAppError(err) ? err : { kind: 'Db' as const, message: formatError(err) }
+      set({ error })
+      log.error('Failed to upload moodboard image', { error, workspaceId, projectId, itemId })
       throw err
     }
   },
