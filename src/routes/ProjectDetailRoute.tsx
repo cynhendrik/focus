@@ -7,6 +7,8 @@ import { useCustomersStore } from '@/store/customers.store'
 import { useTodosStore } from '@/store/todos.store'
 import { useMembersStore } from '@/store/members.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useCompanyStore } from '@/store/company.store'
+import { useAccountsStore } from '@/store/accounts.store'
 import { ActivitiesGateway } from '@/data/activities.gateway'
 import { activityToTodo } from '@/data/todos.mapper'
 import type { Activity } from '@/types/pipeline.types'
@@ -18,14 +20,21 @@ import type { TaskMentionCandidate } from '@/components/tasks/task-mentions'
 import { TaskMentionPopover, filterTaskCandidates } from '@/components/tasks/TaskMentionPopover'
 import { insertMentionMarker, stripResolvedMentions, getInputCaretAnchor } from '@/components/tasks/plain-input-mention'
 import type { ResolvedInputMention } from '@/components/tasks/plain-input-mention'
-import { Target, Milestone, Image as ImageIcon } from 'lucide-react'
+import { Target, Milestone, Image as ImageIcon, FileText } from 'lucide-react'
 import { TabBar } from '@/components/shared/TabBar'
 import { ProjectCockpit } from '@/components/projects/ProjectCockpit'
 import { formatDateDe } from '@/lib/projects/signals'
 import { ProjectPhasesList } from '@/components/projects/ProjectPhasesList'
 import { ProjectMoodboard } from '@/components/projects/ProjectMoodboard'
+import { ProjectInvoices } from '@/components/projects/ProjectInvoices'
+import { InvoiceForm } from '@/components/finance/InvoiceForm'
+import { PaymentModal } from '@/components/finance/PaymentModal'
 import { ProjectsGateway } from '@/data/projects.gateway'
+import { FinanceGateway } from '@/data/finance.gateway'
+import { FinanceService } from '@/services/finance.service'
+import { useFinanceStore } from '@/store/finance.store'
 import { useToastStore } from '@/store/toast.store'
+import type { Invoice } from '@/types/finance.types'
 
 function NewPhaseForm({ onCreate }: {
   onCreate: (name: string, startDate: string, endDate: string, gateName: string) => void
@@ -219,11 +228,20 @@ export function ProjectDetailRoute() {
   const nameOf = useMembersStore(s => s.nameOf)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
   const workspaceId = useWorkspaceStore(s => s.activeWorkspaceId) ?? ''
+  const setInvoiceProject = useFinanceStore(s => s.setInvoiceProject)
+  const payments = useFinanceStore(s => s.payments)
+  const profile = useCompanyStore(s => s.profile)
+  const account = useAccountsStore(s => s.accounts.find(a => a.id === project?.accountId))
+  const toast = useToastStore(s => s.show)
 
   const [activities, setActivities] = useState<Activity[]>([])
   const [loadingActivities, setLoadingActivities] = useState(false)
   const [phaseError, setPhaseError] = useState<string | null>(null)
   const activeProjectIdRef = useRef<string | null>(null)
+  const [projectInvoices, setProjectInvoices] = useState<Invoice[]>([])
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null)
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
 
   const refreshActivities = (projectId: string) =>
     ActivitiesGateway.getByProject(projectId).then(fetched => {
@@ -243,6 +261,11 @@ export function ProjectDetailRoute() {
   useEffect(() => {
     if (workspaceId && isShared) loadMembers(workspaceId)
   }, [workspaceId, isShared, loadMembers])
+
+  useEffect(() => {
+    if (!project) return
+    FinanceGateway.getInvoicesByProject(project.id).then(setProjectInvoices)
+  }, [project])
 
   const customerName = project ? (customers.find(c => c.id === project.accountId)?.name ?? 'Unbekannter Kunde') : ''
 
@@ -296,6 +319,18 @@ export function ProjectDetailRoute() {
     await refreshActivities(project.id)
   }
 
+  const downloadInvoice = async (inv: Invoice) => {
+    if (!profile || !account) { toast({ message: 'Firmenprofil oder Kunde fehlt für das PDF.', variant: 'error' }); return }
+    setPdfBusy(inv.id)
+    try {
+      const full = await FinanceService.getInvoice(inv.id)
+      const { downloadInvoicePDF } = await import('@/components/finance/InvoicePDF')
+      await downloadInvoicePDF(full, profile, account)
+    } catch (e) {
+      toast({ message: `PDF fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    } finally { setPdfBusy(null) }
+  }
+
   const isLastPhase = phases.length > 0 && phases[phases.length - 1]?.id === project.currentPhaseId
   const canPause = project.status !== 'completed'
 
@@ -304,6 +339,7 @@ export function ProjectDetailRoute() {
     { id: 'cockpit', label: 'Cockpit', icon: Target },
     { id: 'phasen', label: 'Phasen', icon: Milestone, count: pendingGateCount > 0 ? pendingGateCount : undefined },
     { id: 'moodboard', label: 'Moodboard', icon: ImageIcon },
+    { id: 'rechnungen', label: 'Rechnungen', icon: FileText },
   ]
 
   return (
@@ -344,7 +380,7 @@ export function ProjectDetailRoute() {
         </div>
       </div>
 
-      <TabBar tabs={tabs} activeId={activeTab} onChange={id => setActiveTab(id as 'cockpit' | 'phasen' | 'moodboard')} />
+      <TabBar tabs={tabs} activeId={activeTab} onChange={id => setActiveTab(id as 'cockpit' | 'phasen' | 'moodboard' | 'rechnungen')} />
 
       <div style={{ paddingTop: 24 }}>
         {activeTab === 'cockpit' && (
@@ -440,7 +476,38 @@ export function ProjectDetailRoute() {
             readImage={(_itemId, storageKey) => ProjectsGateway.readMoodboardImage(workspaceId, storageKey)}
           />
         )}
+
+        {activeTab === 'rechnungen' && (
+          <ProjectInvoices
+            project={project} invoices={projectInvoices} payments={payments} pdfBusy={pdfBusy}
+            onAssignProject={async (invoiceId, projectId) => {
+              await setInvoiceProject(invoiceId, projectId)
+              const refreshed = await FinanceGateway.getInvoicesByProject(project.id)
+              setProjectInvoices(refreshed)
+            }}
+            onCreateInvoice={() => setShowInvoiceForm(true)}
+            onPayment={setPaymentInvoice}
+            onDownload={downloadInvoice}
+          />
+        )}
       </div>
+
+      {showInvoiceForm && (
+        <InvoiceForm
+          initialAccountId={project.accountId}
+          initialProjectId={project.id}
+          onClose={() => setShowInvoiceForm(false)}
+          onSaved={async () => {
+            setShowInvoiceForm(false)
+            const refreshed = await FinanceGateway.getInvoicesByProject(project.id)
+            setProjectInvoices(refreshed)
+          }}
+        />
+      )}
+
+      {paymentInvoice && (
+        <PaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} />
+      )}
     </div>
   )
 }
