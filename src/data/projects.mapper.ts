@@ -1,4 +1,4 @@
-import type { Project, ProjectPhase, Deliverable } from '@/types/project.types'
+import type { Project, ProjectPhase, Deliverable, MoodboardItem } from '@/types/project.types'
 
 function parseDeliverables(raw: unknown): Deliverable[] {
   if (Array.isArray(raw)) return raw as Deliverable[]
@@ -26,6 +26,19 @@ function parseAssigneeIds(raw: unknown): string[] {
   return []
 }
 
+function parseMoodboardItems(raw: unknown): MoodboardItem[] {
+  if (Array.isArray(raw)) return raw as MoodboardItem[]
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export function projectRowToProject(r: any): Project {
   return {
     id: r.id,
@@ -41,6 +54,7 @@ export function projectRowToProject(r: any): Project {
     retainerMonthly: r.retainer_monthly ?? 0,
     retainerHours: r.retainer_hours ?? 0,
     retainerMonths: r.retainer_months ?? null,
+    moodboardItems: parseMoodboardItems(r.moodboard_items),
   }
 }
 

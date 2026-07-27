@@ -14,6 +14,7 @@ describe('projectRowToProject', () => {
       description: 'Kurzbeschreibung', status: 'paused', currentPhaseId: 'ph1',
       createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z', completedAt: null,
       retainerMonthly: 8500, retainerHours: 60, retainerMonths: 12,
+      moodboardItems: [],
     })
   })
 
@@ -30,6 +31,40 @@ describe('projectRowToProject', () => {
     expect(project.retainerMonthly).toBe(0)
     expect(project.retainerHours).toBe(0)
     expect(project.retainerMonths).toBeNull()
+  })
+
+  it('parst moodboardItems aus einem JSON-String (lokaler SQLite-Pfad)', () => {
+    const row = {
+      id: 'p1', workspace_id: 'ws1', account_id: 'a1', title: 'Relaunch',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      moodboard_items: '[{"id":"m1","kind":"note","x":10,"y":10,"w":20,"h":15,"cap":"Notiz","text":"Hallo"}]',
+    }
+    const project = projectRowToProject(row)
+    expect(project.moodboardItems).toEqual([
+      { id: 'm1', kind: 'note', x: 10, y: 10, w: 20, h: 15, cap: 'Notiz', text: 'Hallo' },
+    ])
+  })
+
+  it('akzeptiert moodboardItems als bereits geparstes Array (Supabase-jsonb-Pfad)', () => {
+    const row = {
+      id: 'p1', workspace_id: 'ws1', account_id: 'a1', title: 'Relaunch',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      moodboard_items: [{ id: 'm1', kind: 'color', x: 5, y: 5, w: 24, h: 12, cap: 'Palette', colors: ['#fff'] }],
+    }
+    const project = projectRowToProject(row)
+    expect(project.moodboardItems).toEqual([
+      { id: 'm1', kind: 'color', x: 5, y: 5, w: 24, h: 12, cap: 'Palette', colors: ['#fff'] },
+    ])
+  })
+
+  it('faellt auf leeres Array zurueck bei fehlendem/ungueltigem moodboard_items', () => {
+    const base = {
+      id: 'p1', workspace_id: 'ws1', account_id: 'a1', title: 'Relaunch',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    }
+    expect(projectRowToProject({ ...base }).moodboardItems).toEqual([])
+    expect(projectRowToProject({ ...base, moodboard_items: 'not json' }).moodboardItems).toEqual([])
+    expect(projectRowToProject({ ...base, moodboard_items: '{"not":"an array"}' }).moodboardItems).toEqual([])
   })
 })
 
