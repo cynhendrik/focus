@@ -19,11 +19,12 @@ import {
 interface Props {
   initial?: InvoiceWithItems
   initialAccountId?: string
+  initialProjectId?: string
   onClose: () => void
   onSaved: () => void
 }
 
-export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Props) {
+export function InvoiceForm({ initial, initialAccountId, initialProjectId, onClose, onSaved }: Props) {
   const createInvoice  = useFinanceStore(s => s.createInvoice)
   const updateInvoice  = useFinanceStore(s => s.updateInvoice)
   const accounts       = useAccountsStore(s => s.accounts)
@@ -49,6 +50,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
   const zahlungszielTage = profile.zahlungszielTage ?? 14
 
   const [accountId, setAccountId] = useState(initial?.invoice.accountId ?? initialAccountId ?? '')
+  const [projectId] = useState(initial?.invoice.projectId ?? initialProjectId ?? undefined)
   const [date,      setDate]      = useState(initial?.invoice.date ?? todayStr())
   const [dueDate,   setDueDate]   = useState(
     initial?.invoice.dueDate ?? generateZahlungsziel(todayStr(), zahlungszielTage)
@@ -149,7 +151,7 @@ export function InvoiceForm({ initial, initialAccountId, onClose, onSaved }: Pro
     try {
       const bankInfo = JSON.stringify({ iban: profile.iban ?? '' })
       const payload: UpsertInvoicePayload = {
-        workspaceId, createdBy: user?.id ?? '', accountId, date, dueDate,
+        workspaceId, createdBy: user?.id ?? '', accountId, projectId, date, dueDate,
         status: asDraft ? 'draft' : 'open',
         // Nur eine manuell geänderte Nummer mitschicken; akzeptierter Vorschlag → Auto-Vergabe (Zähler +1).
         number: !asDraft && invoiceNumber.trim() && invoiceNumber.trim() !== suggestedNumber
