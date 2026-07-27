@@ -10,7 +10,7 @@ function phase(overrides: Partial<ProjectPhase> = {}): ProjectPhase {
     id: 'ph1', projectId: 'p1', name: 'Konzept', orderIndex: 0, createdAt: '2026-01-01',
     startDate: '2026-04-27', endDate: '2026-05-11', gateName: 'Konzeptfreigabe',
     gateState: 'open', gateDate: null, gateApprovedBy: null, progressPercent: 40,
-    deliverables: [],
+    deliverables: [], assigneeIds: [],
     ...overrides,
   }
 }
@@ -25,6 +25,9 @@ function renderList(overrides: Partial<Parameters<typeof ProjectPhasesList>[0]> 
       onApproveGate={vi.fn()}
       onUpdateDeliverables={vi.fn()}
       onRemind={vi.fn()}
+      members={[]}
+      nameOf={(id: string) => id}
+      onUpdateAssignees={vi.fn()}
       {...overrides}
     />,
   )
@@ -136,5 +139,61 @@ describe('ProjectPhasesList', () => {
     expect(onDeletePhase).not.toHaveBeenCalled()
     fireEvent.click(screen.getByText('Wirklich löschen'))
     expect(onDeletePhase).toHaveBeenCalledWith('ph2')
+  })
+
+  it('zeigt zugewiesene Mitglieder als Namens-Chips', () => {
+    renderList({
+      phases: [phase({ assigneeIds: ['u-1', 'u-2'] })],
+      members: [
+        { id: 'u-1', displayName: 'Hendrik', email: null },
+        { id: 'u-2', displayName: 'M. Weber', email: null },
+      ],
+      nameOf: (id: string) => (id === 'u-1' ? 'Hendrik' : 'M. Weber'),
+    })
+    expect(screen.getByText('Hendrik')).toBeTruthy()
+    expect(screen.getByText('M. Weber')).toBeTruthy()
+  })
+
+  it('zeigt Hinweistext, wenn niemand zugewiesen ist', () => {
+    renderList()
+    expect(screen.getByText('Noch niemand zugewiesen.')).toBeTruthy()
+  })
+
+  it('fuegt ein Mitglied ueber das Dropdown hinzu', () => {
+    const onUpdateAssignees = vi.fn()
+    renderList({
+      members: [{ id: 'u-1', displayName: 'Hendrik', email: null }],
+      nameOf: () => 'Hendrik',
+      onUpdateAssignees,
+    })
+    fireEvent.click(screen.getByText('+ Person'))
+    fireEvent.click(screen.getByText('Hendrik'))
+    expect(onUpdateAssignees).toHaveBeenCalledWith('ph1', ['u-1'])
+  })
+
+  it('entfernt ein zugewiesenes Mitglied', () => {
+    const onUpdateAssignees = vi.fn()
+    renderList({
+      phases: [phase({ assigneeIds: ['u-1'] })],
+      members: [{ id: 'u-1', displayName: 'Hendrik', email: null }],
+      nameOf: () => 'Hendrik',
+      onUpdateAssignees,
+    })
+    fireEvent.click(screen.getByLabelText('Hendrik entfernen'))
+    expect(onUpdateAssignees).toHaveBeenCalledWith('ph1', [])
+  })
+
+  it('zeigt im Dropdown nur noch nicht zugewiesene Mitglieder', () => {
+    renderList({
+      phases: [phase({ assigneeIds: ['u-1'] })],
+      members: [
+        { id: 'u-1', displayName: 'Hendrik', email: null },
+        { id: 'u-2', displayName: 'M. Weber', email: null },
+      ],
+      nameOf: (id: string) => (id === 'u-1' ? 'Hendrik' : 'M. Weber'),
+    })
+    fireEvent.click(screen.getByText('+ Person'))
+    expect(screen.queryByText('Hendrik', { selector: 'button' })).toBeNull()
+    expect(screen.getByText('M. Weber', { selector: 'button' })).toBeTruthy()
   })
 })
