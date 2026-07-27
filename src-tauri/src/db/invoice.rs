@@ -549,7 +549,7 @@ pub fn create_suggestion_from_deal(conn: &Connection, deal: &crate::db::deal::De
 
     conn.execute(
         &format!("INSERT INTO invoices ({INVOICE_COLS})
-         VALUES (?1,?2,?3,?4,?5,NULL,?6,?7,'draft','standard',?8,0,?8,'{{}}',NULL,NULL,1,NULL,NULL,1,?9,?9)"),
+         VALUES (?1,?2,?3,?4,?5,NULL,?6,?7,'draft','standard',?8,0,?8,'{{}}',NULL,NULL,1,NULL,NULL,1,?9,?9,NULL)"),
         rusqlite::params![
             id, deal.workspace_id, deal.created_by, deal.account_id, deal.id,
             today, due, value, now,
@@ -1204,5 +1204,42 @@ mod tests {
         // Counter must not have advanced
         let (counter, _, _) = get_invoice_sequence(&conn, "ws-1").unwrap();
         assert_eq!(counter, 7, "peek must not advance the persisted counter");
+    }
+
+    /// Regressionstest: create_suggestion_from_deal baut die VALUES-Klausel von Hand
+    /// (kein #[derive] o.ä.), daher schützt kein Compiler davor, dass eine künftige
+    /// weitere Spalte in INVOICE_COLS die Anzahl der Platzhalter/Literale stillschweigend
+    /// aus dem Takt bringt. Dieser Test muss bei jeder Spaltenänderung an invoices
+    /// rot werden, falls die INSERT-VALUES-Klausel nicht mitgepflegt wurde.
+    #[test]
+    fn create_suggestion_from_deal_succeeds_with_no_project() {
+        let conn = setup();
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO deals (id, workspace_id, created_by, account_id, title, stage, value, currency, created_at, updated_at)
+             VALUES ('deal-1','ws-1','u-1','acc-1','Website Relaunch','won',5000,'EUR',?1,?1)",
+            [&now],
+        ).unwrap();
+        let deal = crate::db::deal::Deal {
+            id: "deal-1".into(),
+            workspace_id: "ws-1".into(),
+            created_by: "u-1".into(),
+            account_id: "acc-1".into(),
+            contact_id: None,
+            customer_id: None,
+            title: "Website Relaunch".into(),
+            stage: "won".into(),
+            value: Some(5000.0),
+            currency: "EUR".into(),
+            probability: None,
+            expected_close: None,
+            owner: None,
+            notes: None,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        let invoice = create_suggestion_from_deal(&conn, &deal).unwrap();
+        assert!(invoice.is_suggestion, "deal-derived invoice must be a suggestion");
+        assert_eq!(invoice.project_id, None, "deal-derived suggestion has no project context");
     }
 }
