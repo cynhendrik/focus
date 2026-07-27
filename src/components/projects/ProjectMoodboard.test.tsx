@@ -5,10 +5,8 @@ import type { MoodboardItem } from '@/types/project.types'
 
 afterEach(cleanup)
 
-// jsdom does not implement the Blob URL APIs; ImageTile's real display path (Task 14)
-// calls both. Polyfill minimally so the async image test can observe a real <img>.
-if (!URL.createObjectURL) URL.createObjectURL = vi.fn(() => 'blob:mock-url')
-if (!URL.revokeObjectURL) URL.revokeObjectURL = vi.fn()
+// URL.createObjectURL / URL.revokeObjectURL are polyfilled globally in src/test/setup.js
+// (with distinguishable per-call values so revoke-correctness can be asserted).
 
 function renderBoard(items: MoodboardItem[] = [], overrides: Partial<Parameters<typeof ProjectMoodboard>[0]> = {}) {
   return render(
@@ -119,5 +117,35 @@ describe('ProjectMoodboard', () => {
     )
     await vi.waitFor(() => expect(readImage).toHaveBeenCalledWith('m1', 'key-1'))
     await vi.waitFor(() => expect(screen.getByRole('img')).toBeTruthy())
+  })
+
+  it('fetcht ein Bild nicht erneut, wenn das Board bei gleichem storageKey neu rendert (Drag-Flicker-Regression)', async () => {
+    const readImage = vi.fn().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    const item: MoodboardItem = { id: 'm1', kind: 'image', x: 10, y: 10, w: 24, h: 26, cap: 'Bild', storageKey: 'key-1' }
+    const { rerender } = renderBoard([item], { readImage })
+
+    await vi.waitFor(() => expect(screen.getByRole('img')).toBeTruthy())
+    expect(readImage).toHaveBeenCalledTimes(1)
+    // URL.createObjectURL/revokeObjectURL are polyfilled once at module scope in
+    // src/test/setup.js and shared across every test in this file, so we track
+    // deltas rather than absolute counts.
+    const createCallsAfterInitialFetch = vi.mocked(URL.createObjectURL).mock.calls.length
+    const revokeCallsAfterInitialFetch = vi.mocked(URL.revokeObjectURL).mock.calls.length
+
+    // Simulate what onGrab's forceRerender does on every pointermove during a drag:
+    // ProjectMoodboard re-renders with a fresh `items` array while storageKey is unchanged.
+    rerender(
+      <ProjectMoodboard
+        items={[{ ...item }]}
+        onChange={vi.fn()}
+        onUploadImage={vi.fn()}
+        onRemoveImage={vi.fn()}
+        readImage={readImage}
+      />,
+    )
+
+    expect(readImage).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(URL.createObjectURL).mock.calls.length).toBe(createCallsAfterInitialFetch)
+    expect(vi.mocked(URL.revokeObjectURL).mock.calls.length).toBe(revokeCallsAfterInitialFetch)
   })
 })

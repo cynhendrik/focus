@@ -30,3 +30,10 @@ vi.mock('@/lib/supabase', () => ({
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   },
 }))
+
+// jsdom does not implement the Blob URL APIs. Polyfill with distinguishable
+// per-call values (not a constant string) so tests can assert that the
+// specific blob URL that was created is the one that gets revoked.
+let mockObjectUrlCounter = 0
+URL.createObjectURL = vi.fn(() => `blob:mock-url-${mockObjectUrlCounter++}`)
+URL.revokeObjectURL = vi.fn()

@@ -49,12 +49,14 @@ function ImageTile({ item, onUpload, readImage }: {
 }) {
   const [url, setUrl] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const readImageRef = useRef(readImage)
+  readImageRef.current = readImage
 
   useEffect(() => {
     if (!item.storageKey) { setUrl(null); return }
     let cancelled = false
     let objectUrl: string | null = null
-    readImage(item.storageKey).then(blob => {
+    readImageRef.current(item.storageKey).then(blob => {
       if (cancelled) return
       objectUrl = URL.createObjectURL(blob)
       setUrl(objectUrl)
@@ -63,7 +65,7 @@ function ImageTile({ item, onUpload, readImage }: {
       cancelled = true
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [item.storageKey, readImage])
+  }, [item.storageKey])
 
   if (!item.storageKey) {
     return (
