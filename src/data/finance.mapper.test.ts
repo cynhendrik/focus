@@ -27,6 +27,29 @@ describe('finance.mapper', () => {
       paid_at:'2026-01-10', method:'bank', note:null, created_at:'2026-01-10T00:00:00Z' })
     expect(p.invoiceId).toBe('i1'); expect(p.amount).toBe(50)
   })
+  it('mappt project_id zu projectId (invoiceRowToInvoice)', () => {
+    const row = {
+      id: 'inv1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1', deal_id: null,
+      number: null, date: '2026-01-01', due_date: '2026-01-15', status: 'draft', tax_mode: 'standard',
+      subtotal: 100, tax_amount: 19, total: 119, bank_info: '{}', notes: null, pdf_path: null,
+      is_suggestion: 0, suggested_by: null, approved_by: null, pending_sync: 0,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      project_id: 'p1',
+    }
+    expect(invoiceRowToInvoice(row).projectId).toBe('p1')
+  })
+
+  it('faellt bei fehlendem project_id auf undefined zurueck (invoiceRowToInvoice)', () => {
+    const row = {
+      id: 'inv1', workspace_id: 'ws1', created_by: 'u1', account_id: 'a1', deal_id: null,
+      number: null, date: '2026-01-01', due_date: '2026-01-15', status: 'draft', tax_mode: 'standard',
+      subtotal: 100, tax_amount: 19, total: 119, bank_info: '{}', notes: null, pdf_path: null,
+      is_suggestion: 0, suggested_by: null, approved_by: null, pending_sync: 0,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      project_id: null,
+    }
+    expect(invoiceRowToInvoice(row).projectId).toBeUndefined()
+  })
 })
 
 describe('finance payload→row', () => {
@@ -54,6 +77,23 @@ describe('finance payload→row', () => {
       { id:'it1', invoiceId:'i1' })
     expect(r.invoice_id).toBe('i1'); expect(r.unit_price).toBe(50); expect(r.tax_rate).toBe(19)
     expect(r.description).toBeNull()
+  })
+  it('schreibt project_id aus projectId (invoicePayloadToRow)', () => {
+    const payload = {
+      workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1', projectId: 'p1',
+      date: '2026-01-01', dueDate: '2026-01-15', subtotal: 100, taxAmount: 19, total: 119, items: [],
+    }
+    const row = invoicePayloadToRow(payload, { id: 'inv1', now: '2026-01-01T00:00:00Z' })
+    expect(row.project_id).toBe('p1')
+  })
+
+  it('schreibt project_id als null, wenn projectId fehlt (invoicePayloadToRow)', () => {
+    const payload = {
+      workspaceId: 'ws1', createdBy: 'u1', accountId: 'a1',
+      date: '2026-01-01', dueDate: '2026-01-15', subtotal: 100, taxAmount: 19, total: 119, items: [],
+    }
+    const row = invoicePayloadToRow(payload, { id: 'inv1', now: '2026-01-01T00:00:00Z' })
+    expect(row.project_id).toBeNull()
   })
 })
 
