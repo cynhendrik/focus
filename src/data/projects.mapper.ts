@@ -1,4 +1,17 @@
-import type { Project, ProjectPhase } from '@/types/project.types'
+import type { Project, ProjectPhase, Deliverable } from '@/types/project.types'
+
+function parseDeliverables(raw: unknown): Deliverable[] {
+  if (Array.isArray(raw)) return raw as Deliverable[]
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
 
 export function projectRowToProject(r: any): Project {
   return {
@@ -57,5 +70,6 @@ export function projectPhaseRowToPhase(r: any): ProjectPhase {
     gateDate: r.gate_date ?? null,
     gateApprovedBy: r.gate_approved_by ?? null,
     progressPercent: r.progress_percent ?? 0,
+    deliverables: parseDeliverables(r.deliverables),
   }
 }
