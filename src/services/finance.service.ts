@@ -23,6 +23,9 @@ export const FinanceService = {
   deleteInvoice(id: string): Promise<void> {
     return invoke('delete_invoice', { id })
   },
+  setInvoiceProject(id: string, projectId: string | null): Promise<Invoice> {
+    return invoke('set_invoice_project', { id, projectId })
+  },
   approveInvoiceSuggestion(id: string, approvedBy: string, workspaceId: string): Promise<Invoice> {
     return invoke('approve_invoice_suggestion', { id, approvedBy, workspaceId })
   },
@@ -34,6 +37,9 @@ export const FinanceService = {
   },
   getInvoicesByAccount(accountId: string): Promise<Invoice[]> {
     return invoke('get_invoices_by_account', { accountId })
+  },
+  getInvoicesByProject(projectId: string): Promise<Invoice[]> {
+    return invoke('get_invoices_by_project', { projectId })
   },
   getFinanceKpis(workspaceId: string): Promise<FinanceKpis> {
     return invoke('get_finance_kpis', { workspaceId })

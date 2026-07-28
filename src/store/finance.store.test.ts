@@ -20,6 +20,7 @@ vi.mock('@/data/finance.gateway', () => ({
     convertOfferToInvoice: vi.fn(),
     approveInvoiceSuggestion: vi.fn(),
     updateInvoiceStatus: vi.fn(),
+    setInvoiceProject: vi.fn(),
     updateOfferStatus: vi.fn(),
   },
 }))
@@ -33,6 +34,7 @@ import { FinanceService } from '@/services/finance.service'
 import { useFinanceStore } from './finance.store'
 import { useToastStore } from './toast.store'
 import { useTourStore } from './tour.store'
+import type { Invoice } from '@/types/finance.types'
 
 describe('useFinanceStore — Schreibfehler sind nicht still (Toast + weiterwerfen)', () => {
   beforeEach(() => {
@@ -88,5 +90,37 @@ describe('useFinanceStore — während der KORA-Tour keine Loads (Schau-Daten ni
   it('loadAll: ohne Tour normal laden', async () => {
     await useFinanceStore.getState().loadAll('ws1')
     expect(FinanceGateway.getInvoices).toHaveBeenCalledWith('ws1')
+  })
+})
+
+describe('useFinanceStore — setInvoiceProject', () => {
+  const sampleInvoice: Invoice = {
+    id: 'inv1',
+    workspaceId: 'ws1',
+    createdBy: 'user1',
+    accountId: 'acc1',
+    date: '2026-07-01',
+    dueDate: '2026-07-15',
+    status: 'draft',
+    taxMode: 'standard',
+    subtotal: 100,
+    taxAmount: 19,
+    total: 119,
+    bankInfo: '',
+    isSuggestion: false,
+    pendingSync: false,
+    createdAt: '2026-07-01T00:00:00Z',
+    updatedAt: '2026-07-01T00:00:00Z',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useFinanceStore.setState({ invoices: [sampleInvoice] })
+  })
+
+  it('setInvoiceProject aktualisiert die Rechnung im Store', async () => {
+    vi.mocked(FinanceGateway.setInvoiceProject).mockResolvedValue({ ...sampleInvoice, projectId: 'p1' })
+    await useFinanceStore.getState().setInvoiceProject('inv1', 'p1')
+    expect(useFinanceStore.getState().invoices.find(i => i.id === 'inv1')?.projectId).toBe('p1')
   })
 })

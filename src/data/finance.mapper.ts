@@ -4,7 +4,7 @@ import type { Invoice, InvoiceItem, Offer, OfferItem, Payment, UpsertInvoicePayl
 export function invoiceRowToInvoice(r: any): Invoice {
   return {
     id: r.id, workspaceId: r.workspace_id, createdBy: r.created_by, accountId: r.account_id,
-    dealId: r.deal_id ?? undefined, number: r.number ?? undefined, date: r.date, dueDate: r.due_date,
+    dealId: r.deal_id ?? undefined, projectId: r.project_id ?? undefined, number: r.number ?? undefined, date: r.date, dueDate: r.due_date,
     status: r.status, taxMode: r.tax_mode, subtotal: r.subtotal, taxAmount: r.tax_amount, total: r.total,
     bankInfo: r.bank_info ?? '{}', notes: r.notes ?? undefined, pdfPath: r.pdf_path ?? undefined,
     isSuggestion: !!r.is_suggestion, suggestedBy: r.suggested_by ?? undefined,
@@ -57,7 +57,7 @@ export function invoicePayloadToRow(
 ): Record<string, unknown> {
   return {
     id: ctx.id, workspace_id: p.workspaceId, created_by: p.createdBy, account_id: p.accountId,
-    deal_id: p.dealId ?? null, number: p.number ?? null, date: p.date, due_date: p.dueDate,
+    deal_id: p.dealId ?? null, project_id: p.projectId ?? null, number: p.number ?? null, date: p.date, due_date: p.dueDate,
     status: p.status ?? 'draft', tax_mode: p.taxMode ?? 'standard',
     subtotal: p.subtotal, tax_amount: p.taxAmount, total: p.total,
     bank_info: p.bankInfo ?? '{}', notes: p.notes ?? null,

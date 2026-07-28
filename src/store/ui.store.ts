@@ -73,9 +73,8 @@ export function mapLegacyCustomerTab(tab: string): CustomerTab {
 }
 export type SettingsTab = 'workspace' | 'profil' | 'aussehen' | 'module' | 'integrationen' | 'lizenzen' | 'datenschutz' | 'developer' | 'gefahrenzone' | 'auftraege' | 'benachrichtigungen'
 
-/** Tabs im Projekt-Detail. Rechnungen kommt erst als Tab dazu, wenn
- * Etappe 6 tatsaechlich gebaut wird. */
-export type ProjectTab = 'cockpit' | 'phasen' | 'moodboard'
+/** Tabs im Projekt-Detail. */
+export type ProjectTab = 'cockpit' | 'phasen' | 'moodboard' | 'rechnungen'
 
 export type AppView =
   | 'dashboard' | 'profile'
