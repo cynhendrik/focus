@@ -472,14 +472,39 @@ fn main() {
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Sicherheitsnetz-Backup wie bisher — best effort.
-                commands::export::auto_export(window.app_handle());
+                // Sicherheitsnetz-Backup wie bisher — best effort, nur fuer das
+                // Hauptfenster relevant (nicht bei jedem Schliessen des
+                // Snip-Overlays erneut ausloesen).
+                if window.label() == "main" {
+                    commands::export::auto_export(window.app_handle());
+                }
                 // Default: in den Tray statt beenden — die Präsenz-Schicht
                 // (Briefing, Geld-Events) lebt nur, solange der Prozess lebt.
                 let to_tray = window.app_handle().state::<CloseToTray>().0.load(Ordering::Relaxed);
                 if to_tray && window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
+                }
+                // Sicherheitsnetz: Wird das Snip-Overlay auf einem anderen Weg
+                // als cmd_finish_screen_snip/cmd_cancel_screen_snip geschlossen
+                // (Alt+F4, Task-Kill, Renderer-Absturz), muss der wartende
+                // oneshot::Sender trotzdem bedient werden -- sonst haengt
+                // cmd_start_screen_snip fuer immer und das Hauptfenster bleibt
+                // minimiert stecken.
+                if window.label() == commands::screen_snip::OVERLAY_LABEL {
+                    let app_handle = window.app_handle();
+                    let session = app_handle.state::<commands::screen_snip::SnipSession>();
+                    let data = {
+                        let mut guard = session.0.lock().unwrap_or_else(|e| e.into_inner());
+                        guard.take()
+                    };
+                    if let Some(data) = data {
+                        let _ = data.responder.send(commands::screen_snip::SnipOutcome::Cancelled);
+                    }
+                    if let Some(main) = app_handle.get_webview_window("main") {
+                        let _ = main.unminimize();
+                        let _ = main.set_focus();
+                    }
                 }
             }
         })

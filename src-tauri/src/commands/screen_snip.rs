@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::oneshot;
 
-const OVERLAY_LABEL: &str = "snip-overlay";
+pub const OVERLAY_LABEL: &str = "snip-overlay";
 
 pub enum SnipOutcome {
     Done(Vec<u8>),
