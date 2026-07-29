@@ -64,6 +64,14 @@ pub fn capture_monitor_at(x: i32, y: i32) -> Result<RgbaImage, String> {
         .map(|(_, m)| m)
         .ok_or_else(|| "Kein Monitor gefunden".to_string())?;
 
+    // Warm-up-Aufnahme: die Windows-Bildschirmaufnahme-API (DXGI Desktop
+    // Duplication) liefert den allerersten Frame nach einem Szenenwechsel
+    // (z.B. Fenster minimieren) mitunter noch leer/schwarz zurueck. Ein
+    // verworfener erster Capture-Aufruf + kurze Pause macht den zweiten,
+    // tatsaechlich verwendeten Aufruf zuverlaessig.
+    let _ = monitor.capture_image();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+
     monitor
         .capture_image()
         .map_err(|e| format!("Bildschirmaufnahme fehlgeschlagen: {e}"))
