@@ -36,4 +36,17 @@ describe('SyncStatusChip', () => {
     const { container } = render(<SyncStatusChip />)
     expect(container.firstChild).toBeNull()
   })
+
+  it('zeigt einen ruhigen Zustand fuer wartende, noch nicht fehlgeschlagene Aenderungen', () => {
+    useWorkspaceStore.setState({ failedCount: 0, pendingCount: 4 } as never)
+    render(<SyncStatusChip />)
+    expect(screen.getByText('Synchronisiert …')).toBeInTheDocument()
+    expect(screen.queryByText('Sync-Fehler')).not.toBeInTheDocument()
+  })
+
+  it('rendert nichts wenn weder Fehler noch wartende Aenderungen vorliegen', () => {
+    useWorkspaceStore.setState({ failedCount: 0, pendingCount: 0 } as never)
+    const { container } = render(<SyncStatusChip />)
+    expect(container.firstChild).toBeNull()
+  })
 })
