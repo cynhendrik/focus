@@ -70,10 +70,13 @@ export function SnipOverlay() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onContextMenu={e => { e.preventDefault(); void invoke('cmd_cancel_screen_snip') }}
-      style={{ position: 'fixed', inset: 0 }}
+      style={{ position: 'fixed', inset: 0, userSelect: 'none', touchAction: 'none' }}
     >
       {bgUrl && (
-        <img src={bgUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }} />
+        <img
+          src={bgUrl} alt="" draggable={false} onDragStart={e => e.preventDefault()}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none', userSelect: 'none', WebkitUserDrag: 'none' } as React.CSSProperties}
+        />
       )}
       {rect && (
         <>
