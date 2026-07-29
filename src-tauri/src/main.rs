@@ -8,6 +8,7 @@ mod core;
 mod services;
 mod activity_engine;
 mod engine;
+mod screen_snip;
 
 pub use error::AppError;
 
