@@ -77,6 +77,7 @@ import { NamePrompt } from '@/components/onboarding/NamePrompt'
 import { useOnboardingSync } from '@/components/onboarding/useOnboardingSync'
 import { useBriefingScheduler } from '@/hooks/useBriefingScheduler'
 import { useMoneyEvents } from '@/hooks/useMoneyEvents'
+import { useTrayBadge } from '@/hooks/useTrayBadge'
 import { usePresenceBridge } from '@/hooks/usePresenceBridge'
 import { usePreparationTick } from '@/hooks/usePreparationTick'
 import { useOnboardingStore } from '@/store/onboarding.store'
@@ -227,6 +228,7 @@ export default function App() {
   useOnboardingSync()
   useBriefingScheduler()
   useMoneyEvents()
+  useTrayBadge()
   usePresenceBridge()
   usePreparationTick()
 
