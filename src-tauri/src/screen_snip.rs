@@ -40,6 +40,35 @@ pub fn crop_to_png(image: &RgbaImage, rect: SnipRect) -> Result<Vec<u8>, String>
     Ok(bytes)
 }
 
+/// Sucht den Monitor, dessen Position am naechsten an (x, y) liegt (der
+/// Monitor, auf dem sich das Hauptfenster zuletzt befand, siehe Task 3),
+/// und nimmt ihn per Screenshot auf.
+///
+/// In xcap 0.9.7 liefern `Monitor::x()`/`y()`/`capture_image()` allesamt
+/// `XCapResult<T>` (kein direkter Feldzugriff) -- Monitore, deren Position
+/// nicht ermittelt werden kann, werden bei der Auswahl uebersprungen statt
+/// die gesamte Suche abzubrechen.
+pub fn capture_monitor_at(x: i32, y: i32) -> Result<RgbaImage, String> {
+    let monitors = xcap::Monitor::all().map_err(|e| format!("Monitore konnten nicht ermittelt werden: {e}"))?;
+
+    let monitor = monitors
+        .into_iter()
+        .filter_map(|m| {
+            let mx = m.x().ok()?;
+            let my = m.y().ok()?;
+            let dx = (mx - x) as i64;
+            let dy = (my - y) as i64;
+            Some((dx * dx + dy * dy, m))
+        })
+        .min_by_key(|(dist, _)| *dist)
+        .map(|(_, m)| m)
+        .ok_or_else(|| "Kein Monitor gefunden".to_string())?;
+
+    monitor
+        .capture_image()
+        .map_err(|e| format!("Bildschirmaufnahme fehlgeschlagen: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,5 +119,15 @@ mod tests {
         let img = test_image(); // 20x20
         let result = crop_to_png(&img, SnipRect { x: 25, y: 25, width: 10, height: 10 });
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn captures_the_monitor_nearest_to_the_given_origin() {
+        // Laeuft gegen den echten Bildschirm der Entwicklungsmaschine (kein
+        // Headless-CI in diesem Projekt konfiguriert) -- reiner Rauch-Test:
+        // liefert ueberhaupt ein nicht-leeres Bild zurueck.
+        let image = capture_monitor_at(0, 0).expect("Capture sollte auf einer echten Maschine gelingen");
+        assert!(image.width() > 0);
+        assert!(image.height() > 0);
     }
 }
