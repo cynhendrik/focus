@@ -4,7 +4,7 @@ import { useFinanceStore } from '@/store/finance.store'
 import { useMailStore } from '@/store/mail.store'
 import { useTodosStore } from '@/store/todos.store'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
-import { computeOpenCount } from '@/lib/heute/due'
+import { computeOpenCount, isTodoForToday, todayLocalIso } from '@/lib/heute/due'
 
 /**
  * Haelt den Tray-Tooltip synchron mit der Anzahl offener Punkte
@@ -17,9 +17,10 @@ export function useTrayBadge() {
     s.invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length
   )
   const unreadMails = useMailStore(s => s.emails.filter(e => !e.isRead).length)
-  const todayTodos = useTodosStore(s =>
-    s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')).length
-  )
+  const todayTodos = useTodosStore(s => {
+    const today = todayLocalIso()
+    return s.allTodos.filter(t => isTodoForToday(t, today)).length
+  })
 
   useEffect(() => {
     const openCount = computeOpenCount(overdueCount, unreadMails, todayTodos)

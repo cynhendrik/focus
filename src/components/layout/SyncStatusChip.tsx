@@ -13,6 +13,7 @@ interface SyncNowResult { pending_count: number; failed_count: number; last_sync
 export function SyncStatusChip() {
   const failedCount = useWorkspaceStore(s => s.failedCount)
   const pendingCount = useWorkspaceStore(s => s.pendingCount)
+  const isOnline = useWorkspaceStore(s => s.isOnline)
   const isShared = useWorkspaceStore(s => s.isActiveWorkspaceShared())
   const [busy, setBusy] = useState(false)
 
@@ -24,10 +25,10 @@ export function SyncStatusChip() {
         className="nav-item"
         data-active="false"
         data-label="Sync-Pending"
-        title={`${pendingCount} Änderungen werden übertragen`}
+        title={isOnline ? `${pendingCount} Änderungen werden übertragen` : `${pendingCount} Änderungen warten — keine Verbindung`}
       >
         <RefreshCw size={18} strokeWidth={1.75} />
-        <span className="nav-item__label">Synchronisiert …</span>
+        <span className="nav-item__label">{isOnline ? 'Synchronisiert …' : 'Wartet auf Verbindung'}</span>
       </div>
     )
   }

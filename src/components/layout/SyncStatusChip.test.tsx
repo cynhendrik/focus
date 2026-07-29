@@ -9,6 +9,8 @@ describe('SyncStatusChip', () => {
   beforeEach(() => {
     useWorkspaceStore.setState({
       failedCount: 0,
+      pendingCount: 0,
+      isOnline: true,
       activeWorkspaceId: 'ws1',
       workspaces: [{ id: 'ws1', name: 'Test', logo_url: null, role: 'owner', capabilities: [], isShared: true, join_code: null }],
       localWorkspaces: [],
@@ -48,5 +50,11 @@ describe('SyncStatusChip', () => {
     useWorkspaceStore.setState({ failedCount: 0, pendingCount: 0 } as never)
     const { container } = render(<SyncStatusChip />)
     expect(container.firstChild).toBeNull()
+  })
+
+  it('zeigt "wartet auf Verbindung" statt Fortschritt wenn offline', () => {
+    useWorkspaceStore.setState({ failedCount: 0, pendingCount: 4, isOnline: false } as never)
+    render(<SyncStatusChip />)
+    expect(screen.getByText('Wartet auf Verbindung')).toBeInTheDocument()
   })
 })

@@ -8,7 +8,7 @@ import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { countLeadsInFirstOpenStage } from '@/lib/leads/nav-badge'
-import { computeOpenCount } from '@/lib/heute/due'
+import { computeOpenCount, isTodoForToday, todayLocalIso } from '@/lib/heute/due'
 import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
@@ -74,9 +74,10 @@ export function NavSidebar() {
   const overdueCount  = useFinanceStore(s =>
     s.invoices.filter(i => !i.isSuggestion && invoiceCategory(i) === 'overdue').length
   )
-  const todayTodos = useTodosStore(s =>
-    s.allTodos.filter(t => t.status !== 'done' && (t.bucket === 'today' || t.bucket === 'in_progress')).length
-  )
+  const todayTodos = useTodosStore(s => {
+    const today = todayLocalIso()
+    return s.allTodos.filter(t => isTodoForToday(t, today)).length
+  })
 
   const modules = useCompanyStore(s => s.modules)
   const mod = (key: keyof typeof modules, defaultOn = true) => {
