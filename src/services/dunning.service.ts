@@ -176,7 +176,10 @@ export async function prepareReminder(
     if (!mailAccount) return { ok: false, error: 'Kein E-Mail-Konto konfiguriert.' }
 
     const account = useAccountsStore.getState().accounts.find(a => a.id === invoice.accountId)
-    const contacts = await ContactsGateway.getByAccount(invoice.accountId).catch(() => [])
+    const contacts = await ContactsGateway.getByAccount(invoice.accountId).catch((err) => {
+      log.warn('contact lookup failed, falling back to account email', { invoiceId: invoice.id, err })
+      return []
+    })
     const recipient = contacts.find(c => c.email)?.email ?? account?.email
     if (!recipient) return { ok: false, error: 'Keine E-Mail-Adresse für diesen Kunden.' }
     const profile = useCompanyStore.getState().profile
@@ -266,6 +269,7 @@ export async function sendReminder(invoice: Invoice, level: number, opts?: { bod
     })
   } catch (protoErr) {
     log.warn('reminder protocol activity failed', { invoiceId: invoice.id, protoErr })
+    return { invoiceId: invoice.id, ok: true, warning: 'Mahnung gesendet, aber nicht im Kundenverlauf protokolliert.' }
   }
   return { invoiceId: invoice.id, ok: true }
 }

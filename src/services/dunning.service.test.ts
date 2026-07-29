@@ -16,6 +16,8 @@ vi.mock('@/store/todos.store', () => ({
 vi.mock('@/data/finance.gateway', () => ({ FinanceGateway: { getInvoice: vi.fn() } }))
 vi.mock('@/data/contacts.gateway', () => ({ ContactsGateway: { getByAccount: vi.fn().mockResolvedValue([]) } }))
 vi.mock('@/lib/ai/corra', () => ({ generateCorraDraft: vi.fn().mockRejectedValue(new Error('offline')) }))
+vi.mock('@/components/finance/InvoicePDF', () => ({ getInvoicePdfBytes: vi.fn().mockResolvedValue(new Uint8Array([])) }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue('/tmp/test.pdf') }))
 
 const inv = (over: Partial<Invoice> = {}): Invoice => ({
   id: 'inv1', workspaceId: 'w', createdBy: 'u', accountId: 'a',
@@ -190,5 +192,65 @@ describe('prepareReminder: PDF-Pflicht', () => {
     const result = await prepareReminder(invoice, 0)
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toContain('PDF')
+  })
+})
+
+describe('prepareReminder: Kontakt-Lookup-Fehler', () => {
+  it('loggt eine Warnung wenn der Kontakt-Lookup fehlschlaegt, faellt aber auf Konto-E-Mail zurueck', async () => {
+    const { prepareReminder } = await import('./dunning.service')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+    const { useCompanyStore } = await import('@/store/company.store')
+    const { ContactsGateway } = await import('@/data/contacts.gateway')
+    const { FinanceGateway } = await import('@/data/finance.gateway')
+    const { getInvoicePdfBytes } = await import('@/components/finance/InvoicePDF')
+    const { log } = await import('@/lib/logger')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    useAccountsStore.setState({ accounts: [{ id: 'acc1', name: 'Meyer GmbH', email: 'info@meyer.de' }] } as never)
+    useCompanyStore.setState({ profile: { dunningFees: [0, 5, 10] } } as never)
+    vi.mocked(ContactsGateway.getByAccount).mockRejectedValueOnce(new Error('db timeout'))
+    vi.mocked(FinanceGateway.getInvoice).mockResolvedValueOnce({
+      id: 'inv1', accountId: 'acc1', workspaceId: 'w', createdBy: 'u', number: 'R-1',
+      dueDate: '2026-06-01', date: '2026-06-01', status: 'overdue', total: 100, subtotal: 100,
+      taxAmount: 0, taxMode: 'standard', isSuggestion: false, pendingSync: false,
+      bankInfo: '', createdAt: '', updatedAt: '',
+    } as never)
+    vi.mocked(getInvoicePdfBytes).mockResolvedValueOnce(new Uint8Array([1, 2, 3]))
+    const warnSpy = vi.spyOn(log, 'warn')
+
+    const invoice = { id: 'inv1', accountId: 'acc1', number: 'R-1', dueDate: '2026-06-01', total: 100, status: 'overdue' } as never
+    const result = await prepareReminder(invoice, 0)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.data.to).toEqual(['info@meyer.de'])
+    expect(warnSpy).toHaveBeenCalledWith(
+      'contact lookup failed, falling back to account email',
+      expect.objectContaining({ invoiceId: 'inv1' })
+    )
+    warnSpy.mockRestore()
+  })
+})
+
+describe('sendReminder: Protokollbuch-Fehler', () => {
+  it('gibt eine Warnung zurueck wenn die Aktivitaet nicht protokolliert werden konnte, Versand zaehlt trotzdem als ok', async () => {
+    const { sendReminder } = await import('./dunning.service')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+    const { MailService } = await import('@/services/mail.service')
+    const { ActivitiesGateway } = await import('@/data/activities.gateway')
+    const { ContactsGateway } = await import('@/data/contacts.gateway')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    useAccountsStore.setState({ accounts: [] } as never) // kein PDF-Block noetig
+    vi.mocked(ContactsGateway.getByAccount).mockResolvedValueOnce([{ email: 'x@y.de' }] as never)
+    vi.spyOn(MailService, 'sendEmail').mockResolvedValueOnce(undefined as never)
+    vi.spyOn(ActivitiesGateway, 'create').mockRejectedValueOnce(new Error('offline'))
+
+    const invoice = { id: 'inv1', accountId: 'accX', number: 'R-1', dueDate: '2026-06-01', total: 100, status: 'overdue' } as never
+    const result = await sendReminder(invoice, 0)
+
+    expect(result.ok).toBe(true)
+    expect(result.warning).toBe('Mahnung gesendet, aber nicht im Kundenverlauf protokolliert.')
   })
 })
