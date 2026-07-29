@@ -8,6 +8,7 @@ import { useDealsStore } from '@/store/deals.store'
 import { useLeadsStore } from '@/store/leads.store'
 import { useLeadStagesStore } from '@/store/lead-stages.store'
 import { countLeadsInFirstOpenStage } from '@/lib/leads/nav-badge'
+import { computeOpenCount } from '@/lib/heute/due'
 import { useMailStore } from '@/store/mail.store'
 import { useFinanceStore } from '@/store/finance.store'
 import { invoiceCategory } from '@/lib/finance/invoice-filters'
@@ -89,7 +90,7 @@ export function NavSidebar() {
 
   const chatTotal = useMessagesStore(s => totalUnread(s.unreadTeam, s.conversations))
 
-  const corraBadge  = overdueCount + unreadMails + todayTodos || undefined
+  const corraBadge  = computeOpenCount(overdueCount, unreadMails, todayTodos) || undefined
   const displayName = ((user?.user_metadata?.full_name as string | undefined)?.trim().split(' ')[0])
     || user?.email?.split('@')[0]
     || 'Nutzer'

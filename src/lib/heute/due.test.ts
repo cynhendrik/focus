@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isTodoForToday } from './due'
+import { isTodoForToday, computeOpenCount } from './due'
 import type { Todo } from '@/types/todo.types'
 
 const base: Todo = {
@@ -28,5 +28,14 @@ describe('isTodoForToday', () => {
 
   it('false for a backlog todo scheduled on another day', () => {
     expect(isTodoForToday({ ...base, bucket: 'backlog', scheduledAt: '2026-06-20T09:00:00.000Z' }, TODAY)).toBe(false)
+  })
+})
+
+describe('computeOpenCount', () => {
+  it('summiert ueberfaellige Rechnungen, ungelesene Mails und Heute-Todos', () => {
+    expect(computeOpenCount(2, 3, 1)).toBe(6)
+  })
+  it('ist 0 wenn alles leer ist', () => {
+    expect(computeOpenCount(0, 0, 0)).toBe(0)
   })
 })

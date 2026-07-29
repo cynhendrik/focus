@@ -25,3 +25,8 @@ export function isTodoForToday(t: Todo, todayIso: string): boolean {
     (!!t.scheduledAt && t.scheduledAt.slice(0, 10) === todayIso)
   )
 }
+
+/** Gesamtzahl offener Punkte fuer Tray-Badge und Sidebar — EINE Quelle fuer beide. */
+export function computeOpenCount(overdueCount: number, unreadMails: number, todayTodos: number): number {
+  return overdueCount + unreadMails + todayTodos
+}
