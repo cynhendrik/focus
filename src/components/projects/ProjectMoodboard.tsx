@@ -4,7 +4,7 @@ import type { MoodboardItem, MoodboardColorItem, MoodboardTypeItem, MoodboardNot
 
 const DEFAULT_COLORS = ['oklch(80% 0.06 60)', 'oklch(60% 0.08 250)', 'oklch(92% 0.01 90)']
 
-function newItem(kind: MoodboardItem['kind']): MoodboardItem {
+export function newItem(kind: MoodboardItem['kind']): MoodboardItem {
   const id = crypto.randomUUID()
   const base = { id, x: 40, y: 40, w: 24, h: 20 }
   if (kind === 'image') return { ...base, kind: 'image', w: 24, h: 26, cap: 'Neues Bild — hier ablegen', storageKey: null }
@@ -109,11 +109,12 @@ function ImageTile({ item, onUpload, readImage }: {
   )
 }
 
-export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage, readImage }: {
+export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage, onSnip, readImage }: {
   items: MoodboardItem[]
   onChange: (next: MoodboardItem[]) => void
   onUploadImage: (itemId: string, file: File) => void
   onRemoveImage: (itemId: string) => void
+  onSnip: () => void
   readImage: (itemId: string, storageKey: string) => Promise<Blob>
 }) {
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -198,6 +199,7 @@ export function ProjectMoodboard({ items, onChange, onUploadImage, onRemoveImage
           <button className="btn-ghost" onClick={() => add('color')}>Farbe</button>
           <button className="btn-ghost" onClick={() => add('type')}>Typo</button>
           <button className="btn-ghost" onClick={() => add('note')}>Notiz</button>
+          <button className="btn-ghost" onClick={onSnip}>Schnappschuss</button>
         </div>
       </div>
     </div>

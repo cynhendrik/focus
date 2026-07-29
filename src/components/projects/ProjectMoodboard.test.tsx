@@ -15,6 +15,7 @@ function renderBoard(items: MoodboardItem[] = [], overrides: Partial<Parameters<
       onChange={vi.fn()}
       onUploadImage={vi.fn()}
       onRemoveImage={vi.fn()}
+      onSnip={vi.fn()}
       readImage={vi.fn().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))}
       {...overrides}
     />,
@@ -179,5 +180,12 @@ describe('ProjectMoodboard', () => {
     expect(readImage).toHaveBeenCalledTimes(1)
     expect(vi.mocked(URL.createObjectURL).mock.calls.length).toBe(createCallsAfterInitialFetch)
     expect(vi.mocked(URL.revokeObjectURL).mock.calls.length).toBe(revokeCallsAfterInitialFetch)
+  })
+
+  it('ruft onSnip auf, wenn der Schnappschuss-Button geklickt wird', () => {
+    const onSnip = vi.fn()
+    renderBoard([], { onSnip })
+    fireEvent.click(screen.getByText('Schnappschuss'))
+    expect(onSnip).toHaveBeenCalledOnce()
   })
 })
