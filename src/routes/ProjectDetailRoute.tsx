@@ -25,7 +25,8 @@ import { TabBar } from '@/components/shared/TabBar'
 import { ProjectCockpit } from '@/components/projects/ProjectCockpit'
 import { formatDateDe } from '@/lib/projects/signals'
 import { ProjectPhasesList } from '@/components/projects/ProjectPhasesList'
-import { ProjectMoodboard } from '@/components/projects/ProjectMoodboard'
+import { invoke } from '@tauri-apps/api/core'
+import { ProjectMoodboard, newItem } from '@/components/projects/ProjectMoodboard'
 import { ProjectInvoices } from '@/components/projects/ProjectInvoices'
 import { InvoiceForm } from '@/components/finance/InvoiceForm'
 import { PaymentModal } from '@/components/finance/PaymentModal'
@@ -249,6 +250,20 @@ export function ProjectDetailRoute() {
       if (activeProjectIdRef.current === projectId) setActivities(fetched)
     })
 
+  const handleSnip = async () => {
+    if (!project) return
+    try {
+      const bytes = await invoke<number[] | null>('cmd_start_screen_snip')
+      if (!bytes) return
+      const item = newItem('image')
+      await updateMoodboardItems(project.id, [...project.moodboardItems, item])
+      const file = new File([new Uint8Array(bytes)], 'schnappschuss.png', { type: 'image/png' })
+      await uploadMoodboardImage(workspaceId, project.id, item.id, file)
+    } catch (e) {
+      toast({ message: `Schnappschuss fehlgeschlagen: ${String(e)}`, variant: 'error' })
+    }
+  }
+
   useEffect(() => {
     if (!selectedProjectId) return
     activeProjectIdRef.current = selectedProjectId
@@ -469,6 +484,7 @@ export function ProjectDetailRoute() {
             items={project.moodboardItems}
             onChange={items => updateMoodboardItems(project.id, items)}
             onUploadImage={(itemId, file) => uploadMoodboardImage(workspaceId, project.id, itemId, file)}
+            onSnip={handleSnip}
             onRemoveImage={itemId => {
               const item = project.moodboardItems.find(i => i.id === itemId)
               if (item?.kind === 'image' && item.storageKey) {

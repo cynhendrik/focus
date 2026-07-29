@@ -9,6 +9,7 @@ pub mod company;
 pub mod pipeline_stage;
 pub mod project;
 pub mod project_phase;
+pub mod screen_snip;
 pub mod lead_stage;
 pub mod automation_rule;
 pub mod lead;

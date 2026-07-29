@@ -47,6 +47,8 @@ chrono           = { version = "0.4", features = ["serde"] }
 # ── Export / File Dialog ─────────────────────────────────────────────────────
 dirs             = "5"
 zip              = "0.6"
+image = { version = "0.25.6", features = ["png"] }
+xcap = "0.9.7"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

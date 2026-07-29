@@ -14,9 +14,29 @@ function fail(error: { message?: string; code?: string } | null): never {
   throw new Error(e.code ? `${e.message ?? 'Supabase-Fehler'} (${e.code})` : (e.message ?? 'Supabase-Fehler'))
 }
 
+// HOTFIX (nur lokal im Worktree, nicht Teil dieses Branches): der Rust-Command
+// liefert JSON-in-TEXT-Spalten (moodboardItems/deliverables/assigneeIds) als
+// rohen String statt als Array -- vorbestehender Bug im lokalen Pfad,
+// unabhaengig vom Snipping-Tool-Feature.
+function parseArr(v: unknown): unknown[] {
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string') { try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [] } catch { return [] } }
+  return []
+}
+function fixLocalProject(p: Project): Project {
+  return { ...p, moodboardItems: parseArr(p.moodboardItems) as typeof p.moodboardItems }
+}
+function fixLocalPhase(p: ProjectPhase): ProjectPhase {
+  return {
+    ...p,
+    deliverables: parseArr(p.deliverables) as typeof p.deliverables,
+    assigneeIds: parseArr(p.assigneeIds) as typeof p.assigneeIds,
+  }
+}
+
 export const ProjectsGateway = {
   async getAll(workspaceId: string): Promise<Project[]> {
-    if (!shared()) return ProjectsService.getAll(workspaceId)
+    if (!shared()) return (await ProjectsService.getAll(workspaceId)).map(fixLocalProject)
     const { data, error } = await supabase.from('projects').select('*')
       .eq('workspace_id', workspaceId).order('created_at', { ascending: false })
     if (error) fail(error)
@@ -24,14 +44,14 @@ export const ProjectsGateway = {
   },
 
   async getById(id: string): Promise<Project> {
-    if (!shared()) return ProjectsService.getById(id)
+    if (!shared()) return fixLocalProject(await ProjectsService.getById(id))
     const { data, error } = await supabase.from('projects').select('*').eq('id', id).single()
     if (error) fail(error)
     return projectRowToProject(data)
   },
 
   async upsert(payload: UpsertProjectPayload): Promise<Project> {
-    if (!shared()) return ProjectsService.upsert(payload)
+    if (!shared()) return fixLocalProject(await ProjectsService.upsert(payload))
     const id = payload.id ?? crypto.randomUUID()
     const now = new Date().toISOString()
     const { data, error } = await supabase.from('projects')
@@ -47,7 +67,7 @@ export const ProjectsGateway = {
   },
 
   async advancePhase(projectId: string): Promise<Project> {
-    if (!shared()) return ProjectsService.advancePhase(projectId)
+    if (!shared()) return fixLocalProject(await ProjectsService.advancePhase(projectId))
     const { data: phases, error: pErr } = await supabase.from('project_phases').select('*')
       .eq('project_id', projectId).order('order_index', { ascending: true })
     if (pErr) fail(pErr)
@@ -68,7 +88,7 @@ export const ProjectsGateway = {
   },
 
   async setStatus(projectId: string, status: 'active' | 'paused'): Promise<Project> {
-    if (!shared()) return ProjectsService.setStatus(projectId, status)
+    if (!shared()) return fixLocalProject(await ProjectsService.setStatus(projectId, status))
     const { data: proj, error: gErr } = await supabase.from('projects').select('*').eq('id', projectId).single()
     if (gErr) fail(gErr)
     if (proj.status === 'completed') {
@@ -82,7 +102,7 @@ export const ProjectsGateway = {
   },
 
   async updateMoodboardItems(id: string, moodboardItems: MoodboardItem[]): Promise<Project> {
-    if (!shared()) return ProjectsService.updateMoodboardItems(id, JSON.stringify(moodboardItems))
+    if (!shared()) return fixLocalProject(await ProjectsService.updateMoodboardItems(id, JSON.stringify(moodboardItems)))
     const { data, error } = await supabase.from('projects')
       .update({ moodboard_items: moodboardItems }).eq('id', id).select('*').single()
     if (error) fail(error)
@@ -90,7 +110,7 @@ export const ProjectsGateway = {
   },
 
   async getPhases(projectId: string): Promise<ProjectPhase[]> {
-    if (!shared()) return ProjectsService.getPhases(projectId)
+    if (!shared()) return (await ProjectsService.getPhases(projectId)).map(fixLocalPhase)
     const { data, error } = await supabase.from('project_phases').select('*')
       .eq('project_id', projectId).order('order_index', { ascending: true })
     if (error) fail(error)
@@ -98,7 +118,7 @@ export const ProjectsGateway = {
   },
 
   async createPhase(payload: CreateProjectPhasePayload): Promise<ProjectPhase> {
-    if (!shared()) return ProjectsService.createPhase(payload)
+    if (!shared()) return fixLocalPhase(await ProjectsService.createPhase(payload))
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     const { data: existing, error: eErr } = await supabase.from('project_phases')
@@ -142,7 +162,7 @@ export const ProjectsGateway = {
   },
 
   async updatePhaseProgress(id: string, projectId: string, progressPercent: number): Promise<ProjectPhase> {
-    if (!shared()) return ProjectsService.updatePhaseProgress(id, projectId, progressPercent)
+    if (!shared()) return fixLocalPhase(await ProjectsService.updatePhaseProgress(id, projectId, progressPercent))
     const { data, error } = await supabase.from('project_phases')
       .update({ progress_percent: progressPercent }).eq('id', id).eq('project_id', projectId)
       .select('*').single()
@@ -151,7 +171,7 @@ export const ProjectsGateway = {
   },
 
   async requestGate(id: string, projectId: string, gateDate: string | null): Promise<ProjectPhase> {
-    if (!shared()) return ProjectsService.requestGate(id, projectId, gateDate)
+    if (!shared()) return fixLocalPhase(await ProjectsService.requestGate(id, projectId, gateDate))
     const { data: current, error: cErr } = await supabase.from('project_phases')
       .select('gate_state').eq('id', id).single()
     if (cErr) fail(cErr)
@@ -168,7 +188,7 @@ export const ProjectsGateway = {
   async approveGate(id: string, projectId: string, approvedBy: string): Promise<ProjectPhase> {
     const trimmed = approvedBy.trim()
     if (!trimmed) throw new Error('approved_by darf nicht leer sein')
-    if (!shared()) return ProjectsService.approveGate(id, projectId, trimmed)
+    if (!shared()) return fixLocalPhase(await ProjectsService.approveGate(id, projectId, trimmed))
     const { data: current, error: cErr } = await supabase.from('project_phases')
       .select('gate_state').eq('id', id).single()
     if (cErr) fail(cErr)
@@ -184,7 +204,7 @@ export const ProjectsGateway = {
   },
 
   async updateDeliverables(id: string, projectId: string, deliverables: Deliverable[]): Promise<ProjectPhase> {
-    if (!shared()) return ProjectsService.updateDeliverables(id, projectId, JSON.stringify(deliverables))
+    if (!shared()) return fixLocalPhase(await ProjectsService.updateDeliverables(id, projectId, JSON.stringify(deliverables)))
     const { data, error } = await supabase.from('project_phases')
       .update({ deliverables }).eq('id', id).eq('project_id', projectId)
       .select('*').single()
@@ -193,7 +213,7 @@ export const ProjectsGateway = {
   },
 
   async updateAssignees(id: string, projectId: string, assigneeIds: string[]): Promise<ProjectPhase> {
-    if (!shared()) return ProjectsService.updateAssignees(id, projectId, JSON.stringify(assigneeIds))
+    if (!shared()) return fixLocalPhase(await ProjectsService.updateAssignees(id, projectId, JSON.stringify(assigneeIds)))
     const { data, error } = await supabase.from('project_phases')
       .update({ assignee_ids: assigneeIds }).eq('id', id).eq('project_id', projectId)
       .select('*').single()

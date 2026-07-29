@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema/desktop-schema.json",
+  "identifier": "overlay-capability",
+  "description": "Permissions fuer das Schnappschuss-Aufnahme-Overlay-Fenster",
+  "windows": ["snip-overlay"],
+  "permissions": [
+    "core:default"
+  ]
+}
