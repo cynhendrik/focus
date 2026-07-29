@@ -193,6 +193,7 @@ fn main() {
             app.manage(sync_state.clone());
             app.manage(db_pool.clone());
             app.manage(CloseToTray(AtomicBool::new(true)));
+            app.manage(commands::screen_snip::SnipSession(std::sync::Mutex::new(None)));
 
             // Legacy email DB — kept until Phase 4 email migration
             let email_db_path = data_dir.join("emails.db");
@@ -276,6 +277,10 @@ fn main() {
             cmd_update_tray_status,
             commands::account::get_accounts,
             commands::account::upsert_account,
+            commands::screen_snip::cmd_start_screen_snip,
+            commands::screen_snip::cmd_get_snip_background,
+            commands::screen_snip::cmd_finish_screen_snip,
+            commands::screen_snip::cmd_cancel_screen_snip,
             commands::account::delete_account,
             commands::account::cmd_set_primary_deal,
             commands::account::cmd_set_account_archived,
