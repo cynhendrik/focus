@@ -231,3 +231,26 @@ describe('prepareReminder: Kontakt-Lookup-Fehler', () => {
     warnSpy.mockRestore()
   })
 })
+
+describe('sendReminder: Protokollbuch-Fehler', () => {
+  it('gibt eine Warnung zurueck wenn die Aktivitaet nicht protokolliert werden konnte, Versand zaehlt trotzdem als ok', async () => {
+    const { sendReminder } = await import('./dunning.service')
+    const { useMailStore } = await import('@/store/mail.store')
+    const { useAccountsStore } = await import('@/store/accounts.store')
+    const { MailService } = await import('@/services/mail.service')
+    const { ActivitiesGateway } = await import('@/data/activities.gateway')
+    const { ContactsGateway } = await import('@/data/contacts.gateway')
+
+    useMailStore.setState({ accounts: [{ id: 'mail1' }] } as never)
+    useAccountsStore.setState({ accounts: [] } as never) // kein PDF-Block noetig
+    vi.mocked(ContactsGateway.getByAccount).mockResolvedValueOnce([{ email: 'x@y.de' }] as never)
+    vi.spyOn(MailService, 'sendEmail').mockResolvedValueOnce(undefined as never)
+    vi.spyOn(ActivitiesGateway, 'create').mockRejectedValueOnce(new Error('offline'))
+
+    const invoice = { id: 'inv1', accountId: 'accX', number: 'R-1', dueDate: '2026-06-01', total: 100, status: 'overdue' } as never
+    const result = await sendReminder(invoice, 0)
+
+    expect(result.ok).toBe(true)
+    expect(result.warning).toBe('Mahnung gesendet, aber nicht im Kundenverlauf protokolliert.')
+  })
+})

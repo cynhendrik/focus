@@ -269,6 +269,7 @@ export async function sendReminder(invoice: Invoice, level: number, opts?: { bod
     })
   } catch (protoErr) {
     log.warn('reminder protocol activity failed', { invoiceId: invoice.id, protoErr })
+    return { invoiceId: invoice.id, ok: true, warning: 'Mahnung gesendet, aber nicht im Kundenverlauf protokolliert.' }
   }
   return { invoiceId: invoice.id, ok: true }
 }
